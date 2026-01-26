@@ -1,8 +1,91 @@
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import Tabs from "../components/Tabs"
 import styles from "./Stake.module.css"
+import { useWallet } from "../app/wallet/WalletProvider"
+import {
+  fetchDelegations,
+  fetchRewards,
+  fetchUnbonding,
+  fetchValidators
+} from "../app/data/classic"
+import { formatPercent, formatTokenAmount, sumAmounts } from "../app/utils/format"
+import { CLASSIC_DENOMS } from "../app/chain"
 
 const Stake = () => {
+  const { account } = useWallet()
+
+  const { data: delegations = [] } = useQuery({
+    queryKey: ["delegations", account?.address],
+    queryFn: () => fetchDelegations(account?.address ?? ""),
+    enabled: Boolean(account?.address)
+  })
+
+  const { data: rewards = [] } = useQuery({
+    queryKey: ["rewards", account?.address],
+    queryFn: () => fetchRewards(account?.address ?? ""),
+    enabled: Boolean(account?.address)
+  })
+
+  const { data: unbonding = [] } = useQuery({
+    queryKey: ["unbonding", account?.address],
+    queryFn: () => fetchUnbonding(account?.address ?? ""),
+    enabled: Boolean(account?.address)
+  })
+
+  const { data: validators = [] } = useQuery({
+    queryKey: ["validators"],
+    queryFn: fetchValidators,
+    staleTime: 60_000
+  })
+
+  const delegatedAmount = useMemo(() => {
+    const amounts = delegations
+      .map((item) => item.balance)
+      .filter((balance) => balance?.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom)
+      .map((balance) => balance?.amount)
+    return sumAmounts(amounts)
+  }, [delegations])
+
+  const rewardAmount = useMemo(() => {
+    const reward = rewards.find(
+      (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+    )
+    return reward?.amount
+  }, [rewards])
+
+  const unbondingAmount = useMemo(() => {
+    const amounts = unbonding.flatMap((item) =>
+      item.entries?.map((entry) => entry.balance) ?? []
+    )
+    return sumAmounts(amounts)
+  }, [unbonding])
+
+  const delegationsDisplay = account
+    ? `${formatTokenAmount(
+        delegatedAmount,
+        CLASSIC_DENOMS.lunc.coinDecimals,
+        2
+      )} LUNC`
+    : "--"
+  const rewardsDisplay = account
+    ? `${formatTokenAmount(
+        rewardAmount,
+        CLASSIC_DENOMS.lunc.coinDecimals,
+        2
+      )} LUNC`
+    : "--"
+  const unbondingDisplay = account
+    ? `${formatTokenAmount(
+        unbondingAmount,
+        CLASSIC_DENOMS.lunc.coinDecimals,
+        2
+      )} LUNC`
+    : "--"
+
+  const quickValidators = validators.slice(0, 3)
+  const manualValidators = validators.slice(0, 6)
   const tabs = [
     {
       key: "quick",
@@ -15,12 +98,27 @@ const Stake = () => {
             </div>
             <div className="cardDivider" />
             <div className="list dense">
-              {["Burrito Node", "Allnodes", "Classic Labs"].map((name) => (
-                <div key={name} className="listRow">
-                  <strong>{name}</strong>
-                  <span>APR --</span>
-                </div>
-              ))}
+              {quickValidators.length
+                ? quickValidators.map((validator) => {
+                    const rate = Number(
+                      validator.commission?.commission_rates?.rate ?? 0
+                    )
+                    return (
+                      <div
+                        key={validator.operator_address}
+                        className="listRow"
+                      >
+                        <strong>{validator.description?.moniker ?? "--"}</strong>
+                        <span>Commission {formatPercent(rate * 100)}</span>
+                      </div>
+                    )
+                  })
+                : ["Burrito Node", "Allnodes", "Classic Labs"].map((name) => (
+                    <div key={name} className="listRow">
+                      <strong>{name}</strong>
+                      <span>Commission --</span>
+                    </div>
+                  ))}
             </div>
           </div>
         </div>
@@ -37,12 +135,27 @@ const Stake = () => {
             </div>
             <div className="cardDivider" />
             <div className="list dense">
-              {["Validator A", "Validator B", "Validator C"].map((name) => (
-                <div key={name} className="listRow">
-                  <strong>{name}</strong>
-                  <span>Commission --</span>
-                </div>
-              ))}
+              {manualValidators.length
+                ? manualValidators.map((validator) => {
+                    const rate = Number(
+                      validator.commission?.commission_rates?.rate ?? 0
+                    )
+                    return (
+                      <div
+                        key={validator.operator_address}
+                        className="listRow"
+                      >
+                        <strong>{validator.description?.moniker ?? "--"}</strong>
+                        <span>Commission {formatPercent(rate * 100)}</span>
+                      </div>
+                    )
+                  })
+                : ["Validator A", "Validator B", "Validator C"].map((name) => (
+                    <div key={name} className="listRow">
+                      <strong>{name}</strong>
+                      <span>Commission --</span>
+                    </div>
+                  ))}
             </div>
           </div>
         </div>
@@ -82,11 +195,11 @@ const Stake = () => {
             </div>
             <div className={styles.chartMeta}>
               <div>
-                <strong>--</strong>
+                <strong>{delegationsDisplay}</strong>
                 <span>Delegated</span>
               </div>
               <div>
-                <strong>--</strong>
+                <strong>{rewardsDisplay}</strong>
                 <span>Rewards</span>
               </div>
             </div>
@@ -100,9 +213,9 @@ const Stake = () => {
           <div className="cardDivider" />
           <div className="list dense">
             {[
-              ["Delegations", "--"],
-              ["Rewards", "--"],
-              ["Unbonding", "--"],
+              ["Delegations", delegationsDisplay],
+              ["Rewards", rewardsDisplay],
+              ["Unbonding", unbondingDisplay],
               ["APR", "--"]
             ].map(([label, value]) => (
               <div key={label} className="listRow">

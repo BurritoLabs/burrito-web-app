@@ -624,31 +624,9 @@
   border-color: rgba(255, 255, 255, 0.35);
 }
 
-.buyMeta {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(234, 245, 235, 0.5);
-}
-
-.buyList {
-  display: grid;
-  gap: 8px;
-}
-
-.buyRow {
-  text-align: left;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(234, 245, 235, 0.8);
-  font-size: 12px;
-}
-
-.buyRow:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+.addressButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .assetDetailHeader {

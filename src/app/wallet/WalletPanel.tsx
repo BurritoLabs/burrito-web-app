@@ -1,6 +1,16 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { SVGProps } from "react"
 import styles from "./WalletPanel.module.css"
+import { useWallet } from "./WalletProvider"
+import { useQuery } from "@tanstack/react-query"
+import { CLASSIC_DENOMS } from "../chain"
+import { fetchBalances, fetchPrices } from "../data/classic"
+import {
+  formatPercent,
+  formatTokenAmount,
+  formatUsd,
+  toUnitAmount
+} from "../utils/format"
 
 type IconProps = SVGProps<SVGSVGElement>
 
@@ -60,18 +70,6 @@ const ReceiveIcon = (props: IconProps) => (
   </svg>
 )
 
-const BuyIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...props}>
-    <path
-      d="M12 5v14M5 12h14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
 const ManageIcon = (props: IconProps) => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" {...props}>
     <path
@@ -107,21 +105,85 @@ const PriceDownIcon = (props: IconProps) => (
 )
 
 const WalletPanel = () => {
+  const { account } = useWallet()
   const [isOpen, setIsOpen] = useState(
     typeof window !== "undefined" && window.innerWidth > 992
   )
-  const [view, setView] = useState<
-    "wallet" | "send" | "receive" | "asset" | "buy"
-  >("wallet")
+  const [view, setView] = useState<"wallet" | "send" | "receive" | "asset">(
+    "wallet"
+  )
   const [selectedAsset, setSelectedAsset] = useState({
     symbol: "LUNC",
-    name: "Terra Classic"
+    name: "Terra Classic",
+    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
   })
+
+  const { data: balances = [] } = useQuery({
+    queryKey: ["balances", account?.address],
+    queryFn: () => fetchBalances(account?.address ?? ""),
+    enabled: Boolean(account?.address)
+  })
+
+  const { data: prices } = useQuery({
+    queryKey: ["prices"],
+    queryFn: fetchPrices,
+    staleTime: 60_000,
+    refetchInterval: 120_000
+  })
+
+  const getBalance = useMemo(() => {
+    const map = new Map(balances.map((coin) => [coin.denom, coin.amount]))
+    return (denom: string) => map.get(denom)
+  }, [balances])
+
+  const luncAmount = getBalance(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+  const ustcAmount = getBalance(CLASSIC_DENOMS.ustc.coinMinimalDenom)
+  const luncPrice = prices?.lunc?.usd
+  const ustcPrice = prices?.ustc?.usd
+  const luncChange = prices?.lunc?.usd_24h_change
+  const ustcChange = prices?.ustc?.usd_24h_change
+
+  const luncValue =
+    luncPrice !== undefined
+      ? toUnitAmount(luncAmount, CLASSIC_DENOMS.lunc.coinDecimals) * luncPrice
+      : undefined
+  const ustcValue =
+    ustcPrice !== undefined
+      ? toUnitAmount(ustcAmount, CLASSIC_DENOMS.ustc.coinDecimals) * ustcPrice
+      : undefined
+  const netWorth =
+    luncValue !== undefined || ustcValue !== undefined
+      ? (luncValue ?? 0) + (ustcValue ?? 0)
+      : undefined
+
+  const selectedBalance = getBalance(selectedAsset.denom)
+  const selectedDecimals =
+    selectedAsset.symbol === "USTC"
+      ? CLASSIC_DENOMS.ustc.coinDecimals
+      : CLASSIC_DENOMS.lunc.coinDecimals
+  const selectedPrice =
+    selectedAsset.symbol === "USTC" ? ustcPrice : luncPrice
+  const selectedValue =
+    selectedPrice !== undefined
+      ? toUnitAmount(selectedBalance, selectedDecimals) * selectedPrice
+      : undefined
+  const selectedAmountDisplay = formatTokenAmount(
+    selectedBalance,
+    selectedDecimals,
+    2
+  )
 
   useEffect(() => {
     if (typeof window === "undefined") return
     if (window.innerWidth > 992) setIsOpen(true)
   }, [])
+
+  const handleCopy = (value: string) => {
+    if (!account) return
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(value).catch(() => {})
+    }
+  }
 
   const renderDetails = () => {
     if (view === "asset") {
@@ -131,9 +193,11 @@ const WalletPanel = () => {
             <div className={styles.assetBadgeLarge}>
               {selectedAsset.symbol.slice(0, 1)}
             </div>
-            <div className={styles.assetDetailValue}>$0.00</div>
+            <div className={styles.assetDetailValue}>
+              {account ? formatUsd(selectedValue) : "--"}
+            </div>
             <div className={styles.assetDetailAmount}>
-              0.00 {selectedAsset.symbol}
+              {account ? `${selectedAmountDisplay} ${selectedAsset.symbol}` : "--"}
             </div>
           </div>
         </div>
@@ -147,7 +211,9 @@ const WalletPanel = () => {
         <div className={styles.networthHeader}>
           <div>
             <div className={styles.kicker}>Portfolio value</div>
-            <div className={styles.networthValue}>$0.00</div>
+            <div className={styles.networthValue}>
+              {account ? formatUsd(netWorth) : "--"}
+            </div>
           </div>
         </div>
 
@@ -171,16 +237,6 @@ const WalletPanel = () => {
               <ReceiveIcon />
             </button>
             <span>Receive</span>
-          </div>
-          <div className={styles.actionItem}>
-            <button
-              className={styles.actionButton}
-              type="button"
-              onClick={() => setView("buy")}
-            >
-              <BuyIcon />
-            </button>
-            <span>Buy</span>
           </div>
         </div>
       </div>
@@ -210,9 +266,6 @@ const WalletPanel = () => {
                 >
                   Classic
                 </button>
-                <button className={styles.chainPill} type="button">
-                  Testnet
-                </button>
               </div>
             </div>
             <div className={styles.formField}>
@@ -232,7 +285,16 @@ const WalletPanel = () => {
                   LUNC
                 </button>
               </div>
-              <div className={styles.fieldHint}>Available: --</div>
+              <div className={styles.fieldHint}>
+                Available:{" "}
+                {account
+                  ? `${formatTokenAmount(
+                      luncAmount,
+                      CLASSIC_DENOMS.lunc.coinDecimals,
+                      2
+                    )} LUNC`
+                  : "--"}
+              </div>
             </div>
             <div className={styles.formField}>
               <label>Memo (optional)</label>
@@ -258,6 +320,7 @@ const WalletPanel = () => {
     }
 
     if (view === "receive") {
+      const address = account?.address ?? "Connect wallet"
       return (
         <div className={`${styles.formPanel} ${styles.receivePanel}`}>
           <h1 className={styles.formTitleLarge}>Receive</h1>
@@ -271,8 +334,7 @@ const WalletPanel = () => {
           </div>
           <div className={styles.addressTable}>
             {[
-              { chain: "Terra Classic", address: "terra1..." },
-              { chain: "Classic Testnet", address: "terra1..." }
+              { chain: "Terra Classic", address }
             ].map((row) => (
               <div key={row.chain} className={styles.addressRow}>
                 <div className={styles.addressChain}>
@@ -280,39 +342,16 @@ const WalletPanel = () => {
                   <span>{row.chain}</span>
                 </div>
                 <div className={styles.addressValue}>{row.address}</div>
-                <button className={styles.addressButton} type="button">
+                <button
+                  className={styles.addressButton}
+                  type="button"
+                  disabled={!account}
+                  onClick={() => handleCopy(row.address)}
+                >
                   Copy
                 </button>
               </div>
             ))}
-          </div>
-        </div>
-      )
-    }
-
-    if (view === "buy") {
-      return (
-        <div className={`${styles.formPanel} ${styles.receivePanel}`}>
-          <h1 className={styles.formTitleLarge}>Buy</h1>
-          <div className={styles.formCard}>
-            <div className={styles.formHeader}>
-              <div className={styles.formTitle}>Buy LUNC</div>
-              <div className={styles.buyMeta}>Fiat on-ramp</div>
-            </div>
-            <div className={styles.buyList}>
-              <button className={styles.buyRow} type="button">
-                Kado - Open
-              </button>
-              <button className={styles.buyRow} type="button">
-                Transak - Open
-              </button>
-              <button className={styles.buyRow} type="button">
-                MoonPay - Open
-              </button>
-            </div>
-            <button className="uiButton uiButtonOutline" type="button">
-              Learn more
-            </button>
           </div>
         </div>
       )
@@ -328,8 +367,13 @@ const WalletPanel = () => {
               </div>
               <div className={styles.chainSectionList}>
                 {[
-                  { name: "columbus-5", value: "--", amount: "--" },
-                  { name: "classic-testnet", value: "--", amount: "--" }
+                  {
+                    name: "columbus-5",
+                    value: account ? formatUsd(selectedValue) : "--",
+                    amount: account
+                      ? `${selectedAmountDisplay} ${selectedAsset.symbol}`
+                      : "--"
+                  }
                 ].map((row) => (
                   <div key={row.name} className={styles.chainRowItem}>
                     <div className={styles.chainRowHeader}>
@@ -360,7 +404,11 @@ const WalletPanel = () => {
           <div
             className={styles.assetRow}
             onClick={() => {
-              setSelectedAsset({ symbol: "LUNC", name: "Terra Classic" })
+              setSelectedAsset({
+                symbol: "LUNC",
+                name: "Terra Classic",
+                denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+              })
               setView("asset")
             }}
           >
@@ -372,16 +420,30 @@ const WalletPanel = () => {
                     <span className={styles.assetSymbolName}>LUNC</span>
                     <span className={styles.chainCount}>1</span>
                   </div>
-                  <div className={styles.assetPrice}>$0.00</div>
+                  <div className={styles.assetPrice}>
+                    {formatUsd(luncPrice)}
+                  </div>
                 </div>
                 <div className={styles.assetBottomRow}>
                   <div
-                    className={`${styles.assetChange} ${styles.assetChangeUp}`}
+                    className={`${styles.assetChange} ${
+                      (luncChange ?? 0) >= 0
+                        ? styles.assetChangeUp
+                        : styles.assetChangeDown
+                    }`}
                   >
-                    <PriceUpIcon />
-                    +0.00%
+                    {(luncChange ?? 0) >= 0 ? <PriceUpIcon /> : <PriceDownIcon />}
+                    {formatPercent(luncChange)}
                   </div>
-                  <div className={styles.assetAmount}>0.00 LUNC</div>
+                  <div className={styles.assetAmount}>
+                    {account
+                      ? `${formatTokenAmount(
+                          luncAmount,
+                          CLASSIC_DENOMS.lunc.coinDecimals,
+                          2
+                        )} LUNC`
+                      : "--"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -389,7 +451,11 @@ const WalletPanel = () => {
           <div
             className={styles.assetRow}
             onClick={() => {
-              setSelectedAsset({ symbol: "USTC", name: "Stablecoin" })
+              setSelectedAsset({
+                symbol: "USTC",
+                name: "Stablecoin",
+                denom: CLASSIC_DENOMS.ustc.coinMinimalDenom
+              })
               setView("asset")
             }}
           >
@@ -401,16 +467,30 @@ const WalletPanel = () => {
                     <span className={styles.assetSymbolName}>USTC</span>
                     <span className={styles.chainCount}>1</span>
                   </div>
-                  <div className={styles.assetPrice}>$0.00</div>
+                  <div className={styles.assetPrice}>
+                    {formatUsd(ustcPrice)}
+                  </div>
                 </div>
                 <div className={styles.assetBottomRow}>
                   <div
-                    className={`${styles.assetChange} ${styles.assetChangeDown}`}
+                    className={`${styles.assetChange} ${
+                      (ustcChange ?? 0) >= 0
+                        ? styles.assetChangeUp
+                        : styles.assetChangeDown
+                    }`}
                   >
-                    <PriceDownIcon />
-                    -0.00%
+                    {(ustcChange ?? 0) >= 0 ? <PriceUpIcon /> : <PriceDownIcon />}
+                    {formatPercent(ustcChange)}
                   </div>
-                  <div className={styles.assetAmount}>0.00 USTC</div>
+                  <div className={styles.assetAmount}>
+                    {account
+                      ? `${formatTokenAmount(
+                          ustcAmount,
+                          CLASSIC_DENOMS.ustc.coinDecimals,
+                          2
+                        )} USTC`
+                      : "--"}
+                  </div>
                 </div>
               </div>
             </div>

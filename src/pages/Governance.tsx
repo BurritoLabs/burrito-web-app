@@ -1,13 +1,95 @@
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import Tabs from "../components/Tabs"
 import styles from "./Governance.module.css"
+import { fetchProposals, ProposalItem } from "../app/data/classic"
+import {
+  formatPercent,
+  formatTimestamp,
+  formatTokenAmount
+} from "../app/utils/format"
+import { CLASSIC_DENOMS } from "../app/chain"
 
 const Governance = () => {
-  const votingProposals = [
-    { id: 112, type: "Text", title: "Upgrade roadmap" },
-    { id: 113, type: "Parameter", title: "Validator incentives" },
-    { id: 114, type: "Community", title: "Community pool" }
-  ]
+  const { data: proposals = [] } = useQuery({
+    queryKey: ["proposals"],
+    queryFn: fetchProposals,
+    staleTime: 60_000
+  })
+
+  const normalized = useMemo(() => {
+    const groups: Record<string, ProposalItem[]> = {
+      voting: [],
+      deposit: [],
+      passed: [],
+      rejected: []
+    }
+
+    proposals.forEach((proposal) => {
+      const status = String(proposal.status).toUpperCase()
+      if (status.includes("VOTING")) groups.voting.push(proposal)
+      else if (status.includes("DEPOSIT")) groups.deposit.push(proposal)
+      else if (status.includes("PASSED")) groups.passed.push(proposal)
+      else if (status.includes("REJECTED")) groups.rejected.push(proposal)
+    })
+
+    return groups
+  }, [proposals])
+
+  const renderProposal = (
+    proposal: ProposalItem,
+    statusLabel: string,
+    statusClass: string,
+    actionLabel?: string
+  ) => {
+    const depositDisplay = formatTokenAmount(
+      proposal.deposit,
+      CLASSIC_DENOMS.lunc.coinDecimals,
+      2
+    )
+    const tally = proposal.finalTally
+    const totalVotes = tally
+      ? Number(tally.yes) +
+        Number(tally.no) +
+        Number(tally.abstain) +
+        Number(tally.noWithVeto)
+      : 0
+    const yes = tally && totalVotes > 0 ? formatPercent((Number(tally.yes) / totalVotes) * 100) : "--"
+
+    return (
+      <div key={proposal.id} className={`card ${styles.proposalCard}`}>
+        <div className={styles.proposalTagRow}>
+          <span className={styles.proposalTag}>#{proposal.id}</span>
+          <span className={`${styles.statusPill} ${statusClass}`}>
+            {statusLabel}
+          </span>
+        </div>
+        <div className={styles.proposalHeader}>
+          <div>
+            <strong>{proposal.title}</strong>
+            <span>
+              {proposal.votingEndTime
+                ? `Voting ends ${formatTimestamp(proposal.votingEndTime)}`
+                : proposal.submitTime
+                  ? `Submitted ${formatTimestamp(proposal.submitTime)}`
+                  : "Status update --"}
+            </span>
+          </div>
+          {actionLabel ? (
+            <button className="uiButton uiButtonOutline" type="button">
+              {actionLabel}
+            </button>
+          ) : null}
+        </div>
+        <div className={styles.proposalMeta}>
+          <span>Deposit: {depositDisplay} LUNC</span>
+          <span>Yes: {yes}</span>
+          <span>Quorum: --</span>
+        </div>
+      </div>
+    )
+  }
 
   const tabs = [
     {
@@ -15,35 +97,25 @@ const Governance = () => {
       label: "Voting",
       content: (
         <div className={styles.proposals}>
-          {votingProposals.map((proposal) => (
-            <div
-              key={proposal.id}
-              className={`card ${styles.proposalCard}`}
-            >
-              <div className={styles.proposalTagRow}>
-                <span className={styles.proposalTag}>
-                  #{proposal.id} | {proposal.type}
-                </span>
-                <span className={`${styles.statusPill} ${styles.statusVoting}`}>
-                  Voting
-                </span>
-              </div>
-              <div className={styles.proposalHeader}>
-                <div>
-                  <strong>{proposal.title}</strong>
-                  <span>Voting period - 7d left</span>
-                </div>
-                <button className="uiButton uiButtonOutline" type="button">
-                  Vote
-                </button>
-              </div>
-              <div className={styles.proposalMeta}>
-                <span>Deposit: --</span>
-                <span>Quorum: --</span>
-                <span>Yes: --</span>
-              </div>
-            </div>
-          ))}
+          {normalized.voting.length
+            ? normalized.voting.map((proposal) =>
+                renderProposal(
+                  proposal,
+                  "Voting",
+                  styles.statusVoting,
+                  "Vote"
+                )
+              )
+            : renderProposal(
+                {
+                  id: "--",
+                  status: "",
+                  title: "No voting proposals",
+                  deposit: "0"
+                },
+                "Voting",
+                styles.statusVoting
+              )}
         </div>
       )
     },
@@ -52,28 +124,25 @@ const Governance = () => {
       label: "Deposit",
       content: (
         <div className={styles.proposals}>
-          <div className={`card ${styles.proposalCard}`}>
-            <div className={styles.proposalTagRow}>
-              <span className={styles.proposalTag}>#115 | Community</span>
-              <span className={`${styles.statusPill} ${styles.statusDeposit}`}>
-                Deposit
-              </span>
-            </div>
-            <div className={styles.proposalHeader}>
-              <div>
-                <strong>Community pool refill</strong>
-                <span>Deposit period - 3d left</span>
-              </div>
-              <button className="uiButton uiButtonOutline" type="button">
-                Deposit
-              </button>
-            </div>
-            <div className={styles.proposalMeta}>
-              <span>Deposit: --</span>
-              <span>Required: --</span>
-              <span>Yes: --</span>
-            </div>
-          </div>
+          {normalized.deposit.length
+            ? normalized.deposit.map((proposal) =>
+                renderProposal(
+                  proposal,
+                  "Deposit",
+                  styles.statusDeposit,
+                  "Deposit"
+                )
+              )
+            : renderProposal(
+                {
+                  id: "--",
+                  status: "",
+                  title: "No deposit proposals",
+                  deposit: "0"
+                },
+                "Deposit",
+                styles.statusDeposit
+              )}
         </div>
       )
     },
@@ -82,25 +151,20 @@ const Governance = () => {
       label: "Passed",
       content: (
         <div className={styles.proposals}>
-          <div className={`card ${styles.proposalCard}`}>
-            <div className={styles.proposalTagRow}>
-              <span className={styles.proposalTag}>#101 | Text</span>
-              <span className={`${styles.statusPill} ${styles.statusPassed}`}>
-                Passed
-              </span>
-            </div>
-            <div className={styles.proposalHeader}>
-              <div>
-                <strong>Validator rewards update</strong>
-                <span>Passed - 2d ago</span>
-              </div>
-            </div>
-            <div className={styles.proposalMeta}>
-              <span>Yes: --</span>
-              <span>No: --</span>
-              <span>Abstain: --</span>
-            </div>
-          </div>
+          {normalized.passed.length
+            ? normalized.passed.map((proposal) =>
+                renderProposal(proposal, "Passed", styles.statusPassed)
+              )
+            : renderProposal(
+                {
+                  id: "--",
+                  status: "",
+                  title: "No passed proposals",
+                  deposit: "0"
+                },
+                "Passed",
+                styles.statusPassed
+              )}
         </div>
       )
     },
@@ -109,25 +173,20 @@ const Governance = () => {
       label: "Rejected",
       content: (
         <div className={styles.proposals}>
-          <div className={`card ${styles.proposalCard}`}>
-            <div className={styles.proposalTagRow}>
-              <span className={styles.proposalTag}>#097 | Parameter</span>
-              <span className={`${styles.statusPill} ${styles.statusRejected}`}>
-                Rejected
-              </span>
-            </div>
-            <div className={styles.proposalHeader}>
-              <div>
-                <strong>Reduce gas fees</strong>
-                <span>Rejected - 1w ago</span>
-              </div>
-            </div>
-            <div className={styles.proposalMeta}>
-              <span>No: --</span>
-              <span>Yes: --</span>
-              <span>Abstain: --</span>
-            </div>
-          </div>
+          {normalized.rejected.length
+            ? normalized.rejected.map((proposal) =>
+                renderProposal(proposal, "Rejected", styles.statusRejected)
+              )
+            : renderProposal(
+                {
+                  id: "--",
+                  status: "",
+                  title: "No rejected proposals",
+                  deposit: "0"
+                },
+                "Rejected",
+                styles.statusRejected
+              )}
         </div>
       )
     }

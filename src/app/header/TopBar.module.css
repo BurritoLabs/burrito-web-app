@@ -96,6 +96,11 @@
   letter-spacing: -0.01em;
 }
 
+.connected {
+  color: #52c41a;
+  border-color: rgba(82, 196, 26, 0.6);
+}
+
 .latestTx {
   position: absolute;
   top: calc(100% + var(--grid-gap));

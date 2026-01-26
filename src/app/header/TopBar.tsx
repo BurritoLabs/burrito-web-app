@@ -1,4 +1,7 @@
+import { useState } from "react"
 import styles from "./TopBar.module.css"
+import ConnectModal from "../wallet/ConnectModal"
+import { useWallet } from "../wallet/WalletProvider"
 
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -65,6 +68,12 @@ type TopBarProps = {
 }
 
 const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
+  const { account } = useWallet()
+  const [connectOpen, setConnectOpen] = useState(false)
+  const connectLabel = account
+    ? `${account.address.slice(0, 6)}...${account.address.slice(-4)}`
+    : "Connect"
+
   return (
     <div className={styles.bar}>
       <div className={styles.status}>
@@ -102,10 +111,13 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
           Validator
         </button>
         <button
-          className={`uiButton uiButtonOutline ${styles.connectButton}`}
+          className={`uiButton uiButtonOutline ${styles.connectButton} ${
+            account ? styles.connected : ""
+          }`}
           type="button"
+          onClick={() => setConnectOpen(true)}
         >
-          Connect
+          {connectLabel}
         </button>
         <button
           className={styles.menuButton}
@@ -127,6 +139,8 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
           <div className={styles.latestHash}>Waiting for activity</div>
         </div>
       </div>
+
+      <ConnectModal open={connectOpen} onClose={() => setConnectOpen(false)} />
     </div>
   )
 }
