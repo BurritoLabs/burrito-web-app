@@ -104,6 +104,16 @@ const PriceDownIcon = (props: IconProps) => (
   </svg>
 )
 
+type AssetDenom =
+  | typeof CLASSIC_DENOMS.lunc.coinMinimalDenom
+  | typeof CLASSIC_DENOMS.ustc.coinMinimalDenom
+
+type SelectedAsset = {
+  symbol: "LUNC" | "USTC"
+  name: string
+  denom: AssetDenom
+}
+
 const WalletPanel = () => {
   const { account } = useWallet()
   const [isOpen, setIsOpen] = useState(
@@ -112,7 +122,7 @@ const WalletPanel = () => {
   const [view, setView] = useState<"wallet" | "send" | "receive" | "asset">(
     "wallet"
   )
-  const [selectedAsset, setSelectedAsset] = useState({
+  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset>({
     symbol: "LUNC",
     name: "Terra Classic",
     denom: CLASSIC_DENOMS.lunc.coinMinimalDenom

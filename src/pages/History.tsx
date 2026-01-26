@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./History.module.css"
 import { useWallet } from "../app/wallet/WalletProvider"
-import { fetchTxs, TxItem } from "../app/data/classic"
+import { fetchTxs } from "../app/data/classic"
+import type { TxItem } from "../app/data/classic"
 import { formatTimestamp, truncateHash } from "../app/utils/format"
 
 const formatTxType = (tx: TxItem) => {

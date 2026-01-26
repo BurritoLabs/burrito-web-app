@@ -19,7 +19,7 @@ type WalletAccount = {
 type WalletConnector = {
   id: WalletConnectorId
   label: string
-  type: "extension"
+  type: "extension" | "mobile"
   available: boolean
 }
 
@@ -39,15 +39,17 @@ type InjectedWallet = {
   experimentalSuggestChain?: (config: unknown) => Promise<void>
 }
 
+type InjectedWallets = {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+}
+
 const WalletContext = createContext<WalletContextValue | undefined>(undefined)
 
-const getInjectedWallets = () => {
+const getInjectedWallets = (): InjectedWallets => {
   if (typeof window === "undefined") return {}
-  return window as Window & {
-    keplr?: InjectedWallet
-    station?: InjectedWallet
-    galaxyStation?: InjectedWallet
-  }
+  return window as Window & InjectedWallets
 }
 
 const formatWalletError = (error: unknown) =>

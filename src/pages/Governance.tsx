@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import Tabs from "../components/Tabs"
 import styles from "./Governance.module.css"
-import { fetchProposals, ProposalItem } from "../app/data/classic"
+import { fetchProposals } from "../app/data/classic"
+import type { ProposalItem } from "../app/data/classic"
 import {
   formatPercent,
   formatTimestamp,

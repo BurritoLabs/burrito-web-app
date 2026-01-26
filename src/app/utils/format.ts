@@ -55,7 +55,7 @@ export const formatTimestamp = (timestamp: string | undefined) => {
 }
 
 export const sumAmounts = (amounts: Array<string | number | undefined>) =>
-  amounts.reduce((total, item) => {
+  amounts.reduce<number>((total, item) => {
     if (item === undefined || item === null || item === "") return total
     const value = typeof item === "string" ? Number(item) : item
     if (!Number.isFinite(value)) return total
