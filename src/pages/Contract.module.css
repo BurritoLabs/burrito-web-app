@@ -1,0 +1,127 @@
+.contract {
+  display: grid;
+  background-color: var(--card-bg);
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.contractSearch {
+  padding: 20px var(--main-padding);
+}
+
+.contractBody {
+  background-color: var(--card-bg-muted);
+  padding: 20px var(--main-padding);
+  border-top: var(--border-width) solid var(--card-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.searchField {
+  position: relative;
+  margin: 0;
+}
+
+.searchInput {
+  width: 100%;
+  height: var(--input-height);
+  background: var(--card-bg-muted);
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  padding-left: 50px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.resultCard {
+  display: grid;
+  gap: 16px;
+}
+
+.stateCard {
+  display: grid;
+  gap: 12px;
+  place-items: center;
+  text-align: center;
+  color: rgba(234, 245, 235, 0.7);
+  padding: 32px;
+}
+
+.stateIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(234, 245, 235, 0.7);
+}
+
+.stateIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.stateText {
+  font-size: 13px;
+}
+
+.resultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.resultHeader strong {
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.resultBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.resultBody div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.resultBody strong {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.resultFooter {
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .resultBody {
+    grid-template-columns: 1fr;
+  }
+}

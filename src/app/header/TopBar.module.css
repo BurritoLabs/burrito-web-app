@@ -2,8 +2,9 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   height: 100%;
+  position: relative;
 }
 
 .status {
@@ -14,86 +15,129 @@
 
 .menuButton {
   display: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 0;
+  background: transparent;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 0;
+  padding: 20px;
+  color: inherit;
 }
 
 .menuButton span {
   display: block;
-  width: 14px;
+  width: 18px;
   height: 2px;
-  background: rgba(234, 245, 235, 0.8);
+  background: currentColor;
   border-radius: 999px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.menuButton[data-open="true"] span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.menuButton[data-open="true"] span:nth-child(2) {
+  opacity: 0;
+}
+
+.menuButton[data-open="true"] span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
 }
 
 .networkChip {
-  padding: 0 12px;
-  height: var(--button-height-small);
-  line-height: var(--button-height-small);
-  border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: rgba(82, 196, 26, 0.18);
-  border: var(--border-width) solid rgba(82, 196, 26, 0.35);
-  color: #52c41a;
-}
-
-.heightPill {
-  padding: 0 12px;
-  height: var(--button-height-small);
-  line-height: var(--button-height-small);
-  border-radius: 12px;
-  font-size: 11px;
-  color: rgba(234, 245, 235, 0.76);
-  background: rgba(255, 255, 255, 0.06);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-}
-
-.heightPill strong {
-  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  background: rgba(82, 196, 26, 0.9);
+  color: #0c1411;
+  font-weight: 500;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto;
+  color: var(--menu-text);
 }
 
-.ghostButton {
-  color: rgba(234, 245, 235, 0.7);
-  height: var(--button-height-small);
-  padding: 0 20px;
-  border-radius: var(--button-radius);
-  font-size: 13px;
-  transition: border-color 0.2s ease, color 0.2s ease;
+.actionGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.ghostButton:hover {
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.3);
+.iconButton {
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  transition: opacity 0.2s ease;
 }
 
-.primaryButton {
+.iconButton:hover {
+  opacity: 1;
+}
+
+.validatorButton {
+  color: #52c41a;
+  background: transparent;
+}
+
+.connectButton {
   font-weight: 500;
-  letter-spacing: -0.02em;
-  box-shadow: 0 10px 24px rgba(82, 196, 26, 0.3);
-  transition: filter 0.2s ease;
+  letter-spacing: -0.01em;
 }
 
-.primaryButton:hover {
-  filter: brightness(1.02);
+.latestTx {
+  position: absolute;
+  top: calc(100% + var(--grid-gap));
+  right: var(--grid-gap);
+  z-index: 12;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  width: 240px;
+  background: var(--card-bg);
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  color: rgba(234, 245, 235, 0.85);
+  cursor: zoom-in;
 }
 
-@media (max-width: 1023px) {
+.latestTx[data-visible="true"] {
+  display: flex;
+}
+
+.latestIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(82, 196, 26, 0.15);
+  border: var(--border-width) solid rgba(82, 196, 26, 0.35);
+}
+
+.latestTitle {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.latestHash {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+@media (max-width: 991.98px) {
   .menuButton {
     display: inline-flex;
   }

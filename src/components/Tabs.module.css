@@ -1,0 +1,87 @@
+.container {
+  display: grid;
+  gap: 0;
+}
+
+.page {
+}
+
+.card {
+}
+
+.tabs {
+  display: flex;
+  background: var(--card-bg-muted);
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tab {
+  flex: 1;
+  height: 60px;
+  border-right: var(--border-width) solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: color 0.2s ease, background 0.2s ease;
+  padding: 0 30px;
+}
+
+.tab:last-child {
+  border-right: 0;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.active {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.content {
+  background: var(--card-bg);
+  border: var(--border-width) solid var(--card-border);
+  border-top: var(--border-width) solid transparent;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: 0;
+}
+
+.card .tabs {
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+}
+
+.card .content {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+@media (max-width: 600px) {
+  .tabs {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  .content {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    padding: 0;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .tab {
+    padding: 0;
+  }
+}

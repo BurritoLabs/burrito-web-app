@@ -1,0 +1,55 @@
+.aside {
+  padding: 28px 20px;
+  position: relative;
+  z-index: 10;
+}
+
+.links {
+  --gutter: 10px;
+}
+
+.tutorial {
+  border-bottom: var(--border-width) solid var(--menu-border);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--menu-text);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.75;
+  padding: var(--gutter) 0;
+  transition: opacity 0.2s ease;
+  width: 100%;
+}
+
+.link:hover {
+  opacity: 1;
+}
+
+.community {
+  display: flex;
+  gap: 10px;
+  margin: var(--gutter) 0;
+}
+
+.communityIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+
+.communityIcon:hover {
+  opacity: 1;
+}
+
+.communityIcon img {
+  width: 18px;
+  height: 18px;
+  display: block;
+  filter: brightness(0) invert(1);
+}

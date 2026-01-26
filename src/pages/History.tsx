@@ -1,37 +1,75 @@
 import PageShell from "./PageShell"
+import styles from "./History.module.css"
 
 const History = () => {
+  const items = [
+    {
+      title: "Swap LUNC -> USTC",
+      status: "success",
+      label: "Success",
+      time: "2m ago"
+    },
+    { title: "Stake LUNC", status: "pending", label: "Pending", time: "--" },
+    { title: "Send LUNC", status: "failed", label: "Failed", time: "1h ago" }
+  ] as const
+
   return (
-    <PageShell
-      title="History"
-      subtitle="Track every swap, transfer, and staking action across your Terra Classic wallet."
-      actionLabel="Export"
-    >
-      <div className="card">
-        <div className="cardHeader">
-          <div className="cardTitle">Recent activity</div>
-          <div className="pill">All chains</div>
+    <PageShell title="History">
+      <div className={styles.chainFilter}>
+        <div className={styles.chainPills}>
+          <button
+            className={`${styles.chainPill} ${styles.chainPillActive} ${styles.chainPillAll}`}
+            type="button"
+          >
+            All
+          </button>
+          <button className={styles.chainPill} type="button">
+            <span className={styles.chainPillIcon} aria-hidden="true" />
+            Terra Classic
+          </button>
         </div>
-        <div className="cardDivider" />
-        <div className="list tight">
-          {["Swap LUNC → USTC", "Stake LUNC", "Send LUNC"].map((item) => (
-            <div key={item} className="listRow">
-              <div>
-                <strong>{item}</strong>
-                <span>Awaiting wallet connection</span>
+        <div className={styles.list}>
+          {items.map((item) => (
+            <div key={item.title} className={`card ${styles.card}`}>
+              <div className={styles.header}>
+                <div className={styles.hash}>
+                  <span className={styles.chain}>
+                    <img
+                      src="/brand/icon.png"
+                      alt=""
+                      className={styles.chainIcon}
+                    />
+                    Terra Classic
+                  </span>
+                  <span className={styles.link}>TX#----</span>
+                </div>
+                <div className={styles.time}>
+                  <span className={styles.timeIcon} />
+                  {item.time}
+                </div>
               </div>
-              <div className="listMeta">--</div>
+              <div className={styles.messages}>
+                <div className={styles.message}>
+                  <span className={`${styles.tag} ${styles[item.status]}`}>
+                    {item.label}
+                  </span>
+                  <div className={styles.messageBody}>
+                    <strong>{item.title}</strong>
+                    <span>Details --</span>
+                  </div>
+                </div>
+              </div>
+              <div className={styles.footer}>
+                <dl className={styles.details}>
+                  <dt>Fee</dt>
+                  <dd>--</dd>
+                  <dt>Memo</dt>
+                  <dd>--</dd>
+                </dl>
+              </div>
             </div>
           ))}
         </div>
-      </div>
-      <div className="cardGrid three">
-        {["Total swaps", "Total transfers", "Staking txs"].map((label) => (
-          <div key={label} className="statCard">
-            <div>{label}</div>
-            <strong>--</strong>
-          </div>
-        ))}
       </div>
     </PageShell>
   )

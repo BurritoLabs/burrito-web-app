@@ -1,52 +1,104 @@
+import { useState } from "react"
 import PageShell from "./PageShell"
+import styles from "./Contract.module.css"
+
+type IconProps = {
+  className?: string
+}
+
+const SearchIcon = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" className={className}>
+    <circle
+      cx="11"
+      cy="11"
+      r="6.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M16.5 16.5L21 21"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
 const Contract = () => {
+  const [address, setAddress] = useState("")
+  const hasAddress = address.trim().length > 0
+
   return (
     <PageShell
       title="Contract"
-      subtitle="Store, instantiate, and manage smart contracts on Terra Classic."
-      actionLabel="Deploy"
+      extra={
+        <>
+          <button className="uiButton uiButtonPrimary" type="button">
+            Upload
+          </button>
+          <button className="uiButton uiButtonPrimary" type="button">
+            Instantiate
+          </button>
+        </>
+      }
     >
-      <div className="cardGrid two">
-        <div className="card">
-          <div className="cardHeader">
-            <div className="cardTitle">Contract actions</div>
-            <div className="pill">WASM</div>
-          </div>
-          <div className="cardDivider" />
-          <p className="cardText">
-            Upload WASM, instantiate contracts, and execute messages with full
-            transparency.
-          </p>
-          <div className="pillRow">
-            <span>Store code</span>
-            <span>Instantiate</span>
-            <span>Execute</span>
+      <div className={styles.contract}>
+        <div className={styles.contractSearch}>
+          <div className={styles.searchField}>
+            <SearchIcon className={styles.searchIcon} />
+            <input
+              className={styles.searchInput}
+              placeholder="Search by contract address"
+              aria-label="Search by contract address"
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+            />
           </div>
         </div>
-        <div className="card">
-          <div className="cardHeader">
-            <div className="cardTitle">Recent contracts</div>
-            <div className="pill">Latest</div>
-          </div>
-          <div className="cardDivider" />
-          <div className="list dense">
-            {["Exchange router", "Vault", "Oracle"].map((name) => (
-              <div key={name} className="listRow">
-                <strong>{name}</strong>
-                <span>0x...</span>
+        <div className={styles.contractBody}>
+          {!hasAddress ? (
+            <div className={`card ${styles.stateCard}`}>
+              <div className={styles.stateIcon}>
+                <SearchIcon />
               </div>
-            ))}
-          </div>
+              <div className={styles.stateText}>Search by contract address</div>
+            </div>
+          ) : (
+            <div className={`card ${styles.resultCard}`}>
+              <div className={styles.resultHeader}>
+                <strong>Contract info</strong>
+                <span>Address - --</span>
+              </div>
+              <div className={styles.resultBody}>
+                <div>
+                  <span>Creator</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>Code ID</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>Admin</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>Label</span>
+                  <strong>--</strong>
+                </div>
+              </div>
+              <div className={styles.resultFooter}>
+                <button className="uiButton uiButtonOutline" type="button">
+                  Execute
+                </button>
+                <button className="uiButton uiButtonOutline" type="button">
+                  Migrate
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-      <div className="cardGrid three">
-        {["Contracts", "Executions", "Gas used"].map((label) => (
-          <div key={label} className="statCard">
-            <div>{label}</div>
-            <strong>--</strong>
-          </div>
-        ))}
       </div>
     </PageShell>
   )

@@ -12,7 +12,6 @@
 
 .banner {
   grid-area: banner;
-  border-bottom: 1px solid var(--border);
   background: linear-gradient(
     90deg,
     rgba(82, 196, 26, 0.22),
@@ -21,8 +20,7 @@
   );
   color: var(--fg);
   font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-align: center;
 }
 
 .sidebar {
@@ -36,10 +34,8 @@
 
 .header {
   grid-area: header;
-  border-bottom: 1px solid var(--border);
-  border-left: 1px solid var(--border);
+  border-left: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
-  backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -50,7 +46,10 @@
   display: flex;
   align-items: center;
   padding: 0 var(--main-padding);
-  gap: 16px;
+  gap: 10px;
+  position: relative;
+  width: 100%;
+  white-space: nowrap;
 }
 
 .main {
@@ -58,8 +57,8 @@
   overflow: hidden;
   position: relative;
   background: transparent;
-  border-left: 1px solid var(--border);
-  border-top: 1px solid var(--border);
+  border-left: var(--border-width) solid var(--card-border);
+  border-top: var(--border-width) solid var(--card-border);
 }
 
 .mainContainer {
@@ -67,9 +66,10 @@
   display: grid;
   grid-template-columns: auto min-content;
   grid-template-areas: "main walletbar";
+  position: relative;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 991.98px) {
   .layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto var(--header-height) 1fr;
@@ -102,6 +102,10 @@
   .main {
     border-left: none;
   }
+
+  .headerInner {
+    padding: 0;
+  }
 }
 
 .menuOpen .sidebar {
@@ -109,7 +113,7 @@
   box-shadow: 12px 0 28px rgba(0, 0, 0, 0.5);
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 991.98px) {
   .menuOpen .header,
   .menuOpen .main {
     display: none;

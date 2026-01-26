@@ -1,16 +1,39 @@
-import { NavLink } from "react-router-dom"
+import { NavLink, useLocation } from "react-router-dom"
 import BrandLogo from "../../components/brand/BrandLogo"
 import { useNav } from "../routes"
 import styles from "./Nav.module.css"
+import { useEffect } from "react"
 
-const Nav = () => {
+type NavProps = {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+const Nav = ({ isOpen, onClose }: NavProps) => {
   const { menu } = useNav()
+  const { pathname } = useLocation()
+  const openState = isOpen ? "true" : "false"
+
+  useEffect(() => {
+    if (isOpen && onClose) onClose()
+  }, [pathname, isOpen, onClose])
 
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>
-        <BrandLogo textSize={18} iconSize={24} gap={8} />
+        <BrandLogo textSize={18} iconSize={24} gap={4} />
         <span className={styles.stationTag}>Station</span>
+        {isOpen ? (
+          <button
+            className={styles.toggle}
+            onClick={onClose}
+            aria-label="Close"
+            type="button"
+          >
+            <span />
+            <span />
+          </button>
+        ) : null}
       </div>
 
       <div className={styles.links}>
@@ -28,7 +51,21 @@ const Nav = () => {
         ))}
       </div>
 
-      <div className={styles.glow} aria-hidden="true" />
+      <div
+        className={styles.backgroundBlurPrimary}
+        data-open={openState}
+        aria-hidden="true"
+      />
+      <div
+        className={styles.backgroundBlurSecondary}
+        data-open={openState}
+        aria-hidden="true"
+      />
+      <div
+        className={styles.backgroundBlurTertiary}
+        data-open={openState}
+        aria-hidden="true"
+      />
     </nav>
   )
 }

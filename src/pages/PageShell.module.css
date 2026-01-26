@@ -4,24 +4,52 @@
   padding: 32px var(--main-padding);
 }
 
+.grid {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  margin: 0 auto;
+  max-width: var(--max-width);
+}
+
+.withBanner {
+  padding-top: 82px;
+  position: relative;
+}
+
+.banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--green);
+  color: #0c1411;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 42px;
+  flex-wrap: wrap;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
   margin-right: 24px;
 }
 
-.kicker {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(82, 196, 26, 0.9);
+.titleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.header h1 {
-  margin: 8px 0 6px;
+.title {
+  margin: 0;
   font-size: 36px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -29,35 +57,10 @@
   color: #ffffff;
 }
 
-.header p {
-  margin: 0;
-  max-width: 680px;
-  color: rgba(234, 245, 235, 0.76);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.header button {
-  background: rgba(255, 255, 255, 0.08);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-  height: var(--button-height-small);
-  padding: 0 20px;
-  border-radius: var(--button-radius);
-  font-size: 14px;
-  transition: border-color 0.2s ease;
-}
-
-.header button:hover {
-  border-color: rgba(255, 255, 255, 0.28);
-}
-
-.actionButton {
-  height: var(--button-height-small);
-  line-height: var(--button-height-small);
-  padding: 0 20px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+.extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .content {
@@ -65,7 +68,7 @@
   gap: 18px;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 991.98px) {
   .page {
     padding: 28px var(--main-padding);
   }
@@ -76,7 +79,45 @@
     padding: 28px 0;
   }
 
-  .header h1 {
+  .banner {
+    gap: 20px;
+  }
+
+  .grid {
+    gap: 16px;
+  }
+
+  .title {
     font-size: 28px;
   }
+
+  .header {
+    padding: 0 var(--main-padding);
+  }
+}
+
+@media (max-width: 500px) {
+  .banner {
+    gap: 12px;
+    padding: 12px 10px;
+  }
+}
+
+@media (max-width: 425px) {
+  .banner {
+    gap: 8px;
+    padding: 12px 6px;
+    font-size: 12px;
+  }
+}
+
+.small .grid {
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--max-width-small);
+  gap: 36px;
+}
+
+.small .header {
+  padding-bottom: 18px;
 }

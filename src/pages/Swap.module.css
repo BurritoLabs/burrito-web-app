@@ -1,0 +1,358 @@
+.powered {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.7);
+}
+
+.poweredLink {
+  color: rgba(234, 245, 235, 0.7);
+  text-decoration: none;
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+
+.poweredLink:hover {
+  opacity: 1;
+}
+
+.bannerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  border: var(--border-width) solid currentColor;
+  border-radius: 15px;
+  padding: 0 16px;
+  font-size: 11px;
+  font-weight: 500;
+  color: inherit;
+  text-decoration: none;
+  line-height: 1;
+  transition: background-color 0.2s ease;
+}
+
+.bannerButton:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.bannerClose {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.bannerClose span {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.bannerClose span::before,
+.bannerClose span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.bannerClose span::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.bannerClose span::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.bannerContent {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.bannerContent h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.swapCard {
+  display: grid;
+  gap: 20px;
+}
+
+.swapWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 8px;
+  width: 100%;
+  text-align: left;
+  background: rgba(246, 195, 67, 0.12);
+  color: #f6c343;
+}
+
+.chainFilter {
+  display: grid;
+  gap: var(--grid-gap);
+}
+
+.chainFilterHeader {
+  padding-block: var(--grid-gap);
+  padding-top: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.chainFilterTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.chainPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chainPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 4rem;
+  border: var(--border-width) solid var(--card-border);
+  border-radius: 1rem;
+  padding: 2px 16px;
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 0.5px var(--card-border);
+  transition: all 0.1s ease;
+  opacity: 0.75;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+}
+
+.chainPill:hover {
+  color: var(--text);
+  border-color: rgba(82, 196, 26, 0.7);
+  box-shadow: inset 0 0 0 0.5px rgba(82, 196, 26, 0.7);
+  opacity: 1;
+}
+
+.chainPillActive {
+  background-color: rgba(82, 196, 26, 0.95);
+  border-color: rgba(82, 196, 26, 0.95);
+  color: #0c1411;
+  opacity: 1;
+  box-shadow: none;
+}
+
+.chainPillIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--card-bg-muted);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background-image: url("/brand/icon.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.warningIcon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.warningIcon::after {
+  content: "i";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: currentColor;
+}
+
+.swapForm {
+  display: grid;
+  gap: 20px;
+}
+
+.swapField {
+  display: grid;
+  gap: 8px;
+}
+
+.swapFieldCard {
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  overflow: hidden;
+  display: grid;
+  gap: 0;
+}
+
+.fieldHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 16px 20px 0;
+}
+
+.fieldMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.maxButton {
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 245, 235, 0.8);
+  font-size: 11px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.fieldBody {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+}
+
+.fieldBody input {
+  background: transparent;
+  border: 0;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 400;
+  width: 100%;
+  text-align: right;
+  outline: none;
+}
+
+.fieldFooter {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.5);
+  text-align: right;
+  padding-right: 20px;
+}
+
+.assetButton {
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.3);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(234, 245, 235, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+  min-width: 72px;
+}
+
+.swapDivider {
+  display: flex;
+  justify-content: center;
+}
+
+.swapArrowIcon {
+  width: 20px;
+  height: 20px;
+  color: rgba(234, 245, 235, 0.8);
+}
+
+.swapDetails {
+  border-top: var(--border-width) solid var(--card-border);
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 16px;
+  column-gap: 16px;
+  font-size: 12px;
+}
+
+.swapDetails dt,
+.swapDetails dd {
+  margin: 0;
+}
+
+.swapDetails dt {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.swapDetails dd {
+  color: #ffffff;
+  font-weight: 500;
+  text-align: right;
+}
+
+.swapSettings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.settingPill {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  border-radius: 14px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 245, 235, 0.7);
+  font-size: 12px;
+  padding: 0 12px;
+  font-weight: 500;
+}
+
+.settingPill:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.submit {
+  height: var(--input-height);
+  border-radius: var(--button-radius);
+  width: 100%;
+  font-size: 14px;
+}
+
+@media (max-width: 500px) {
+  .bannerButton {
+    height: 22px;
+    min-width: 76px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+}

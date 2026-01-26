@@ -2,6 +2,7 @@
 
 :root {
   --bg: #0c1411;
+  --bg-muted: rgba(255, 255, 255, 0.08);
   --fg: #eaf5eb;
   --surface: rgba(255, 255, 255, 0.04);
   --surface-strong: rgba(255, 255, 255, 0.08);
@@ -9,14 +10,26 @@
   --border-strong: rgba(255, 255, 255, 0.2);
   --green: #52c41a;
   --menu-bg: rgba(12, 20, 17, 0.92);
+  --menu-border: rgba(255, 255, 255, 0.12);
+  --menu-text: rgba(234, 245, 235, 0.9);
   --card-bg: rgba(12, 20, 17, 0.65);
   --card-bg-muted: rgba(12, 20, 17, 0.78);
+  --text: #eaf5eb;
+  --text-muted: rgba(234, 245, 235, 0.6);
+  --button-default-bg: rgba(255, 255, 255, 0.08);
+  --button-default-text: rgba(234, 245, 235, 0.9);
   --wallet-shadow: 1px 0px 10px 2px rgba(0, 0, 0, 0.31);
   --border-width: 1px;
   --card-border: rgba(255, 255, 255, 0.12);
   --button-height: 48px;
   --button-height-small: 32px;
   --button-radius: 15px;
+  --grid-gap: 20px;
+  --card-padding: 28px;
+  --card-padding-small: 20px;
+  --max-width: 1080px;
+  --max-width-small: 640px;
+  --input-height: 45px;
 
   --header-height: 72px;
   --sidebar-width: 220px;
@@ -26,6 +39,7 @@
   --radius-md: 6px;
   --radius-sm: 4px;
 
+  --font-montserrat: "Montserrat", "Nunito Sans", system-ui, sans-serif;
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
 }
 
@@ -41,7 +55,7 @@ body,
 
 body {
   margin: 0;
-  color: var(--fg);
+  color: var(--text);
   font-family: var(--font-ui);
   font-size: 14px;
   line-height: 1.5;
@@ -96,11 +110,20 @@ button {
   cursor: pointer;
 }
 
+input {
+  font-family: var(--font-ui);
+}
+
+input::placeholder {
+  color: rgba(234, 245, 235, 0.4);
+}
+
 .bannerStrip {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 18px;
+  padding: 4px 0;
+  justify-content: center;
 }
 
 .bannerDot {
@@ -148,8 +171,8 @@ button {
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
-  padding: 24px 28px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+  padding: var(--card-padding);
+  box-shadow: none;
 }
 
 .cardHeader {
@@ -158,33 +181,33 @@ button {
   justify-content: space-between;
   gap: 12px;
   font-size: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .cardDivider {
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
-  margin: 12px -28px;
+  margin: 12px calc(-1 * var(--card-padding));
 }
 
 .cardTitle {
   font-size: 16px;
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: #ffffff;
 }
 
 .cardText {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: rgba(234, 245, 235, 0.76);
-  line-height: 1.5;
+  line-height: 1.45;
   font-size: 14px;
 }
 
 .cardMeta {
-  margin-top: 10px;
+  margin-top: 8px;
   font-size: 12px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: rgba(234, 245, 235, 0.55);
   line-height: 1.4;
 }
@@ -215,10 +238,11 @@ button {
 .statCard div {
   font-size: 12px;
   color: rgba(234, 245, 235, 0.62);
+  letter-spacing: 0.02em;
 }
 
 .statCard strong {
-  font-size: 18px;
+  font-size: 16px;
   color: #ffffff;
   font-weight: 500;
 }
@@ -234,18 +258,18 @@ button {
 .pill {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  font-size: 11px;
+  font-size: 10.5px;
   color: rgba(234, 245, 235, 0.76);
 }
 
 .list {
   display: grid;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .list.tight {
@@ -262,7 +286,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
   border: var(--border-width) solid rgba(255, 255, 255, 0.08);
@@ -277,7 +301,7 @@ button {
 
 .listRow span {
   display: block;
-  font-size: 11px;
+  font-size: 10.5px;
   color: rgba(234, 245, 235, 0.55);
   line-height: 1.4;
 }
@@ -285,14 +309,6 @@ button {
 .listMeta {
   font-size: 12px;
   color: rgba(234, 245, 235, 0.55);
-}
-
-.menuOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  border: 0;
-  z-index: 20;
 }
 
 .uiButton {
@@ -303,7 +319,7 @@ button {
   min-width: 100px;
   padding: 0 20px;
   border-radius: var(--button-radius);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -316,13 +332,49 @@ button {
   border-color: rgba(255, 255, 255, 0.28);
 }
 
+.uiButtonOutline {
+  background: transparent;
+  border-color: currentColor;
+  color: var(--text);
+}
+
+.uiButtonOutline:hover {
+  border-color: currentColor;
+}
+
 .uiButtonPrimary {
   background: #52c41a;
   border-color: #52c41a;
   color: #0c1411;
 }
 
-@media (max-width: 1023px) {
+.filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 245, 235, 0.8);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.filterCaret {
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-top: -2px;
+}
+
+@media (max-width: 991.98px) {
+  .cardGrid {
+    gap: 16px;
+  }
+
   .cardGrid.two,
   .cardGrid.three {
     grid-template-columns: 1fr;

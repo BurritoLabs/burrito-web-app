@@ -2,15 +2,9 @@ import PageShell from "./PageShell"
 
 const NotFound = () => {
   return (
-    <PageShell
-      title="Page not found"
-      subtitle="This route does not exist in Burrito Station."
-    >
+    <PageShell title="404">
       <div className="card">
-        <div className="cardTitle">Try another section</div>
-        <p className="cardText">
-          Use the sidebar to navigate to Swap, Stake, Governance, or History.
-        </p>
+        <div className="cardText">Not found</div>
       </div>
     </PageShell>
   )

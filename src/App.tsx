@@ -10,6 +10,7 @@ import Layout, {
 import TopBar from "./app/header/TopBar"
 import Nav from "./app/nav/Nav"
 import WalletPanel from "./app/wallet/WalletPanel"
+import Aside from "./app/aside/Aside"
 
 function App() {
   const { element: routes } = useNav()
@@ -20,20 +21,20 @@ function App() {
       <Banner>
         <div className="bannerStrip">
           <span className="bannerDot" />
-          <span>Terra Classic only · External wallets</span>
+          <span>Terra Classic only - External wallets</span>
         </div>
       </Banner>
 
       <Sidebar>
-        <Nav />
-        <div className="sidebarFooter">
-          <div className="sidebarMeta">Burrito Network</div>
-          <div className="sidebarTag">Classic</div>
-        </div>
+        <Nav isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
+        <Aside />
       </Sidebar>
 
       <Header>
-        <TopBar onMenuClick={() => setMenuOpen(true)} />
+        <TopBar
+          onMenuClick={() => setMenuOpen((open) => !open)}
+          menuOpen={menuOpen}
+        />
       </Header>
 
       <Content>
@@ -42,14 +43,6 @@ function App() {
           <WalletPanel />
         </MainContainer>
       </Content>
-
-      {menuOpen ? (
-        <button
-          className="menuOverlay"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Close menu"
-        />
-      ) : null}
     </Layout>
   )
 }

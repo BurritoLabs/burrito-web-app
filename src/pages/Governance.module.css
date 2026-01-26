@@ -1,0 +1,121 @@
+.proposals {
+  display: grid;
+  gap: var(--grid-gap);
+}
+
+.proposalCard {
+  display: grid;
+  gap: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.proposalCard:hover {
+  border-color: rgba(82, 196, 26, 0.6);
+}
+
+.proposalTagRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.proposalTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.proposalTag::before {
+  content: "";
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--button-default-bg);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statusVoting {
+  color: #52c41a;
+  border-color: rgba(82, 196, 26, 0.4);
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.statusDeposit {
+  color: #f6c343;
+  border-color: rgba(246, 195, 67, 0.45);
+  background: rgba(246, 195, 67, 0.12);
+}
+
+.statusPassed {
+  color: #52c41a;
+  border-color: rgba(82, 196, 26, 0.4);
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.statusRejected {
+  color: #ff7875;
+  border-color: rgba(255, 120, 117, 0.45);
+  background: rgba(255, 120, 117, 0.12);
+}
+
+.proposalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.proposalHeader strong {
+  display: block;
+  font-size: 20px;
+  color: #ffffff;
+  font-weight: 400;
+}
+
+.proposalHeader span {
+  display: block;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+  margin-top: 4px;
+}
+
+.proposalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.proposalMeta span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+}
+
+@media (min-width: 992px) {
+  .proposals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

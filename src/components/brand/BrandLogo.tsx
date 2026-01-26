@@ -37,8 +37,7 @@ export default function BrandLogo({
           color: "#FFFFFF",
           lineHeight: "1em",
           display: "block",
-          fontFamily:
-            "var(--font-montserrat), Montserrat, Inter, system-ui, sans-serif"
+          fontFamily: "var(--font-montserrat), var(--font-ui)"
         }}
       >
         Burrito
