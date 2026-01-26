@@ -3,6 +3,28 @@
   display: flex;
   align-items: center;
   gap: 18px;
+  height: 100%;
+}
+
+.menuButton {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.menuButton span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  background: rgba(234, 245, 235, 0.8);
+  border-radius: 999px;
 }
 
 .status {
@@ -12,7 +34,9 @@
 }
 
 .networkChip {
-  padding: 6px 10px;
+  padding: 0 12px;
+  height: var(--button-height-small);
+  line-height: var(--button-height-small);
   border-radius: 999px;
   font-size: 12px;
   letter-spacing: 0.08em;
@@ -23,9 +47,11 @@
 }
 
 .heightPill {
-  padding: 6px 12px;
+  padding: 0 12px;
+  height: var(--button-height-small);
+  line-height: var(--button-height-small);
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(234, 245, 235, 0.76);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -42,9 +68,10 @@
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(234, 245, 235, 0.7);
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13px;
+  height: var(--button-height-small);
+  padding: 0 20px;
+  border-radius: var(--button-radius);
+  font-size: 14px;
   transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
@@ -55,13 +82,11 @@
 }
 
 .primaryButton {
-  background: #52c41a;
-  border: none;
-  color: #0c1411;
-  padding: 10px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 700;
+  height: var(--button-height-small);
+  padding: 0 20px;
+  border-radius: var(--button-radius);
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: -0.01em;
   box-shadow: 0 10px 24px rgba(82, 196, 26, 0.3);
   transition: transform 0.2s ease, filter 0.2s ease;
@@ -70,4 +95,10 @@
 .primaryButton:hover {
   transform: translateY(-1px);
   filter: brightness(1.02);
+}
+
+@media (max-width: 1023px) {
+  .menuButton {
+    display: inline-flex;
+  }
 }

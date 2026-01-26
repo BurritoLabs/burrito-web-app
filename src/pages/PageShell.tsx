@@ -16,7 +16,9 @@ const PageShell = ({ title, subtitle, actionLabel, children }: PageShellProps) =
           <h1>{title}</h1>
           <p>{subtitle}</p>
         </div>
-        {actionLabel ? <button>{actionLabel}</button> : null}
+        {actionLabel ? (
+          <button className={styles.actionButton}>{actionLabel}</button>
+        ) : null}
       </header>
       <div className={styles.content}>{children}</div>
     </section>

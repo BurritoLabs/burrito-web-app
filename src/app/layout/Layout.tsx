@@ -25,8 +25,16 @@ export const MainContainer = ({ children }: PropsWithChildren) => {
   return <div className={styles.mainContainer}>{children}</div>
 }
 
-const Layout = ({ children }: PropsWithChildren) => {
-  return <div className={styles.layout}>{children}</div>
+type LayoutProps = PropsWithChildren<{
+  menuOpen?: boolean
+}>
+
+const Layout = ({ children, menuOpen }: LayoutProps) => {
+  return (
+    <div className={`${styles.layout} ${menuOpen ? styles.menuOpen : ""}`}>
+      {children}
+    </div>
+  )
 }
 
 export default Layout

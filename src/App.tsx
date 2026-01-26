@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useNav } from "./app/routes"
 import Layout, {
   Banner,
@@ -12,9 +13,10 @@ import WalletPanel from "./app/wallet/WalletPanel"
 
 function App() {
   const { element: routes } = useNav()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <Layout>
+    <Layout menuOpen={menuOpen}>
       <Banner>
         <div className="bannerStrip">
           <span className="bannerDot" />
@@ -31,7 +33,7 @@ function App() {
       </Sidebar>
 
       <Header>
-        <TopBar />
+        <TopBar onMenuClick={() => setMenuOpen(true)} />
       </Header>
 
       <Content>
@@ -40,6 +42,14 @@ function App() {
           <WalletPanel />
         </MainContainer>
       </Content>
+
+      {menuOpen ? (
+        <button
+          className="menuOverlay"
+          onClick={() => setMenuOpen(false)}
+          aria-label="Close menu"
+        />
+      ) : null}
     </Layout>
   )
 }

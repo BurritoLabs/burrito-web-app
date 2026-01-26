@@ -1,7 +1,7 @@
 .page {
-  padding: 28px 28px 40px;
   height: 100%;
-  overflow: auto;
+  overflow-y: auto;
+  padding: 32px var(--main-padding);
 }
 
 .header {
@@ -10,6 +10,7 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 24px;
+  margin-right: 24px;
 }
 
 .kicker {
@@ -21,7 +22,7 @@
 
 .header h1 {
   margin: 8px 0 6px;
-  font-size: 30px;
+  font-size: 36px;
   letter-spacing: -0.03em;
   color: #ffffff;
 }
@@ -38,9 +39,10 @@
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: #ffffff;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 12px;
+  height: var(--button-height-small);
+  padding: 0 20px;
+  border-radius: var(--button-radius);
+  font-size: 14px;
   transition: transform 0.2s ease;
 }
 
@@ -48,7 +50,31 @@
   transform: translateY(-1px);
 }
 
+.actionButton {
+  height: var(--button-height-small);
+  line-height: var(--button-height-small);
+  padding: 0 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 .content {
   display: grid;
   gap: 18px;
+}
+
+@media (max-width: 1023px) {
+  .page {
+    padding: 28px var(--main-padding);
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 28px 0;
+  }
+
+  .header h1 {
+    font-size: 28px;
+  }
 }

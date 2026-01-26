@@ -29,7 +29,6 @@
   grid-area: sidebar;
   display: grid;
   grid-template-rows: 1fr auto;
-  border-right: 1px solid var(--border);
   background: var(--menu-bg);
   position: relative;
   overflow: hidden;
@@ -38,7 +37,8 @@
 .header {
   grid-area: header;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-left: 1px solid var(--border);
+  background: var(--card-bg);
   backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
@@ -58,13 +58,15 @@
   overflow: hidden;
   position: relative;
   background: transparent;
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
 
 .mainContainer {
   height: calc(100vh - var(--header-height));
   display: grid;
-  grid-template-columns: 1fr minmax(280px, var(--wallet-width));
-  grid-template-areas: "page wallet";
+  grid-template-columns: auto min-content;
+  grid-template-areas: "main walletbar";
 }
 
 @media (max-width: 1023px) {
@@ -78,14 +80,38 @@
   }
 
   .sidebar {
-    display: none;
+    display: block;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 82%;
+    max-width: 320px;
+    transform: translateX(-102%);
+    transition: transform 0.25s ease;
+    z-index: 30;
   }
 
   .mainContainer {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "page"
-      "wallet";
+      "main"
+      "walletbar";
     height: auto;
+  }
+
+  .header,
+  .main {
+    border-left: none;
+  }
+}
+
+.menuOpen .sidebar {
+  transform: translateX(0);
+  box-shadow: 12px 0 28px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 1023px) {
+  .menuOpen .header,
+  .menuOpen .main {
+    display: none;
   }
 }

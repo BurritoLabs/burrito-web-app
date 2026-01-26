@@ -1,8 +1,17 @@
 import styles from "./TopBar.module.css"
 
-const TopBar = () => {
+type TopBarProps = {
+  onMenuClick?: () => void
+}
+
+const TopBar = ({ onMenuClick }: TopBarProps) => {
   return (
     <div className={styles.bar}>
+      <button className={styles.menuButton} onClick={onMenuClick}>
+        <span />
+        <span />
+        <span />
+      </button>
       <div className={styles.status}>
         <div className={styles.networkChip}>Terra Classic</div>
         <div className={styles.heightPill}>

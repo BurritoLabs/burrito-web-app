@@ -17,15 +17,15 @@ const WalletPanel = () => {
         <div className={styles.cardMeta}>Terra Classic · LUNC</div>
       </div>
 
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>Quick actions</div>
-        <div className={styles.actionsGrid}>
-          <button>Send</button>
-          <button>Receive</button>
-          <button>Swap</button>
-          <button>Stake</button>
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Quick actions</div>
+          <div className={styles.actionsGrid}>
+          <button className="uiButton">Send</button>
+          <button className="uiButton">Receive</button>
+          <button className="uiButton">Swap</button>
+          <button className="uiButton">Stake</button>
+          </div>
         </div>
-      </div>
 
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Assets</div>

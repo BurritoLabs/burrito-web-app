@@ -8,13 +8,19 @@
   --border: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.2);
   --green: #52c41a;
+  --menu-bg: rgba(12, 20, 17, 0.92);
+  --card-bg: rgba(12, 20, 17, 0.65);
+  --wallet-shadow: 1px 0px 10px 2px rgba(0, 0, 0, 0.31);
+  --button-height: 48px;
+  --button-height-small: 32px;
+  --button-radius: 15px;
 
   --header-height: 72px;
   --sidebar-width: 220px;
   --wallet-width: 420px;
   --main-padding: 20px;
-  --radius-lg: 18px;
-  --radius-md: 12px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
 
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
 }
@@ -33,11 +39,47 @@ body {
   margin: 0;
   color: var(--fg);
   font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
   background:
     radial-gradient(1600px 900px at 12% -20%, rgba(255, 255, 255, 0.045), transparent 70%),
     radial-gradient(1400px 800px at 88% -10%, rgba(82, 196, 26, 0.035), transparent 72%),
     linear-gradient(180deg, #0e1714 0%, #0c1411 55%, #08110f 100%);
   background-color: var(--bg);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  background:
+    radial-gradient(1200px 780px at 70% 24%, rgba(82, 196, 26, 0.18), transparent 62%),
+    radial-gradient(980px 620px at 52% 44%, rgba(82, 196, 26, 0.1), transparent 66%),
+    radial-gradient(820px 520px at 18% 16%, rgba(255, 255, 255, 0.06), transparent 62%);
+  filter: blur(12px);
+  opacity: 0.86;
+  animation: burritoBreath 7.5s ease-in-out infinite;
+}
+
+body::after {
+  background: radial-gradient(
+    1200px 800px at 50% 40%,
+    rgba(0, 0, 0, 0),
+    rgba(0, 0, 0, 0.28) 68%,
+    rgba(0, 0, 0, 0.44) 100%
+  );
+  opacity: 0.55;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 a {
@@ -92,23 +134,23 @@ button {
 }
 
 .pageArea {
-  grid-area: page;
-  background: transparent;
-  border-right: 1px solid var(--border);
+  grid-area: main;
+  background: var(--menu-bg);
   min-height: 100%;
+  animation: pageFade 0.4s ease-out;
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
-  padding: 18px;
+  padding: 28px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
 }
 
 .cardTitle {
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: #ffffff;
 }
@@ -129,7 +171,7 @@ button {
 
 .cardGrid {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .cardGrid.two {
@@ -144,7 +186,7 @@ button {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 20px;
   display: grid;
   gap: 8px;
   color: rgba(234, 245, 235, 0.7);
@@ -189,7 +231,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -211,13 +253,66 @@ button {
   color: rgba(234, 245, 235, 0.55);
 }
 
-@media (max-width: 1023px) {
-  .pageArea {
-    border-right: none;
-  }
+.menuOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: 0;
+  z-index: 20;
+}
 
+.uiButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--button-height-small);
+  min-width: 100px;
+  padding: 0 20px;
+  border-radius: var(--button-radius);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.uiButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.uiButtonPrimary {
+  background: #52c41a;
+  border-color: #52c41a;
+  color: #0c1411;
+}
+
+@media (max-width: 1023px) {
   .cardGrid.two,
   .cardGrid.three {
     grid-template-columns: 1fr;
+  }
+}
+
+@keyframes burritoBreath {
+  0%,
+  100% {
+    opacity: 0.86;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

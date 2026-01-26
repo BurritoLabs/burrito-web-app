@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom"
+import BrandLogo from "../../components/brand/BrandLogo"
 import { useNav } from "../routes"
 import styles from "./Nav.module.css"
 
@@ -8,13 +9,8 @@ const Nav = () => {
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>
-        <span className={styles.logo} aria-hidden="true">
-          B
-        </span>
-        <div className={styles.brandText}>
-          <strong>Burrito</strong>
-          <span>Station</span>
-        </div>
+        <BrandLogo textSize={18} iconSize={24} gap={8} />
+        <span className={styles.stationTag}>Station</span>
       </div>
 
       <div className={styles.links}>
