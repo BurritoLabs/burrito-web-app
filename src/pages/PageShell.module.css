@@ -1,0 +1,54 @@
+.page {
+  padding: 28px 28px 40px;
+  height: 100%;
+  overflow: auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.kicker {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(82, 196, 26, 0.9);
+}
+
+.header h1 {
+  margin: 8px 0 6px;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.header p {
+  margin: 0;
+  max-width: 680px;
+  color: rgba(234, 245, 235, 0.76);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.header button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.header button:hover {
+  transform: translateY(-1px);
+}
+
+.content {
+  display: grid;
+  gap: 18px;
+}

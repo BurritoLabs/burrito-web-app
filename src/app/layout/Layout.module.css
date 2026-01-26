@@ -1,0 +1,91 @@
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: auto var(--header-height) 1fr;
+  grid-template-areas:
+    "banner banner"
+    "sidebar header"
+    "sidebar main";
+  height: 100vh;
+  background: transparent;
+}
+
+.banner {
+  grid-area: banner;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    90deg,
+    rgba(82, 196, 26, 0.22),
+    rgba(255, 255, 255, 0.06),
+    rgba(82, 196, 26, 0.16)
+  );
+  color: var(--fg);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar {
+  grid-area: sidebar;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  border-right: 1px solid var(--border);
+  background: var(--menu-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.header {
+  grid-area: header;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.headerInner {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--main-padding);
+  gap: 16px;
+}
+
+.main {
+  grid-area: main;
+  overflow: hidden;
+  position: relative;
+  background: transparent;
+}
+
+.mainContainer {
+  height: calc(100vh - var(--header-height));
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, var(--wallet-width));
+  grid-template-areas: "page wallet";
+}
+
+@media (max-width: 1023px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto var(--header-height) 1fr;
+    grid-template-areas:
+      "banner"
+      "header"
+      "main";
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .mainContainer {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "page"
+      "wallet";
+    height: auto;
+  }
+}

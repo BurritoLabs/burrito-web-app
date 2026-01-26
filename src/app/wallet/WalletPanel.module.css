@@ -1,0 +1,135 @@
+.wallet {
+  grid-area: wallet;
+  border-left: 1px solid var(--border);
+  background: rgba(12, 20, 17, 0.6);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 280px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.header h3 {
+  margin: 6px 0 0;
+  font-size: 16px;
+  color: #ffffff;
+}
+
+.connect {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.connect:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+}
+
+.cardTitle {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.cardValue {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.cardMeta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.5);
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.actionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.actionsGrid button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(234, 245, 235, 0.8);
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.actionsGrid button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.assetList {
+  display: grid;
+  gap: 12px;
+}
+
+.assetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.assetRow strong {
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.assetRow span {
+  display: block;
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.assetValue {
+  text-align: right;
+}

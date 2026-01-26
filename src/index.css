@@ -1,0 +1,223 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&family=Nunito+Sans:wght@600;700&display=swap");
+
+:root {
+  --bg: #0c1411;
+  --fg: #eaf5eb;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --green: #52c41a;
+
+  --header-height: 72px;
+  --sidebar-width: 220px;
+  --wallet-width: 420px;
+  --main-padding: 20px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+
+  --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--fg);
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(1600px 900px at 12% -20%, rgba(255, 255, 255, 0.045), transparent 70%),
+    radial-gradient(1400px 800px at 88% -10%, rgba(82, 196, 26, 0.035), transparent 72%),
+    linear-gradient(180deg, #0e1714 0%, #0c1411 55%, #08110f 100%);
+  background-color: var(--bg);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.bannerStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+}
+
+.bannerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px rgba(82, 196, 26, 0.7);
+}
+
+.sidebarFooter {
+  padding: 16px 18px 20px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 6px;
+}
+
+.sidebarMeta {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.sidebarTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(82, 196, 26, 0.18);
+  border: 1px solid rgba(82, 196, 26, 0.35);
+  color: var(--green);
+  font-size: 12px;
+}
+
+.pageArea {
+  grid-area: page;
+  background: transparent;
+  border-right: 1px solid var(--border);
+  min-height: 100%;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.cardText {
+  margin: 10px 0 0;
+  color: rgba(234, 245, 235, 0.76);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.cardMeta {
+  margin-top: 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.cardGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.cardGrid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cardGrid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+  color: rgba(234, 245, 235, 0.7);
+}
+
+.statCard strong {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.pillRow {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pillRow span,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.76);
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.list.dense {
+  gap: 8px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.listRow strong {
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.listRow span {
+  display: block;
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.listMeta {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.55);
+}
+
+@media (max-width: 1023px) {
+  .pageArea {
+    border-right: none;
+  }
+
+  .cardGrid.two,
+  .cardGrid.three {
+    grid-template-columns: 1fr;
+  }
+}

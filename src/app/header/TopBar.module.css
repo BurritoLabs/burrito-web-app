@@ -1,0 +1,73 @@
+.bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.networkChip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(82, 196, 26, 0.18);
+  border: 1px solid rgba(82, 196, 26, 0.35);
+  color: #52c41a;
+}
+
+.heightPill {
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: rgba(234, 245, 235, 0.76);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.ghostButton {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(234, 245, 235, 0.7);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.ghostButton:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.primaryButton {
+  background: #52c41a;
+  border: none;
+  color: #0c1411;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 10px 24px rgba(82, 196, 26, 0.3);
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
