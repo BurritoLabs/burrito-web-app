@@ -10,7 +10,10 @@
   --green: #52c41a;
   --menu-bg: rgba(12, 20, 17, 0.92);
   --card-bg: rgba(12, 20, 17, 0.65);
+  --card-bg-muted: rgba(12, 20, 17, 0.78);
   --wallet-shadow: 1px 0px 10px 2px rgba(0, 0, 0, 0.31);
+  --border-width: 1px;
+  --card-border: rgba(255, 255, 255, 0.12);
   --button-height: 48px;
   --button-height-small: 32px;
   --button-radius: 15px;
@@ -21,6 +24,7 @@
   --main-padding: 20px;
   --radius-lg: 8px;
   --radius-md: 6px;
+  --radius-sm: 4px;
 
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
 }
@@ -142,15 +146,30 @@ button {
 
 .card {
   background: var(--card-bg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
-  padding: 28px;
+  padding: 24px 28px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.cardDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 12px -28px;
 }
 
 .cardTitle {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
   color: #ffffff;
 }
@@ -158,15 +177,16 @@ button {
 .cardText {
   margin: 10px 0 0;
   color: rgba(234, 245, 235, 0.76);
-  line-height: 1.6;
+  line-height: 1.5;
   font-size: 14px;
 }
 
 .cardMeta {
   margin-top: 10px;
   font-size: 12px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: rgba(234, 245, 235, 0.55);
+  line-height: 1.4;
 }
 
 .cardGrid {
@@ -184,17 +204,23 @@ button {
 
 .statCard {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 18px 20px;
   display: grid;
   gap: 8px;
   color: rgba(234, 245, 235, 0.7);
 }
 
+.statCard div {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.62);
+}
+
 .statCard strong {
   font-size: 18px;
   color: #ffffff;
+  font-weight: 500;
 }
 
 .pillRow {
@@ -211,7 +237,7 @@ button {
   padding: 4px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   font-size: 11px;
   color: rgba(234, 245, 235, 0.76);
 }
@@ -220,6 +246,11 @@ button {
   display: grid;
   gap: 12px;
   margin-top: 12px;
+}
+
+.list.tight {
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .list.dense {
@@ -231,21 +262,24 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  min-height: 44px;
 }
 
 .listRow strong {
   font-size: 14px;
   color: #ffffff;
+  font-weight: 500;
 }
 
 .listRow span {
   display: block;
   font-size: 11px;
   color: rgba(234, 245, 235, 0.55);
+  line-height: 1.4;
 }
 
 .listMeta {
@@ -269,17 +303,16 @@ button {
   min-width: 100px;
   padding: 0 20px;
   border-radius: var(--button-radius);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .uiButton:hover {
-  transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.28);
 }
 

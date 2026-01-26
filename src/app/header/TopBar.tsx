@@ -20,8 +20,10 @@ const TopBar = ({ onMenuClick }: TopBarProps) => {
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.ghostButton}>Preferences</button>
-        <button className={styles.primaryButton}>Connect Wallet</button>
+        <button className={`uiButton ${styles.ghostButton}`}>Preferences</button>
+        <button className={`uiButton uiButtonPrimary ${styles.primaryButton}`}>
+          Connect Wallet
+        </button>
       </div>
     </div>
   )

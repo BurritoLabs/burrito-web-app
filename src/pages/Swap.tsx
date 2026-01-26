@@ -9,7 +9,11 @@ const Swap = () => {
     >
       <div className="cardGrid two">
         <div className="card">
-          <div className="cardTitle">Route preview</div>
+          <div className="cardHeader">
+            <div className="cardTitle">Route preview</div>
+            <div className="pill">Route</div>
+          </div>
+          <div className="cardDivider" />
           <p className="cardText">
             Liquidity sources, expected output, and price impact will appear
             here once a wallet is connected.
@@ -17,7 +21,11 @@ const Swap = () => {
           <div className="cardMeta">Classic · On-chain routing</div>
         </div>
         <div className="card">
-          <div className="cardTitle">Swap panel</div>
+          <div className="cardHeader">
+            <div className="cardTitle">Swap panel</div>
+            <div className="pill">Execute</div>
+          </div>
+          <div className="cardDivider" />
           <p className="cardText">
             Choose assets, review slippage, and sign with your external wallet.
           </p>

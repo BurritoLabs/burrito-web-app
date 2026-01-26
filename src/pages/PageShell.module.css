@@ -6,10 +6,10 @@
 
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   margin-right: 24px;
 }
 
@@ -23,7 +23,9 @@
 .header h1 {
   margin: 8px 0 6px;
   font-size: 36px;
-  letter-spacing: -0.03em;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: #ffffff;
 }
 
@@ -31,30 +33,30 @@
   margin: 0;
   max-width: 680px;
   color: rgba(234, 245, 235, 0.76);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .header button {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
   color: #ffffff;
   height: var(--button-height-small);
   padding: 0 20px;
   border-radius: var(--button-radius);
   font-size: 14px;
-  transition: transform 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .header button:hover {
-  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .actionButton {
   height: var(--button-height-small);
   line-height: var(--button-height-small);
   padding: 0 20px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.01em;
 }
 

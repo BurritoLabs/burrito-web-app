@@ -8,8 +8,12 @@ const History = () => {
       actionLabel="Export"
     >
       <div className="card">
-        <div className="cardTitle">Recent activity</div>
-        <div className="list">
+        <div className="cardHeader">
+          <div className="cardTitle">Recent activity</div>
+          <div className="pill">All chains</div>
+        </div>
+        <div className="cardDivider" />
+        <div className="list tight">
           {["Swap LUNC → USTC", "Stake LUNC", "Send LUNC"].map((item) => (
             <div key={item} className="listRow">
               <div>

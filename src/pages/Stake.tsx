@@ -9,14 +9,22 @@ const Stake = () => {
     >
       <div className="cardGrid two">
         <div className="card">
-          <div className="cardTitle">Staked balance</div>
+          <div className="cardHeader">
+            <div className="cardTitle">Staked balance</div>
+            <div className="pill">All</div>
+          </div>
+          <div className="cardDivider" />
           <p className="cardText">
             Overview of your delegated LUNC, rewards, and unbonding positions.
           </p>
           <div className="cardMeta">Validators · Rewards · Unbonding</div>
         </div>
         <div className="card">
-          <div className="cardTitle">Validator list</div>
+          <div className="cardHeader">
+            <div className="cardTitle">Validator list</div>
+            <div className="pill">Active</div>
+          </div>
+          <div className="cardDivider" />
           <p className="cardText">
             Discover active validators, voting power, and commission details.
           </p>

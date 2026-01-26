@@ -9,7 +9,11 @@ const Contract = () => {
     >
       <div className="cardGrid two">
         <div className="card">
-          <div className="cardTitle">Contract actions</div>
+          <div className="cardHeader">
+            <div className="cardTitle">Contract actions</div>
+            <div className="pill">WASM</div>
+          </div>
+          <div className="cardDivider" />
           <p className="cardText">
             Upload WASM, instantiate contracts, and execute messages with full
             transparency.
@@ -21,7 +25,11 @@ const Contract = () => {
           </div>
         </div>
         <div className="card">
-          <div className="cardTitle">Recent contracts</div>
+          <div className="cardHeader">
+            <div className="cardTitle">Recent contracts</div>
+            <div className="pill">Latest</div>
+          </div>
+          <div className="cardDivider" />
           <div className="list dense">
             {["Exchange router", "Vault", "Oracle"].map((name) => (
               <div key={name} className="listRow">

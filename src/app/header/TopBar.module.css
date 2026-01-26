@@ -2,15 +2,21 @@
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   height: 100%;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .menuButton {
   display: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   align-items: center;
@@ -21,16 +27,10 @@
 
 .menuButton span {
   display: block;
-  width: 16px;
+  width: 14px;
   height: 2px;
   background: rgba(234, 245, 235, 0.8);
   border-radius: 999px;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .networkChip {
@@ -38,11 +38,11 @@
   height: var(--button-height-small);
   line-height: var(--button-height-small);
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: rgba(82, 196, 26, 0.18);
-  border: 1px solid rgba(82, 196, 26, 0.35);
+  border: var(--border-width) solid rgba(82, 196, 26, 0.35);
   color: #52c41a;
 }
 
@@ -51,49 +51,45 @@
   height: var(--button-height-small);
   line-height: var(--button-height-small);
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(234, 245, 235, 0.76);
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+}
+
+.heightPill strong {
+  font-weight: 600;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-left: auto;
 }
 
 .ghostButton {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(234, 245, 235, 0.7);
   height: var(--button-height-small);
   padding: 0 20px;
   border-radius: var(--button-radius);
-  font-size: 14px;
-  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  font-size: 13px;
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .ghostButton:hover {
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
 }
 
 .primaryButton {
-  height: var(--button-height-small);
-  padding: 0 20px;
-  border-radius: var(--button-radius);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   box-shadow: 0 10px 24px rgba(82, 196, 26, 0.3);
-  transition: transform 0.2s ease, filter 0.2s ease;
+  transition: filter 0.2s ease;
 }
 
 .primaryButton:hover {
-  transform: translateY(-1px);
   filter: brightness(1.02);
 }
 

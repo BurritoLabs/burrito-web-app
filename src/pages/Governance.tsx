@@ -8,8 +8,12 @@ const Governance = () => {
       actionLabel="New proposal"
     >
       <div className="card">
-        <div className="cardTitle">Open proposals</div>
-        <div className="list">
+        <div className="cardHeader">
+          <div className="cardTitle">Open proposals</div>
+          <div className="pill">Voting</div>
+        </div>
+        <div className="cardDivider" />
+        <div className="list tight">
           {["Upgrade roadmap", "Validator incentives", "Community pool"].map(
             (title) => (
               <div key={title} className="listRow">
