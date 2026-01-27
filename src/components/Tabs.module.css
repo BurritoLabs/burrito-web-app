@@ -65,6 +65,10 @@
   min-width: 0;
 }
 
+.page .tab:hover:not(.active) {
+  color: var(--text);
+}
+
 .page .tab {
   flex: 1;
 }
@@ -88,6 +92,10 @@
   flex: 0 0 120px;
   min-width: 0;
   padding: 0;
+}
+
+.card .tab:hover:not(.active) {
+  color: var(--text);
 }
 
 .card .active {

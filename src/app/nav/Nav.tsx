@@ -12,7 +12,6 @@ type NavProps = {
 const Nav = ({ isOpen, onClose }: NavProps) => {
   const { menu } = useNav()
   const { pathname } = useLocation()
-  const openState = isOpen ? "true" : "false"
 
   useEffect(() => {
     if (isOpen && onClose) onClose()
@@ -22,7 +21,7 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
     <nav className={styles.nav}>
       <div className={styles.brand}>
         <Link to="/" className={styles.brandLink} aria-label="Go to dashboard">
-          <BrandLogo textSize={20} iconSize={30} gap={6} />
+          <BrandLogo textSize={20} iconSize={24} gap={6} />
         </Link>
         {isOpen ? (
           <button
@@ -52,21 +51,6 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
         ))}
       </div>
 
-      <div
-        className={styles.backgroundBlurPrimary}
-        data-open={openState}
-        aria-hidden="true"
-      />
-      <div
-        className={styles.backgroundBlurSecondary}
-        data-open={openState}
-        aria-hidden="true"
-      />
-      <div
-        className={styles.backgroundBlurTertiary}
-        data-open={openState}
-        aria-hidden="true"
-      />
     </nav>
   )
 }

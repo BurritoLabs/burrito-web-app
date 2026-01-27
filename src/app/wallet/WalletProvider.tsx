@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState
 } from "react"
@@ -46,6 +47,7 @@ type InjectedWallets = {
 }
 
 const WalletContext = createContext<WalletContextValue | undefined>(undefined)
+const STORAGE_KEY = "burritoWalletConnector"
 
 const getInjectedWallets = (): InjectedWallets => {
   if (typeof window === "undefined") return {}
@@ -60,6 +62,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
   const [account, setAccount] = useState<WalletAccount>()
   const [error, setError] = useState<string>()
+  const [autoConnectAttempted, setAutoConnectAttempted] = useState(false)
 
   const connectors = useMemo<WalletConnector[]>(() => {
     const injected = getInjectedWallets()
@@ -108,6 +111,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
           await connectInjected(wallet, id)
         }
         setStatus("connected")
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(STORAGE_KEY, id)
+        }
       } catch (err) {
         setStatus("error")
         setError(formatWalletError(err))
@@ -121,7 +127,33 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     setConnectorId(undefined)
     setError(undefined)
     setStatus("disconnected")
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(STORAGE_KEY)
+    }
   }, [])
+
+  useEffect(() => {
+    if (autoConnectAttempted) return
+    if (typeof window === "undefined") {
+      setAutoConnectAttempted(true)
+      return
+    }
+    const stored = window.localStorage.getItem(STORAGE_KEY) as WalletConnectorId | null
+    if (!stored) {
+      setAutoConnectAttempted(true)
+      return
+    }
+    const injected = getInjectedWallets()
+    const available =
+      stored === "keplr"
+        ? injected.keplr
+        : injected.station ?? injected.galaxyStation
+    if (!available) {
+      setAutoConnectAttempted(true)
+      return
+    }
+    void connect(stored).finally(() => setAutoConnectAttempted(true))
+  }, [autoConnectAttempted, connect])
 
   const value = useMemo<WalletContextValue>(
     () => ({

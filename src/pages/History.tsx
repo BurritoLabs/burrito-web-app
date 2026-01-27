@@ -63,24 +63,6 @@ const History = () => {
   return (
     <PageShell title="History">
       <div className={styles.chainFilter}>
-        <div className={styles.chainPills}>
-          <button
-            className={`${styles.chainPill} ${styles.chainPillAll}`}
-            type="button"
-          >
-            All
-          </button>
-          <button
-            className={`${styles.chainPill} ${styles.chainPillActive}`}
-            type="button"
-          >
-            <span className={styles.chainPillIcon} aria-hidden="true" />
-            Terra Classic
-          </button>
-          <button className={`${styles.chainPill} ${styles.chainPillCount}`} type="button">
-            +1
-          </button>
-        </div>
         <div className={styles.list}>
           {!account ? (
             <div className={`card ${styles.card}`}>

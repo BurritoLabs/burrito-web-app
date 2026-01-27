@@ -8,6 +8,61 @@
     "sidebar main";
   height: 100vh;
   background: transparent;
+  position: relative;
+}
+
+.layout > :not(.globalGlow) {
+  position: relative;
+  z-index: 1;
+}
+
+.globalGlow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.globalGlow::before {
+  content: "";
+  position: fixed;
+  inset: -20vh -18vw;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1100px 740px at 70% 26%, rgba(82, 196, 26, 0.18), transparent 62%),
+    radial-gradient(980px 620px at 52% 44%, rgba(82, 196, 26, 0.10), transparent 66%);
+  filter: blur(12px);
+  opacity: 0.92;
+  animation: burritoSystemBreath 7.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.globalGlow span {
+  position: absolute;
+  display: block;
+}
+
+.glowPrimary {
+  height: 360px;
+  width: 980px;
+  left: -420px;
+  bottom: -40px;
+  transform: rotate(55deg);
+  background-color: rgba(82, 196, 26, 0.42);
+  filter: blur(110px);
+  animation: burritoSystemBreath 7.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+@keyframes burritoSystemBreath {
+  0%,
+  100% {
+    opacity: 0.86;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .banner {
@@ -27,16 +82,23 @@
   grid-area: sidebar;
   display: grid;
   grid-template-rows: 1fr auto;
-  background: var(--menu-bg);
+  background: var(--glass-sidebar);
   position: relative;
   overflow: hidden;
+  backdrop-filter:
+    blur(calc(var(--glass-blur) + 6px))
+    saturate(calc(var(--glass-saturate) + 20%));
+  -webkit-backdrop-filter:
+    blur(calc(var(--glass-blur) + 6px))
+    saturate(calc(var(--glass-saturate) + 20%));
+  box-shadow: 10px 0 28px rgba(0, 0, 0, 0.35);
 }
 
 .header {
   grid-area: header;
   border-left: var(--border-width) solid var(--card-border);
   border-bottom: var(--border-width) solid var(--card-border);
-  background: var(--card-bg);
+  background: transparent;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -50,7 +112,13 @@
   gap: 10px;
   position: relative;
   width: 100%;
+  max-width: none;
+  margin: 0;
   white-space: nowrap;
+  background: var(--glass-header);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-bottom: var(--border-width) solid var(--card-border);
 }
 
 .main {
@@ -67,6 +135,7 @@
   grid-template-columns: auto min-content;
   grid-template-areas: "main walletbar";
   position: relative;
+  z-index: 1;
 }
 
 @media (max-width: 991.98px) {

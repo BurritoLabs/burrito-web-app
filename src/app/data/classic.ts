@@ -1,4 +1,4 @@
-import { CLASSIC_CHAIN } from "../chain"
+import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 
 export type CoinBalance = {
   denom: string
@@ -41,12 +41,81 @@ export type PriceMap = {
   ustc?: { usd: number; usd_24h_change?: number }
 }
 
+export type SwapRateItem = {
+  denom: string
+  swaprate: string
+}
+
+export type FxRates = {
+  MNT?: number
+  TWD?: number
+}
+
 const fetchJson = async <T>(url: string): Promise<T> => {
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`)
   }
   return response.json() as Promise<T>
+}
+
+const PRICE_CACHE_KEY = "burritoPriceCache"
+const FX_CACHE_KEY = "burritoFxCache"
+
+export const getCachedPrices = () => {
+  if (typeof window === "undefined") return undefined
+  const raw = window.localStorage.getItem(PRICE_CACHE_KEY)
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as { ts?: number; data?: PriceMap }
+    if (!parsed?.data) return undefined
+    return {
+      data: parsed.data,
+      ts: parsed.ts ?? Date.now()
+    }
+  } catch {
+    return undefined
+  }
+}
+
+const setCachedPrices = (data: PriceMap) => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      PRICE_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), data })
+    )
+  } catch {
+    // ignore
+  }
+}
+
+export const getCachedFxRates = () => {
+  if (typeof window === "undefined") return undefined
+  const raw = window.localStorage.getItem(FX_CACHE_KEY)
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as { ts?: number; data?: FxRates }
+    if (!parsed?.data) return undefined
+    return {
+      data: parsed.data,
+      ts: parsed.ts ?? Date.now()
+    }
+  } catch {
+    return undefined
+  }
+}
+
+const setCachedFxRates = (data: FxRates) => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      FX_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), data })
+    )
+  } catch {
+    // ignore
+  }
 }
 
 const buildUrl = (base: string, path: string, params?: Record<string, string>) => {
@@ -125,6 +194,7 @@ export const fetchValidator = async (operatorAddress: string) => {
 const parseProposalTitle = (proposal: any) => {
   if (proposal?.title) return proposal.title as string
   if (proposal?.content?.title) return proposal.content.title as string
+  if (proposal?.summary) return proposal.summary as string
   if (proposal?.metadata) {
     try {
       const parsed = JSON.parse(proposal.metadata)
@@ -136,41 +206,131 @@ const parseProposalTitle = (proposal: any) => {
   return "Proposal"
 }
 
-const normalizeProposal = (proposal: any): ProposalItem => ({
-  id: String(proposal?.id ?? proposal?.proposal_id ?? "--"),
-  status: String(proposal?.status ?? proposal?.proposal_status ?? "--"),
-  title: parseProposalTitle(proposal),
-  deposit:
+const normalizeProposal = (proposal: any): ProposalItem => {
+  const id = String(proposal?.id ?? proposal?.proposal_id ?? "--")
+  const status = String(proposal?.status ?? proposal?.proposal_status ?? "--")
+  const title = parseProposalTitle(proposal)
+  const deposit =
     proposal?.total_deposit?.[0]?.amount ??
     proposal?.total_deposit?.amount ??
-    "0",
-  submitTime: proposal?.submit_time ?? proposal?.submit_time?.toString(),
-  votingEndTime: proposal?.voting_end_time ?? proposal?.voting_end_time?.toString(),
-  finalTally: proposal?.final_tally_result
+    "0"
+
+  const tally = proposal?.final_tally_result
+  const finalTally = tally
     ? {
-        yes: proposal.final_tally_result.yes ?? "0",
-        no: proposal.final_tally_result.no ?? "0",
-        abstain: proposal.final_tally_result.abstain ?? "0",
-        noWithVeto: proposal.final_tally_result.no_with_veto ?? "0"
+        yes: tally.yes ?? tally.yes_count ?? "0",
+        no: tally.no ?? tally.no_count ?? "0",
+        abstain: tally.abstain ?? tally.abstain_count ?? "0",
+        noWithVeto: tally.no_with_veto ?? tally.no_with_veto_count ?? "0"
       }
     : undefined
-})
+
+  return {
+    id,
+    status,
+    title,
+    deposit,
+    submitTime: proposal?.submit_time ?? proposal?.submit_time?.toString(),
+    votingEndTime:
+      proposal?.voting_end_time ?? proposal?.voting_end_time?.toString(),
+    finalTally
+  }
+}
+
+const GOV_STATUSES = {
+  voting: "PROPOSAL_STATUS_VOTING_PERIOD",
+  deposit: "PROPOSAL_STATUS_DEPOSIT_PERIOD",
+  passed: "PROPOSAL_STATUS_PASSED",
+  rejected: "PROPOSAL_STATUS_REJECTED"
+} as const
+
+const mapV1Proposal = (prop: any) => {
+  if (Array.isArray(prop?.messages) && prop.messages.length > 0) {
+    const message = prop.messages[0]
+    const isLegacy =
+      message?.["@type"] === "/cosmos.gov.v1.MsgExecLegacyContent"
+    const legacyContent = isLegacy ? message.content : null
+    const content = legacyContent
+      ? legacyContent
+      : message
+      ? {
+          ...message,
+          title: prop.title,
+          description: prop.summary
+        }
+      : {
+          "@type": "/cosmos.gov.v1.TextProposal",
+          title: prop.title,
+          description: prop.summary
+        }
+    return {
+      ...prop,
+      proposal_id: prop.id,
+      content
+    }
+  }
+  return prop
+}
+
+const fetchGovPaged = async (path: string, params: Record<string, string>) => {
+  const items: any[] = []
+  let nextKey: string | undefined
+  let guard = 0
+
+  do {
+    const pageParams = {
+      ...params,
+      ...(nextKey ? { "pagination.key": nextKey } : {})
+    }
+    const url = buildUrl(CLASSIC_CHAIN.lcd, path, pageParams)
+    const data = await fetchJson<{
+      proposals?: any[]
+      pagination?: { next_key?: string | null }
+    }>(url)
+    items.push(...(data.proposals ?? []))
+    const newKey = data.pagination?.next_key ?? undefined
+    nextKey = newKey && newKey !== nextKey ? newKey : undefined
+    guard += 1
+  } while (nextKey && guard < 50)
+
+  return items
+}
+
+const fetchGovV1ByStatus = async (status: string) => {
+  const proposals = await fetchGovPaged("/cosmos/gov/v1/proposals", {
+    proposal_status: status,
+    "pagination.limit": "200",
+    "pagination.reverse": "true"
+  })
+  return proposals.map(mapV1Proposal)
+}
+
+const fetchGovV1beta1ByStatus = async (status: string) => {
+  return fetchGovPaged("/cosmos/gov/v1beta1/proposals", {
+    proposal_status: status,
+    "pagination.limit": "200",
+    "pagination.reverse": "true"
+  })
+}
 
 export const fetchProposals = async () => {
-  const v1Url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/proposals", {
-    "pagination.limit": "50"
-  })
+  const statuses = [
+    GOV_STATUSES.voting,
+    GOV_STATUSES.deposit,
+    GOV_STATUSES.passed,
+    GOV_STATUSES.rejected
+  ]
+
   try {
-    const data = await fetchJson<{ proposals?: any[] }>(v1Url)
-    return (data.proposals ?? []).map(normalizeProposal)
-  } catch {
-    const legacyUrl = buildUrl(
-      CLASSIC_CHAIN.lcd,
-      "/cosmos/gov/v1beta1/proposals",
-      { "pagination.limit": "50" }
+    const pages = await Promise.all(
+      statuses.map((status) => fetchGovV1ByStatus(status))
     )
-    const data = await fetchJson<{ proposals?: any[] }>(legacyUrl)
-    return (data.proposals ?? []).map(normalizeProposal)
+    return pages.flat().map(normalizeProposal)
+  } catch {
+    const pages = await Promise.all(
+      statuses.map((status) => fetchGovV1beta1ByStatus(status))
+    )
+    return pages.flat().map(normalizeProposal)
   }
 }
 
@@ -194,13 +354,76 @@ export const fetchContractInfo = async (address: string) => {
 }
 
 export const fetchPrices = async (): Promise<PriceMap> => {
-  const url =
-    "https://api.coingecko.com/api/v3/simple/price?ids=terra-luna,terrausd&vs_currencies=usd&include_24hr_change=true"
-  const data = await fetchJson<Record<string, { usd: number; usd_24h_change?: number }>>(
-    url
-  )
-  return {
-    lunc: data["terra-luna"],
-    ustc: data["terrausd"]
+  const base =
+    import.meta.env.DEV ? "/coingecko" : "https://api.coingecko.com/api/v3"
+  const url = `${base}/simple/price?ids=terra-luna,terraclassicusd,terrausd&vs_currencies=usd&include_24hr_change=true`
+  const cached = getCachedPrices()
+  try {
+    const data = await fetchJson<
+      Record<string, { usd: number; usd_24h_change?: number }>
+    >(url)
+    const result: PriceMap = {
+      lunc: data["terra-luna"] ?? cached?.data?.lunc,
+      ustc:
+        data["terraclassicusd"] ??
+        data["terrausd"] ??
+        cached?.data?.ustc
+    }
+    if (!result.ustc) {
+      try {
+        const paprika = await fetchJson<{
+          quotes?: { USD?: { price?: number; percent_change_24h?: number } }
+        }>("https://api.coinpaprika.com/v1/tickers/ust-terrausd")
+        const price = paprika?.quotes?.USD?.price
+        if (price) {
+          result.ustc = {
+            usd: price,
+            usd_24h_change: paprika?.quotes?.USD?.percent_change_24h
+          }
+        }
+      } catch {
+        // ignore fallback failure
+      }
+    }
+    if (result.lunc || result.ustc) {
+      setCachedPrices(result)
+    }
+    return result
+  } catch (err) {
+    if (cached?.data) {
+      return cached.data
+    }
+    throw err
   }
+}
+
+export const fetchFxRates = async (): Promise<FxRates> => {
+  const cached = getCachedFxRates()
+  try {
+    const data = await fetchJson<{ rates?: Record<string, number> }>(
+      "https://open.er-api.com/v6/latest/USD"
+    )
+    const rates = data?.rates ?? {}
+    const result: FxRates = {
+      MNT: rates.MNT ? 1 / rates.MNT : undefined,
+      TWD: rates.TWD ? 1 / rates.TWD : undefined
+    }
+    if (result.MNT || result.TWD) {
+      setCachedFxRates(result)
+    }
+    return result
+  } catch (err) {
+    if (cached?.data) {
+      return cached.data
+    }
+    throw err
+  }
+}
+
+export const fetchSwapRates = async (
+  currency = CLASSIC_DENOMS.ustc.coinMinimalDenom
+) => {
+  const url = buildUrl(CLASSIC_CHAIN.fcd, `/v1/market/swaprate/${currency}`)
+  const data = await fetchJson<SwapRateItem[]>(url)
+  return data ?? []
 }

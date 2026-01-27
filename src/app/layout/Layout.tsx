@@ -32,6 +32,9 @@ type LayoutProps = PropsWithChildren<{
 const Layout = ({ children, menuOpen }: LayoutProps) => {
   return (
     <div className={`${styles.layout} ${menuOpen ? styles.menuOpen : ""}`}>
+      <div className={styles.globalGlow} aria-hidden="true">
+        <span className={styles.glowPrimary} />
+      </div>
       {children}
     </div>
   )

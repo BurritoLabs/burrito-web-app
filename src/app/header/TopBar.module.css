@@ -7,6 +7,32 @@
   position: relative;
 }
 
+.leftRail {
+  width: calc(100% - var(--wallet-offset));
+  max-width: var(--max-width);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  transform: translateX(calc(var(--wallet-offset) / -2));
+  transition: transform 400ms ease;
+}
+
+.chainBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  min-width: 62.31px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--green);
+  color: #0c1411;
+  font-size: 12px;
+  font-weight: var(--bold);
+  line-height: 1;
+}
+
 .status {
   display: flex;
   align-items: center;
@@ -59,7 +85,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-left: auto;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--menu-text);
 }
 
@@ -73,10 +102,10 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 0;
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
+  border: 0;
+  background: transparent;
   color: var(--text);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
@@ -86,13 +115,32 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #52c41a;
-  box-shadow: 0 0 10px rgba(82, 196, 26, 0.7);
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
-.statusLabel {
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+@keyframes lcdPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(82, 196, 26, 0.4);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(82, 196, 26, 0.8);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(82, 196, 26, 0.4);
+  }
+}
+
+.statusHealthy .statusDot {
+  background: #52c41a;
+  animation: lcdPulse 1.6s ease-in-out infinite;
+}
+
+.statusOffline .statusDot {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .iconButton {
@@ -171,6 +219,10 @@
 @media (max-width: 991.98px) {
   .menuButton {
     display: inline-flex;
+  }
+
+  .actions {
+    right: var(--main-padding);
   }
 }
 

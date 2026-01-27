@@ -22,6 +22,19 @@
   will-change: transform, max-width;
 }
 
+@keyframes walletSlideIn {
+  from {
+    transform: translate(100%, 0);
+  }
+  to {
+    transform: translate(0, 0);
+  }
+}
+
+.animateOpen {
+  animation: walletSlideIn 400ms ease both;
+}
+
 @media (max-width: 1420px) {
   .wallet {
     position: absolute;
@@ -278,6 +291,7 @@
   grid-template-rows: min-content minmax(0, 1fr);
   gap: 0;
   padding: 0 10px;
+  background-color: var(--card-bg-muted);
   overflow: hidden;
   position: relative;
   min-height: 0;
@@ -293,6 +307,16 @@
   position: relative;
   display: grid;
   gap: 12px;
+}
+
+.formPanel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.formPanel {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .sendPanel {
@@ -662,6 +686,7 @@
   font-size: var(--font-size-title);
   font-weight: var(--bold);
   color: #ffffff;
+  overflow: hidden;
 }
 
 .assetDetailAmount {
@@ -682,6 +707,16 @@
   min-height: 0;
 }
 
+.chainSectionContainer::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.chainSectionContainer {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
 .chainSectionTitle {
   padding-left: 10px;
   margin-bottom: 5px;
@@ -700,6 +735,16 @@
   overflow-y: auto;
   padding-bottom: 1rem;
   min-height: 0;
+}
+
+.chainSectionList::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.chainSectionList {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .chainRowItem {
@@ -831,6 +876,9 @@
   font-size: var(--font-size-small);
   color: #52c41a;
   font-weight: var(--bold);
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .manageButton svg {
@@ -840,10 +888,27 @@
 .assetRows {
   display: grid;
   gap: 0;
-  padding-bottom: 26px;
+  padding-bottom: 1.6rem;
   grid-area: list;
   overflow-y: auto;
   min-height: 0;
+  align-content: start;
+}
+
+.assetRows::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.assetRows {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.assetEmpty {
+  padding: 20px 10px 30px;
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
 }
 
 .assetRow {
@@ -854,6 +919,7 @@
   border-radius: 10px;
   transition: 300ms;
   cursor: pointer;
+  position: relative;
 }
 
 .assetRow:hover {
@@ -864,6 +930,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  width: 100%;
 }
 
 .chainCount {
@@ -888,24 +955,27 @@
   font-weight: var(--bold);
   color: #ffffff;
   position: relative;
+  overflow: hidden;
 }
 
-.assetBadge::after {
-  content: "";
-  position: absolute;
-  bottom: -8px;
-  right: -10px;
-  width: 20px;
-  height: 20px;
+.assetBadge img,
+.assetBadgeLarge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   border-radius: 50%;
-  background: var(--card-bg-muted);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 2px rgba(82, 196, 26, 0.2);
-  background-image: url("/brand/icon.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  display: block;
 }
+
+.assetBadge span,
+.assetBadgeLarge span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 
 .assetRowDetails {
   display: flex;
@@ -914,6 +984,7 @@
   width: 100%;
   flex: 1;
   min-width: 0;
+  max-width: calc(100% - 40px);
 }
 
 .assetTopRow,
@@ -952,6 +1023,12 @@
   font-size: var(--font-size-small);
   font-weight: var(--normal);
   color: var(--text-muted);
+  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 100%;
   white-space: nowrap;
 }
 
@@ -975,6 +1052,14 @@
 
 .assetChangeDown {
   color: #ff7875;
+}
+
+.assetChangeMuted {
+  color: var(--text-muted);
+}
+
+.assetChangeMuted svg {
+  display: none;
 }
 
 .actions {

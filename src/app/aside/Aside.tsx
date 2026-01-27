@@ -1,4 +1,5 @@
 import styles from "./Aside.module.css"
+import BlockStatus from "./BlockStatus"
 
 const SetupIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -75,6 +76,10 @@ const Aside = () => {
               <img src={item.icon} alt="" />
             </a>
           ))}
+        </div>
+
+        <div className={styles.blockStatusWrap}>
+          <BlockStatus />
         </div>
       </div>
     </div>

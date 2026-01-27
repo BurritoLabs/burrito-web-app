@@ -19,6 +19,9 @@
   position: relative;
   color: var(--menu-text);
   z-index: 1;
+  background: var(--glass-brand);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 
 .brandLink {
@@ -62,6 +65,7 @@
   padding: 10px 0;
   z-index: 1;
 }
+
 
 .link {
   display: flex;
@@ -175,6 +179,7 @@
   .backgroundBlurTertiary {
     display: none;
   }
+
 }
 
 @media (min-width: 992px) {

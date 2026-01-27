@@ -176,18 +176,6 @@ const Stake = () => {
         <div className={styles.chartCard}>
           <div className={styles.chainHeader}>
             <div className={styles.chainTitle}>Staked funds</div>
-            <div className={styles.chainPills}>
-              <button
-                className={`${styles.chainPill} ${styles.chainPillActive} ${styles.chainPillAll}`}
-                type="button"
-              >
-                All
-              </button>
-              <button className={styles.chainPill} type="button">
-                <span className={styles.chainPillIcon} aria-hidden="true" />
-                Terra Classic
-              </button>
-            </div>
           </div>
           <div className={styles.chartContent}>
             <div className={styles.donut}>

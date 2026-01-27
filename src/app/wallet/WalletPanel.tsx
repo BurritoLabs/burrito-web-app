@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { SVGProps } from "react"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletProvider"
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_DENOMS } from "../chain"
-import { fetchBalances, fetchPrices } from "../data/classic"
+import {
+  fetchBalances,
+  fetchFxRates,
+  fetchPrices,
+  fetchSwapRates,
+  getCachedFxRates,
+  getCachedPrices
+} from "../data/classic"
+import { useCw20Balances } from "../data/cw20"
+import { useCw20Whitelist, useIbcWhitelist } from "../data/terraAssets"
+import ManageTokensModal from "./ManageTokensModal"
+import type { ManageTokenItem } from "./ManageTokensModal"
 import {
   formatPercent,
   formatTokenAmount,
@@ -13,6 +24,100 @@ import {
 } from "../utils/format"
 
 type IconProps = SVGProps<SVGSVGElement>
+
+const ASSET_URL = "https://assets.terra.dev"
+
+type AssetRow = {
+  kind: "native" | "ibc" | "cw20"
+  denom: string
+  symbol: string
+  name: string
+  decimals: number
+  amount: string
+  price?: number
+  change?: number
+  value?: number
+  chainCount: number
+  whitelisted: boolean
+  iconCandidates: string[]
+}
+
+const isAssetRow = (row: AssetRow | undefined): row is AssetRow => Boolean(row)
+
+const formatDenom = (denom: string, isClassic?: boolean) => {
+  if (!denom) return ""
+  if (denom.startsWith("u")) {
+    const f = denom.slice(1)
+    if (f.length > 3) {
+      return f === "luna" ? (isClassic ? "LUNC" : "Luna") : f.toUpperCase()
+    }
+    return f.slice(0, 2).toUpperCase() + `T${isClassic ? "C" : ""}`
+  }
+  return denom
+}
+
+const buildIconCandidates = ({
+  icon,
+  denom,
+  isClassic
+}: {
+  icon?: string
+  denom: string
+  isClassic: boolean
+}) => {
+  const isClassicStable = isClassic && formatDenom(denom, true).endsWith("TC")
+  const iconDenom = denom === "uluna" ? "LUNC" : formatDenom(denom, false)
+  const candidates = [
+    icon,
+    `${ASSET_URL}/icon/60/${iconDenom}.png`,
+    `${ASSET_URL}/icon/svg/${iconDenom}.svg`,
+    `${ASSET_URL}/icon/60/${String(iconDenom).toUpperCase()}.png`,
+    `${ASSET_URL}/icon/svg/${String(iconDenom).toUpperCase()}.svg`,
+    `${ASSET_URL}/icon/60/${String(iconDenom).toLowerCase()}.png`,
+    ...(iconDenom === "LUNA"
+      ? [`${ASSET_URL}/icon/svg/Luna.svg`, `${ASSET_URL}/icon/60/Luna.png`]
+      : []),
+    ...(isClassicStable
+      ? [
+          `${ASSET_URL}/icon/svg/USTC.svg`,
+          `${ASSET_URL}/icon/60/USTC.png`,
+          `${ASSET_URL}/icon/60/ustc.png`
+        ]
+      : []),
+    `${ASSET_URL}/icon/svg/CW.svg`
+  ].filter(Boolean) as string[]
+
+  return candidates
+}
+
+const AssetIcon = ({
+  symbol,
+  candidates
+}: {
+  symbol: string
+  candidates: string[]
+}) => {
+  const [index, setIndex] = useState(0)
+  const [failed, setFailed] = useState(false)
+
+  if (failed || !candidates.length) {
+    return <span>{symbol.slice(0, 1)}</span>
+  }
+
+  return (
+    <img
+      src={candidates[index]}
+      alt={symbol}
+      onError={() => {
+        if (index < candidates.length - 1) {
+          setIndex(index + 1)
+        } else {
+          setFailed(true)
+        }
+      }}
+    />
+  )
+}
 
 const WalletCloseIcon = (props: IconProps) => (
   <svg viewBox="0 0 8 20" width="18" height="18" aria-hidden="true" {...props}>
@@ -116,26 +221,53 @@ const PriceDownIcon = (props: IconProps) => (
   </svg>
 )
 
-type AssetDenom =
-  | typeof CLASSIC_DENOMS.lunc.coinMinimalDenom
-  | typeof CLASSIC_DENOMS.ustc.coinMinimalDenom
-
 type SelectedAsset = {
-  symbol: "LUNC" | "USTC"
+  symbol: string
   name: string
-  denom: AssetDenom
+  denom: string
+  decimals: number
 }
 
 const WalletPanel = () => {
   const { account } = useWallet()
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === "undefined") return false
+    return window.localStorage.getItem("burritoWalletOpen") === "true"
+  })
+  const [animateOpen, setAnimateOpen] = useState(false)
+  const hasAnimatedRef = useRef(false)
   const [view, setView] = useState<"wallet" | "send" | "receive" | "asset">(
     "wallet"
   )
+  const [manageOpen, setManageOpen] = useState(false)
+  const [manageSearch, setManageSearch] = useState("")
+  const [hideNonWhitelisted, setHideNonWhitelisted] = useState(false)
+  const [hideLowBalance, setHideLowBalance] = useState(() => {
+    if (typeof window === "undefined") return true
+    const stored = window.localStorage.getItem("burritoHideLowBalance")
+    return stored ? stored === "true" : true
+  })
+  const [hiddenTokens, setHiddenTokens] = useState<string[]>(() => {
+    if (typeof window === "undefined") return []
+    const stored = window.localStorage.getItem("burritoHiddenTokens")
+    if (!stored) return []
+    try {
+      const parsed = JSON.parse(stored) as string[]
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter(
+        (key) =>
+          key !== CLASSIC_DENOMS.lunc.coinMinimalDenom &&
+          key !== CLASSIC_DENOMS.ustc.coinMinimalDenom
+      )
+    } catch {
+      return []
+    }
+  })
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset>({
     symbol: "LUNC",
     name: "Terra Classic",
-    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+    decimals: CLASSIC_DENOMS.lunc.coinDecimals
   })
 
   const { data: balances = [] } = useQuery({
@@ -144,12 +276,97 @@ const WalletPanel = () => {
     enabled: Boolean(account?.address)
   })
 
+  const cachedPrices = useMemo(() => getCachedPrices(), [])
   const { data: prices } = useQuery({
     queryKey: ["prices"],
     queryFn: fetchPrices,
     staleTime: 60_000,
-    refetchInterval: 120_000
+    refetchInterval: 120_000,
+    initialData: cachedPrices?.data,
+    initialDataUpdatedAt: cachedPrices?.ts
   })
+  const cachedFxRates = useMemo(() => getCachedFxRates(), [])
+  const { data: fxRates } = useQuery({
+    queryKey: ["fx-rates"],
+    queryFn: fetchFxRates,
+    staleTime: 12 * 60 * 60 * 1000,
+    refetchInterval: 12 * 60 * 60 * 1000,
+    initialData: cachedFxRates?.data,
+    initialDataUpdatedAt: cachedFxRates?.ts
+  })
+
+  const { data: swapRates = [] } = useQuery({
+    queryKey: ["swaprates", CLASSIC_DENOMS.ustc.coinMinimalDenom],
+    queryFn: () => fetchSwapRates(CLASSIC_DENOMS.ustc.coinMinimalDenom),
+    staleTime: 300_000
+  })
+
+  const { data: cw20Whitelist } = useCw20Whitelist()
+  const { data: ibcWhitelist } = useIbcWhitelist()
+  const { data: cw20Balances = [] } = useCw20Balances(
+    account?.address,
+    cw20Whitelist
+  )
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        "burritoHiddenTokens",
+        JSON.stringify(hiddenTokens)
+      )
+    }
+  }, [hiddenTokens])
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        "burritoHideLowBalance",
+        String(hideLowBalance)
+      )
+    }
+  }, [hideLowBalance])
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("burritoWalletOpen", String(isOpen))
+      const offset =
+        window.innerWidth >= 992 && isOpen ? "var(--wallet-width)" : "0px"
+      document.documentElement.style.setProperty("--wallet-offset", offset)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const handleResize = () => {
+      const offset =
+        window.innerWidth >= 992 && isOpen ? "var(--wallet-width)" : "0px"
+      document.documentElement.style.setProperty("--wallet-offset", offset)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (hasAnimatedRef.current) return
+    hasAnimatedRef.current = true
+    if (!isOpen) return
+    setAnimateOpen(true)
+    const timer = window.setTimeout(() => setAnimateOpen(false), 450)
+    return () => window.clearTimeout(timer)
+  }, [isOpen])
+
+  const toggleHiddenToken = (key: string) => {
+    if (
+      key === CLASSIC_DENOMS.lunc.coinMinimalDenom ||
+      key === CLASSIC_DENOMS.ustc.coinMinimalDenom
+    ) {
+      return
+    }
+    setHiddenTokens((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+    )
+  }
 
   const getBalance = useMemo(() => {
     const map = new Map(balances.map((coin) => [coin.denom, coin.amount]))
@@ -157,34 +374,422 @@ const WalletPanel = () => {
   }, [balances])
 
   const luncAmount = getBalance(CLASSIC_DENOMS.lunc.coinMinimalDenom)
-  const ustcAmount = getBalance(CLASSIC_DENOMS.ustc.coinMinimalDenom)
   const luncPrice = prices?.lunc?.usd
   const ustcPrice = prices?.ustc?.usd
   const luncChange = prices?.lunc?.usd_24h_change
   const ustcChange = prices?.ustc?.usd_24h_change
 
-  const luncValue =
-    luncPrice !== undefined
-      ? toUnitAmount(luncAmount, CLASSIC_DENOMS.lunc.coinDecimals) * luncPrice
-      : undefined
-  const ustcValue =
-    ustcPrice !== undefined
-      ? toUnitAmount(ustcAmount, CLASSIC_DENOMS.ustc.coinDecimals) * ustcPrice
-      : undefined
-  const netWorth =
-    luncValue !== undefined || ustcValue !== undefined
-      ? (luncValue ?? 0) + (ustcValue ?? 0)
-      : undefined
-  const netWorthDisplay = account ? formatUsd(netWorth) : "$0.00"
-  const netWorthValue = netWorthDisplay === "--" ? "$0.00" : netWorthDisplay
+  const assetRows = useMemo<AssetRow[]>(() => {
+    const swapRateMap = new Map(
+      swapRates.map((item) => [item.denom, Number(item.swaprate)])
+    )
+    const calcValueFromSwaprate = (
+      amount: string,
+      swaprate?: number,
+      isClassicStable?: boolean
+    ) => {
+      if (!swaprate) return undefined
+      const base = Number(amount) / swaprate / 1e6
+      if (isClassicStable) {
+        return ustcPrice ? base * ustcPrice : undefined
+      }
+      return base
+    }
 
-  const selectedBalance = getBalance(selectedAsset.denom)
-  const selectedDecimals =
-    selectedAsset.symbol === "USTC"
-      ? CLASSIC_DENOMS.ustc.coinDecimals
-      : CLASSIC_DENOMS.lunc.coinDecimals
-  const selectedPrice =
-    selectedAsset.symbol === "USTC" ? ustcPrice : luncPrice
+    const calcFxFallback = (amount: string, denom?: string) => {
+      if (!ustcPrice || !denom) return undefined
+      const lower = denom.toLowerCase()
+      const fx =
+        lower === "umnt"
+          ? fxRates?.MNT
+          : lower === "utwd"
+          ? fxRates?.TWD
+          : undefined
+      if (!fx) return undefined
+      return (Number(amount) / 1e6) * fx * ustcPrice
+    }
+
+    const nativeRows = (balances ?? [])
+      .filter((coin) => Number(coin.amount) > 0)
+      .map((coin): AssetRow => {
+        const isClassic = true
+        const swaprate = swapRateMap.get(coin.denom)
+        const classicSymbol = formatDenom(coin.denom, true)
+        const isClassicStable = classicSymbol.endsWith("TC")
+        const valueFromSwaprate =
+          calcValueFromSwaprate(
+            coin.amount,
+            swaprate,
+            isClassicStable
+          ) ?? calcFxFallback(coin.amount, coin.denom)
+
+        if (coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
+          const value =
+            luncPrice !== undefined
+              ? toUnitAmount(coin.amount, CLASSIC_DENOMS.lunc.coinDecimals) *
+                luncPrice
+              : valueFromSwaprate
+          const unitAmount = toUnitAmount(
+            coin.amount,
+            CLASSIC_DENOMS.lunc.coinDecimals
+          )
+          const price =
+            value !== undefined && unitAmount > 0 ? value / unitAmount : luncPrice
+
+          return {
+            kind: "native",
+            denom: coin.denom,
+            symbol: "LUNC",
+            name: "Terra Classic",
+            decimals: CLASSIC_DENOMS.lunc.coinDecimals,
+            amount: coin.amount,
+            price,
+            change: luncChange,
+            value,
+            chainCount: 1,
+            whitelisted: true,
+            iconCandidates: buildIconCandidates({
+              icon: undefined,
+              denom: coin.denom,
+              isClassic
+            })
+          }
+        }
+
+        if (coin.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) {
+          const value =
+            ustcPrice !== undefined
+              ? toUnitAmount(coin.amount, CLASSIC_DENOMS.ustc.coinDecimals) *
+                ustcPrice
+              : valueFromSwaprate
+          const unitAmount = toUnitAmount(
+            coin.amount,
+            CLASSIC_DENOMS.ustc.coinDecimals
+          )
+          const price =
+            value !== undefined && unitAmount > 0 ? value / unitAmount : ustcPrice
+
+          return {
+            kind: "native",
+            denom: coin.denom,
+            symbol: "USTC",
+            name: "Stablecoin",
+            decimals: CLASSIC_DENOMS.ustc.coinDecimals,
+            amount: coin.amount,
+            price,
+            change: ustcChange,
+            value,
+            chainCount: 1,
+            whitelisted: true,
+            iconCandidates: buildIconCandidates({
+              icon: undefined,
+              denom: coin.denom,
+              isClassic
+            })
+          }
+        }
+
+        if (coin.denom.startsWith("ibc/")) {
+          const hash = coin.denom.replace("ibc/", "")
+          const ibcToken = ibcWhitelist?.[hash]
+          const symbol = ibcToken?.symbol ?? "IBC"
+          const name = ibcToken?.name ?? symbol
+          const decimals = ibcToken?.decimals ?? 6
+          const unitAmount = toUnitAmount(coin.amount, decimals)
+          const baseDenom = ibcToken?.base_denom ?? coin.denom
+          const isClassicStableIbc = formatDenom(baseDenom, true).endsWith("TC")
+          const value = calcValueFromSwaprate(
+            coin.amount,
+            swaprate,
+            isClassicStableIbc
+          ) ?? calcFxFallback(coin.amount, baseDenom)
+          const price =
+            value !== undefined && unitAmount > 0 ? value / unitAmount : undefined
+
+          return {
+            kind: "ibc",
+            denom: coin.denom,
+            symbol,
+            name,
+            decimals,
+            amount: coin.amount,
+            price,
+            change: undefined,
+            value,
+            chainCount: 1,
+            whitelisted: Boolean(ibcToken),
+            iconCandidates: buildIconCandidates({
+              icon: ibcToken?.icon,
+              denom: ibcToken?.base_denom ?? coin.denom,
+              isClassic
+            })
+          }
+        }
+
+        const displaySymbol = formatDenom(coin.denom, true)
+        const unitAmount = toUnitAmount(coin.amount, 6)
+        const value = valueFromSwaprate ?? calcFxFallback(coin.amount, coin.denom)
+        const price =
+          value !== undefined && unitAmount > 0 ? value / unitAmount : undefined
+
+        return {
+          kind: "native",
+          denom: coin.denom,
+          symbol: displaySymbol,
+          name: displaySymbol,
+          decimals: 6,
+          amount: coin.amount,
+          price,
+          change: undefined,
+          value,
+          chainCount: 1,
+          whitelisted: false,
+          iconCandidates: buildIconCandidates({
+            icon: undefined,
+            denom: coin.denom,
+            isClassic
+          })
+        }
+      })
+
+    const hasLunc = nativeRows.some(
+      (row) => row.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+    )
+    const hasUstc = nativeRows.some(
+      (row) => row.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+    )
+
+    if (!hasLunc) {
+      const amount = getBalance(CLASSIC_DENOMS.lunc.coinMinimalDenom) ?? "0"
+      const unitAmount = toUnitAmount(
+        amount,
+        CLASSIC_DENOMS.lunc.coinDecimals
+      )
+      nativeRows.push({
+        kind: "native",
+        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+        symbol: "LUNC",
+        name: "Terra Classic",
+        decimals: CLASSIC_DENOMS.lunc.coinDecimals,
+        amount,
+        price: luncPrice,
+        change: luncChange,
+        value: luncPrice !== undefined ? unitAmount * luncPrice : undefined,
+        chainCount: 1,
+        whitelisted: true,
+        iconCandidates: buildIconCandidates({
+          icon: undefined,
+          denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+          isClassic: true
+        })
+      })
+    }
+
+    if (!hasUstc) {
+      const amount = getBalance(CLASSIC_DENOMS.ustc.coinMinimalDenom) ?? "0"
+      const unitAmount = toUnitAmount(
+        amount,
+        CLASSIC_DENOMS.ustc.coinDecimals
+      )
+      nativeRows.push({
+        kind: "native",
+        denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
+        symbol: "USTC",
+        name: "Stablecoin",
+        decimals: CLASSIC_DENOMS.ustc.coinDecimals,
+        amount,
+        price: ustcPrice,
+        change: ustcChange,
+        value: ustcPrice !== undefined ? unitAmount * ustcPrice : undefined,
+        chainCount: 1,
+        whitelisted: true,
+        iconCandidates: buildIconCandidates({
+          icon: undefined,
+          denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
+          isClassic: true
+        })
+      })
+    }
+
+    const cw20Rows =
+      cw20Balances
+        ?.filter((token) => Number(token.balance) > 0)
+        .map((token): AssetRow => {
+          const unitAmount = toUnitAmount(token.balance, token.decimals ?? 6)
+          const price =
+            token.symbol === "LUNC"
+              ? luncPrice
+              : token.symbol === "USTC"
+              ? ustcPrice
+              : undefined
+          const value =
+            price !== undefined && unitAmount > 0 ? unitAmount * price : undefined
+
+          return {
+            kind: "cw20",
+            denom: token.address,
+            symbol: token.symbol,
+            name: token.name ?? token.symbol,
+            decimals: token.decimals ?? 6,
+            amount: token.balance,
+            price,
+            change: undefined,
+            value,
+            chainCount: 1,
+            whitelisted: true,
+            iconCandidates: [token.icon, `${ASSET_URL}/icon/svg/CW.svg`].filter(
+              Boolean
+            ) as string[]
+          }
+        }) ?? []
+
+    const sortByValueDesc = (
+      a: { value?: number; amount: string; decimals: number; symbol: string },
+      b: { value?: number; amount: string; decimals: number; symbol: string }
+    ) => {
+      const aValue = a.value ?? toUnitAmount(a.amount, a.decimals)
+      const bValue = b.value ?? toUnitAmount(b.amount, b.decimals)
+      if (aValue === bValue) {
+        return a.symbol.localeCompare(b.symbol)
+      }
+      return bValue - aValue
+    }
+
+    const luncRow = nativeRows.find(
+      (row) => row.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+    )
+    const ustcRow = nativeRows.find(
+      (row) => row.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+    )
+    const nativeNonIbc = nativeRows.filter(
+      (row) =>
+        row.denom !== CLASSIC_DENOMS.lunc.coinMinimalDenom &&
+        row.denom !== CLASSIC_DENOMS.ustc.coinMinimalDenom &&
+        !row.denom.startsWith("ibc/")
+    )
+    const ibcRows = nativeRows.filter((row) => row.denom.startsWith("ibc/"))
+
+    const sortedNative = nativeNonIbc.sort(sortByValueDesc)
+    const sortedIbc = ibcRows.sort(sortByValueDesc)
+    const sortedCw20 = cw20Rows.sort(sortByValueDesc)
+
+    return [
+      luncRow,
+      ustcRow,
+      ...sortedNative,
+      ...sortedCw20,
+      ...sortedIbc
+    ].filter(isAssetRow)
+  }, [
+    balances,
+    cw20Balances,
+    ibcWhitelist,
+    luncChange,
+    luncPrice,
+    swapRates,
+    ustcChange,
+    ustcPrice
+  ])
+
+  const hiddenTokenSet = useMemo(
+    () => new Set(hiddenTokens),
+    [hiddenTokens]
+  )
+
+  const filteredAssetRows = useMemo(() => {
+    let list = assetRows.filter((asset) => !hiddenTokenSet.has(asset.denom))
+    if (hideNonWhitelisted) {
+      list = list.filter((asset) => asset.whitelisted)
+    }
+    if (!hideLowBalance) return list
+    return list.filter((asset) => {
+      if (
+        asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ||
+        asset.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+      ) {
+        return true
+      }
+      if (asset.kind === "cw20" || asset.kind === "ibc") {
+        return toUnitAmount(asset.amount, asset.decimals) >= 0.01
+      }
+      return asset.value !== undefined && asset.value >= 1
+    })
+  }, [assetRows, hiddenTokenSet, hideLowBalance, hideNonWhitelisted])
+
+  const manageItems = useMemo<ManageTokenItem[]>(() => {
+    const nativeItems: ManageTokenItem[] = [
+      {
+        key: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+        symbol: "LUNC",
+        name: "Luna Classic",
+        iconCandidates: buildIconCandidates({
+          icon: undefined,
+          denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+          isClassic: true
+        }),
+        enabled: !hiddenTokenSet.has(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+      },
+      {
+        key: CLASSIC_DENOMS.ustc.coinMinimalDenom,
+        symbol: "USTC",
+        name: "TerraClassicUSD",
+        iconCandidates: buildIconCandidates({
+          icon: undefined,
+          denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
+          isClassic: true
+        }),
+        enabled: !hiddenTokenSet.has(CLASSIC_DENOMS.ustc.coinMinimalDenom)
+      }
+    ]
+
+    const ibcItems = Object.entries(ibcWhitelist ?? {}).map(
+      ([hash, token]) => ({
+        key: `ibc/${hash}`,
+        symbol: token.symbol,
+        name: token.name,
+        iconCandidates: buildIconCandidates({
+          icon: token.icon,
+          denom: token.base_denom,
+          isClassic: true
+        }),
+        enabled: !hiddenTokenSet.has(`ibc/${hash}`)
+      })
+    )
+
+    const cw20Items = Object.entries(cw20Whitelist ?? {}).map(
+      ([address, token]) => ({
+        key: address,
+        symbol: token.symbol,
+        name: token.name ?? token.protocol,
+        iconCandidates: [token.icon, `${ASSET_URL}/icon/svg/CW.svg`].filter(
+          Boolean
+        ) as string[],
+        enabled: !hiddenTokenSet.has(address)
+      })
+    )
+
+    const list = [...nativeItems, ...ibcItems, ...cw20Items]
+    return list.sort((a, b) => a.symbol.localeCompare(b.symbol))
+  }, [cw20Whitelist, hiddenTokenSet, ibcWhitelist])
+
+  const netWorth = assetRows.reduce((sum, asset) => sum + (asset.value ?? 0), 0)
+  const netWorthDisplay = account ? formatUsd(netWorth) : "$0.00"
+  const netWorthValue =
+    netWorthDisplay === "--" || netWorthDisplay === "$0"
+      ? "$0.00"
+      : netWorthDisplay
+
+  const selectedCw20Balance = cw20Balances.find(
+    (token) => token.address === selectedAsset.denom
+  )?.balance
+  const selectedBalance = selectedCw20Balance ?? getBalance(selectedAsset.denom)
+  const selectedAssetRow = assetRows.find(
+    (asset) => asset.denom === selectedAsset.denom
+  )
+  const selectedDecimals = selectedAssetRow?.decimals ?? selectedAsset.decimals
+  const selectedPrice = selectedAssetRow?.price
+  const selectedSymbol = selectedAssetRow?.symbol ?? selectedAsset.symbol
+  const selectedIconCandidates = selectedAssetRow?.iconCandidates ?? []
   const selectedValue =
     selectedPrice !== undefined
       ? toUnitAmount(selectedBalance, selectedDecimals) * selectedPrice
@@ -208,13 +813,16 @@ const WalletPanel = () => {
         <div className={styles.details}>
           <div className={styles.assetDetails}>
             <div className={styles.assetBadgeLarge}>
-              {selectedAsset.symbol.slice(0, 1)}
+              <AssetIcon
+                symbol={selectedSymbol}
+                candidates={selectedIconCandidates}
+              />
             </div>
             <div className={styles.assetDetailValue}>
               {account ? formatUsd(selectedValue) : "--"}
             </div>
             <div className={styles.assetDetailAmount}>
-              {account ? `${selectedAmountDisplay} ${selectedAsset.symbol}` : "--"}
+              {account ? `${selectedAmountDisplay} ${selectedSymbol}` : "--"}
             </div>
           </div>
         </div>
@@ -417,107 +1025,100 @@ const WalletPanel = () => {
       <div className={styles.assetList}>
         <div className={styles.assetHeader}>
           <div className={styles.assetTitle}>Assets</div>
-          <button className={styles.manageButton} type="button">
+          <button
+            className={styles.manageButton}
+            type="button"
+            onClick={() => setManageOpen(true)}
+          >
             Manage
             <ManageIcon />
           </button>
         </div>
 
         <div className={styles.assetRows}>
-          <div
-            className={styles.assetRow}
-            onClick={() => {
-              setSelectedAsset({
-                symbol: "LUNC",
-                name: "Terra Classic",
-                denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
-              })
-              setView("asset")
-            }}
-          >
-            <div className={styles.assetInfo}>
-              <div className={styles.assetBadge}>L</div>
-              <div className={styles.assetRowDetails}>
-                <div className={styles.assetTopRow}>
-                  <div className={styles.assetSymbol}>
-                    <span className={styles.assetSymbolName}>LUNC</span>
-                    <span className={styles.chainCount}>1</span>
-                  </div>
-                  <div className={styles.assetPrice}>
-                    {formatUsd(luncPrice)}
-                  </div>
-                </div>
-                <div className={styles.assetBottomRow}>
-                  <div
-                    className={`${styles.assetChange} ${
-                      (luncChange ?? 0) >= 0
-                        ? styles.assetChangeUp
-                        : styles.assetChangeDown
-                    }`}
-                  >
-                    {(luncChange ?? 0) >= 0 ? <PriceUpIcon /> : <PriceDownIcon />}
-                    {formatPercent(luncChange)}
-                  </div>
-                  <div className={styles.assetAmount}>
-                    {account
-                      ? `${formatTokenAmount(
-                          luncAmount,
-                          CLASSIC_DENOMS.lunc.coinDecimals,
-                          2
-                        )} LUNC`
-                      : "--"}
-                  </div>
-                </div>
-              </div>
+          {filteredAssetRows.length === 0 ? (
+            <div className={styles.assetEmpty}>
+              {account ? "No assets found" : "Connect a wallet to view assets"}
             </div>
-          </div>
-          <div
-            className={styles.assetRow}
-            onClick={() => {
-              setSelectedAsset({
-                symbol: "USTC",
-                name: "Stablecoin",
-                denom: CLASSIC_DENOMS.ustc.coinMinimalDenom
-              })
-              setView("asset")
-            }}
-          >
-            <div className={styles.assetInfo}>
-              <div className={styles.assetBadge}>U</div>
-              <div className={styles.assetRowDetails}>
-                <div className={styles.assetTopRow}>
-                  <div className={styles.assetSymbol}>
-                    <span className={styles.assetSymbolName}>USTC</span>
-                    <span className={styles.chainCount}>1</span>
-                  </div>
-                  <div className={styles.assetPrice}>
-                    {formatUsd(ustcPrice)}
+          ) : (
+            filteredAssetRows.map((asset) => {
+              const hasChange = asset.change !== undefined
+              const changeValue = asset.change ?? 0
+              return (
+                <div
+                  key={asset.denom}
+                  className={styles.assetRow}
+                  onClick={() => {
+                    setSelectedAsset({
+                      symbol: asset.symbol,
+                      name: asset.name,
+                      denom: asset.denom,
+                      decimals: asset.decimals
+                    })
+                    setView("asset")
+                  }}
+                >
+                  <div className={styles.assetInfo}>
+                    <div
+                      className={styles.assetBadge}
+                      data-chain={asset.chainCount > 1 ? "multi" : "single"}
+                    >
+                      <AssetIcon
+                        symbol={asset.symbol}
+                        candidates={asset.iconCandidates ?? []}
+                      />
+                    </div>
+                    <div className={styles.assetRowDetails}>
+                      <div className={styles.assetTopRow}>
+                        <div className={styles.assetSymbol}>
+                          <span className={styles.assetSymbolName}>
+                            {asset.symbol}
+                          </span>
+                          {asset.chainCount > 1 ? (
+                            <span className={styles.chainCount}>
+                              {asset.chainCount}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className={styles.assetPrice}>
+                          {formatUsd(asset.value)}
+                        </div>
+                      </div>
+                      <div className={styles.assetBottomRow}>
+                        <div
+                          className={`${styles.assetChange} ${
+                            hasChange
+                              ? changeValue >= 0
+                                ? styles.assetChangeUp
+                                : styles.assetChangeDown
+                              : styles.assetChangeMuted
+                          }`}
+                        >
+                          {hasChange ? (
+                            changeValue >= 0 ? (
+                              <PriceUpIcon />
+                            ) : (
+                              <PriceDownIcon />
+                            )
+                          ) : null}
+                          {hasChange ? formatPercent(changeValue) : "--"}
+                        </div>
+                        <div className={styles.assetAmount}>
+                          {account
+                            ? `${formatTokenAmount(
+                                asset.amount,
+                                asset.decimals,
+                                2
+                              )} ${asset.symbol}`
+                            : "--"}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className={styles.assetBottomRow}>
-                  <div
-                    className={`${styles.assetChange} ${
-                      (ustcChange ?? 0) >= 0
-                        ? styles.assetChangeUp
-                        : styles.assetChangeDown
-                    }`}
-                  >
-                    {(ustcChange ?? 0) >= 0 ? <PriceUpIcon /> : <PriceDownIcon />}
-                    {formatPercent(ustcChange)}
-                  </div>
-                  <div className={styles.assetAmount}>
-                    {account
-                      ? `${formatTokenAmount(
-                          ustcAmount,
-                          CLASSIC_DENOMS.ustc.coinDecimals,
-                          2
-                        )} USTC`
-                      : "--"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+              )
+            })
+          )}
         </div>
       </div>
     )
@@ -551,39 +1152,59 @@ const WalletPanel = () => {
   }
 
   return (
-    <aside className={`${styles.wallet} ${!isOpen ? styles.closed : ""}`}>
-      <button
-        className={styles.close}
-        onClick={() => setIsOpen((open) => !open)}
-        aria-label="Toggle wallet"
-        type="button"
+    <>
+      <aside
+        className={`${styles.wallet} ${!isOpen ? styles.closed : ""} ${
+          animateOpen ? styles.animateOpen : ""
+        }`}
       >
-        {isOpen ? (
-          <>
-            <WalletCloseIcon className={styles.closeIcon} />
-            <CloseIcon className={styles.closeIconMobile} />
-          </>
-        ) : (
-          <>
-            <span>Wallet</span>
-            <WalletIcon className={styles.walletIcon} />
-          </>
-        )}
-      </button>
-      {view !== "wallet" ? (
         <button
-          className={styles.backButton}
+          className={styles.close}
+          onClick={() => setIsOpen((open) => !open)}
+          aria-label="Toggle wallet"
           type="button"
-          onClick={() => setView("wallet")}
-          aria-label="Back to wallet"
         >
-          <span />
+          {isOpen ? (
+            <>
+              <WalletCloseIcon className={styles.closeIcon} />
+              <CloseIcon className={styles.closeIconMobile} />
+            </>
+          ) : (
+            <>
+              <span>Wallet</span>
+              <WalletIcon className={styles.walletIcon} />
+            </>
+          )}
         </button>
-      ) : null}
-      {renderDetails()}
-      {renderBody()}
-      {renderActions()}
-    </aside>
+        {view !== "wallet" ? (
+          <button
+            className={styles.backButton}
+            type="button"
+            onClick={() => setView("wallet")}
+            aria-label="Back to wallet"
+          >
+            <span />
+          </button>
+        ) : null}
+        {renderDetails()}
+        {renderBody()}
+        {renderActions()}
+      </aside>
+      <ManageTokensModal
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        items={manageItems}
+        search={manageSearch}
+        onSearchChange={setManageSearch}
+        hideNonWhitelisted={hideNonWhitelisted}
+        onToggleHideNonWhitelisted={() =>
+          setHideNonWhitelisted((value) => !value)
+        }
+        hideLowBalance={hideLowBalance}
+        onToggleHideLowBalance={() => setHideLowBalance((value) => !value)}
+        onToggleToken={toggleHiddenToken}
+      />
+    </>
   )
 }
 

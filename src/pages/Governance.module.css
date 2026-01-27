@@ -39,16 +39,22 @@
   align-items: center;
   gap: 8px;
   min-width: 4rem;
+  min-height: 32px;
   border: var(--border-width) solid var(--card-border);
   border-radius: 1rem;
-  padding: 2px 16px;
+  padding: 6px 16px;
   color: var(--text-muted);
-  box-shadow: inset 0 0 0 0.5px var(--card-border);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.16);
   transition: all 0.1s ease;
   opacity: 0.75;
   font-size: var(--font-size-small);
   font-weight: var(--bold);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
+  line-height: 1;
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
 .chainPill:hover {
@@ -132,6 +138,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 34px;
   font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
 }
@@ -148,8 +155,8 @@
 
 .proposalTag::before {
   content: "";
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--button-default-bg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
@@ -158,20 +165,29 @@
 .statusPill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  height: 22px;
+  box-sizing: border-box;
   padding: 4px 10px;
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  font-size: var(--font-size-xxs);
-  font-weight: var(--bold);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: capitalize;
+  line-height: 1;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25),
+    0 6px 16px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
 .statusVoting {
-  color: #52c41a;
-  border-color: rgba(82, 196, 26, 0.4);
-  background: rgba(82, 196, 26, 0.12);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.16);
 }
 
 .statusDeposit {
@@ -193,17 +209,27 @@
 }
 
 .proposalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+
+.proposalTitleBlock {
+  min-width: 0;
 }
 
 .proposalHeader strong {
   display: block;
-  font-size: var(--font-size-title-xl);
+  font-size: var(--font-size-title-lg);
   color: #ffffff;
-  font-weight: var(--normal);
+  font-weight: var(--bold);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .proposalHeader span {
@@ -211,6 +237,11 @@
   font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
   margin-top: 4px;
+}
+
+.proposalAction {
+  align-self: start;
+  white-space: nowrap;
 }
 
 .proposalMeta {
@@ -224,8 +255,13 @@
 .proposalMeta span {
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    0 6px 16px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
 @media (min-width: 992px) {

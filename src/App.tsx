@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { useNav } from "./app/routes"
 import Layout, {
-  Banner,
   Content,
   Header,
   MainContainer,

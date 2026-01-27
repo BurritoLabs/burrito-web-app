@@ -24,6 +24,11 @@ export const CLASSIC_DENOMS = {
 } as const
 
 const prefix = CLASSIC_CHAIN.bech32Prefix
+const GAS_PRICE_STEP = {
+  low: 28.325,
+  average: 28.325,
+  high: 50
+}
 
 export const KEPLR_CHAIN_CONFIG = {
   chainId: CLASSIC_CHAIN.chainId,
@@ -42,11 +47,11 @@ export const KEPLR_CHAIN_CONFIG = {
     bech32PrefixConsPub: `${prefix}valconspub`
   },
   currencies: [CLASSIC_DENOMS.lunc, CLASSIC_DENOMS.ustc],
-  feeCurrencies: [CLASSIC_DENOMS.lunc],
-  stakeCurrency: CLASSIC_DENOMS.lunc,
-  gasPriceStep: {
-    low: 28.325,
-    average: 28.325,
-    high: 50
-  }
+  feeCurrencies: [
+    {
+      ...CLASSIC_DENOMS.lunc,
+      gasPriceStep: GAS_PRICE_STEP
+    }
+  ],
+  stakeCurrency: CLASSIC_DENOMS.lunc
 }

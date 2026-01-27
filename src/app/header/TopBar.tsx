@@ -36,15 +36,10 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
 
   return (
     <div className={styles.bar}>
+      <div className={styles.leftRail}>
+        <div className={styles.chainBadge}>Terra Classic</div>
+      </div>
       <div className={styles.actions}>
-        <div
-          className={styles.statusIndicator}
-          title={`LCD: ${CLASSIC_CHAIN.lcd}`}
-          aria-label={`LCD: ${CLASSIC_CHAIN.lcd}`}
-        >
-          <span className={styles.statusDot} aria-hidden="true" />
-          <span className={styles.statusLabel}>LCD</span>
-        </div>
         {showValidator ? (
           <button
             className={`uiButton uiButtonOutline ${styles.validatorButton}`}

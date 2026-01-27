@@ -1,0 +1,223 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 10, 8, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.modal {
+  width: min(520px, 100%);
+  max-height: min(70vh, 620px);
+  background: var(--card-bg);
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  font-size: var(--font-size-title-lg);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.closeButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+  color: rgba(234, 245, 235, 0.8);
+  position: relative;
+}
+
+.closeButton span {
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+  display: block;
+  position: absolute;
+}
+
+.closeButton span:first-child {
+  transform: rotate(45deg);
+}
+
+.closeButton span:last-child {
+  transform: rotate(-45deg);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.searchIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(234, 245, 235, 0.6);
+  position: relative;
+}
+
+.searchIcon::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 2px;
+  background: rgba(234, 245, 235, 0.6);
+  right: -5px;
+  bottom: -2px;
+  transform: rotate(45deg);
+  border-radius: 999px;
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: #ffffff;
+  font-size: var(--font-size);
+  outline: none;
+}
+
+.filters {
+  display: flex;
+  gap: 16px;
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.7);
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox input {
+  accent-color: #52c41a;
+}
+
+.list {
+  display: grid;
+  gap: 4px;
+  overflow-y: auto;
+  padding: 2px 0 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+.list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.list {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #ffffff;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.rowLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tokenIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.tokenIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tokenIconFallback {
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+.symbol {
+  font-size: var(--font-size);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.name {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--bold);
+  font-size: var(--font-size-small);
+}
+
+.toggleOn {
+  background: #52c41a;
+  color: #0c1411;
+}
+
+.toggleOff {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(234, 245, 235, 0.8);
+}

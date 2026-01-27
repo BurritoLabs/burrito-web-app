@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
@@ -20,27 +20,19 @@ const Governance = () => {
     staleTime: 60_000
   })
 
+  const [activeKey, setActiveKey] = useState("all")
+
   const chainFilters = (
     <div className={styles.panelHeader}>
       <div className={styles.chainPills}>
         <button
-          className={`${styles.chainPill} ${styles.chainPillAll}`}
+          className={`${styles.chainPill} ${styles.chainPillAll} ${
+            activeKey === "all" ? styles.chainPillActive : ""
+          }`}
           type="button"
+          onClick={() => setActiveKey("all")}
         >
-          All
-        </button>
-        <button
-          className={`${styles.chainPill} ${styles.chainPillActive}`}
-          type="button"
-        >
-          <span className={styles.chainPillIcon} aria-hidden="true" />
-          Terra Classic
-        </button>
-        <button
-          className={`${styles.chainPill} ${styles.chainPillCount}`}
-          type="button"
-        >
-          +8
+          All proposals
         </button>
       </div>
     </div>
@@ -94,7 +86,7 @@ const Governance = () => {
           </span>
         </div>
         <div className={styles.proposalHeader}>
-          <div>
+          <div className={styles.proposalTitleBlock}>
             <strong>{proposal.title}</strong>
             <span>
               {proposal.votingEndTime
@@ -105,7 +97,10 @@ const Governance = () => {
             </span>
           </div>
           {actionLabel ? (
-            <button className="uiButton uiButtonOutline" type="button">
+            <button
+              className={`uiButton uiButtonOutline ${styles.proposalAction}`}
+              type="button"
+            >
               {actionLabel}
             </button>
           ) : null}
@@ -150,103 +145,133 @@ const Governance = () => {
     </div>
   )
 
+  const renderList = (
+    list: ProposalItem[],
+    statusLabel: string,
+    statusClass: string,
+    emptyMessage: string,
+    actionLabel?: string
+  ) =>
+    list.length ? (
+      <div className={styles.proposals}>
+        {list.map((proposal) =>
+          renderProposal(proposal, statusLabel, statusClass, actionLabel)
+        )}
+      </div>
+    ) : (
+      renderEmptyState(emptyMessage)
+    )
+
+  const getAllContent = () => {
+    if (activeKey !== "all") return null
+    const hasAny =
+      normalized.voting.length ||
+      normalized.deposit.length ||
+      normalized.passed.length ||
+      normalized.rejected.length
+    return renderPanel(
+      hasAny ? (
+        <div className={styles.proposals}>
+          {normalized.voting.map((proposal) =>
+            renderProposal(proposal, "Voting", styles.statusVoting, "Vote")
+          )}
+          {normalized.deposit.map((proposal) =>
+            renderProposal(
+              proposal,
+              "Deposit",
+              styles.statusDeposit,
+              "Deposit"
+            )
+          )}
+          {normalized.passed.map((proposal) =>
+            renderProposal(proposal, "Passed", styles.statusPassed)
+          )}
+          {normalized.rejected.map((proposal) =>
+            renderProposal(proposal, "Rejected", styles.statusRejected)
+          )}
+        </div>
+      ) : (
+        renderEmptyState("No proposals")
+      )
+    )
+  }
+
+  const getVotingContent = () => {
+    if (activeKey !== "voting") return null
+    return renderPanel(
+      renderList(
+        normalized.voting,
+        "Voting",
+        styles.statusVoting,
+        "No proposals in voting period",
+        "Vote"
+      )
+    )
+  }
+
+  const getDepositContent = () => {
+    if (activeKey !== "deposit") return null
+    return renderPanel(
+      renderList(
+        normalized.deposit,
+        "Deposit",
+        styles.statusDeposit,
+        "No proposals in deposit period",
+        "Deposit"
+      )
+    )
+  }
+
+  const getPassedContent = () => {
+    if (activeKey !== "passed") return null
+    return renderPanel(
+      renderList(
+        normalized.passed,
+        "Passed",
+        styles.statusPassed,
+        "No passed proposals"
+      )
+    )
+  }
+
+  const getRejectedContent = () => {
+    if (activeKey !== "rejected") return null
+    return renderPanel(
+      renderList(
+        normalized.rejected,
+        "Rejected",
+        styles.statusRejected,
+        "No rejected proposals"
+      )
+    )
+  }
+
   const tabs = [
     {
       key: "all",
       label: "All",
-      content: renderPanel(
-        normalized.voting.length ||
-          normalized.deposit.length ||
-          normalized.passed.length ||
-          normalized.rejected.length ? (
-          <div className={styles.proposals}>
-            {normalized.voting.map((proposal) =>
-              renderProposal(proposal, "Voting", styles.statusVoting, "Vote")
-            )}
-            {normalized.deposit.map((proposal) =>
-              renderProposal(
-                proposal,
-                "Deposit",
-                styles.statusDeposit,
-                "Deposit"
-              )
-            )}
-            {normalized.passed.map((proposal) =>
-              renderProposal(proposal, "Passed", styles.statusPassed)
-            )}
-            {normalized.rejected.map((proposal) =>
-              renderProposal(proposal, "Rejected", styles.statusRejected)
-            )}
-          </div>
-        ) : (
-          renderEmptyState("No proposals")
-        )
-      )
+      content: getAllContent(),
+      hidden: true
     },
     {
       key: "voting",
       label: "Voting",
-      content: renderPanel(
-        normalized.voting.length ? (
-          <div className={styles.proposals}>
-            {normalized.voting.map((proposal) =>
-              renderProposal(proposal, "Voting", styles.statusVoting, "Vote")
-            )}
-          </div>
-        ) : (
-          renderEmptyState("No proposals in voting period")
-        )
-      )
+      content: getVotingContent()
     },
     {
       key: "deposit",
       label: "Deposit",
-      content: renderPanel(
-        normalized.deposit.length ? (
-          <div className={styles.proposals}>
-            {normalized.deposit.map((proposal) =>
-              renderProposal(
-                proposal,
-                "Deposit",
-                styles.statusDeposit,
-                "Deposit"
-              )
-            )}
-          </div>
-        ) : (
-          renderEmptyState("No proposals in deposit period")
-        )
-      )
+      content: getDepositContent()
     },
     {
       key: "passed",
       label: "Passed",
-      content: renderPanel(
-        normalized.passed.length ? (
-          <div className={styles.proposals}>
-            {normalized.passed.map((proposal) =>
-              renderProposal(proposal, "Passed", styles.statusPassed)
-            )}
-          </div>
-        ) : (
-          renderEmptyState("No passed proposals")
-        )
-      )
+      content: getPassedContent()
     },
     {
       key: "rejected",
       label: "Rejected",
-      content: renderPanel(
-        normalized.rejected.length ? (
-          <div className={styles.proposals}>
-            {normalized.rejected.map((proposal) =>
-              renderProposal(proposal, "Rejected", styles.statusRejected)
-            )}
-          </div>
-        ) : (
-          renderEmptyState("No rejected proposals")
-        )
-      )
+      content: getRejectedContent()
     }
   ]
 
@@ -259,7 +284,12 @@ const Governance = () => {
         </button>
       }
     >
-      <Tabs tabs={tabs} variant="card" />
+      <Tabs
+        tabs={tabs}
+        variant="card"
+        activeKey={activeKey}
+        onChange={(key) => setActiveKey(key)}
+      />
     </PageShell>
   )
 }

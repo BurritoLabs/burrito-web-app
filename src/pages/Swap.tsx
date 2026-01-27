@@ -56,38 +56,9 @@ const Swap = () => {
     </>
   ) : null
 
-  const poweredBy = (
-    <div className={styles.powered}>
-      Powered by{" "}
-      <a
-        className={styles.poweredLink}
-        href="https://tfm.com"
-        target="_blank"
-        rel="noreferrer"
-      >
-        TFM
-      </a>
-    </div>
-  )
-
   return (
-    <PageShell title="Swap" small banner={banner} extra={poweredBy}>
+    <PageShell title="Swap" small banner={banner}>
       <div className={styles.chainFilter}>
-        <div className={styles.chainFilterHeader}>
-          <div className={styles.chainFilterTitle}>
-            Select a chain to perform swaps on
-          </div>
-          <div className={styles.chainPills}>
-            <button
-              className={`${styles.chainPill} ${styles.chainPillActive}`}
-              type="button"
-            >
-              <span className={styles.chainPillIcon} aria-hidden="true" />
-              Terra Classic
-            </button>
-          </div>
-        </div>
-
         <div className={`card ${styles.swapCard}`}>
           <div className={styles.swapWarning}>
             <span className={styles.warningIcon} aria-hidden="true" />
