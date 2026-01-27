@@ -7,13 +7,35 @@ import { fetchTxs } from "../app/data/classic"
 import type { TxItem } from "../app/data/classic"
 import { formatTimestamp, truncateHash } from "../app/utils/format"
 
-const formatTxType = (tx: TxItem) => {
-  const raw =
-    tx.tx?.value?.msg?.[0]?.type ??
-    tx.tx?.body?.messages?.[0]?.["@type"] ??
-    "Transaction"
-  const parts = raw.split(".")
-  return parts[parts.length - 1]?.replace("Msg", "") || raw
+const formatMsgType = (msg: any) => {
+  const raw = msg?.type ?? msg?.["@type"] ?? "Transaction"
+  const parts = String(raw).split(".")
+  const last = parts[parts.length - 1] || raw
+  return String(last).replace(/^Msg/, "")
+}
+
+const sentenceCase = (value: string) => {
+  const spaced = value
+    .replace(/_/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+const getTxMessages = (tx: TxItem) => {
+  const rawMessages =
+    tx.tx?.body?.messages ??
+    tx.tx?.value?.msg ??
+    []
+
+  if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+    return [{ label: "Transaction", detail: "Details --" }]
+  }
+
+  return rawMessages.map((msg) => ({
+    label: sentenceCase(formatMsgType(msg)),
+    detail: "Details --"
+  }))
 }
 
 const History = () => {
@@ -30,10 +52,9 @@ const History = () => {
         const isSuccess = !tx.code
         return {
           hash: tx.txhash ?? "--",
-          title: formatTxType(tx),
           status: isSuccess ? "success" : "failed",
-          label: isSuccess ? "Success" : "Failed",
-          time: formatTimestamp(tx.timestamp)
+          time: formatTimestamp(tx.timestamp),
+          messages: getTxMessages(tx)
         }
       }),
     [txs]
@@ -44,14 +65,20 @@ const History = () => {
       <div className={styles.chainFilter}>
         <div className={styles.chainPills}>
           <button
-            className={`${styles.chainPill} ${styles.chainPillActive} ${styles.chainPillAll}`}
+            className={`${styles.chainPill} ${styles.chainPillAll}`}
             type="button"
           >
             All
           </button>
-          <button className={styles.chainPill} type="button">
+          <button
+            className={`${styles.chainPill} ${styles.chainPillActive}`}
+            type="button"
+          >
             <span className={styles.chainPillIcon} aria-hidden="true" />
             Terra Classic
+          </button>
+          <button className={`${styles.chainPill} ${styles.chainPillCount}`} type="button">
+            +1
           </button>
         </div>
         <div className={styles.list}>
@@ -123,15 +150,16 @@ const History = () => {
                   </div>
                 </div>
                 <div className={styles.messages}>
-                  <div className={styles.message}>
-                    <span className={`${styles.tag} ${styles[item.status]}`}>
-                      {item.label}
-                    </span>
-                    <div className={styles.messageBody}>
-                      <strong>{item.title}</strong>
-                      <span>Details --</span>
+                  {item.messages.map((message, index) => (
+                    <div key={`${item.hash}-${index}`} className={styles.message}>
+                      <span className={`${styles.tag} ${styles[item.status]}`}>
+                        {message.label}
+                      </span>
+                      <div className={styles.messageBody}>
+                        <span className={styles.messageText}>{message.detail}</span>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
                 <div className={styles.footer}>
                   <dl className={styles.details}>

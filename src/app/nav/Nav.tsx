@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom"
+import { Link, NavLink, useLocation } from "react-router-dom"
 import BrandLogo from "../../components/brand/BrandLogo"
 import { useNav } from "../routes"
 import styles from "./Nav.module.css"
@@ -21,8 +21,9 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>
-        <BrandLogo textSize={18} iconSize={24} gap={4} />
-        <span className={styles.stationTag}>Station</span>
+        <Link to="/" className={styles.brandLink} aria-label="Go to dashboard">
+          <BrandLogo textSize={20} iconSize={30} gap={6} />
+        </Link>
         {isOpen ? (
           <button
             className={styles.toggle}

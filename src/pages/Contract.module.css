@@ -29,7 +29,7 @@
   border: 0;
   border-radius: var(--radius-lg);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--font-size);
   outline: none;
   padding-left: 50px;
 }
@@ -74,7 +74,7 @@
 }
 
 .stateText {
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .resultHeader {
@@ -82,14 +82,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
 }
 
 .resultHeader strong {
-  font-size: 16px;
+  font-size: var(--font-size-title);
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .resultBody {
@@ -106,13 +106,13 @@
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
   border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
 }
 
 .resultBody strong {
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .resultFooter {
@@ -125,3 +125,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+

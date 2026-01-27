@@ -15,19 +15,17 @@
   height: var(--header-height);
   line-height: var(--header-height);
   border-bottom: var(--border-width) solid var(--menu-border);
-  margin-bottom: 26px;
+  margin-bottom: 16px;
   position: relative;
   color: var(--menu-text);
   z-index: 1;
 }
 
-.stationTag {
-  color: var(--menu-text);
-  opacity: 0.6;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-left: 2px;
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
 }
 
 .toggle {
@@ -61,7 +59,7 @@
 .links {
   display: grid;
   gap: 2px;
-  padding: 14px 0;
+  padding: 10px 0;
   z-index: 1;
 }
 
@@ -71,10 +69,11 @@
   gap: 10px;
   padding: 14px 20px;
   color: var(--menu-text);
-  font-size: 14px;
+  font-size: var(--font-size);
   opacity: 0.75;
   transition: opacity 0.2s ease;
-  font-weight: 400;
+  font-weight: var(--normal);
+  line-height: 1;
 }
 
 .link:hover {
@@ -83,14 +82,22 @@
 
 .active {
   opacity: 1;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .icon {
   width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.icon svg,
+.icon img {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .backgroundBlurPrimary,
@@ -151,7 +158,7 @@
 
 @media (max-width: 991.98px) {
   .link {
-    font-size: 28px;
+    font-size: var(--font-size-nav-mobile);
     padding: 6px 20px;
   }
 
@@ -176,11 +183,6 @@
   }
 }
 
-@media (max-width: 500px) {
-  .stationTag {
-    display: none;
-  }
-}
 
 @media (max-height: 1000px) {
   .backgroundBlurPrimary {

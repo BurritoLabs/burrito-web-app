@@ -1,66 +1,11 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import styles from "./TopBar.module.css"
 import ConnectModal from "../wallet/ConnectModal"
 import { useWallet } from "../wallet/WalletProvider"
-
-const RefreshIcon = () => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-    <path
-      d="M4 12a8 8 0 0 1 13.66-5.66"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M18 4v4h-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const SettingsIcon = () => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-    <circle
-      cx="12"
-      cy="12"
-      r="3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-    />
-    <path
-      d="M4 12h2M18 12h2M12 4v2M12 18v2M6.2 6.2l1.4 1.4M16.4 16.4l1.4 1.4M6.2 17.8l1.4-1.4M16.4 7.6l1.4-1.4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const WarningIcon = () => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-    <path
-      d="M12 3l9 16H3l9-16z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M12 9v4M12 17h.01"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </svg>
-)
+import { CLASSIC_CHAIN } from "../chain"
+import { fetchValidator } from "../data/classic"
+import { convertBech32Prefix } from "../utils/bech32"
 
 type TopBarProps = {
   onMenuClick?: () => void
@@ -73,43 +18,41 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   const connectLabel = account
     ? `${account.address.slice(0, 6)}...${account.address.slice(-4)}`
     : "Connect"
+  const valoperAddress = useMemo(() => {
+    if (!account?.address) return null
+    return convertBech32Prefix(
+      account.address,
+      `${CLASSIC_CHAIN.bech32Prefix}valoper`
+    )
+  }, [account?.address])
+
+  const { data: validator } = useQuery({
+    queryKey: ["validator", valoperAddress],
+    queryFn: () => fetchValidator(valoperAddress ?? ""),
+    enabled: Boolean(valoperAddress),
+    staleTime: 60_000
+  })
+  const showValidator = Boolean(validator)
 
   return (
     <div className={styles.bar}>
-      <div className={styles.status}>
-        <div className={styles.networkChip}>CLASSIC</div>
-      </div>
-
       <div className={styles.actions}>
-        <div className={styles.actionGroup}>
-          <button
-            className={styles.iconButton}
-            aria-label="Refresh"
-            type="button"
-          >
-            <RefreshIcon />
-          </button>
-          <button
-            className={styles.iconButton}
-            aria-label="Preferences"
-            type="button"
-          >
-            <SettingsIcon />
-          </button>
-          <button
-            className={styles.iconButton}
-            aria-label="Network status"
-            type="button"
-          >
-            <WarningIcon />
-          </button>
-        </div>
-        <button
-          className={`uiButton uiButtonOutline ${styles.validatorButton}`}
-          type="button"
+        <div
+          className={styles.statusIndicator}
+          title={`LCD: ${CLASSIC_CHAIN.lcd}`}
+          aria-label={`LCD: ${CLASSIC_CHAIN.lcd}`}
         >
-          Validator
-        </button>
+          <span className={styles.statusDot} aria-hidden="true" />
+          <span className={styles.statusLabel}>LCD</span>
+        </div>
+        {showValidator ? (
+          <button
+            className={`uiButton uiButtonOutline ${styles.validatorButton}`}
+            type="button"
+          >
+            Validator
+          </button>
+        ) : null}
         <button
           className={`uiButton uiButtonOutline ${styles.connectButton} ${
             account ? styles.connected : ""

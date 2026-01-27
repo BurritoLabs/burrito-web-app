@@ -1,0 +1,38 @@
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(82, 196, 26, 0.18);
+  overflow: hidden;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    rgba(82, 196, 26, 0),
+    rgba(82, 196, 26, 0.9),
+    rgba(82, 196, 26, 0)
+  );
+  transform: translateX(-120%);
+  animation: loadingSlide 1.1s ease-in-out infinite;
+}
+
+@keyframes loadingSlide {
+  0% {
+    transform: translateX(-120%);
+  }
+  50% {
+    transform: translateX(140%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}

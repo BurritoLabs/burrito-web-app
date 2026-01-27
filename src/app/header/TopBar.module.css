@@ -48,11 +48,11 @@
 .networkChip {
   padding: 6px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: var(--font-size);
   letter-spacing: 0.02em;
   background: rgba(82, 196, 26, 0.9);
   color: #0c1411;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .actions {
@@ -67,6 +67,32 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.statusIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #52c41a;
+  box-shadow: 0 0 10px rgba(82, 196, 26, 0.7);
+}
+
+.statusLabel {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .iconButton {
@@ -92,7 +118,7 @@
 }
 
 .connectButton {
-  font-weight: 500;
+  font-weight: var(--bold);
   letter-spacing: -0.01em;
 }
 
@@ -132,13 +158,13 @@
 }
 
 .latestTitle {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .latestHash {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
 }
 
@@ -147,3 +173,5 @@
     display: inline-flex;
   }
 }
+
+

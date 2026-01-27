@@ -109,6 +109,19 @@ export const fetchValidators = async () => {
   return data.validators ?? []
 }
 
+export const fetchValidator = async (operatorAddress: string) => {
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/cosmos/staking/v1beta1/validators/${operatorAddress}`
+  )
+  try {
+    const data = await fetchJson<{ validator?: ValidatorItem }>(url)
+    return data.validator ?? null
+  } catch {
+    return null
+  }
+}
+
 const parseProposalTitle = (proposal: any) => {
   if (proposal?.title) return proposal.title as string
   if (proposal?.content?.title) return proposal.content.title as string

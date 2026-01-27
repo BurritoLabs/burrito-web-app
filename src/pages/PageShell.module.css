@@ -2,6 +2,13 @@
   height: 100%;
   overflow-y: auto;
   padding: 32px var(--main-padding);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.page::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .grid {
@@ -30,8 +37,8 @@
   gap: 42px;
   flex-wrap: wrap;
   border-radius: 0;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--font-size-label);
+  font-weight: var(--bold);
 }
 
 .header {
@@ -50,10 +57,8 @@
 
 .title {
   margin: 0;
-  font-size: 36px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-size: var(--font-size-page-title);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -88,7 +93,7 @@
   }
 
   .title {
-    font-size: 28px;
+    font-size: var(--font-size-page-title);
   }
 
   .header {
@@ -107,7 +112,7 @@
   .banner {
     gap: 8px;
     padding: 12px 6px;
-    font-size: 12px;
+    font-size: var(--font-size-small);
   }
 }
 
@@ -121,3 +126,5 @@
 .small .header {
   padding-bottom: 18px;
 }
+
+

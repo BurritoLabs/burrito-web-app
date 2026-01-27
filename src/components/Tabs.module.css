@@ -1,40 +1,52 @@
 .container {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0;
 }
 
-.page {
-}
-
-.card {
-}
-
 .tabs {
-  display: flex;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.page {
   background: var(--card-bg-muted);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  font-size: var(--font-size-tabs);
+  font-weight: var(--bold);
   overflow: hidden;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.card {
+  background: var(--card-bg-muted);
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--grid-gap);
+  font-size: var(--font-size-tabs);
+  font-weight: var(--bold);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .tab {
-  flex: 1;
-  height: 60px;
-  border-right: var(--border-width) solid var(--card-border);
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  transition: color 0.2s ease, background 0.2s ease;
-  padding: 0 30px;
-}
-
-.tab:last-child {
-  border-right: 0;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  padding: 0;
 }
 
 .tab:hover {
@@ -46,6 +58,21 @@
   color: var(--text);
 }
 
+.page .tab {
+  height: 60px;
+  border-right: var(--border-width) solid var(--card-border);
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.page .tab {
+  flex: 1;
+}
+
+.page .tab .title {
+  padding-right: 10px;
+}
+
 .content {
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
@@ -54,22 +81,35 @@
   padding: 0;
 }
 
-.card .tabs {
-  border-radius: var(--radius-lg);
-  margin-bottom: 20px;
-}
-
-.card .content {
-  background: transparent;
-  border: 0;
+.card .tab {
+  height: 60px;
+  border-right: var(--border-width) solid var(--card-border);
+  color: var(--text-muted);
+  flex: 0 0 120px;
+  min-width: 0;
   padding: 0;
 }
 
+.card .active {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
 @media (max-width: 600px) {
-  .tabs {
+  .page,
+  .card {
     border-left: 0;
     border-right: 0;
     border-radius: 0;
+    width: 100%;
+  }
+
+  .page {
+    display: flex;
+  }
+
+  .card {
+    display: flex;
   }
 
   .content {
@@ -78,10 +118,25 @@
     border-radius: 0;
     padding: 0;
   }
+
+  .card .tab:last-child {
+    border-right: 0;
+  }
+
+  .card .tab {
+    flex: 1;
+    text-align: center;
+  }
 }
 
 @media (max-width: 991.98px) {
   .tab {
     padding: 0;
+  }
+}
+
+@media (min-width: 992px) {
+  .tab {
+    padding: 0 30px;
   }
 }

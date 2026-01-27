@@ -11,6 +11,7 @@ import TopBar from "./app/header/TopBar"
 import Nav from "./app/nav/Nav"
 import WalletPanel from "./app/wallet/WalletPanel"
 import Aside from "./app/aside/Aside"
+import LoadingBar from "./app/feedback/LoadingBar"
 
 function App() {
   const { element: routes } = useNav()
@@ -18,13 +19,6 @@ function App() {
 
   return (
     <Layout menuOpen={menuOpen}>
-      <Banner>
-        <div className="bannerStrip">
-          <span className="bannerDot" />
-          <span>Terra Classic only - External wallets</span>
-        </div>
-      </Banner>
-
       <Sidebar>
         <Nav isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
         <Aside />
@@ -39,6 +33,7 @@ function App() {
 
       <Content>
         <MainContainer>
+          <LoadingBar />
           <div className="pageArea">{routes}</div>
           <WalletPanel />
         </MainContainer>

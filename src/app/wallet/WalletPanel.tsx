@@ -82,6 +82,18 @@ const ManageIcon = (props: IconProps) => (
   </svg>
 )
 
+const BuyIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
+    <path
+      d="M12 5v14M5 12h14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 const PriceUpIcon = (props: IconProps) => (
   <svg viewBox="0 0 14 8" width="14" height="8" aria-hidden="true" {...props}>
     <path
@@ -116,9 +128,7 @@ type SelectedAsset = {
 
 const WalletPanel = () => {
   const { account } = useWallet()
-  const [isOpen, setIsOpen] = useState(
-    typeof window !== "undefined" && window.innerWidth > 992
-  )
+  const [isOpen, setIsOpen] = useState(false)
   const [view, setView] = useState<"wallet" | "send" | "receive" | "asset">(
     "wallet"
   )
@@ -165,6 +175,8 @@ const WalletPanel = () => {
     luncValue !== undefined || ustcValue !== undefined
       ? (luncValue ?? 0) + (ustcValue ?? 0)
       : undefined
+  const netWorthDisplay = account ? formatUsd(netWorth) : "$0.00"
+  const netWorthValue = netWorthDisplay === "--" ? "$0.00" : netWorthDisplay
 
   const selectedBalance = getBalance(selectedAsset.denom)
   const selectedDecimals =
@@ -182,11 +194,6 @@ const WalletPanel = () => {
     selectedDecimals,
     2
   )
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (window.innerWidth > 992) setIsOpen(true)
-  }, [])
 
   const handleCopy = (value: string) => {
     if (!account) return
@@ -222,7 +229,7 @@ const WalletPanel = () => {
           <div>
             <div className={styles.kicker}>Portfolio value</div>
             <div className={styles.networthValue}>
-              {account ? formatUsd(netWorth) : "--"}
+              {netWorthValue}
             </div>
           </div>
         </div>
@@ -247,6 +254,12 @@ const WalletPanel = () => {
               <ReceiveIcon />
             </button>
             <span>Receive</span>
+          </div>
+          <div className={styles.actionItem}>
+            <button className={styles.actionButton} type="button">
+              <BuyIcon />
+            </button>
+            <span>Buy</span>
           </div>
         </div>
       </div>

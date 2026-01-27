@@ -22,8 +22,8 @@
 }
 
 .chainTitle {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -45,8 +45,8 @@
   box-shadow: inset 0 0 0 0.5px var(--card-border);
   transition: all 0.1s ease;
   opacity: 0.75;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   background: transparent;
 }
 
@@ -107,15 +107,15 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
 }
 
 .chartMeta strong {
   display: block;
-  font-size: 16px;
+  font-size: var(--font-size-title);
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .stakedCard {
@@ -134,3 +134,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+

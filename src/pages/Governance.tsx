@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import Tabs from "../components/Tabs"
@@ -18,6 +19,32 @@ const Governance = () => {
     queryFn: fetchProposals,
     staleTime: 60_000
   })
+
+  const chainFilters = (
+    <div className={styles.panelHeader}>
+      <div className={styles.chainPills}>
+        <button
+          className={`${styles.chainPill} ${styles.chainPillAll}`}
+          type="button"
+        >
+          All
+        </button>
+        <button
+          className={`${styles.chainPill} ${styles.chainPillActive}`}
+          type="button"
+        >
+          <span className={styles.chainPillIcon} aria-hidden="true" />
+          Terra Classic
+        </button>
+        <button
+          className={`${styles.chainPill} ${styles.chainPillCount}`}
+          type="button"
+        >
+          +8
+        </button>
+      </div>
+    </div>
+  )
 
   const normalized = useMemo(() => {
     const groups: Record<string, ProposalItem[]> = {
@@ -92,103 +119,133 @@ const Governance = () => {
     )
   }
 
+  const renderEmptyState = (message: string) => (
+    <div className={styles.emptyCard}>
+      <div className={styles.emptyIcon} aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26">
+          <path
+            d="M4 7h16v10H4z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8 11h8M8 15h5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+      <div className={styles.emptyTitle}>{message}</div>
+    </div>
+  )
+
+  const renderPanel = (content: ReactNode) => (
+    <div className={styles.panel}>
+      {chainFilters}
+      <div className={styles.panelBody}>{content}</div>
+    </div>
+  )
+
   const tabs = [
+    {
+      key: "all",
+      label: "All",
+      content: renderPanel(
+        normalized.voting.length ||
+          normalized.deposit.length ||
+          normalized.passed.length ||
+          normalized.rejected.length ? (
+          <div className={styles.proposals}>
+            {normalized.voting.map((proposal) =>
+              renderProposal(proposal, "Voting", styles.statusVoting, "Vote")
+            )}
+            {normalized.deposit.map((proposal) =>
+              renderProposal(
+                proposal,
+                "Deposit",
+                styles.statusDeposit,
+                "Deposit"
+              )
+            )}
+            {normalized.passed.map((proposal) =>
+              renderProposal(proposal, "Passed", styles.statusPassed)
+            )}
+            {normalized.rejected.map((proposal) =>
+              renderProposal(proposal, "Rejected", styles.statusRejected)
+            )}
+          </div>
+        ) : (
+          renderEmptyState("No proposals")
+        )
+      )
+    },
     {
       key: "voting",
       label: "Voting",
-      content: (
-        <div className={styles.proposals}>
-          {normalized.voting.length
-            ? normalized.voting.map((proposal) =>
-                renderProposal(
-                  proposal,
-                  "Voting",
-                  styles.statusVoting,
-                  "Vote"
-                )
-              )
-            : renderProposal(
-                {
-                  id: "--",
-                  status: "",
-                  title: "No voting proposals",
-                  deposit: "0"
-                },
-                "Voting",
-                styles.statusVoting
-              )}
-        </div>
+      content: renderPanel(
+        normalized.voting.length ? (
+          <div className={styles.proposals}>
+            {normalized.voting.map((proposal) =>
+              renderProposal(proposal, "Voting", styles.statusVoting, "Vote")
+            )}
+          </div>
+        ) : (
+          renderEmptyState("No proposals in voting period")
+        )
       )
     },
     {
       key: "deposit",
       label: "Deposit",
-      content: (
-        <div className={styles.proposals}>
-          {normalized.deposit.length
-            ? normalized.deposit.map((proposal) =>
-                renderProposal(
-                  proposal,
-                  "Deposit",
-                  styles.statusDeposit,
-                  "Deposit"
-                )
-              )
-            : renderProposal(
-                {
-                  id: "--",
-                  status: "",
-                  title: "No deposit proposals",
-                  deposit: "0"
-                },
+      content: renderPanel(
+        normalized.deposit.length ? (
+          <div className={styles.proposals}>
+            {normalized.deposit.map((proposal) =>
+              renderProposal(
+                proposal,
                 "Deposit",
-                styles.statusDeposit
-              )}
-        </div>
+                styles.statusDeposit,
+                "Deposit"
+              )
+            )}
+          </div>
+        ) : (
+          renderEmptyState("No proposals in deposit period")
+        )
       )
     },
     {
       key: "passed",
       label: "Passed",
-      content: (
-        <div className={styles.proposals}>
-          {normalized.passed.length
-            ? normalized.passed.map((proposal) =>
-                renderProposal(proposal, "Passed", styles.statusPassed)
-              )
-            : renderProposal(
-                {
-                  id: "--",
-                  status: "",
-                  title: "No passed proposals",
-                  deposit: "0"
-                },
-                "Passed",
-                styles.statusPassed
-              )}
-        </div>
+      content: renderPanel(
+        normalized.passed.length ? (
+          <div className={styles.proposals}>
+            {normalized.passed.map((proposal) =>
+              renderProposal(proposal, "Passed", styles.statusPassed)
+            )}
+          </div>
+        ) : (
+          renderEmptyState("No passed proposals")
+        )
       )
     },
     {
       key: "rejected",
       label: "Rejected",
-      content: (
-        <div className={styles.proposals}>
-          {normalized.rejected.length
-            ? normalized.rejected.map((proposal) =>
-                renderProposal(proposal, "Rejected", styles.statusRejected)
-              )
-            : renderProposal(
-                {
-                  id: "--",
-                  status: "",
-                  title: "No rejected proposals",
-                  deposit: "0"
-                },
-                "Rejected",
-                styles.statusRejected
-              )}
-        </div>
+      content: renderPanel(
+        normalized.rejected.length ? (
+          <div className={styles.proposals}>
+            {normalized.rejected.map((proposal) =>
+              renderProposal(proposal, "Rejected", styles.statusRejected)
+            )}
+          </div>
+        ) : (
+          renderEmptyState("No rejected proposals")
+        )
       )
     }
   ]

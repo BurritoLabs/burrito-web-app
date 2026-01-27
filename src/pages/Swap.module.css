@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.7);
 }
 
@@ -25,8 +25,8 @@
   border: var(--border-width) solid currentColor;
   border-radius: 15px;
   padding: 0 16px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--bold);
   color: inherit;
   text-decoration: none;
   line-height: 1;
@@ -41,7 +41,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 18px;
+  font-size: var(--font-size-title-lg);
   line-height: 1;
   width: 20px;
   height: 20px;
@@ -87,8 +87,8 @@
 
 .bannerContent h4 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--font-size-label);
+  font-weight: var(--bold);
 }
 
 .swapCard {
@@ -101,7 +101,7 @@
   align-items: flex-start;
   gap: 8px;
   border-radius: 5px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   line-height: 18px;
   padding: 8px;
   width: 100%;
@@ -123,8 +123,8 @@
 }
 
 .chainFilterTitle {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   color: var(--text);
 }
 
@@ -146,8 +146,8 @@
   box-shadow: inset 0 0 0 0.5px var(--card-border);
   transition: all 0.1s ease;
   opacity: 0.75;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   background: transparent;
 }
 
@@ -193,8 +193,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--bold);
   color: currentColor;
 }
 
@@ -220,8 +220,8 @@
 .fieldHeader {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: var(--text-muted);
   padding: 16px 20px 0;
 }
@@ -238,10 +238,10 @@
   border: var(--border-width) solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(234, 245, 235, 0.8);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   padding: 2px 8px;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .fieldBody {
@@ -255,15 +255,15 @@
   background: transparent;
   border: 0;
   color: #ffffff;
-  font-size: 18px;
-  font-weight: 400;
+  font-size: var(--font-size-title-lg);
+  font-weight: var(--normal);
   width: 100%;
   text-align: right;
   outline: none;
 }
 
 .fieldFooter {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.5);
   text-align: right;
   padding-right: 20px;
@@ -273,8 +273,8 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.3);
   padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: rgba(234, 245, 235, 0.9);
   background: rgba(255, 255, 255, 0.06);
   min-width: 72px;
@@ -298,7 +298,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   row-gap: 16px;
   column-gap: 16px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
 }
 
 .swapDetails dt,
@@ -308,12 +308,12 @@
 
 .swapDetails dt {
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .swapDetails dd {
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
   text-align: right;
 }
 
@@ -332,9 +332,9 @@
   border: var(--border-width) solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(234, 245, 235, 0.7);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   padding: 0 12px;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .settingPill:hover {
@@ -345,7 +345,7 @@
   height: var(--input-height);
   border-radius: var(--button-radius);
   width: 100%;
-  font-size: 14px;
+  font-size: var(--font-size);
 }
 
 @media (max-width: 500px) {
@@ -353,6 +353,8 @@
     height: 22px;
     min-width: 76px;
     padding: 0 8px;
-    font-size: 10px;
+    font-size: var(--font-size-xxxs);
   }
 }
+
+

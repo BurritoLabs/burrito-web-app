@@ -19,7 +19,7 @@
     rgba(82, 196, 26, 0.16)
   );
   color: var(--fg);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   text-align: center;
 }
 
@@ -35,6 +35,7 @@
 .header {
   grid-area: header;
   border-left: var(--border-width) solid var(--card-border);
+  border-bottom: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
   position: sticky;
   top: 0;
@@ -58,7 +59,6 @@
   position: relative;
   background: transparent;
   border-left: var(--border-width) solid var(--card-border);
-  border-top: var(--border-width) solid var(--card-border);
 }
 
 .mainContainer {
@@ -119,3 +119,4 @@
     display: none;
   }
 }
+

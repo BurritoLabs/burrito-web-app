@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&family=Nunito+Sans:wght@600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Nunito+Sans:wght@400;600;700&display=swap");
 
 :root {
   --bg: #0c1411;
@@ -38,9 +38,33 @@
   --radius-lg: 8px;
   --radius-md: 6px;
   --radius-sm: 4px;
+  --font-size: 14px;
+  --font-size-small: 12px;
+  --font-size-xxxs: 10px;
+  --font-size-xxs: 10.5px;
+  --font-size-xs: 11px;
+  --font-size-label: 13px;
+  --font-size-title: 16px;
+  --font-size-title-lg: 18px;
+  --font-size-title-xl: 20px;
+  --font-size-title-2xl: 18pt;
+  --font-size-title-3xl: 20pt;
+  --font-size-hero: 40px;
+  --font-size-tabs: 13px;
+  --font-size-page-title: 36px;
+  --font-size-nav-mobile: 28px;
+  --font-size-handle: 10pt;
+  --normal: 500;
+  --bold: 700;
 
   --font-montserrat: "Montserrat", "Nunito Sans", system-ui, sans-serif;
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
+}
+
+@media (max-width: 991.98px) {
+  :root {
+    --font-size-page-title: 28px;
+  }
 }
 
 * {
@@ -57,8 +81,11 @@ body {
   margin: 0;
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--font-size);
+  font-weight: var(--normal);
   line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
   background:
     radial-gradient(1600px 900px at 12% -20%, rgba(255, 255, 255, 0.045), transparent 70%),
     radial-gradient(1400px 800px at 88% -10%, rgba(82, 196, 26, 0.035), transparent 72%),
@@ -107,11 +134,28 @@ a {
 
 button {
   font-family: var(--font-ui);
+  font-weight: var(--bold);
   cursor: pointer;
 }
 
 input {
   font-family: var(--font-ui);
+  font-weight: var(--normal);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: var(--bold);
+  margin: 0;
+}
+
+strong {
+  font-weight: var(--bold);
 }
 
 input::placeholder {
@@ -142,7 +186,7 @@ input::placeholder {
 }
 
 .sidebarMeta {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(234, 245, 235, 0.6);
@@ -157,7 +201,7 @@ input::placeholder {
   background: rgba(82, 196, 26, 0.18);
   border: 1px solid rgba(82, 196, 26, 0.35);
   color: var(--green);
-  font-size: 12px;
+  font-size: var(--font-size-small);
 }
 
 .pageArea {
@@ -180,7 +224,7 @@ input::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 16px;
+  font-size: var(--font-size-title);
   margin-bottom: 6px;
 }
 
@@ -191,8 +235,8 @@ input::placeholder {
 }
 
 .cardTitle {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
   letter-spacing: -0.01em;
   color: #ffffff;
 }
@@ -201,12 +245,12 @@ input::placeholder {
   margin: 8px 0 0;
   color: rgba(234, 245, 235, 0.76);
   line-height: 1.45;
-  font-size: 14px;
+  font-size: var(--font-size);
 }
 
 .cardMeta {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   letter-spacing: 0.01em;
   color: rgba(234, 245, 235, 0.55);
   line-height: 1.4;
@@ -236,15 +280,15 @@ input::placeholder {
 }
 
 .statCard div {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.62);
   letter-spacing: 0.02em;
 }
 
 .statCard strong {
-  font-size: 16px;
+  font-size: var(--font-size-title);
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .pillRow {
@@ -262,7 +306,7 @@ input::placeholder {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  font-size: 10.5px;
+  font-size: var(--font-size-xxs);
   color: rgba(234, 245, 235, 0.76);
 }
 
@@ -294,20 +338,20 @@ input::placeholder {
 }
 
 .listRow strong {
-  font-size: 14px;
+  font-size: var(--font-size);
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .listRow span {
   display: block;
-  font-size: 10.5px;
+  font-size: var(--font-size-xxs);
   color: rgba(234, 245, 235, 0.55);
   line-height: 1.4;
 }
 
 .listMeta {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.55);
 }
 
@@ -319,8 +363,8 @@ input::placeholder {
   min-width: 100px;
   padding: 0 20px;
   border-radius: var(--button-radius);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
@@ -357,8 +401,8 @@ input::placeholder {
   border: var(--border-width) solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(234, 245, 235, 0.8);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
 }
 
 .filterCaret {
@@ -401,3 +445,5 @@ input::placeholder {
     transform: translateY(0);
   }
 }
+
+

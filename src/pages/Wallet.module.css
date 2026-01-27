@@ -1,0 +1,69 @@
+.grid {
+  align-items: start;
+}
+
+.value {
+  font-size: var(--font-size-title-3xl);
+  font-weight: var(--bold);
+  letter-spacing: -0.02em;
+  margin: 4px 0 8px;
+}
+
+.assetList {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.assetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+}
+
+.assetInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assetBadge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+}
+
+.assetName {
+  font-size: var(--font-size);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.assetMeta {
+  font-size: var(--font-size-xxs);
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.assetValue {
+  font-size: var(--font-size);
+  color: rgba(234, 245, 235, 0.8);
+}
+
+@media (max-width: 991.98px) {
+  .value {
+    font-size: var(--font-size-title-xl);
+  }
+}

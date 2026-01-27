@@ -5,12 +5,21 @@ type IconProps = SVGProps<SVGSVGElement>
 export const SwapIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path
-      d="M7 7h10l-2.2-2.2M17 17H7l2.2 2.2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      d="M17.3 13.2c-.2-.2-.4 0-.4.2v2.5H3.2c-.1 0-.2.1-.2.2v1.7c0 .1.1.2.2.2h13.7v2.5c0 .2.3.3.4.2l3.7-3.6c.1-.1.1-.3 0-.4l-3.7-3.5z"
+      fill="currentColor"
+    />
+    <path
+      d="M6.7 3.3c.2-.2.4 0 .4.2V6h13.7c.1 0 .2.1.2.2V8c0 .1-.1.2-.2.2H7.2v2.5c0 .2-.3.3-.4.2L3 7.3c-.1-.1-.1-.2 0-.4l3.7-3.6z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
+export const WalletIcon = (props: IconProps) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+    <path
+      d="M21 18v1c0 1.1-.9 2-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14c1.1 0 2 .9 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9Zm-9-2h10V8H12v8Zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"
+      fill="currentColor"
     />
   </svg>
 )
@@ -18,20 +27,12 @@ export const SwapIcon = (props: IconProps) => (
 export const HistoryIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path
-      d="M4 12a8 8 0 1 0 2.34-5.66M4 5v4h4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      d="M13.056 2.4c-5.067 0-9.249 3.84-9.8 8.761h-2.01a.404.404 0 0 0-.31.666l2.966 3.491c.162.19.455.19.617 0l2.964-3.49a.404.404 0 0 0-.307-.667h-1.86c.54-3.792 3.801-6.721 7.74-6.721 4.77 0 8.558 4.291 7.705 9.216-.539 3.11-3.004 5.65-6.097 6.272-2.814.568-5.591-.385-7.428-2.43a.427.427 0 0 0-.588-.056l-.917.743a.437.437 0 0 0-.059.625c2.428 2.74 6.181 3.952 9.927 2.999 3.658-.93 6.494-4.015 7.16-7.732C23.874 7.843 19.089 2.4 13.056 2.4"
+      fill="currentColor"
     />
     <path
-      d="M12 8v4l3 2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      d="m16.105 15.9-3.48-1.462a1.02 1.02 0 0 1-.625-.94V7.2h2.039v5.62l2.856 1.2-.79 1.88Z"
+      fill="currentColor"
     />
   </svg>
 )
@@ -39,12 +40,16 @@ export const HistoryIcon = (props: IconProps) => (
 export const StakeIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path
-      d="M6 18l6-12 6 12M8.2 14h7.6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      d="M13.085 9.848h-1.89l.021-.73c-1.917-.245-3.247-1.085-3.137-2.083.11-1 1.497-1.84 3.253-2.09l.023-.793 1.632-.003.012.745c1.051.083 2.015.374 2.712.834l-1.241.498c-.512-.34-1.27-.535-2.088-.534-1.418.003-2.611.604-2.662 1.341-.049.738 1.146 1.336 2.664 1.336.987 0 1.89-.26 2.352-.677l1.49.408c-.627.578-1.803.966-3.152 1.066l.011.682Zm8.155-2.835C21.24 4.797 17.157 3 12.12 3 7.084 3 3 4.797 3 7.013l.001.007v1.03c0 2.215 4.082 4.012 9.12 4.012 5.036 0 9.119-1.797 9.119-4.013l-.001-.01h.001V7.013Z"
+      fill="currentColor"
+    />
+    <path
+      d="M12.12 14.518c-4.67 0-8.513-1.544-9.049-3.536a1.762 1.762 0 0 0-.071.475l.001.007H3v1.029c0 2.217 4.084 4.012 9.12 4.012 5.037 0 9.12-1.795 9.12-4.012l-.001-.01v-1.026c0-.161-.027-.32-.07-.475-.535 1.992-4.38 3.536-9.049 3.536"
+      fill="currentColor"
+    />
+    <path
+      d="M12.12 18.962c-4.67 0-8.513-1.545-9.049-3.537a1.762 1.762 0 0 0-.071.476l.001.006H3v1.029c0 2.217 4.084 4.013 9.12 4.013 5.037 0 9.12-1.796 9.12-4.013l-.001-.01v-1.025c0-.162-.027-.32-.07-.476-.535 1.992-4.38 3.537-9.049 3.537"
+      fill="currentColor"
     />
   </svg>
 )
@@ -52,34 +57,24 @@ export const StakeIcon = (props: IconProps) => (
 export const GovIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path
-      d="M12 3l8 4-8 4-8-4 8-4zM4 11v6c0 1.1 3.6 4 8 4s8-2.9 8-4v-6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      d="M18 13h-.68l-2 2h1.91L19 17H5l1.78-2h2.05l-2-2H6l-3 3v4c0 1.1.89 2 1.99 2H19a2 2 0 0 0 2-2v-4l-3-3Zm-1-5.05-4.95 4.95-3.54-3.54 4.95-4.95L17 7.95Zm-4.24-5.66L6.39 8.66a.996.996 0 0 0 0 1.41l4.95 4.95c.39.39 1.02.39 1.41 0l6.36-6.36a.996.996 0 0 0 0-1.41L14.16 2.3a.975.975 0 0 0-1.4-.01Z"
+      fill="currentColor"
     />
   </svg>
 )
 
 export const ContractIcon = (props: IconProps) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+  <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" {...props}>
     <rect
-      x="4"
-      y="5"
-      width="16"
-      height="14"
-      rx="2"
+      x="0"
+      y="0"
+      width="0"
+      height="0"
       fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
     />
     <path
-      d="M8 9h8M8 13h5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
+      d="M11.7 3.3c.4 0 .8.3.9.8v11.6c0 .4-.3.8-.8.9H3.4c-.4 0-.8-.3-.9-.8V7.6h2.2c1 0 1.9-.8 2-1.8V3.3h5zm3 9.2c.1 0 .3.1.4.2l.1.1 1 1.3c.2-.1.3-.1.5-.1.7 0 1.3.6 1.3 1.3 0 .7-.6 1.3-1.3 1.3s-1.3-.6-1.3-1.3V15l-.9-1.3h-.9v-1.1h1.1zm-7.2-.1H3.7v1.5h3.8v-1.5zM17 8.8c.7 0 1.3.6 1.3 1.3 0 .7-.6 1.3-1.3 1.3-.5 0-.9-.3-1.1-.6l-.1-.1h-2.3V9.6h2.3c.3-.5.7-.8 1.2-.8zm-5.6.7H3.7V11h7.7V9.5zm5.2-6.1c.7 0 1.3.6 1.3 1.3S17.3 6 16.6 6h-.4l-1.1 1.5c-.1.1-.2.2-.4.2h-1.3V6.5h.9l1-1.3c-.1-.1-.1-.3-.1-.5.1-.8.7-1.3 1.4-1.3zm-11.1 0v2.2c0 .4-.3.8-.7.8H2.5l3-3z"
+      fill="currentColor"
     />
   </svg>
 )

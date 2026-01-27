@@ -22,8 +22,8 @@
   box-shadow: inset 0 0 0 0.5px var(--card-border);
   transition: all 0.1s ease;
   opacity: 0.75;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   background: transparent;
 }
 
@@ -44,6 +44,10 @@
 
 .chainPillAll {
   margin-right: 12px;
+}
+
+.chainPillCount {
+  padding-inline: 10px;
 }
 
 .chainPillIcon {
@@ -74,7 +78,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.7);
   padding: var(--card-padding);
   padding-top: 0;
@@ -105,23 +109,23 @@
   border-radius: 999px;
   background: var(--button-default-bg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  font-size: 10pt;
-  font-weight: 500;
+  font-size: var(--font-size-handle);
+  font-weight: var(--bold);
 }
 
 .link {
-  font-size: 10pt;
+  font-size: var(--font-size-handle);
   color: rgba(234, 245, 235, 0.7);
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .time {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 10pt;
+  font-size: var(--font-size-handle);
   color: rgba(234, 245, 235, 0.6);
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .timeIcon {
@@ -160,8 +164,8 @@
   align-items: center;
   padding: 0 14px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: #0c1411;
   background: rgba(234, 245, 235, 0.7);
   min-width: 50px;
@@ -174,16 +178,9 @@
   gap: 4px;
 }
 
-.message strong {
+.messageText {
   display: block;
-  font-size: 14px;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.message span {
-  display: block;
-  font-size: 14px;
+  font-size: var(--font-size);
   color: var(--text-muted);
 }
 
@@ -205,7 +202,7 @@
 .footer {
   color: rgba(234, 245, 235, 0.6);
   border-top: var(--border-width) solid var(--card-border);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   margin: 0 calc(-1 * var(--card-padding));
   margin-top: var(--card-padding);
   padding: var(--card-padding);
@@ -226,18 +223,15 @@
 
 .details dt {
   grid-column-start: 1;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .details dd {
   grid-column-start: 2;
   text-align: right;
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
-@media (min-width: 992px) {
-  .list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
+
+

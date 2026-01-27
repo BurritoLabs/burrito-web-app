@@ -9,13 +9,17 @@
     "list"
     "actions";
   gap: 0;
-  width: min(var(--wallet-width), 100%);
-  min-width: 280px;
+  width: min(var(--wallet-width), 100vw);
+  max-width: min(var(--wallet-width), 100vw);
   height: calc(100vh - var(--header-height));
   position: relative;
-  overflow: hidden;
-  transition: 400ms;
+  transition:
+    transform 400ms ease,
+    max-width 400ms ease,
+    border-color 200ms ease;
   clip-path: inset(0px 0px 0px -100px);
+  z-index: 5;
+  will-change: transform, max-width;
 }
 
 @media (max-width: 1420px) {
@@ -36,10 +40,11 @@
 }
 
 .closed {
-  width: 0;
   min-width: 0;
+  max-width: 0;
   transform: translate(100%, 0);
   left: unset;
+  border-left: 0;
 }
 
 .close {
@@ -47,6 +52,7 @@
   top: 10px;
   left: 0;
   transform: translate(-100%, 0);
+  z-index: 5;
   padding: 10px 8px;
   background-color: var(--card-bg);
   border-radius: 10px 0 0 10px;
@@ -64,8 +70,8 @@
   writing-mode: vertical-rl;
   text-orientation: mixed;
   transform: rotate(180deg);
-  font-weight: 500;
-  font-size: 10pt;
+  font-weight: var(--bold);
+  font-size: var(--font-size-handle);
 }
 
 .closeIcon {
@@ -133,7 +139,7 @@
 }
 
 .kicker {
-  font-size: 14px;
+  font-size: var(--font-size);
   letter-spacing: 0;
   text-transform: none;
   color: var(--text-muted);
@@ -141,14 +147,14 @@
 
 .viewTitle {
   margin-top: 4px;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--font-size-title-lg);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
 .viewMeta {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.55);
 }
 
@@ -202,8 +208,8 @@
 
 .networthValue {
   margin-top: 6px;
-  font-size: 40px;
-  font-weight: 500;
+  font-size: var(--font-size-hero);
+  font-weight: var(--bold);
   letter-spacing: -0.04em;
   color: #ffffff;
   line-height: 1.2;
@@ -213,7 +219,7 @@
 .networthActions {
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: 28px;
   margin-top: 24px;
   width: 100%;
 }
@@ -222,14 +228,14 @@
   display: grid;
   gap: 8px;
   justify-items: center;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: var(--text);
 }
 
 .actionButton {
-  width: 60px;
-  height: 60px;
+  width: 54px;
+  height: 54px;
   padding: 16px;
   border-radius: 50%;
   border: var(--border-width) solid var(--card-border);
@@ -305,15 +311,15 @@
 }
 
 .formTitle {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
 .formTitleLarge {
-  font-size: 18pt;
+  font-size: var(--font-size-title-2xl);
   margin: 0 0 1rem 2rem;
-  font-weight: 500;
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -339,8 +345,8 @@
 }
 
 .formTitle {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -353,8 +359,8 @@
   border-radius: 999px;
   border: 0;
   padding: 4px 15px;
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-xs);
+  font-weight: var(--normal);
   color: var(--button-default-text);
   background: var(--button-default-bg);
 }
@@ -367,7 +373,7 @@
 .formField {
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: var(--text-muted);
 }
 
@@ -398,7 +404,7 @@
 }
 
 .fieldHint {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: rgba(234, 245, 235, 0.6);
 }
 
@@ -409,8 +415,8 @@
   border: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
   color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   text-align: left;
   padding: 0 12px;
 }
@@ -420,10 +426,10 @@
   border: var(--border-width) solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(234, 245, 235, 0.8);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   padding: 2px 8px;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .formHeaderWrapper {
@@ -436,11 +442,11 @@
 }
 
 .formHeaderWrapper h1 {
-  font-size: 18pt;
+  font-size: var(--font-size-title-2xl);
   margin-top: 1.45rem;
   margin-bottom: 1.45rem;
   margin-left: 3rem;
-  font-weight: 500;
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -449,7 +455,7 @@
   align-items: flex-start;
   gap: 8px;
   border-radius: 5px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   line-height: 18px;
   padding: 8px;
   background: rgba(246, 195, 67, 0.12);
@@ -471,8 +477,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--bold);
   color: currentColor;
 }
 
@@ -510,7 +516,7 @@
   border: 0;
   border-radius: var(--radius-lg);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--font-size);
   outline: none;
   padding-left: 50px;
 }
@@ -530,8 +536,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: rgba(234, 245, 235, 0.9);
 }
 
@@ -558,8 +564,8 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.3);
   padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: rgba(234, 245, 235, 0.9);
   background: rgba(255, 255, 255, 0.06);
   height: var(--input-height);
@@ -579,13 +585,13 @@
 }
 
 .addressLabel {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
   text-align: center;
 }
 
 .addressValue {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: #ffffff;
   word-break: break-all;
   text-align: left;
@@ -603,7 +609,7 @@
   gap: 10px;
   padding: 12px 14px;
   border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.7);
 }
 
@@ -615,9 +621,9 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.2);
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: rgba(234, 245, 235, 0.7);
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .addressButton:hover {
@@ -653,13 +659,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
 .assetDetailAmount {
-  font-size: 12pt;
+  font-size: var(--font-size-title);
   color: rgba(234, 245, 235, 0.6);
 }
 
@@ -683,8 +689,8 @@
 
 .chainSectionTitle h3 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -712,40 +718,40 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
 }
 
 .chainRowValue {
   grid-area: value;
   text-align: right;
-  font-size: 16px;
-  font-weight: 400;
+  font-size: var(--font-size-title);
+  font-weight: var(--normal);
   color: #ffffff;
 }
 
 .chainRowAmount {
   grid-area: amount;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.55);
 }
 
 .assetSymbolLarge {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: var(--font-size-title-xl);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
 .assetChain {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
   margin-top: 4px;
 }
 
 .assetDetailValue {
-  font-size: 20pt;
-  font-weight: 500;
+  font-size: var(--font-size-title-3xl);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -758,13 +764,13 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
 }
 
 .detailRow strong {
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .detailActions {
@@ -782,7 +788,7 @@
 .chainHeader {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: var(--font-size-xxxs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(234, 245, 235, 0.5);
@@ -795,13 +801,13 @@
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.7);
 }
 
 .chainRow strong {
   color: #ffffff;
-  font-weight: 600;
+  font-weight: var(--bold);
 }
 
 .assetHeader {
@@ -813,8 +819,8 @@
 }
 
 .assetTitle {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size);
+  font-weight: var(--bold);
   color: #ffffff;
 }
 
@@ -822,9 +828,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: #52c41a;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .manageButton svg {
@@ -861,7 +867,7 @@
 }
 
 .chainCount {
-  font-size: 12px;
+  font-size: var(--font-size-small);
   padding: 2px 8px;
   border-radius: 4px;
   color: var(--text);
@@ -878,8 +884,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
   color: #ffffff;
   position: relative;
 }
@@ -922,7 +928,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 16px;
+  font-size: var(--font-size-title);
   overflow: hidden;
 }
 
@@ -932,26 +938,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: #ffffff;
-  font-weight: 500;
+  font-weight: var(--bold);
 }
 
 .assetPrice {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
   color: #ffffff;
   white-space: nowrap;
 }
 
 .assetAmount {
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--font-size-small);
+  font-weight: var(--normal);
   color: var(--text-muted);
   white-space: nowrap;
 }
 
 .assetChange {
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--font-size-small);
+  font-weight: var(--normal);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -997,3 +1003,5 @@
     height: 52px;
   }
 }
+
+

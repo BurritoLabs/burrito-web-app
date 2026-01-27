@@ -17,7 +17,7 @@
   align-items: center;
   gap: 4px;
   color: var(--menu-text);
-  font-size: 12px;
+  font-size: var(--font-size-small);
   line-height: 1;
   opacity: 0.75;
   padding: var(--gutter) 0;
@@ -53,3 +53,4 @@
   display: block;
   filter: brightness(0) invert(1);
 }
+
