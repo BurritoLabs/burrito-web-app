@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom"
 import styles from "./ConnectModal.module.css"
 import { useWallet } from "./WalletProvider"
 
@@ -15,8 +16,17 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
 
   if (!open) return null
 
-  return (
-    <div className={styles.backdrop} onClick={onClose} role="dialog">
+  if (typeof document === "undefined") {
+    return null
+  }
+
+  return createPortal(
+    <div
+      className={styles.backdrop}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
           <div>
@@ -71,7 +81,8 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
 
         {error ? <div className={styles.error}>{error}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

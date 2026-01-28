@@ -5,6 +5,7 @@ import Swap from "../pages/Swap"
 import History from "../pages/History"
 import Stake from "../pages/Stake"
 import Governance from "../pages/Governance"
+import ProposalDetails from "../pages/ProposalDetails"
 import Contract from "../pages/Contract"
 import NotFound from "../pages/NotFound"
 import {
@@ -60,6 +61,7 @@ export const useNav = () => {
 
   const routes = [
     { path: "/", element: <Dashboard /> },
+    { path: "/proposal/:id", element: <ProposalDetails /> },
     ...menu,
     { path: "*", element: <NotFound /> }
   ]

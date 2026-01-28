@@ -55,6 +55,38 @@
   gap: 12px;
 }
 
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 24px;
+  height: 24px;
+  color: rgba(234, 245, 235, 0.7);
+  text-decoration: none;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  transition: color 0.2s ease;
+}
+
+.backButton:hover {
+  color: #ffffff;
+}
+
+.backIcon {
+  width: 10px;
+  height: 10px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  display: inline-block;
+}
+
+.backLabel {
+  display: none;
+}
+
 .title {
   margin: 0;
   font-size: var(--font-size-page-title);

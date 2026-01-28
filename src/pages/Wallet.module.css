@@ -1,25 +1,89 @@
-.grid {
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr);
+  gap: var(--grid-gap);
   align-items: start;
 }
 
-.value {
-  font-size: var(--font-size-title-3xl);
+.leftColumn,
+.rightColumn {
+  display: grid;
+  gap: var(--grid-gap);
+}
+
+.sectionCard {
+  display: grid;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionTitle {
+  font-size: var(--font-size-title);
   font-weight: var(--bold);
-  letter-spacing: -0.02em;
-  margin: 4px 0 8px;
+  color: #ffffff;
+}
+
+.filterToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+  color: rgba(234, 245, 235, 0.65);
+  cursor: pointer;
+}
+
+.filterToggle input {
+  accent-color: var(--green);
+  width: 14px;
+  height: 14px;
+}
+
+.sectionBody {
+  display: grid;
+  gap: 12px;
+}
+
+.coinWarning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 120, 117, 0.16);
+  border: var(--border-width) solid rgba(255, 120, 117, 0.3);
+  color: #ff7875;
+  font-size: var(--font-size-small);
+}
+
+.coinWarningIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff7875;
+  color: #0c1411;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xxs);
+  font-weight: var(--bold);
 }
 
 .assetList {
   display: grid;
   gap: 12px;
-  margin-top: 12px;
 }
 
 .assetRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
@@ -30,11 +94,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .assetBadge {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -44,6 +109,13 @@
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.assetBadge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .assetName {
@@ -57,13 +129,114 @@
   color: rgba(234, 245, 235, 0.6);
 }
 
+.assetRight {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+}
+
 .assetValue {
-  font-size: var(--font-size);
-  color: rgba(234, 245, 235, 0.8);
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.85);
+  font-weight: var(--normal);
+}
+
+.assetAmount {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.7);
+  margin-top: 4px;
+}
+
+.assetActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(234, 245, 235, 0.7);
+  font-size: var(--font-size-xxs);
+  white-space: nowrap;
+}
+
+.assetActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font-weight: var(--bold);
+  cursor: pointer;
+  padding: 0;
+}
+
+.assetActions button svg {
+  display: block;
+}
+
+.assetActions button:hover {
+  color: #ffffff;
+}
+
+.emptyState {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.6);
+  padding: 6px 2px;
+}
+
+.sideCard {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 20px 24px;
+  min-height: 180px;
+}
+
+.sideIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(82, 196, 26, 0.12);
+  color: var(--green);
+  display: grid;
+  place-items: center;
+}
+
+.sideTitle {
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.sideText {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.sideLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--green);
+  font-weight: var(--bold);
+  cursor: pointer;
 }
 
 @media (max-width: 991.98px) {
-  .value {
-    font-size: var(--font-size-title-xl);
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .assetRow {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+  .assetRight {
+    justify-items: start;
+    width: 100%;
+  }
+  .assetValue {
+    text-align: left;
   }
 }

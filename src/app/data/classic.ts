@@ -7,23 +7,68 @@ export type CoinBalance = {
 
 export type ValidatorItem = {
   operator_address: string
-  description: { moniker: string }
+  description: { moniker: string; identity?: string }
   commission: { commission_rates: { rate: string } }
+  tokens?: string
+  status?: string
 }
 
 export type ProposalItem = {
   id: string
   status: string
   title: string
+  contentType?: string
+  description?: string
+  summary?: string
+  content?: any
   deposit: string
   submitTime?: string
+  votingStartTime?: string
   votingEndTime?: string
+  depositEndTime?: string
   finalTally?: {
     yes: string
     no: string
     abstain: string
     noWithVeto: string
   }
+}
+
+export type ProposalVote = {
+  voter: string
+  option: string
+  weight?: string
+}
+
+export type ProposalDeposit = {
+  depositor: string
+  amount: CoinBalance[]
+}
+
+export type GovTally = {
+  yes: string
+  no: string
+  abstain: string
+  noWithVeto: string
+}
+
+export type GovVotingParams = {
+  votingPeriodSeconds: number
+}
+
+export type GovDepositParams = {
+  minDeposit: CoinBalance[]
+  maxDepositPeriodSeconds: number
+}
+
+export type GovTallyParams = {
+  quorum: number
+  threshold: number
+  vetoThreshold: number
+}
+
+export type StakingPool = {
+  bonded_tokens?: { amount: string }
 }
 
 export type TxItem = {
@@ -136,16 +181,43 @@ export const fetchBalances = async (address: string) => {
   return data.balances ?? []
 }
 
+export type DelegationResponse = {
+  delegation?: { validator_address?: string }
+  balance?: CoinBalance
+}
+
 export const fetchDelegations = async (address: string) => {
   const url = buildUrl(
     CLASSIC_CHAIN.lcd,
     `/cosmos/staking/v1beta1/delegations/${address}`,
     { "pagination.limit": "200" }
   )
-  const data = await fetchJson<{
-    delegation_responses?: Array<{ balance?: CoinBalance }>
-  }>(url)
+  const data = await fetchJson<{ delegation_responses?: DelegationResponse[] }>(url)
   return data.delegation_responses ?? []
+}
+
+export const fetchDelegationsForVoters = async (addresses: string[]) => {
+  const results = new Map<string, DelegationResponse[]>()
+  const unique = Array.from(new Set(addresses)).filter(Boolean)
+  if (!unique.length) return results
+  const batchSize = 6
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const batch = unique.slice(i, i + batchSize)
+    const batchResults = await Promise.all(
+      batch.map(async (address) => {
+        try {
+          const list = await fetchDelegations(address)
+          return [address, list] as const
+        } catch {
+          return [address, [] as DelegationResponse[]] as const
+        }
+      })
+    )
+    batchResults.forEach(([address, list]) => {
+      results.set(address, list)
+    })
+  }
+  return results
 }
 
 export const fetchUnbonding = async (address: string) => {
@@ -170,12 +242,25 @@ export const fetchRewards = async (address: string) => {
 }
 
 export const fetchValidators = async () => {
-  const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/validators", {
-    status: "BOND_STATUS_BONDED",
-    "pagination.limit": "100"
-  })
-  const data = await fetchJson<{ validators?: ValidatorItem[] }>(url)
-  return data.validators ?? []
+  const items: ValidatorItem[] = []
+  let nextKey: string | undefined
+  let guard = 0
+
+  do {
+    const params: Record<string, string> = { "pagination.limit": "200" }
+    if (nextKey) params["pagination.key"] = nextKey
+    const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/validators", params)
+    const data = await fetchJson<{
+      validators?: ValidatorItem[]
+      pagination?: { next_key?: string | null }
+    }>(url)
+    items.push(...(data.validators ?? []))
+    const newKey = data.pagination?.next_key ?? undefined
+    nextKey = newKey && newKey !== nextKey ? newKey : undefined
+    guard += 1
+  } while (nextKey && guard < 50)
+
+  return items
 }
 
 export const fetchValidator = async (operatorAddress: string) => {
@@ -225,15 +310,48 @@ const normalizeProposal = (proposal: any): ProposalItem => {
       }
     : undefined
 
+  const description =
+    proposal?.content?.description ??
+    proposal?.description ??
+    proposal?.summary ??
+    (proposal?.metadata ? tryParseMetadata(proposal?.metadata)?.description : undefined)
+
+  const summary =
+    proposal?.summary ??
+    proposal?.content?.summary ??
+    (proposal?.metadata ? tryParseMetadata(proposal?.metadata)?.summary : undefined)
+
   return {
     id,
     status,
     title,
+    contentType:
+      proposal?.content?.["@type"] ??
+      proposal?.content?.type ??
+      proposal?.messages?.[0]?.["@type"] ??
+      proposal?.messages?.[0]?.type ??
+      undefined,
+    description,
+    summary,
+    content: proposal?.content ?? proposal?.content?.content ?? proposal?.messages?.[0],
     deposit,
     submitTime: proposal?.submit_time ?? proposal?.submit_time?.toString(),
+    votingStartTime:
+      proposal?.voting_start_time ?? proposal?.voting_start_time?.toString(),
     votingEndTime:
       proposal?.voting_end_time ?? proposal?.voting_end_time?.toString(),
+    depositEndTime:
+      proposal?.deposit_end_time ?? proposal?.deposit_end_time?.toString(),
     finalTally
+  }
+}
+
+const tryParseMetadata = (metadata?: string) => {
+  if (!metadata) return undefined
+  try {
+    return JSON.parse(metadata)
+  } catch {
+    return undefined
   }
 }
 
@@ -243,34 +361,6 @@ const GOV_STATUSES = {
   passed: "PROPOSAL_STATUS_PASSED",
   rejected: "PROPOSAL_STATUS_REJECTED"
 } as const
-
-const mapV1Proposal = (prop: any) => {
-  if (Array.isArray(prop?.messages) && prop.messages.length > 0) {
-    const message = prop.messages[0]
-    const isLegacy =
-      message?.["@type"] === "/cosmos.gov.v1.MsgExecLegacyContent"
-    const legacyContent = isLegacy ? message.content : null
-    const content = legacyContent
-      ? legacyContent
-      : message
-      ? {
-          ...message,
-          title: prop.title,
-          description: prop.summary
-        }
-      : {
-          "@type": "/cosmos.gov.v1.TextProposal",
-          title: prop.title,
-          description: prop.summary
-        }
-    return {
-      ...prop,
-      proposal_id: prop.id,
-      content
-    }
-  }
-  return prop
-}
 
 const fetchGovPaged = async (path: string, params: Record<string, string>) => {
   const items: any[] = []
@@ -296,21 +386,146 @@ const fetchGovPaged = async (path: string, params: Record<string, string>) => {
   return items
 }
 
-const fetchGovV1ByStatus = async (status: string) => {
-  const proposals = await fetchGovPaged("/cosmos/gov/v1/proposals", {
-    proposal_status: status,
-    "pagination.limit": "200",
-    "pagination.reverse": "true"
-  })
-  return proposals.map(mapV1Proposal)
-}
-
 const fetchGovV1beta1ByStatus = async (status: string) => {
   return fetchGovPaged("/cosmos/gov/v1beta1/proposals", {
     proposal_status: status,
     "pagination.limit": "200",
     "pagination.reverse": "true"
   })
+}
+
+const fetchGovV1ByStatus = async (status: string) => {
+  return fetchGovPaged("/cosmos/gov/v1/proposals", {
+    proposal_status: status,
+    "pagination.limit": "200",
+    "pagination.reverse": "true"
+  })
+}
+
+const fetchProposalVotesFromTxs = async (
+  id: string,
+  events: string
+): Promise<ProposalVote[]> => {
+  const votes = new Map<string, { option: string; weight?: string; height: number }>()
+  let page = 1
+  const limit = 100
+  let total = Number.POSITIVE_INFINITY
+  let guard = 0
+  const maxPages = 200
+
+  const parseOptionValue = (raw?: string) => {
+    if (!raw) return { option: undefined as string | undefined, weight: undefined as string | undefined }
+    if (raw.includes("option:")) {
+      const optionMatch = raw.match(/option:([A-Z0-9_]+)/)
+      const weightMatch = raw.match(/weight:\"([0-9.]+)\"/)
+      return {
+        option: optionMatch?.[1],
+        weight: weightMatch?.[1]
+      }
+    }
+    return { option: raw, weight: undefined }
+  }
+
+  while ((page - 1) * limit < total && guard < maxPages) {
+    const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
+      events,
+      page: String(page),
+      limit: String(limit),
+      "pagination.count_total": "true"
+    })
+    const data = await fetchJson<{
+      txs?: Array<{ body?: { messages?: any[] } }>
+      tx_responses?: Array<{ height?: string; events?: Array<{ type?: string; attributes?: Array<{ key?: string; value?: string }> }> }>
+      total?: string
+    }>(url)
+
+    const batch = data.txs ?? []
+    const responses = data.tx_responses ?? []
+    const parsedTotal = Number(data.total ?? NaN)
+    if (Number.isFinite(parsedTotal) && parsedTotal >= 0) {
+      total = parsedTotal
+    }
+
+    if (!batch.length && !responses.length) break
+
+    const length = Math.max(batch.length, responses.length)
+    for (let index = 0; index < length; index += 1) {
+      const height = Number(responses[index]?.height ?? 0)
+      const events = responses[index]?.events ?? []
+
+      const eventVotes: Array<{ voter: string; option?: string; weight?: string }> = []
+      events.forEach((event) => {
+        if (event?.type !== "proposal_vote") return
+        const attrs = event.attributes ?? []
+        const getAttr = (key: string) =>
+          attrs.find((attr) => attr.key === key)?.value
+        const proposalId = getAttr("proposal_id")
+        if (String(proposalId ?? "") !== String(id)) return
+        const voter = getAttr("voter")
+        const rawOption = getAttr("option")
+        const parsed = parseOptionValue(rawOption)
+        if (!voter || !parsed.option) return
+        eventVotes.push({
+          voter,
+          option: parsed.option,
+          weight: parsed.weight
+        })
+      })
+
+      if (!eventVotes.length) {
+        const messages = batch[index]?.body?.messages ?? []
+        messages.forEach((message) => {
+          const type = message?.["@type"] ?? ""
+          if (
+            type !== "/cosmos.gov.v1.MsgVote" &&
+            type !== "/cosmos.gov.v1.MsgVoteWeighted" &&
+            type !== "/cosmos.gov.v1beta1.MsgVote" &&
+            type !== "/cosmos.gov.v1beta1.MsgVoteWeighted"
+          ) {
+            return
+          }
+          if (String(message?.proposal_id ?? "") !== String(id)) return
+          const voter = message?.voter
+          if (!voter) return
+
+          let option = message?.option
+          let weight = message?.weight
+          if (Array.isArray(message?.options) && message.options.length) {
+            const sorted = [...message.options].sort(
+              (a, b) => Number(b?.weight ?? 0) - Number(a?.weight ?? 0)
+            )
+            option = sorted[0]?.option ?? option
+            weight = sorted[0]?.weight ?? weight
+          }
+          if (!option) return
+
+          eventVotes.push({ voter, option, weight })
+        })
+      }
+
+      eventVotes.forEach(({ voter, option, weight }) => {
+        if (!option) return
+        const current = votes.get(voter)
+        if (!current || height >= current.height) {
+          votes.set(voter, {
+            option,
+            weight,
+            height
+          })
+        }
+      })
+    }
+
+    if (batch.length < limit) break
+    page += 1
+    guard += 1
+  }
+
+  return Array.from(votes.entries()).map(([voter, payload]) => ({
+    voter,
+    option: payload.option,
+    weight: payload.weight
+  }))
 }
 
 export const fetchProposals = async () => {
@@ -321,17 +536,271 @@ export const fetchProposals = async () => {
     GOV_STATUSES.rejected
   ]
 
-  try {
-    const pages = await Promise.all(
-      statuses.map((status) => fetchGovV1ByStatus(status))
-    )
-    return pages.flat().map(normalizeProposal)
-  } catch {
-    const pages = await Promise.all(
-      statuses.map((status) => fetchGovV1beta1ByStatus(status))
-    )
-    return pages.flat().map(normalizeProposal)
+  const pages = await Promise.all(
+    statuses.map(async (status) => {
+      try {
+        return await fetchGovV1ByStatus(status)
+      } catch {
+        try {
+          return await fetchGovV1beta1ByStatus(status)
+        } catch {
+          return []
+        }
+      }
+    })
+  )
+  return pages.flat().map(normalizeProposal)
+}
+
+const parseDurationSeconds = (value?: string | number) => {
+  if (!value) return 0
+  if (typeof value === "number") return value
+  const trimmed = String(value).trim()
+  if (!trimmed) return 0
+  if (trimmed.endsWith("s")) {
+    const num = Number(trimmed.replace("s", ""))
+    return Number.isFinite(num) ? num : 0
   }
+  const raw = Number(trimmed)
+  if (!Number.isFinite(raw)) return 0
+  if (raw > 1e12) return Math.round(raw / 1e9)
+  return raw
+}
+
+const normalizeTally = (tally: any): GovTally => ({
+  yes: tally?.yes ?? tally?.yes_count ?? "0",
+  no: tally?.no ?? tally?.no_count ?? "0",
+  abstain: tally?.abstain ?? tally?.abstain_count ?? "0",
+  noWithVeto: tally?.no_with_veto ?? tally?.no_with_veto_count ?? "0"
+})
+
+export const fetchProposalById = async (id: string) => {
+  try {
+    const data = await fetchJson<{ proposal?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1/proposals/${id}`)
+    )
+    return normalizeProposal(data?.proposal ?? {})
+  } catch {
+    const data = await fetchJson<{ proposal?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1beta1/proposals/${id}`)
+    )
+    return normalizeProposal(data?.proposal ?? {})
+  }
+}
+
+export const fetchProposalTally = async (id: string): Promise<GovTally> => {
+  try {
+    const data = await fetchJson<{ tally?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1/proposals/${id}/tally`)
+    )
+    return normalizeTally(data?.tally)
+  } catch {
+    const data = await fetchJson<{ tally?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1beta1/proposals/${id}/tally`)
+    )
+    return normalizeTally(data?.tally)
+  }
+}
+
+const fetchGovPagedList = async (path: string, params: Record<string, string>) => {
+  const items: any[] = []
+  let nextKey: string | undefined
+  let guard = 0
+
+  do {
+    const pageParams = {
+      ...params,
+      ...(nextKey ? { "pagination.key": nextKey } : {})
+    }
+    const url = buildUrl(CLASSIC_CHAIN.lcd, path, pageParams)
+    const data = await fetchJson<{
+      votes?: any[]
+      deposits?: any[]
+      pagination?: { next_key?: string | null }
+    }>(url)
+    items.push(...(data.votes ?? data.deposits ?? []))
+    const newKey = data.pagination?.next_key ?? undefined
+    nextKey = newKey && newKey !== nextKey ? newKey : undefined
+    guard += 1
+  } while (nextKey && guard < 50)
+
+  return items
+}
+
+export const fetchProposalVotes = async (
+  id: string,
+  status?: string
+): Promise<ProposalVote[]> => {
+  let votes: any[] = []
+  try {
+    votes = await fetchGovPagedList(
+      `/cosmos/gov/v1/proposals/${id}/votes`,
+      { "pagination.limit": "200" }
+    )
+  } catch {
+    votes = await fetchGovPagedList(
+      `/cosmos/gov/v1beta1/proposals/${id}/votes`,
+      { "pagination.limit": "200" }
+    )
+  }
+  const normalized = votes.map((vote) => {
+    let option = vote?.option ?? "--"
+    let weight = vote?.weight ?? undefined
+    if (Array.isArray(vote?.options) && vote.options.length) {
+      const sorted = [...vote.options].sort((a, b) =>
+        Number(b?.weight ?? 0) - Number(a?.weight ?? 0)
+      )
+      option = sorted[0]?.option ?? option
+      weight = sorted[0]?.weight ?? weight
+    }
+    return {
+      voter: vote?.voter ?? vote?.voter_address ?? "--",
+      option,
+      weight
+    }
+  })
+  const shouldUseTxs =
+    status !== undefined && status !== null && status !== GOV_STATUSES.voting
+  if (!shouldUseTxs && normalized.length) return normalized
+  let txVotes = await fetchProposalVotesFromTxs(
+    id,
+    `proposal_vote.proposal_id='${id}'`
+  )
+  if (!txVotes.length) {
+    const actionEvents = [
+      "/cosmos.gov.v1beta1.MsgVote",
+      "/cosmos.gov.v1beta1.MsgVoteWeighted",
+      "/cosmos.gov.v1.MsgVote",
+      "/cosmos.gov.v1.MsgVoteWeighted"
+    ]
+    const fallbackMap = new Map<string, ProposalVote>()
+    for (const action of actionEvents) {
+      const actionVotes = await fetchProposalVotesFromTxs(
+        id,
+        `message.action='${action}'`
+      )
+      actionVotes.forEach((vote) => {
+        fallbackMap.set(vote.voter, vote)
+      })
+    }
+    if (fallbackMap.size) {
+      txVotes = Array.from(fallbackMap.values())
+    }
+  }
+  if (!normalized.length) return txVotes
+  if (!txVotes.length) return normalized
+  const merged = new Map<string, ProposalVote>()
+  normalized.forEach((vote) => merged.set(vote.voter, vote))
+  txVotes.forEach((vote) => merged.set(vote.voter, vote))
+  return Array.from(merged.values())
+}
+
+export const fetchProposalDeposits = async (
+  id: string
+): Promise<ProposalDeposit[]> => {
+  let deposits: any[] = []
+  try {
+    deposits = await fetchGovPagedList(
+      `/cosmos/gov/v1/proposals/${id}/deposits`,
+      { "pagination.limit": "200" }
+    )
+  } catch {
+    deposits = await fetchGovPagedList(
+      `/cosmos/gov/v1beta1/proposals/${id}/deposits`,
+      { "pagination.limit": "200" }
+    )
+  }
+  return deposits.map((deposit) => ({
+    depositor: deposit?.depositor ?? "--",
+    amount: deposit?.amount ?? []
+  }))
+}
+
+export const fetchVotingParams = async (): Promise<GovVotingParams> => {
+  try {
+    const data = await fetchJson<{ voting_params?: any; params?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/params/voting")
+    )
+    const seconds = parseDurationSeconds(
+      data?.voting_params?.voting_period ?? data?.params?.voting_period
+    )
+    return { votingPeriodSeconds: seconds }
+  } catch {
+    const data = await fetchJson<{ voting_params?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1beta1/params/voting")
+    )
+    const seconds = parseDurationSeconds(data?.voting_params?.voting_period)
+    return { votingPeriodSeconds: seconds }
+  }
+}
+
+export const fetchDepositParams = async (): Promise<GovDepositParams> => {
+  try {
+    const data = await fetchJson<{ deposit_params?: any; params?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/params/deposit")
+    )
+    return {
+      minDeposit:
+        data?.deposit_params?.min_deposit ?? data?.params?.min_deposit ?? [],
+      maxDepositPeriodSeconds: parseDurationSeconds(
+        data?.deposit_params?.max_deposit_period ??
+          data?.params?.max_deposit_period
+      )
+    }
+  } catch {
+    const data = await fetchJson<{ deposit_params?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1beta1/params/deposit")
+    )
+    return {
+      minDeposit: data?.deposit_params?.min_deposit ?? [],
+      maxDepositPeriodSeconds: parseDurationSeconds(
+        data?.deposit_params?.max_deposit_period
+      )
+    }
+  }
+}
+
+export const fetchTallyParams = async (): Promise<GovTallyParams> => {
+  try {
+    const data = await fetchJson<{ tally_params?: any; params?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/params/tallying")
+    )
+    return {
+      quorum: Number(
+        data?.tally_params?.quorum ?? data?.params?.quorum ?? 0
+      ),
+      threshold: Number(
+        data?.tally_params?.threshold ?? data?.params?.threshold ?? 0
+      ),
+      vetoThreshold: Number(
+        data?.tally_params?.veto_threshold ?? data?.params?.veto_threshold ?? 0
+      )
+    }
+  } catch {
+    const data = await fetchJson<{ tally_params?: any }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1beta1/params/tallying")
+    )
+    return {
+      quorum: Number(data?.tally_params?.quorum ?? 0),
+      threshold: Number(data?.tally_params?.threshold ?? 0),
+      vetoThreshold: Number(data?.tally_params?.veto_threshold ?? 0)
+    }
+  }
+}
+
+export const fetchStakingPool = async (): Promise<StakingPool> => {
+  const data = await fetchJson<{ pool?: StakingPool }>(
+    buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/pool")
+  )
+  const pool = data?.pool ?? {}
+  const bonded = (pool as any)?.bonded_tokens
+  if (typeof bonded === "string") {
+    return { bonded_tokens: { amount: bonded } }
+  }
+  if (bonded && typeof bonded === "object" && "amount" in bonded) {
+    return { bonded_tokens: { amount: (bonded as any).amount ?? "0" } }
+  }
+  return {}
 }
 
 export const fetchTxs = async (address: string, limit = 10) => {

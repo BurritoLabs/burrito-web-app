@@ -84,7 +84,7 @@ const buildIconCandidates = ({
           `${ASSET_URL}/icon/60/ustc.png`
         ]
       : []),
-    `${ASSET_URL}/icon/svg/CW.svg`
+    "/system/cw20.svg"
   ].filter(Boolean) as string[]
 
   return candidates
@@ -518,11 +518,14 @@ const WalletPanel = () => {
             value,
             chainCount: 1,
             whitelisted: Boolean(ibcToken),
-            iconCandidates: buildIconCandidates({
-              icon: ibcToken?.icon,
-              denom: ibcToken?.base_denom ?? coin.denom,
-              isClassic
-            })
+            iconCandidates: [
+              ...buildIconCandidates({
+                icon: ibcToken?.icon,
+                denom: ibcToken?.base_denom ?? coin.denom,
+                isClassic
+              }),
+              "/system/ibc.svg"
+            ]
           }
         }
 
@@ -637,7 +640,7 @@ const WalletPanel = () => {
             value,
             chainCount: 1,
             whitelisted: true,
-            iconCandidates: [token.icon, `${ASSET_URL}/icon/svg/CW.svg`].filter(
+            iconCandidates: [token.icon, "/system/cw20.svg"].filter(
               Boolean
             ) as string[]
           }
@@ -747,11 +750,14 @@ const WalletPanel = () => {
         key: `ibc/${hash}`,
         symbol: token.symbol,
         name: token.name,
-        iconCandidates: buildIconCandidates({
-          icon: token.icon,
-          denom: token.base_denom,
-          isClassic: true
-        }),
+        iconCandidates: [
+          ...buildIconCandidates({
+            icon: token.icon,
+            denom: token.base_denom,
+            isClassic: true
+          }),
+          "/system/ibc.svg"
+        ],
         enabled: !hiddenTokenSet.has(`ibc/${hash}`)
       })
     )
@@ -761,7 +767,7 @@ const WalletPanel = () => {
         key: address,
         symbol: token.symbol,
         name: token.name ?? token.protocol,
-        iconCandidates: [token.icon, `${ASSET_URL}/icon/svg/CW.svg`].filter(
+        iconCandidates: [token.icon, "/system/cw20.svg"].filter(
           Boolean
         ) as string[],
         enabled: !hiddenTokenSet.has(address)
