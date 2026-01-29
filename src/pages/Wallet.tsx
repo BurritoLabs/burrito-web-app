@@ -649,15 +649,25 @@ const Wallet = () => {
   }, [cw20Balances, ibcTokenRows])
 
   const filteredCoinRows = useMemo(() => {
-    if (!hideLowBalanceCoins) return nativeCoinRows
-    return nativeCoinRows.filter((asset) => {
-      if (
-        asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ||
-        asset.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
-      ) {
-        return true
+    const list = hideLowBalanceCoins
+      ? nativeCoinRows.filter((asset) => {
+          if (
+            asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ||
+            asset.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+          ) {
+            return true
+          }
+          return asset.value !== undefined && asset.value >= 1
+        })
+      : nativeCoinRows
+
+    return list.slice().sort((a, b) => {
+      const aValue = a.value ?? 0
+      const bValue = b.value ?? 0
+      if (aValue === bValue) {
+        return a.symbol.localeCompare(b.symbol)
       }
-      return asset.value !== undefined && asset.value >= 1
+      return bValue - aValue
     })
   }, [nativeCoinRows, hideLowBalanceCoins])
 

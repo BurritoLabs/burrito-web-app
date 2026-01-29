@@ -129,6 +129,12 @@
   color: rgba(234, 245, 235, 0.8);
 }
 
+.loadMoreWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
 .proposalCard {
   display: grid;
   gap: 10px;
@@ -215,9 +221,6 @@
   min-height: 2.6em;
 }
 
-.proposalTitle:hover {
-  color: rgba(255, 255, 255, 0.86);
-}
 
 .proposalTime {
   font-size: var(--font-size-small);

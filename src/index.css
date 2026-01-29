@@ -166,6 +166,11 @@ input::placeholder {
   color: rgba(234, 245, 235, 0.4);
 }
 
+textarea::placeholder {
+  color: rgba(234, 245, 235, 0.4);
+  font-weight: var(--normal);
+}
+
 .bannerStrip {
   display: flex;
   align-items: center;

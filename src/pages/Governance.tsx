@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useLocation, useSearchParams } from "react-router-dom"
 import type { ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
@@ -37,7 +37,42 @@ const Governance = () => {
     staleTime: 10 * 60 * 1000
   })
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const [activeKey, setActiveKey] = useState("voting")
+  const [visibleCounts, setVisibleCounts] = useState(() => ({
+    all: 30,
+    voting: 30,
+    deposit: 30,
+    passed: 30,
+    rejected: 30
+  }))
+
+  const validTabs = useMemo(
+    () => new Set(["all", "voting", "deposit", "passed", "rejected"]),
+    []
+  )
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab && validTabs.has(tab) && tab !== activeKey) {
+      setActiveKey(tab)
+    }
+  }, [activeKey, searchParams, validTabs])
+
+  const updateTab = (tab: string) => {
+    setActiveKey(tab)
+    const next = new URLSearchParams(searchParams)
+    next.set("tab", tab)
+    setSearchParams(next, { replace: true })
+  }
+
+  const loadMore = (key: string) => {
+    setVisibleCounts((prev) => ({
+      ...prev,
+      [key]: (prev[key as keyof typeof prev] ?? 30) + 30
+    }))
+  }
 
   const formatProposalType = (type?: string) => {
     if (!type) return "Proposal"
@@ -75,7 +110,7 @@ const Governance = () => {
             activeKey === "all" ? styles.chainPillActive : ""
           }`}
           type="button"
-          onClick={() => setActiveKey("all")}
+          onClick={() => updateTab("all")}
         >
           All proposals
         </button>
@@ -106,19 +141,21 @@ const Governance = () => {
     proposal,
     statusLabel,
     statusClass,
-    actionLabel
+    actionLabel,
+    enableLiveTally
   }: {
     proposal: ProposalItem,
     statusLabel: string,
     statusClass: string,
-    actionLabel?: string
+    actionLabel?: string,
+    enableLiveTally: boolean
   }) => {
     const { data: liveTally } = useQuery({
       queryKey: ["proposalTally", proposal.id],
       queryFn: () => fetchProposalTally(proposal.id),
-      enabled: Boolean(proposal.id),
+      enabled: Boolean(proposal.id) && enableLiveTally,
       staleTime: 10_000,
-      refetchInterval: 15_000,
+      refetchInterval: enableLiveTally ? 15_000 : false,
       refetchIntervalInBackground: true
     })
 
@@ -153,13 +190,11 @@ const Governance = () => {
         key={proposal.id}
         className={styles.proposalLink}
         to={`/proposal/${proposal.id}`}
+        state={{ from: `${location.pathname}${location.search}` }}
       >
         <div className={`card ${styles.proposalCard}`}>
         <div className={styles.proposalMetaRow}>
           <div className={styles.proposalMetaLeft}>
-            <div className={styles.proposalIcon}>
-              <img src="/brand/icon.png" alt="Burrito" />
-            </div>
             <span className={styles.proposalMetaText}>
               #{proposal.id} | {formatProposalType(proposal.contentType)}
             </span>
@@ -284,6 +319,7 @@ const Governance = () => {
   )
 
   const renderList = (
+    key: "all" | "voting" | "deposit" | "passed" | "rejected",
     list: ProposalItem[],
     statusLabel: string,
     statusClass: string,
@@ -291,67 +327,92 @@ const Governance = () => {
     actionLabel?: string
   ) =>
     list.length ? (
-      <div className={styles.proposals}>
-        {list.map((proposal) =>
-          (
+      <>
+        <div className={styles.proposals}>
+          {list.slice(0, visibleCounts[key]).map((proposal) => (
             <ProposalCard
               key={proposal.id}
               proposal={proposal}
               statusLabel={statusLabel}
               statusClass={statusClass}
               actionLabel={actionLabel}
+              enableLiveTally={
+                (activeKey === "voting" || activeKey === "all") &&
+                String(proposal.status).toUpperCase().includes("VOTING")
+              }
             />
-          )
-        )}
-      </div>
+          ))}
+        </div>
+        {list.length > visibleCounts[key] ? (
+          <div className={styles.loadMoreWrap}>
+            <button
+              className="uiButton"
+              type="button"
+              onClick={() => loadMore(key)}
+            >
+              Load more
+            </button>
+          </div>
+        ) : null}
+      </>
     ) : (
       renderEmptyState(emptyMessage)
     )
 
   const getAllContent = () => {
     if (activeKey !== "all") return null
-    const hasAny =
-      normalized.voting.length ||
-      normalized.deposit.length ||
-      normalized.passed.length ||
-      normalized.rejected.length
+    const allList = [
+      ...normalized.voting.map((proposal) => ({
+        proposal,
+        statusLabel: "Voting",
+        statusClass: styles.statusVoting
+      })),
+      ...normalized.deposit.map((proposal) => ({
+        proposal,
+        statusLabel: "Deposit",
+        statusClass: styles.statusDeposit
+      })),
+      ...normalized.passed.map((proposal) => ({
+        proposal,
+        statusLabel: "Passed",
+        statusClass: styles.statusPassed
+      })),
+      ...normalized.rejected.map((proposal) => ({
+        proposal,
+        statusLabel: "Rejected",
+        statusClass: styles.statusRejected
+      }))
+    ]
+
     return renderPanel(
-      hasAny ? (
-        <div className={styles.proposals}>
-          {normalized.voting.map((proposal) => (
-            <ProposalCard
-              key={proposal.id}
-              proposal={proposal}
-              statusLabel="Voting"
-              statusClass={styles.statusVoting}
-            />
-          ))}
-          {normalized.deposit.map((proposal) => (
-            <ProposalCard
-              key={proposal.id}
-              proposal={proposal}
-              statusLabel="Deposit"
-              statusClass={styles.statusDeposit}
-              actionLabel="Deposit"
-            />
-          ))}
-          {normalized.passed.map((proposal) => (
-            <ProposalCard
-              key={proposal.id}
-              proposal={proposal}
-              statusLabel="Passed"
-              statusClass={styles.statusPassed}
-            />
-          ))}
-          {normalized.rejected.map((proposal) => (
-            <ProposalCard
-              key={proposal.id}
-              proposal={proposal}
-              statusLabel="Rejected"
-              statusClass={styles.statusRejected}
-            />
-          ))}
-        </div>
+      allList.length ? (
+        <>
+          <div className={styles.proposals}>
+            {allList.slice(0, visibleCounts.all).map((item) => (
+              <ProposalCard
+                key={item.proposal.id}
+                proposal={item.proposal}
+                statusLabel={item.statusLabel}
+                statusClass={item.statusClass}
+                actionLabel={item.statusLabel === "Deposit" ? "Deposit" : undefined}
+                enableLiveTally={
+                  String(item.proposal.status).toUpperCase().includes("VOTING")
+                }
+              />
+            ))}
+          </div>
+          {allList.length > visibleCounts.all ? (
+            <div className={styles.loadMoreWrap}>
+              <button
+                className="uiButton"
+                type="button"
+                onClick={() => loadMore("all")}
+              >
+                Load more
+              </button>
+            </div>
+          ) : null}
+        </>
       ) : (
         renderEmptyState("No proposals")
       )
@@ -362,6 +423,7 @@ const Governance = () => {
     if (activeKey !== "voting") return null
     return renderPanel(
       renderList(
+        "voting",
         normalized.voting,
         "Voting",
         styles.statusVoting,
@@ -374,6 +436,7 @@ const Governance = () => {
     if (activeKey !== "deposit") return null
     return renderPanel(
       renderList(
+        "deposit",
         normalized.deposit,
         "Deposit",
         styles.statusDeposit,
@@ -387,6 +450,7 @@ const Governance = () => {
     if (activeKey !== "passed") return null
     return renderPanel(
       renderList(
+        "passed",
         normalized.passed,
         "Passed",
         styles.statusPassed,
@@ -399,6 +463,7 @@ const Governance = () => {
     if (activeKey !== "rejected") return null
     return renderPanel(
       renderList(
+        "rejected",
         normalized.rejected,
         "Rejected",
         styles.statusRejected,
@@ -440,16 +505,16 @@ const Governance = () => {
     <PageShell
       title="Governance"
       extra={
-        <button className="uiButton uiButtonPrimary" type="button">
+        <Link className="uiButton uiButtonPrimary" to="/proposal/new">
           New proposal
-        </button>
+        </Link>
       }
     >
       <Tabs
         tabs={tabs}
         variant="card"
         activeKey={activeKey}
-        onChange={(key) => setActiveKey(key)}
+        onChange={(key) => updateTab(key)}
       />
     </PageShell>
   )

@@ -1,5 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { useParams } from "react-router-dom"
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react"
+import { useLocation, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./ProposalDetails.module.css"
@@ -8,6 +15,7 @@ import {
   fetchProposalDeposits,
   fetchProposalTally,
   fetchProposalVotes,
+  fetchProposalVoteTxHashes,
   fetchValidators,
   fetchStakingPool,
   fetchTallyParams,
@@ -34,6 +42,7 @@ import type {
 const ProposalDetails = () => {
   const params = useParams()
   const proposalId = params.id ?? ""
+  const location = useLocation()
 
   const { data: proposal } = useQuery<ProposalItem>({
     queryKey: ["proposal", proposalId],
@@ -120,16 +129,39 @@ const ProposalDetails = () => {
   }, [statusLabel])
 
   const summaryItems = useMemo(() => {
-    if (!proposal?.content) return []
-    return Object.entries(proposal.content)
-      .filter(
-        ([key]) => !["@type", "title", "description", "summary"].includes(key)
-      )
-      .map(([key, value]) => ({
-        label: capitalize(key),
-        value: renderSummaryValue(key, value)
-      }))
-  }, [proposal?.content])
+    if (!proposal) return []
+    const ignored = new Set([
+      "@type",
+      "title",
+      "description",
+      "summary",
+      "details",
+      "metadata",
+      "authors",
+      "proposal_forum_url",
+      "vote_option_context"
+    ])
+    const items: Array<{ label: string; value: ReactNode }> = []
+    const seen = new Set<string>()
+
+    const pushEntries = (source?: Record<string, any>) => {
+      if (!source) return
+      Object.entries(source)
+        .filter(([key]) => !ignored.has(key))
+        .forEach(([key, value]) => {
+          if (seen.has(key)) return
+          seen.add(key)
+          items.push({
+            label: capitalize(key.replace(/_/g, " ")),
+            value: renderSummaryValue(key, value)
+          })
+        })
+    }
+
+    pushEntries(proposal.metadataContent)
+    pushEntries(proposal.content as Record<string, any>)
+    return items
+  }, [proposal])
 
   const validatorInfoMap = useMemo(() => {
     const map = new Map<
@@ -244,17 +276,54 @@ const ProposalDetails = () => {
     )
   }, [validators, delegationsByVoter, validatorInfoMap, voterAddresses, votes])
 
+  const [voteFilter, setVoteFilter] = useState("ALL")
   const [visibleVotes, setVisibleVotes] = useState(25)
   const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>({})
 
   useEffect(() => {
     setVisibleVotes(25)
-  }, [proposalId, votesByValidator.length])
+  }, [proposalId, votesByValidator.length, voteFilter])
+
+  const normalizeVoteOption = (value: string) => {
+    const upper = value.toUpperCase()
+    if (upper.includes("YES")) return "YES"
+    if (upper.includes("NO_WITH_VETO")) return "NO_WITH_VETO"
+    if (upper.includes("NO")) return "NO"
+    if (upper.includes("ABSTAIN")) return "ABSTAIN"
+    return upper
+  }
+
+  const filteredVotesByValidator = useMemo(() => {
+    if (voteFilter === "ALL") return votesByValidator
+    return votesByValidator.filter(
+      (vote) => normalizeVoteOption(vote.option) === voteFilter
+    )
+  }, [votesByValidator, voteFilter])
 
   const visibleVotesByValidator = useMemo(
-    () => votesByValidator.slice(0, visibleVotes),
-    [votesByValidator, visibleVotes]
+    () => filteredVotesByValidator.slice(0, visibleVotes),
+    [filteredVotesByValidator, visibleVotes]
   )
+
+  const visibleVoters = useMemo(
+    () => visibleVotesByValidator.map((vote) => vote.voter).filter(Boolean),
+    [visibleVotesByValidator]
+  )
+
+  const { data: voteTxHashes = {} } = useQuery<Record<string, string>>({
+    queryKey: ["proposalVoteTxs", proposalId, visibleVoters.join("|")],
+    queryFn: () => fetchProposalVoteTxHashes(proposalId, visibleVoters),
+    enabled: Boolean(proposalId) && visibleVoters.length > 0,
+    staleTime: 5 * 60 * 1000
+  })
+
+  const totalVoteWeight = useMemo(() => {
+    let total = 0n
+    votesByValidator.forEach((vote) => {
+      total += vote.weight
+    })
+    return total
+  }, [votesByValidator])
 
   useEffect(() => {
     let cancelled = false
@@ -298,9 +367,40 @@ const ProposalDetails = () => {
 
   const description = proposal?.description ?? proposal?.summary ?? "--"
 
+  const [showDetails, setShowDetails] = useState(false)
+
   const parsedDescription = useMemo(() => {
     if (!description || description === "--") return []
     const lines = description.split(/\n/)
+    const linkify = (text: string) => {
+      const nodes: ReactNode[] = []
+      const pattern = /(https?:\/\/[^\s]+)/g
+      let lastIndex = 0
+      let match = pattern.exec(text)
+      while (match) {
+        if (match.index > lastIndex) {
+          nodes.push(text.slice(lastIndex, match.index))
+        }
+        const url = match[0]
+        nodes.push(
+          <a
+            key={`${match.index}-${url}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className={styles.summaryLink}
+          >
+            {url}
+          </a>
+        )
+        lastIndex = match.index + url.length
+        match = pattern.exec(text)
+      }
+      if (lastIndex < text.length) {
+        nodes.push(text.slice(lastIndex))
+      }
+      return nodes
+    }
     return lines.map((line, index) => {
       if (line.startsWith("# ")) {
         return (
@@ -319,17 +419,32 @@ const ProposalDetails = () => {
       if (line.startsWith("- ")) {
         return (
           <li key={index} className={styles.descListItem}>
-            {line.replace("- ", "")}
+            {linkify(line.replace("- ", ""))}
           </li>
         )
       }
       return (
         <p key={index} className={styles.descParagraph}>
-          {line}
+          {linkify(line)}
         </p>
       )
     })
   }, [description])
+
+  const metadata = proposal?.metadataContent as Record<string, any> | undefined
+  const authors = metadata?.authors
+  const forumUrl = metadata?.proposal_forum_url
+  const voteContext = metadata?.vote_option_context
+  const forumLabel = (() => {
+    if (!forumUrl || typeof forumUrl !== "string") return ""
+    try {
+      const url = new URL(forumUrl)
+      const parts = url.pathname.split("/").filter(Boolean)
+      return parts[parts.length - 1] ?? forumUrl
+    } catch {
+      return forumUrl
+    }
+  })()
 
   const tallyStats = useMemo(() => {
     const safeRatio = (num: bigint, den: bigint) => {
@@ -404,7 +519,8 @@ const ProposalDetails = () => {
       amount: tally?.yes ?? "0",
       textClass: styles.voteYes,
       segmentClass: styles.segmentYes,
-      itemClass: styles.voteCardYes
+      itemClass: styles.voteCardYes,
+      filterKey: "YES"
     },
     {
       label: "No",
@@ -413,7 +529,8 @@ const ProposalDetails = () => {
       amount: tally?.no ?? "0",
       textClass: styles.voteNo,
       segmentClass: styles.segmentNo,
-      itemClass: styles.voteCardNo
+      itemClass: styles.voteCardNo,
+      filterKey: "NO"
     },
     {
       label: "No with veto",
@@ -422,7 +539,8 @@ const ProposalDetails = () => {
       amount: tally?.noWithVeto ?? "0",
       textClass: styles.voteVeto,
       segmentClass: styles.segmentVeto,
-      itemClass: styles.voteCardVeto
+      itemClass: styles.voteCardVeto,
+      filterKey: "NO_WITH_VETO"
     },
     {
       label: "Abstain",
@@ -431,17 +549,21 @@ const ProposalDetails = () => {
       amount: tally?.abstain ?? "0",
       textClass: styles.voteAbstain,
       segmentClass: styles.segmentAbstain,
-      itemClass: styles.voteCardAbstain
+      itemClass: styles.voteCardAbstain,
+      filterKey: "ABSTAIN"
     }
   ]
 
   const actionLabel =
     statusLabel === "Voting" ? "Vote" : statusLabel === "Deposit" ? "Deposit" : null
 
+  const backTo =
+    (location.state as { from?: string } | undefined)?.from ?? "/gov"
+
   return (
     <PageShell
       title="Proposal details"
-      backTo="/gov"
+      backTo={backTo}
       backLabel=""
       extra={
         actionLabel ? (
@@ -456,9 +578,6 @@ const ProposalDetails = () => {
           <div className={`card ${styles.detailCard}`}>
             <div className={styles.headerMeta}>
               <div className={styles.metaLeft}>
-                <div className={styles.metaIcon}>
-                  <img src="/brand/icon.png" alt="Burrito" />
-                </div>
                 <span>
                   {proposal?.id ? `#${proposal.id}` : "--"} |{" "}
                   {formatProposalType(proposal?.contentType)}
@@ -475,24 +594,66 @@ const ProposalDetails = () => {
               Submitted{" "}
               {proposal?.submitTime ? formatTimestamp(proposal.submitTime) : "--"}
             </div>
-            <div className={styles.description}>{parsedDescription}</div>
+            <button
+              className={styles.detailsToggle}
+              type="button"
+              onClick={() => setShowDetails((prev) => !prev)}
+            >
+              {showDetails ? "Hide details" : "Show details"}
+            </button>
+            {showDetails ? (
+              <>
+                <div className={styles.description}>{parsedDescription}</div>
+                <div className={styles.detailsList}>
+                  {authors ? (
+                    <div className={styles.detailsRow}>
+                      <div className={styles.detailsLabel}>Authors</div>
+                      <div className={styles.detailsValue}>
+                        {Array.isArray(authors) ? authors.join(", ") : String(authors)}
+                      </div>
+                    </div>
+                  ) : null}
+                  {forumUrl ? (
+                    <div className={styles.detailsRow}>
+                      <div className={styles.detailsLabel}>Proposal forum url</div>
+                      <div className={styles.detailsValue}>
+                        <a
+                          className={styles.summaryLink}
+                          href={forumUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {forumLabel || forumUrl}
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+                  {voteContext ? (
+                    <div className={styles.detailsRow}>
+                      <div className={styles.detailsLabel}>Vote option context</div>
+                      <div className={styles.detailsValue}>{String(voteContext)}</div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
         <div className={styles.sideColumn}>
           <div className={`card ${styles.summaryCard}`}>
-          <div className={styles.summaryList}>
-            {summaryItems.length ? (
-              summaryItems.map((item) => (
-                <div key={item.label} className={styles.summaryRow}>
-                  <div className={styles.summaryLabel}>{item.label}</div>
-                  <div className={styles.summaryValue}>{item.value}</div>
-                </div>
-              ))
-            ) : (
-              <div className={styles.emptyState}>No details available.</div>
-            )}
-          </div>
+            <div className={styles.summaryList}>
+              {summaryItems.length ? (
+                summaryItems.map((item) => (
+                  <div key={item.label} className={styles.summaryRow}>
+                    <div className={styles.summaryLabel}>{item.label}</div>
+                    <div className={styles.summaryValue}>{item.value}</div>
+                  </div>
+                ))
+              ) : (
+                <div className={styles.emptyState}>No details available.</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -526,109 +687,202 @@ const ProposalDetails = () => {
         </div>
       ) : null}
 
-      {statusLabel !== "Rejected" ? (
-        <div className={`card ${styles.sectionCard}`}>
-          <div className={styles.sectionHeader}>Votes</div>
-          <div className={`${styles.sectionBody} ${styles.votesBody}`}>
-            <div className={styles.voteGrid}>
-              <div className={styles.voteTotals}>
-                <div className={styles.voteTotalTitle}>Total voted</div>
-                <div className={styles.voteTotalValue}>
-                  {formatTokenAmount(tallyStats.total, 6, 0)} LUNC{" "}
-                  <span className={styles.voteTotalPercent}>
-                    ({formatPercentPlain(tallyStats.ratio * 100)})
-                  </span>
-                </div>
-                <div className={styles.voteTotalMeta}>
-                  {tallyStats.isPassing ? "Passing..." : "Not passing..."}
-                </div>
+      <div className={`card ${styles.sectionCard}`}>
+        <div className={styles.sectionHeader}>Votes</div>
+        <div className={`${styles.sectionBody} ${styles.votesBody}`}>
+          <div className={styles.voteGrid}>
+            <div className={styles.voteTotals}>
+              <div className={styles.voteTotalTitle}>Total voted</div>
+              <div className={styles.voteTotalValue}>
+                {formatTokenAmount(tallyStats.total, 6, 0)} LUNC{" "}
+                <span className={styles.voteTotalPercent}>
+                  ({formatPercentPlain(tallyStats.ratio * 100)})
+                </span>
               </div>
-              <div className={styles.voteList}>
-                {voteRows.map((row) => (
-                  <article
-                    key={row.label}
-                    className={`${styles.voteItem} ${row.itemClass}`}
-                  >
-                    <div className={styles.voteItemTitle}>{row.label}</div>
-                    <div className={`${styles.voteItemRatio} ${row.textClass}`}>
-                      {formatPercentPlain(row.value * 100)}
-                    </div>
-                    <div className={styles.voteItemAmount}>
-                      {formatTokenAmount(row.amount, 6, 0)} LUNC
-                    </div>
-                  </article>
-                ))}
+              <div className={styles.voteTotalMeta}>
+                {tallyStats.isPassing ? "Passing..." : "Not passing..."}
               </div>
             </div>
+            <div className={styles.voteList}>
+              {voteRows.map((row) => (
+                <article
+                  key={row.label}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    setVoteFilter((prev) =>
+                      prev === row.filterKey ? "ALL" : row.filterKey
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      setVoteFilter((prev) =>
+                        prev === row.filterKey ? "ALL" : row.filterKey
+                      )
+                    }
+                  }}
+                  className={`${styles.voteItem} ${styles.voteItemClickable} ${
+                    row.itemClass
+                  } ${voteFilter === row.filterKey ? styles.voteItemActive : ""}`}
+                >
+                  <div className={styles.voteItemTitle}>{row.label}</div>
+                  <div className={`${styles.voteItemRatio} ${row.textClass}`}>
+                    {formatPercentPlain(row.value * 100)}
+                  </div>
+                  <div className={styles.voteItemAmount}>
+                    {formatTokenAmount(row.amount, 6, 0)} LUNC
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
 
-            <div className={styles.progressBlock}>
-              <div className={styles.progressWrap}>
-                <div className={styles.progressTrack}>
-                  {voteRows.map((row) => (
-                    <div
-                      key={row.label}
-                      className={`${styles.progressSegment} ${row.segmentClass}`}
-                      style={{ width: `${row.barValue * 100}%` }}
-                    />
-                  ))}
-                </div>
-                <VoteFlag
-                  label={tallyStats.flag.label}
-                  left={Math.min(100, tallyStats.flag.value * 100)}
-                />
+          <div className={styles.progressBlock}>
+            <div className={styles.progressWrap}>
+              <div className={styles.progressTrack}>
+                {voteRows.map((row) => (
+                  <div
+                    key={row.label}
+                    className={`${styles.progressSegment} ${row.segmentClass}`}
+                    style={{ width: `${row.barValue * 100}%` }}
+                  />
+                ))}
               </div>
-              <div className={styles.voteMeta}>
-                Voted: {formatTokenAmount(tallyStats.total, 6, 0)} /{" "}
-                {formatTokenAmount(tallyStats.totalStaked, 6, 0)}
-              </div>
-              <div className={styles.voteEnd}>
-                {proposal?.votingEndTime
-                  ? `Ends ${formatTimestamp(proposal.votingEndTime)}`
-                  : "--"}
-              </div>
+              <VoteFlag
+                label={tallyStats.flag.label}
+                left={Math.min(100, tallyStats.flag.value * 100)}
+              />
+            </div>
+            <div className={styles.voteMeta}>
+              Voted: {formatTokenAmount(tallyStats.total, 6, 0)} /{" "}
+              {formatTokenAmount(tallyStats.totalStaked, 6, 0)}
+            </div>
+            <div className={styles.voteEnd}>
+              {proposal?.votingEndTime
+                ? `Ends ${formatTimestamp(proposal.votingEndTime)}`
+                : "--"}
             </div>
           </div>
         </div>
-      ) : null}
+      </div>
 
-      <div className={`card ${styles.sectionCard}`}>
-        <div className={styles.sectionHeader}>Votes by validator</div>
-        <div className={styles.sectionBody}>
-          {votesByValidator.length ? (
+      {votesByValidator.length ? (
+        <div className={`card ${styles.sectionCard}`}>
+          <div className={styles.sectionHeader}>Votes by validator</div>
+          <div className={styles.sectionBody}>
             <div className={styles.list}>
-              {visibleVotesByValidator.map((vote) => (
-                <div key={vote.voter} className={styles.validatorRow}>
-                  <div className={styles.validatorInfo}>
-                  <img
-                    className={styles.validatorAvatar}
-                    src={
-                      vote.validator?.identity
-                        ? keybasePictures[vote.validator.identity] ||
-                          "/system/validator.png"
-                        : "/system/validator.png"
-                    }
-                    alt={vote.validator?.moniker ?? "Validator"}
-                    onError={(event) => {
-                      const target = event.currentTarget
-                      target.onerror = null
-                      target.src = "/system/validator.png"
-                    }}
-                  />
-                    <div>
-                      <div className={styles.validatorName}>
-                        {vote.validator?.moniker ?? truncateHash(vote.voter)}
+              {visibleVotesByValidator.map((vote) => {
+                const weightPercent = getWeightPercent(vote.weight, totalVoteWeight)
+                const badgeRight = Math.min(98, Math.max(0, weightPercent + 1))
+                const txHash = vote.txhash ?? voteTxHashes[vote.voter]
+                const txUrl = txHash
+                  ? `https://finder.burrito.money/classic/tx/${txHash}`
+                  : ""
+                return (
+                  <div key={vote.voter}>
+                    {txUrl ? (
+                      <a
+                        className={`${styles.validatorRow} ${styles.validatorLink}`}
+                        href={txUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <div
+                          className={styles.validatorWeightBar}
+                          style={{
+                            width: `${weightPercent}%`,
+                            backgroundColor: getVoteColor(vote.option)
+                          }}
+                        />
+                        <span
+                          className={styles.validatorVoteBadge}
+                          style={{
+                            color: getVoteColor(vote.option),
+                            right: `${badgeRight}%`
+                          }}
+                        >
+                          {formatVoteOption(vote.option)}
+                        </span>
+                        <div className={styles.validatorInfo}>
+                          <img
+                            className={styles.validatorAvatar}
+                            src={
+                              vote.validator?.identity
+                                ? keybasePictures[vote.validator.identity] ||
+                                  "/system/validator.png"
+                                : "/system/validator.png"
+                            }
+                            alt={vote.validator?.moniker ?? "Validator"}
+                            onError={(event) => {
+                              const target = event.currentTarget
+                              target.onerror = null
+                              target.src = "/system/validator.png"
+                            }}
+                          />
+                          <div>
+                            <div className={styles.validatorName}>
+                              {vote.validator?.moniker ?? truncateHash(vote.voter)}
+                            </div>
+                            {!vote.validator?.moniker ? (
+                              <div className={styles.validatorAddress}>
+                                {vote.voter}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </a>
+                    ) : (
+                      <div className={styles.validatorRow}>
+                        <div
+                          className={styles.validatorWeightBar}
+                          style={{
+                            width: `${weightPercent}%`,
+                            backgroundColor: getVoteColor(vote.option)
+                          }}
+                        />
+                        <span
+                          className={styles.validatorVoteBadge}
+                          style={{
+                            color: getVoteColor(vote.option),
+                            right: `${badgeRight}%`
+                          }}
+                        >
+                          {formatVoteOption(vote.option)}
+                        </span>
+                        <div className={styles.validatorInfo}>
+                          <img
+                            className={styles.validatorAvatar}
+                            src={
+                              vote.validator?.identity
+                                ? keybasePictures[vote.validator.identity] ||
+                                  "/system/validator.png"
+                                : "/system/validator.png"
+                            }
+                            alt={vote.validator?.moniker ?? "Validator"}
+                            onError={(event) => {
+                              const target = event.currentTarget
+                              target.onerror = null
+                              target.src = "/system/validator.png"
+                            }}
+                          />
+                          <div>
+                            <div className={styles.validatorName}>
+                              {vote.validator?.moniker ?? truncateHash(vote.voter)}
+                            </div>
+                            {!vote.validator?.moniker ? (
+                              <div className={styles.validatorAddress}>
+                                {vote.voter}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                      {!vote.validator?.moniker ? (
-                        <div className={styles.validatorAddress}>{vote.voter}</div>
-                      ) : null}
-                    </div>
+                    )}
                   </div>
-                  <div className={styles.listValue}>
-                    {formatVoteOption(vote.option)}
-                  </div>
-                </div>
-              ))}
-              {votesByValidator.length > visibleVotes ? (
+                )
+              })}
+              {filteredVotesByValidator.length > visibleVotes ? (
                 <div className={styles.loadMoreWrap}>
                   <button
                     className="uiButton"
@@ -640,41 +894,39 @@ const ProposalDetails = () => {
                 </div>
               ) : null}
             </div>
-          ) : (
-            <div className={styles.emptyState}>No votes yet.</div>
-          )}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className={`card ${styles.tallyCard}`}>
         <div className={styles.tallyHeader}>Tallying procedure</div>
-          <div className={styles.tallyBody}>
-            <div className={styles.tallyItem}>
-              <div className={styles.tallyLabel}>Quorum</div>
-              <div className={styles.tallyValue}>
+        <div className={styles.tallyBody}>
+          <div className={styles.tallyItem}>
+            <div className={styles.tallyLabel}>Quorum</div>
+            <div className={styles.tallyValue}>
               {tallyParams
                 ? formatPercentPlain((tallyParams.quorum ?? 0) * 100)
                 : "--"}
-              </div>
             </div>
-            <div className={styles.tallyItem}>
-              <div className={styles.tallyLabel}>Pass threshold</div>
-              <div className={styles.tallyValue}>
+          </div>
+          <div className={styles.tallyItem}>
+            <div className={styles.tallyLabel}>Pass threshold</div>
+            <div className={styles.tallyValue}>
               {tallyParams
                 ? formatPercentPlain((tallyParams.threshold ?? 0) * 100)
                 : "--"}
-              </div>
             </div>
-            <div className={styles.tallyItem}>
-              <div className={styles.tallyLabel}>Veto threshold</div>
-              <div className={styles.tallyValue}>
+          </div>
+          <div className={styles.tallyItem}>
+            <div className={styles.tallyLabel}>Veto threshold</div>
+            <div className={styles.tallyValue}>
               {tallyParams
                 ? formatPercentPlain((tallyParams.vetoThreshold ?? 0) * 100)
                 : "--"}
-              </div>
             </div>
           </div>
         </div>
+      </div>
     </PageShell>
   )
 }
@@ -708,6 +960,8 @@ const VoteFlag = ({ label, left }: { label: string; left: number }) => {
 
 const formatDenom = (denom: string) => {
   if (!denom) return "--"
+  if (denom === "uluna") return "LUNC"
+  if (denom === "uusd") return "USTC"
   if (denom.startsWith("u")) {
     const f = denom.slice(1)
     if (f.length > 3) {
@@ -725,6 +979,21 @@ const formatVoteOption = (value: string) => {
   if (upper.includes("NO")) return "No"
   if (upper.includes("ABSTAIN")) return "Abstain"
   return value
+}
+
+const getVoteColor = (value: string) => {
+  const upper = value.toUpperCase()
+  if (upper.includes("YES")) return "#52c41a"
+  if (upper.includes("NO_WITH_VETO")) return "#ff4d4f"
+  if (upper.includes("NO")) return "#ff7aa2"
+  if (upper.includes("ABSTAIN")) return "#f6c343"
+  return "rgba(255,255,255,0.12)"
+}
+
+const getWeightPercent = (value: bigint, total: bigint) => {
+  if (total <= 0n) return 0
+  const scaled = (value * 10000n) / total
+  return Math.min(100, Number(scaled) / 100)
 }
 
 const formatPercentPlain = (value: number | undefined) => {

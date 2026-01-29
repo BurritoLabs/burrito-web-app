@@ -21,6 +21,8 @@ export type ProposalItem = {
   description?: string
   summary?: string
   content?: any
+  metadataContent?: any
+  metadata?: string
   deposit: string
   submitTime?: string
   votingStartTime?: string
@@ -38,6 +40,7 @@ export type ProposalVote = {
   voter: string
   option: string
   weight?: string
+  txhash?: string
 }
 
 export type ProposalDeposit = {
@@ -277,17 +280,12 @@ export const fetchValidator = async (operatorAddress: string) => {
 }
 
 const parseProposalTitle = (proposal: any) => {
+  const parsedMetadata = proposal?.__metadata ?? tryParseMetadata(proposal?.metadata)
   if (proposal?.title) return proposal.title as string
   if (proposal?.content?.title) return proposal.content.title as string
   if (proposal?.summary) return proposal.summary as string
-  if (proposal?.metadata) {
-    try {
-      const parsed = JSON.parse(proposal.metadata)
-      if (parsed?.title) return parsed.title as string
-    } catch {
-      return String(proposal.metadata)
-    }
-  }
+  if (parsedMetadata?.title) return parsedMetadata.title as string
+  if (proposal?.metadata) return String(proposal.metadata)
   return "Proposal"
 }
 
@@ -310,16 +308,23 @@ const normalizeProposal = (proposal: any): ProposalItem => {
       }
     : undefined
 
+  const parsedMetadata = proposal?.__metadata ?? tryParseMetadata(proposal?.metadata)
+
   const description =
     proposal?.content?.description ??
     proposal?.description ??
+    parsedMetadata?.details ??
+    parsedMetadata?.description ??
+    parsedMetadata?.summary ??
     proposal?.summary ??
-    (proposal?.metadata ? tryParseMetadata(proposal?.metadata)?.description : undefined)
+    proposal?.content?.summary
 
   const summary =
     proposal?.summary ??
     proposal?.content?.summary ??
-    (proposal?.metadata ? tryParseMetadata(proposal?.metadata)?.summary : undefined)
+    parsedMetadata?.summary ??
+    parsedMetadata?.details ??
+    parsedMetadata?.description
 
   return {
     id,
@@ -334,6 +339,8 @@ const normalizeProposal = (proposal: any): ProposalItem => {
     description,
     summary,
     content: proposal?.content ?? proposal?.content?.content ?? proposal?.messages?.[0],
+    metadataContent: parsedMetadata,
+    metadata: proposal?.metadata,
     deposit,
     submitTime: proposal?.submit_time ?? proposal?.submit_time?.toString(),
     votingStartTime:
@@ -353,6 +360,42 @@ const tryParseMetadata = (metadata?: string) => {
   } catch {
     return undefined
   }
+}
+
+const resolveMetadata = async (metadata?: string) => {
+  if (!metadata) return undefined
+  const parsed = tryParseMetadata(metadata)
+  if (parsed) return parsed
+  const trimmed = metadata.trim()
+  const gateways = [
+    "https://cloudflare-ipfs.com/ipfs/",
+    "https://ipfs.io/ipfs/",
+    "https://gateway.pinata.cloud/ipfs/"
+  ]
+  const isHttp = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+  const isIpfs = trimmed.startsWith("ipfs://")
+  const isCid = /^[a-z0-9]{46,}$/i.test(trimmed)
+
+  const urls: string[] = []
+  if (isIpfs) {
+    const hash = trimmed.replace("ipfs://", "")
+    gateways.forEach((base) => urls.push(`${base}${hash}`))
+  } else if (isHttp) {
+    urls.push(trimmed)
+  } else if (isCid) {
+    gateways.forEach((base) => urls.push(`${base}${trimmed}`))
+  }
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url)
+      if (!response.ok) continue
+      return await response.json()
+    } catch {
+      continue
+    }
+  }
+  return undefined
 }
 
 const GOV_STATUSES = {
@@ -406,7 +449,10 @@ const fetchProposalVotesFromTxs = async (
   id: string,
   events: string
 ): Promise<ProposalVote[]> => {
-  const votes = new Map<string, { option: string; weight?: string; height: number }>()
+  const votes = new Map<
+    string,
+    { option: string; weight?: string; height: number; txhash?: string }
+  >()
   let page = 1
   const limit = 100
   let total = Number.POSITIVE_INFINITY
@@ -435,7 +481,14 @@ const fetchProposalVotesFromTxs = async (
     })
     const data = await fetchJson<{
       txs?: Array<{ body?: { messages?: any[] } }>
-      tx_responses?: Array<{ height?: string; events?: Array<{ type?: string; attributes?: Array<{ key?: string; value?: string }> }> }>
+      tx_responses?: Array<{
+        height?: string
+        txhash?: string
+        events?: Array<{
+          type?: string
+          attributes?: Array<{ key?: string; value?: string }>
+        }>
+      }>
       total?: string
     }>(url)
 
@@ -451,9 +504,15 @@ const fetchProposalVotesFromTxs = async (
     const length = Math.max(batch.length, responses.length)
     for (let index = 0; index < length; index += 1) {
       const height = Number(responses[index]?.height ?? 0)
+      const txhash = responses[index]?.txhash ?? undefined
       const events = responses[index]?.events ?? []
 
-      const eventVotes: Array<{ voter: string; option?: string; weight?: string }> = []
+      const eventVotes: Array<{
+        voter: string
+        option?: string
+        weight?: string
+        txhash?: string
+      }> = []
       events.forEach((event) => {
         if (event?.type !== "proposal_vote") return
         const attrs = event.attributes ?? []
@@ -468,7 +527,8 @@ const fetchProposalVotesFromTxs = async (
         eventVotes.push({
           voter,
           option: parsed.option,
-          weight: parsed.weight
+          weight: parsed.weight,
+          txhash
         })
       })
 
@@ -499,18 +559,19 @@ const fetchProposalVotesFromTxs = async (
           }
           if (!option) return
 
-          eventVotes.push({ voter, option, weight })
+          eventVotes.push({ voter, option, weight, txhash })
         })
       }
 
-      eventVotes.forEach(({ voter, option, weight }) => {
+      eventVotes.forEach(({ voter, option, weight, txhash }) => {
         if (!option) return
         const current = votes.get(voter)
         if (!current || height >= current.height) {
           votes.set(voter, {
             option,
             weight,
-            height
+            height,
+            txhash
           })
         }
       })
@@ -524,7 +585,8 @@ const fetchProposalVotesFromTxs = async (
   return Array.from(votes.entries()).map(([voter, payload]) => ({
     voter,
     option: payload.option,
-    weight: payload.weight
+    weight: payload.weight,
+    txhash: payload.txhash
   }))
 }
 
@@ -579,12 +641,22 @@ export const fetchProposalById = async (id: string) => {
     const data = await fetchJson<{ proposal?: any }>(
       buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1/proposals/${id}`)
     )
-    return normalizeProposal(data?.proposal ?? {})
+    const proposal = data?.proposal ?? {}
+    const resolved = await resolveMetadata(proposal?.metadata)
+    if (resolved) {
+      proposal.__metadata = resolved
+    }
+    return normalizeProposal(proposal)
   } catch {
     const data = await fetchJson<{ proposal?: any }>(
       buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1beta1/proposals/${id}`)
     )
-    return normalizeProposal(data?.proposal ?? {})
+    const proposal = data?.proposal ?? {}
+    const resolved = await resolveMetadata(proposal?.metadata)
+    if (resolved) {
+      proposal.__metadata = resolved
+    }
+    return normalizeProposal(proposal)
   }
 }
 
@@ -691,8 +763,87 @@ export const fetchProposalVotes = async (
   if (!txVotes.length) return normalized
   const merged = new Map<string, ProposalVote>()
   normalized.forEach((vote) => merged.set(vote.voter, vote))
-  txVotes.forEach((vote) => merged.set(vote.voter, vote))
+  txVotes.forEach((vote) => {
+    const current = merged.get(vote.voter)
+    if (!current) {
+      merged.set(vote.voter, vote)
+      return
+    }
+    merged.set(vote.voter, {
+      ...current,
+      ...vote,
+      txhash: vote.txhash ?? current.txhash
+    })
+  })
   return Array.from(merged.values())
+}
+
+export const fetchProposalVoteTxHashes = async (
+  id: string,
+  voters: string[]
+): Promise<Record<string, string>> => {
+  const target = new Set(voters.filter(Boolean))
+  if (!target.size) return {}
+  const found = new Map<string, { txhash: string; height: number }>()
+  let page = 1
+  const limit = 100
+  let total = Number.POSITIVE_INFINITY
+  let guard = 0
+  const maxPages = 200
+
+  while ((page - 1) * limit < total && guard < maxPages && found.size < target.size) {
+    const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
+      events: `proposal_vote.proposal_id='${id}'`,
+      page: String(page),
+      limit: String(limit),
+      "pagination.count_total": "true"
+    })
+    const data = await fetchJson<{
+      tx_responses?: Array<{
+        height?: string
+        txhash?: string
+        events?: Array<{
+          type?: string
+          attributes?: Array<{ key?: string; value?: string }>
+        }>
+      }>
+      total?: string
+    }>(url)
+
+    const responses = data.tx_responses ?? []
+    const parsedTotal = Number(data.total ?? NaN)
+    if (Number.isFinite(parsedTotal) && parsedTotal >= 0) {
+      total = parsedTotal
+    }
+    if (!responses.length) break
+
+    responses.forEach((response) => {
+      const height = Number(response?.height ?? 0)
+      const txhash = response?.txhash
+      if (!txhash) return
+      const events = response?.events ?? []
+      events.forEach((event) => {
+        if (event?.type !== "proposal_vote") return
+        const attrs = event.attributes ?? []
+        const getAttr = (key: string) =>
+          attrs.find((attr) => attr.key === key)?.value
+        const proposalId = getAttr("proposal_id")
+        if (String(proposalId ?? "") !== String(id)) return
+        const voter = getAttr("voter")
+        if (!voter || !target.has(voter)) return
+        const current = found.get(voter)
+        if (!current || height >= current.height) {
+          found.set(voter, { txhash, height })
+        }
+      })
+    })
+
+    if (responses.length < limit) break
+    page += 1
+    guard += 1
+  }
+
+  return Object.fromEntries(Array.from(found.entries()).map(([voter, meta]) => [voter, meta.txhash]))
 }
 
 export const fetchProposalDeposits = async (

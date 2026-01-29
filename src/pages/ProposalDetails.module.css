@@ -63,6 +63,51 @@
   color: var(--text-muted);
 }
 
+.detailsToggle {
+  align-self: flex-start;
+  justify-self: start;
+  margin-top: 8px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-size: var(--font-size-xxs);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  line-height: 1.2;
+}
+
+.detailsList {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: var(--font-size-small);
+}
+
+.detailsRow {
+  display: grid;
+  gap: 4px;
+}
+
+.detailsLabel {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.6);
+  font-weight: 500;
+}
+
+.detailsValue {
+  color: #ffffff;
+  font-weight: 400;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .description {
   display: grid;
   gap: 10px;
@@ -114,6 +159,32 @@
   color: #ffffff;
   font-weight: 400;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(82, 196, 26, 0.6) rgba(255, 255, 255, 0.06);
+}
+
+.summaryValue::-webkit-scrollbar {
+  width: 6px;
+}
+
+.summaryValue::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.summaryValue::-webkit-scrollbar-thumb {
+  background: rgba(82, 196, 26, 0.6);
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.summaryValue::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 196, 26, 0.8);
 }
 
 .summaryLink {
@@ -209,6 +280,8 @@
 .listValue {
   color: #ffffff;
   font-weight: var(--bold);
+  position: relative;
+  z-index: 1;
 }
 
 .validatorRow {
@@ -219,7 +292,39 @@
   padding: 10px 14px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  position: relative;
+  overflow: hidden;
+}
+
+.validatorLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.validatorLink:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.28),
+    0 10px 24px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.validatorWeightBar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 0%;
+  opacity: 0.18;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .validatorInfo {
@@ -227,6 +332,33 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.validatorStatus {
+  margin-left: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.validatorVoteBadge {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xxs);
+  font-weight: var(--bold);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  text-transform: capitalize;
+  flex-shrink: 0;
+  z-index: 2;
+  white-space: nowrap;
 }
 
 .validatorAvatar {
@@ -311,9 +443,30 @@
   padding: 16px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
   font-size: var(--font-size-small);
   line-height: 1.4;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    0 10px 22px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+}
+
+.voteItemClickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.voteItemClickable:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.voteItemActive {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
 }
 
 .voteItemTitle {
