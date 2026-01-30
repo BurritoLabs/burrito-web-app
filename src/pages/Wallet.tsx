@@ -56,37 +56,59 @@ const AssetIcon = ({
 }
 
 const BuyIcon = () => (
-  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-    <path
-      d="M8 3v10M3 8h10"
+  <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+    <circle
+      cx="8"
+      cy="8"
+      r="6.5"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.2"
+    />
+    <path
+      d="M8 5v6M5 8h6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
       strokeLinecap="round"
     />
   </svg>
 )
 
 const SendIcon = () => (
-  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+  <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
     <path
-      d="M3 8h7M8 3l5 5-5 5"
+      d="M3 9.5l14-6.5-6.2 14-1.9-5.3L3 9.5z"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
+      strokeWidth="1.2"
       strokeLinejoin="round"
+    />
+    <path
+      d="M8.2 11.3l2.8-2.8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
     />
   </svg>
 )
 
 const SwapIcon = () => (
-  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+  <svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
     <path
-      d="M4 5h7M10 3l2 2-2 2M12 11H5M6 9l-2 2 2 2"
+      d="M4 6h9l-2-2M16 14H7l2 2"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.4"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M11 4l2 2-2 2M9 16l-2-2 2-2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
@@ -136,47 +158,45 @@ const CoinsSection = memo(
                 const showBuy = asset.isBuyable
                 return (
                   <div key={asset.denom} className={styles.assetRow}>
-                    <div className={styles.assetInfo}>
+                  <div className={styles.assetTopRow}>
+                    <div className={styles.assetTopLeft}>
                       <div className={styles.assetBadge}>
                         <AssetIcon
                           symbol={asset.symbol}
                           candidates={asset.iconCandidates ?? []}
                         />
                       </div>
-                      <div>
-                        <div className={styles.assetName}>{asset.symbol}</div>
-                        <div className={styles.assetMeta}>{asset.name}</div>
-                        <div className={styles.assetAmount}>
-                          {formatTokenAmount(asset.amount, asset.decimals, 2)}{" "}
-                          {asset.symbol}
-                        </div>
-                      </div>
+                      <div className={styles.assetName}>{asset.symbol}</div>
                     </div>
-                    <div className={styles.assetRight}>
-                      <div className={styles.assetActions}>
-                        {showBuy ? (
-                          <button type="button">
-                            <BuyIcon />
-                            Buy
-                          </button>
-                        ) : null}
+                    <div className={styles.assetActions}>
+                      {showBuy ? (
                         <button type="button">
-                          <SendIcon />
-                          Send
+                          <BuyIcon />
+                          Buy
                         </button>
-                        <button type="button">
-                          <SwapIcon />
-                          Swap
-                        </button>
-                      </div>
-                      <div className={styles.assetValue}>
-                        {formatUsd(asset.value)}
-                      </div>
+                      ) : null}
+                      <button type="button">
+                        <SendIcon />
+                        Send
+                      </button>
+                      <button type="button">
+                        <SwapIcon />
+                        Swap
+                      </button>
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  <div className={styles.assetBottomRow}>
+                    <div className={styles.assetAmount}>
+                      {formatTokenAmount(asset.amount, asset.decimals, 2)}
+                    </div>
+                    <div className={styles.assetValue}>
+                      ≈ {formatUsd(asset.value)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
           )}
         </div>
       </div>
@@ -220,23 +240,16 @@ const TokensSection = memo(
             <div className={styles.assetList}>
               {rows.map((asset) => (
                 <div key={asset.denom} className={styles.assetRow}>
-                  <div className={styles.assetInfo}>
-                    <div className={styles.assetBadge}>
-                      <AssetIcon
-                        symbol={asset.symbol}
-                        candidates={asset.iconCandidates ?? []}
-                      />
-                    </div>
-                    <div>
-                      <div className={styles.assetName}>{asset.symbol}</div>
-                      <div className={styles.assetMeta}>{asset.name}</div>
-                      <div className={styles.assetAmount}>
-                        {formatTokenAmount(asset.amount, asset.decimals, 2)}{" "}
-                        {asset.symbol}
+                  <div className={styles.assetTopRow}>
+                    <div className={styles.assetTopLeft}>
+                      <div className={styles.assetBadge}>
+                        <AssetIcon
+                          symbol={asset.symbol}
+                          candidates={asset.iconCandidates ?? []}
+                        />
                       </div>
+                      <div className={styles.assetName}>{asset.symbol}</div>
                     </div>
-                  </div>
-                  <div className={styles.assetRight}>
                     <div className={styles.assetActions}>
                       <button type="button">
                         <SendIcon />
@@ -247,7 +260,12 @@ const TokensSection = memo(
                         Swap
                       </button>
                     </div>
-                    <div className={styles.assetValue}>--</div>
+                  </div>
+                  <div className={styles.assetBottomRow}>
+                    <div className={styles.assetAmount}>
+                      {formatTokenAmount(asset.amount, asset.decimals, 2)}
+                    </div>
+                    <div className={styles.assetValue}>≈ --</div>
                   </div>
                 </div>
               ))}

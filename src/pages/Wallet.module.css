@@ -80,26 +80,36 @@
 }
 
 .assetRow {
+  --asset-icon-size: 22px;
+  --asset-icon-gap: 10px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 14px;
+  gap: 6px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
   border: var(--border-width) solid rgba(255, 255, 255, 0.08);
 }
 
-.assetInfo {
-  display: flex;
+.assetTopRow,
+.assetBottomRow {
+  display: grid;
+  grid-template-columns: var(--asset-icon-size) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  column-gap: var(--asset-icon-gap);
+  row-gap: 0;
+}
+
+.assetTopRow {
+  align-items: flex-end;
+}
+
+.assetTopLeft {
+  display: contents;
 }
 
 .assetBadge {
-  width: 32px;
-  height: 32px;
+  width: var(--asset-icon-size);
+  height: var(--asset-icon-size);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -107,8 +117,8 @@
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  border: 0;
   overflow: hidden;
 }
 
@@ -119,33 +129,28 @@
 }
 
 .assetName {
-  font-size: var(--font-size);
+  font-size: 16px;
   font-weight: var(--bold);
   color: #ffffff;
-}
-
-.assetMeta {
-  font-size: var(--font-size-xxs);
-  color: rgba(234, 245, 235, 0.6);
-}
-
-.assetRight {
-  display: grid;
-  justify-items: end;
-  align-content: start;
-  gap: 8px;
+  grid-column: 2;
+  line-height: 1.1;
+  align-self: flex-end;
 }
 
 .assetValue {
-  font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.85);
-  font-weight: var(--normal);
+  font-size: 16px;
+  color: #ffffff;
+  font-weight: var(--bold);
+  grid-column: 3;
+  justify-self: end;
 }
 
 .assetAmount {
-  font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
-  margin-top: 4px;
+  font-size: 16px;
+  color: rgba(234, 245, 235, 0.75);
+  font-weight: var(--normal);
+  margin: 0;
+  grid-column: 2;
 }
 
 .assetActions {
@@ -153,8 +158,17 @@
   align-items: center;
   gap: 12px;
   color: rgba(234, 245, 235, 0.7);
-  font-size: var(--font-size-xxs);
+  font-size: 12px;
+  font-weight: 400;
   white-space: nowrap;
+  grid-column: 3;
+  justify-self: end;
+  line-height: 1.1;
+  align-self: flex-start;
+}
+
+.assetBadge {
+  align-self: flex-end;
 }
 
 .assetActions button {
@@ -164,9 +178,11 @@
   background: transparent;
   border: 0;
   color: inherit;
-  font-weight: var(--bold);
+  font-weight: 400;
+  font-size: 12px;
   cursor: pointer;
   padding: 0;
+  line-height: 1;
 }
 
 .assetActions button svg {
@@ -175,6 +191,10 @@
 
 .assetActions button:hover {
   color: #ffffff;
+}
+
+.assetBadge {
+  grid-column: 1;
 }
 
 .emptyState {
@@ -228,15 +248,8 @@
   .layout {
     grid-template-columns: 1fr;
   }
-  .assetRow {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: start;
-  }
-  .assetRight {
-    justify-items: start;
-    width: 100%;
-  }
-  .assetValue {
-    text-align: left;
+  .assetTopRow,
+  .assetBottomRow {
+    align-items: flex-start;
   }
 }

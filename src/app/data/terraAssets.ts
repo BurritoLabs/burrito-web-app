@@ -22,13 +22,13 @@ export type IbcToken = {
   path?: string
 }
 
-const fetchAsset = async <T,>(path: string): Promise<T> => {
+export const fetchAsset = async <T,>(path: string): Promise<T> => {
   const res = await fetch(`${ASSET_URL}/${path}`)
   if (!res.ok) throw new Error(`Failed to load ${path}`)
   return res.json() as Promise<T>
 }
 
-const pickChainAssets = <T,>(
+export const pickChainAssets = <T,>(
   data: Record<string, T> | undefined,
   name: string,
   chainId: string
@@ -48,6 +48,12 @@ const pickChainAssets = <T,>(
     data.mainnet ??
     data["phoenix-1"]
   )
+}
+
+export type Cw20Contract = {
+  protocol?: string
+  name?: string
+  icon?: string
 }
 
 export const useCw20Whitelist = () => {
@@ -71,6 +77,21 @@ export const useIbcWhitelist = () => {
     queryFn: async () => {
       const data = await fetchAsset<Record<string, Record<string, IbcToken>>>(
         "ibc/tokens.json"
+      )
+      return (
+        pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
+      )
+    },
+    staleTime: 60 * 60 * 1000
+  })
+}
+
+export const useCw20Contracts = () => {
+  return useQuery({
+    queryKey: ["terra-assets", "cw20-contracts", CLASSIC_CHAIN.chainId],
+    queryFn: async () => {
+      const data = await fetchAsset<Record<string, Record<string, Cw20Contract>>>(
+        "cw20/contracts.json"
       )
       return (
         pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}

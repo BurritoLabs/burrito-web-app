@@ -372,6 +372,7 @@ const ProposalNew = () => {
 
   const feeMicro = feeEstimate ? BigInt(feeEstimate.feeAmount) : 0n
   const balanceMicro = BigInt(luncBalance || "0")
+  const maxSpendable = balanceMicro > feeMicro ? balanceMicro - feeMicro : 0n
   const balanceAfter = balanceMicro - depositMicro - feeMicro
 
   const submit = async (event: FormEvent) => {
@@ -537,9 +538,9 @@ const ProposalNew = () => {
               />
             </label>
 
-            <label className={styles.field}>
+            <div className={styles.field}>
               <div className={styles.fieldHeader}>
-                <span className={styles.label}>
+                <label className={styles.label} htmlFor="initial-deposit-input">
                   Initial deposit (optional)
                   <span
                     className={styles.tooltipIcon}
@@ -548,34 +549,57 @@ const ProposalNew = () => {
                   >
                     ?
                   </span>
-                </span>
+                </label>
                 {account?.address ? (
                   <button
                     type="button"
                     className={styles.maxButton}
                     onClick={() => {
-                      const max = balanceMicro > feeMicro ? balanceMicro - feeMicro : 0n
-                      const text = formatMicro(max).replace(/\.?0+$/, "")
+                      const text = formatMicro(maxSpendable).replace(/\.?0+$/, "")
                       setDeposit(text || "0")
                     }}
                   >
-                    Max: {formatMicro(balanceMicro)} LUNC
+                    <svg
+                      className={styles.maxIcon}
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M4 7.5h16a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-9a0.5 0.5 0 0 1 0.5-0.5Z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M4 7.5V6a2 2 0 0 1 2-2h11a3 3 0 0 1 3 3v1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinejoin="round"
+                      />
+                      <circle cx="17.5" cy="13" r="1.5" fill="currentColor" />
+                    </svg>
+                    <span>{formatMicro(maxSpendable)} LUNC</span>
                   </button>
                 ) : null}
               </div>
               <div className={styles.inputWithSuffix}>
                 <input
                   className={`${styles.input} ${styles.inputHasSuffix} ${styles.numberInput}`}
+                  id="initial-deposit-input"
                   value={deposit}
-                  onChange={(event) => setDeposit(event.target.value)}
-                  placeholder="0.000000"
-                  type="number"
-                  min="0"
-                  step="0.000001"
+                  onChange={(event) => {
+                    setDeposit(event.target.value)
+                  }}
+                  placeholder=""
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
                 />
                 <span className={styles.suffix}>LUNC</span>
               </div>
-            </label>
+            </div>
           </div>
 
           {proposalType === "SPEND" ? (

@@ -149,14 +149,17 @@
 }
 
 .small .grid {
-  margin: 0 auto;
-  width: 100%;
-  max-width: var(--max-width-small);
   gap: 36px;
 }
 
 .small .header {
   padding-bottom: 18px;
+}
+
+.small .content {
+  margin: 0 auto;
+  width: var(--max-width-small);
+  max-width: 100%;
 }
 
 

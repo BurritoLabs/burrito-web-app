@@ -204,6 +204,11 @@
 
 .summaryLink:hover {
   text-decoration: underline;
+  color: rgba(82, 196, 26, 0.85);
+}
+
+.summaryLink::after {
+  text-decoration: none;
 }
 
 .sectionCard {

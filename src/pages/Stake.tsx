@@ -4,13 +4,21 @@ import PageShell from "./PageShell"
 import Tabs from "../components/Tabs"
 import styles from "./Stake.module.css"
 import { useWallet } from "../app/wallet/WalletProvider"
+import { Link } from "react-router-dom"
 import {
   fetchDelegations,
   fetchRewards,
   fetchUnbonding,
-  fetchValidators
+  fetchValidators,
+  fetchPrices
 } from "../app/data/classic"
-import { formatPercent, formatTokenAmount, sumAmounts } from "../app/utils/format"
+import {
+  formatPercent,
+  formatTokenAmount,
+  formatUsd,
+  sumAmounts,
+  toUnitAmount
+} from "../app/utils/format"
 import { CLASSIC_DENOMS } from "../app/chain"
 
 const Stake = () => {
@@ -39,6 +47,52 @@ const Stake = () => {
     queryFn: fetchValidators,
     staleTime: 60_000
   })
+
+
+  const validatorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    validators.forEach((validator) => {
+      if (validator.operator_address && validator.description?.moniker) {
+        map.set(validator.operator_address, validator.description.moniker)
+      }
+    })
+    return map
+  }, [validators])
+
+  const validatorDelegations = useMemo(() => {
+    if (!account) return []
+    const map = new Map<string, bigint>()
+    delegations.forEach((item) => {
+      const denom = item.balance?.denom
+      const validator = item.delegation?.validator_address
+      if (!validator || denom !== CLASSIC_DENOMS.lunc.coinMinimalDenom) return
+      const amount = BigInt(item.balance?.amount ?? "0")
+      if (amount <= 0n) return
+      map.set(validator, (map.get(validator) ?? 0n) + amount)
+    })
+    return Array.from(map.entries())
+      .map(([validator, amount]) => ({
+        validator,
+        moniker: validatorMap.get(validator) ?? validator,
+        amount
+      }))
+      .sort((a, b) => (a.amount === b.amount ? 0 : a.amount > b.amount ? -1 : 1))
+  }, [account, delegations, validatorMap])
+
+  const totalDelegated = useMemo(() => {
+    return validatorDelegations.reduce((sum, item) => sum + item.amount, 0n)
+  }, [validatorDelegations])
+
+  const DONUT_COLORS = [
+    "#7893F5",
+    "#7C1AE5",
+    "#FF7940",
+    "#FF9F40",
+    "#ACACAC",
+    "#52C41A",
+    "#36CFC9",
+    "#FAAD14"
+  ]
 
   const delegatedAmount = useMemo(() => {
     const amounts = delegations
@@ -83,6 +137,23 @@ const Stake = () => {
         2
       )} LUNC`
     : "--"
+
+  const { data: prices } = useQuery({
+    queryKey: ["prices"],
+    queryFn: fetchPrices,
+    staleTime: 300_000
+  })
+
+  const stakedValueDisplay = useMemo(() => {
+    if (!account) return "--"
+    const price = prices?.lunc?.usd
+    if (!price) return "--"
+    const amount = toUnitAmount(
+      delegatedAmount,
+      CLASSIC_DENOMS.lunc.coinDecimals
+    )
+    return formatUsd(amount * price)
+  }, [account, delegatedAmount, prices?.lunc?.usd])
 
   const quickValidators = validators.slice(0, 3)
   const manualValidators = validators.slice(0, 6)
@@ -163,13 +234,33 @@ const Stake = () => {
     }
   ]
 
+  const donutSegments = useMemo(() => {
+    const total = totalDelegated
+    if (!total || total === 0n) return []
+    const single = validatorDelegations.length === 1
+    return validatorDelegations.map((item, index) => {
+      const ratio = Number(item.amount) / Number(total)
+      const percent = ratio * 100
+      const percentLabel =
+        percent > 0 && percent < 1 ? "< 1" : Math.round(percent).toString()
+      return {
+        ...item,
+        color: single ? "#52C41A" : DONUT_COLORS[index % DONUT_COLORS.length],
+        ratio,
+        percentLabel
+      }
+    })
+  }, [totalDelegated, validatorDelegations])
+
+  const hasDelegations = account && totalDelegated > 0n
+
   return (
     <PageShell
       title="Stake"
       extra={
-        <button className="uiButton uiButtonPrimary" type="button">
+        <Link className="uiButton uiButtonPrimary" to="/rewards">
           Withdraw all rewards
-        </button>
+        </Link>
       }
     >
       <div className={styles.summaryGrid}>
@@ -178,39 +269,93 @@ const Stake = () => {
             <div className={styles.chainTitle}>Staked funds</div>
           </div>
           <div className={styles.chartContent}>
-            <div className={styles.donut}>
-              <span />
-            </div>
-            <div className={styles.chartMeta}>
-              <div>
-                <strong>{delegationsDisplay}</strong>
-                <span>Delegated</span>
+            {hasDelegations ? (
+              <>
+                <div className={styles.donut}>
+                  <svg
+                    className={styles.donutSvg}
+                    viewBox="0 0 220 220"
+                    role="img"
+                    aria-label="Staked funds distribution"
+                  >
+                    <circle
+                      cx="110"
+                      cy="110"
+                      r="80"
+                      fill="none"
+                      stroke="rgba(255, 255, 255, 0.08)"
+                      strokeWidth="40"
+                    />
+                    {(() => {
+                      const radius = 80
+                      const circumference = 2 * Math.PI * radius
+                      let offset = 0
+                      return donutSegments.map((segment) => {
+                        const dash = segment.ratio * circumference
+                        const strokeDasharray = `${dash} ${
+                          circumference - dash
+                        }`
+                        const circle = (
+                          <circle
+                            key={segment.validator}
+                            cx="110"
+                            cy="110"
+                            r={radius}
+                            fill="none"
+                            stroke={segment.color}
+                            strokeWidth="40"
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={-offset}
+                            strokeLinecap="butt"
+                          />
+                        )
+                        offset += dash
+                        return circle
+                      })
+                    })()}
+                  </svg>
+                </div>
+                <div className={styles.legend}>
+                  {donutSegments.map((segment) => (
+                    <div key={segment.validator} className={styles.legendRow}>
+                      <span
+                        className={styles.legendDot}
+                        style={{ backgroundColor: segment.color }}
+                      />
+                      <span className={styles.legendName}>{segment.moniker}</span>
+                      <span className={styles.legendPercent}>
+                        {segment.percentLabel}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className={styles.emptyDonut}>
+                {account ? "No delegations" : "Connect a wallet to view staking."}
               </div>
-              <div>
-                <strong>{rewardsDisplay}</strong>
-                <span>Rewards</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        <div className={`card ${styles.stakedCard}`}>
-          <div className="cardHeader">
-            <div className="cardTitle">Staking overview</div>
+        <div className={styles.stakedCard}>
+          <div className={styles.chainHeader}>
+            <div className={styles.chainTitle}>Staking overview</div>
           </div>
-          <div className="cardDivider" />
-          <div className="list dense">
-            {[
-              ["Delegations", delegationsDisplay],
-              ["Rewards", rewardsDisplay],
-              ["Unbonding", unbondingDisplay],
-              ["APR", "--"]
-            ].map(([label, value]) => (
-              <div key={label} className="listRow">
-                <strong>{label}</strong>
-                <span>{value}</span>
-              </div>
-            ))}
+          <div className={styles.overviewBody}>
+            <div className="list dense">
+              {[
+                ["Staked", delegationsDisplay],
+                ["Value", stakedValueDisplay],
+                ["Rewards", rewardsDisplay],
+                ["Unstaking", unbondingDisplay]
+              ].map(([label, value]) => (
+                <div key={label} className="listRow">
+                  <strong>{label}</strong>
+                  <span>{value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

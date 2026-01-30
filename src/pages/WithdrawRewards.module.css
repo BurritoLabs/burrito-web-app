@@ -1,0 +1,217 @@
+.pageCard {
+  display: grid;
+  gap: 16px;
+  padding: var(--card-padding);
+}
+
+.actions {
+  display: flex;
+}
+
+.actionButton {
+  color: var(--green);
+  margin-left: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  cursor: pointer;
+}
+
+.validatorCard {
+  padding: 12px 14px;
+  background: var(--card-bg-muted);
+  border: 1px solid var(--card-border);
+}
+
+.validatorHeader {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.validatorHeader dt,
+.validatorHeader dd {
+  font-weight: 600;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.validatorList {
+  max-height: 150px;
+  overflow: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.validatorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.validatorRow:first-child {
+  border-top: 0;
+}
+
+.validatorRow input {
+  accent-color: var(--green);
+  margin-top: 0;
+}
+
+.validatorItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+}
+
+.validatorName {
+  font-size: 12px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.validatorReward {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: right;
+  min-width: 120px;
+}
+
+.empty {
+  padding: 16px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.summaryDivider {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0 8px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.summaryDivider svg {
+  width: 18px;
+  height: 18px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.summaryCard {
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--card-bg-muted);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 56px;
+  --reward-icon-size: 16px;
+  --reward-icon-gap: 6px;
+}
+
+.summaryHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--reward-icon-gap);
+}
+
+.summarySymbol {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.summaryAmount {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(234, 245, 235, 0.75);
+  line-height: 1.2;
+  padding-left: calc(var(--reward-icon-size) + var(--reward-icon-gap));
+}
+
+.rewardIcon {
+  width: var(--reward-icon-size);
+  height: var(--reward-icon-size);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.rewardIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rewardIconFallback {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 991.98px) {
+  .summaryGrid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+.feeCard {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--card-bg-muted);
+  border: 1px solid var(--card-border);
+}
+
+.feeCard dl {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.feeError {
+  font-size: 12px;
+  color: #ff8c8c;
+  margin-top: 6px;
+}
+
+.submit {
+  margin-top: 12px;
+  width: 100%;
+  height: 38px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--green);
+  color: #0c1411;
+  font-weight: var(--bold);
+  cursor: pointer;
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submitError {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #ff8c8c;
+}

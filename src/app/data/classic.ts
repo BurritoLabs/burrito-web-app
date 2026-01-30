@@ -78,9 +78,33 @@ export type TxItem = {
   txhash?: string
   timestamp?: string
   code?: number
+  height?: string
+  raw_log?: string
+  logs?: Array<{
+    msg_index?: number
+    log?: string
+    events?: Array<{
+      type?: string
+      attributes?: Array<{ key?: string; value?: string }>
+    }>
+  }>
+  events?: Array<{
+    type?: string
+    attributes?: Array<{ key?: string; value?: string }>
+  }>
   tx?: {
     value?: { msg?: Array<{ type?: string }> }
-    body?: { messages?: Array<{ "@type"?: string }> }
+    body?: { messages?: Array<{ "@type"?: string }>; memo?: string }
+    auth_info?: {
+      fee?: { amount?: CoinBalance[] }
+      signer_infos?: Array<{
+        mode_info?: {
+          single?: { mode?: string }
+          multi?: { mode_infos?: Array<unknown> }
+        }
+        public_key?: { public_keys?: Array<unknown> }
+      }>
+    }
   }
 }
 
@@ -242,6 +266,26 @@ export const fetchRewards = async (address: string) => {
   )
   const data = await fetchJson<{ total?: CoinBalance[] }>(url)
   return data.total ?? []
+}
+
+export type RewardsByValidator = {
+  validator_address: string
+  reward: CoinBalance[]
+}
+
+export const fetchRewardsByValidator = async (address: string) => {
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/cosmos/distribution/v1beta1/delegators/${address}/rewards`
+  )
+  const data = await fetchJson<{
+    rewards?: RewardsByValidator[]
+    total?: CoinBalance[]
+  }>(url)
+  return {
+    rewards: data.rewards ?? [],
+    total: data.total ?? []
+  }
 }
 
 export const fetchValidators = async () => {
@@ -954,14 +998,93 @@ export const fetchStakingPool = async (): Promise<StakingPool> => {
   return {}
 }
 
-export const fetchTxs = async (address: string, limit = 10) => {
-  const url = buildUrl(CLASSIC_CHAIN.fcd, "/v1/txs", {
-    account: address,
-    limit: String(limit),
-    offset: "0"
+export const fetchTxs = async (address: string, limit = 75) => {
+  if (!address) return []
+  const EVENTS = [
+    "message.sender",
+    "transfer.recipient",
+    "transfer.sender"
+  ]
+  const requests = await Promise.all(
+    EVENTS.map(async (event) => {
+      const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
+        events: `${event}='${address}'`,
+        page: "1",
+        limit: String(limit),
+        "pagination.count_total": "false"
+      })
+      try {
+        return await fetchJson<{
+          txs?: Array<{ body?: { messages?: any[]; memo?: string }; auth_info?: any }>
+          tx_responses?: Array<{
+            txhash?: string
+            timestamp?: string
+            height?: string
+            code?: number
+            raw_log?: string
+            logs?: Array<{
+              msg_index?: number
+              log?: string
+              events?: Array<{
+                type?: string
+                attributes?: Array<{ key?: string; value?: string }>
+              }>
+            }>
+            events?: Array<{
+              type?: string
+              attributes?: Array<{ key?: string; value?: string }>
+            }>
+          }>
+        }>(url)
+      } catch {
+        return undefined
+      }
+    })
+  )
+
+  const merged = new Map<string, TxItem>()
+  requests.forEach((data) => {
+    if (!data) return
+    const txs = data.txs ?? []
+    const responses = data.tx_responses ?? []
+    const length = Math.max(txs.length, responses.length)
+    for (let index = 0; index < length; index += 1) {
+      const response = responses[index]
+      if (!response?.txhash) continue
+      const item: TxItem = {
+        ...response,
+        tx: txs[index]
+      }
+      const existing = merged.get(response.txhash)
+      if (!existing) {
+        merged.set(response.txhash, item)
+      } else {
+        const existingHasMsgs = Boolean(existing.tx?.body?.messages?.length)
+        const itemHasMsgs = Boolean(item.tx?.body?.messages?.length)
+        const existingHasEvents = Boolean(existing.events?.length)
+        const itemHasEvents = Boolean(item.events?.length)
+        const existingHasLogs = Boolean((existing as any).logs?.length)
+        const itemHasLogs = Boolean((item as any).logs?.length)
+        if (
+          (itemHasMsgs && !existingHasMsgs) ||
+          (itemHasEvents && !existingHasEvents) ||
+          (itemHasLogs && !existingHasLogs)
+        ) {
+          merged.set(response.txhash, item)
+        }
+      }
+    }
   })
-  const data = await fetchJson<{ txs?: TxItem[] }>(url)
-  return data.txs ?? []
+
+  const list = Array.from(merged.values())
+  return list
+    .sort((a, b) => {
+      const aTime = new Date(a.timestamp ?? 0).getTime()
+      const bTime = new Date(b.timestamp ?? 0).getTime()
+      if (aTime && bTime) return bTime - aTime
+      return Number(b.height ?? 0) - Number(a.height ?? 0)
+    })
+    .slice(0, limit)
 }
 
 export const fetchContractInfo = async (address: string) => {

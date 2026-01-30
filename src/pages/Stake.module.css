@@ -8,10 +8,10 @@
   display: grid;
   grid-template-rows: min-content auto;
   min-height: 300px;
-  border: var(--border-width) solid var(--card-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--card-bg);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
 .chainHeader {
@@ -19,6 +19,10 @@
   display: grid;
   gap: 12px;
   background: var(--card-bg);
+  border: var(--border-width) solid var(--card-border);
+  border-bottom: 0;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
 }
 
 .chainTitle {
@@ -85,7 +89,12 @@
   padding: var(--grid-gap);
   background: var(--card-bg-muted);
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  align-items: center;
   gap: 16px;
+  border: var(--border-width) solid var(--card-border);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
 }
 
 .donut {
@@ -95,12 +104,57 @@
   justify-content: center;
 }
 
-.donut span {
-  width: 200px;
-  height: 200px;
+.donutSvg {
+  width: 220px;
+  height: 220px;
+  transform: rotate(-90deg);
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 16px solid rgba(255, 255, 255, 0.08);
-  border-top-color: rgba(82, 196, 26, 0.8);
+  flex-shrink: 0;
+}
+
+.legendName {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legendPercent {
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.emptyDonut {
+  grid-column: 1 / -1;
+  height: 300px;
+  display: grid;
+  place-items: center;
+  color: rgba(234, 245, 235, 0.6);
+  font-size: var(--font-size-small);
+  text-align: center;
 }
 
 .chartMeta {
@@ -120,8 +174,31 @@
 
 .stakedCard {
   display: grid;
-  gap: 12px;
+  grid-template-rows: min-content auto;
   min-width: 275px;
+  background: transparent;
+}
+
+.overviewBody {
+  padding: var(--grid-gap);
+  background: var(--card-bg-muted);
+  border: var(--border-width) solid var(--card-border);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  display: grid;
+  gap: 12px;
+}
+
+.overviewBody :global(.listRow) {
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+}
+
+.overviewBody :global(.listRow strong),
+.overviewBody :global(.listRow span) {
+  line-height: 44px;
+  display: block;
 }
 
 .tabContent {

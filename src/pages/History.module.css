@@ -77,7 +77,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.7);
   padding: var(--card-padding);
@@ -113,17 +113,35 @@
   font-weight: var(--bold);
 }
 
-.link {
-  font-size: var(--font-size-handle);
-  color: rgba(234, 245, 235, 0.7);
+.txLink {
+  color: var(--green);
+  font-size: 10pt;
   font-weight: var(--bold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.txLink::after {
+  content: "↗";
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.txLinkText {
+  text-decoration: none;
+}
+
+.txLink:hover .txLinkText {
+  text-decoration: underline;
 }
 
 .time {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: var(--font-size-handle);
+  font-size: 10pt;
   color: rgba(234, 245, 235, 0.6);
   font-weight: var(--bold);
 }
@@ -131,21 +149,8 @@
 .timeIcon {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
-  border: 1.5px solid currentColor;
-  position: relative;
+  display: block;
   opacity: 0.8;
-}
-
-.timeIcon::before {
-  content: "";
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  top: 4px;
-  height: 2px;
-  background: currentColor;
-  border-radius: 999px;
 }
 
 .messages {
@@ -167,21 +172,90 @@
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   color: #0c1411;
-  background: rgba(234, 245, 235, 0.7);
+  background: rgba(82, 196, 26, 0.7);
+  border: 1px solid rgba(82, 196, 26, 0.55);
   min-width: 50px;
   justify-content: center;
   height: 22px;
 }
 
 .messageBody {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
-.messageText {
-  display: block;
+.messagePrimary {
+  display: inline-flex;
   font-size: var(--font-size);
-  color: var(--text-muted);
+  color: #ffffff;
+  font-weight: var(--bold);
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.messageSecondary {
+  display: inline-flex;
+  font-size: var(--font-size);
+  color: rgba(234, 245, 235, 0.7);
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.addressPair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.messageLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.messagePart {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.arrow {
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.addressLink {
+  color: var(--green);
+  font-weight: var(--bold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.addressLink::after {
+  content: "↗";
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.addressText {
+  text-decoration: none;
+}
+
+.addressLink:hover {
+  color: rgba(82, 196, 26, 0.85);
+}
+
+.addressLink:hover .addressText {
+  text-decoration: underline;
+}
+
+.plainText {
+  color: var(--text);
+  font-weight: var(--bold);
 }
 
 .pending {
@@ -207,31 +281,42 @@
   margin-top: var(--card-padding);
   padding: var(--card-padding);
   padding-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.details {
-  display: grid;
-  gap: 16px;
-  width: 100%;
-  margin: 0;
+.detailRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-block: 4px;
 }
 
-.details dt,
-.details dd {
-  margin: 0;
-}
-
-.details dt {
-  grid-column-start: 1;
+.detailLabel {
   font-weight: var(--bold);
+  color: rgba(234, 245, 235, 0.7);
 }
 
-.details dd {
-  grid-column-start: 2;
-  text-align: right;
+.detailValue {
   color: #ffffff;
   font-weight: var(--bold);
+  line-height: 1.4;
 }
 
+.signMode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  color: rgba(82, 196, 26, 0.9);
+  font-size: var(--font-size-small);
+}
+
+.signModeIcon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
 
 

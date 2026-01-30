@@ -74,19 +74,29 @@
 }
 
 .fieldHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
 }
 
 .maxButton {
   background: transparent;
   border: none;
-  color: rgba(234, 245, 235, 0.65);
+  color: rgba(234, 245, 235, 0.6);
   font-size: var(--font-size-small);
   font-weight: var(--normal);
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  width: max-content;
+}
+
+.maxIcon {
+  width: 14px;
+  height: 14px;
 }
 
 .tooltipIcon {
