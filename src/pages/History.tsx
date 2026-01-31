@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, type ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./History.module.css"
@@ -69,11 +69,10 @@ const shortenAddress = (value?: string) => truncateHash(value, 6, 4)
 const decodeEventValue = (value?: string) => {
   if (!value) return ""
   try {
-    const decoded =
-      typeof atob === "function"
-        ? atob(value)
-        : Buffer.from(value, "base64").toString("utf-8")
-    if (/^[\x20-\x7E]+$/.test(decoded)) return decoded
+    if (typeof atob === "function") {
+      const decoded = atob(value)
+      if (/^[\x20-\x7E]+$/.test(decoded)) return decoded
+    }
   } catch {
     // ignore
   }
@@ -110,7 +109,7 @@ const normalizeTxLogs = (logs?: Array<any>, rawLog?: string) => {
 const buildCanonicalMessages = (
   tx: TxItem,
   logMatcher: ReturnType<typeof createLogMatcherForActions> | null,
-  renderLine: (line: string) => JSX.Element
+  renderLine: (line: string) => ReactNode
 ): TxMessage[] => {
   if (!logMatcher || !tx.tx || !tx.txhash || !tx.timestamp) return []
   const logs = normalizeTxLogs((tx as any).logs, tx.raw_log)
@@ -267,10 +266,10 @@ const formatHistoryTimestamp = (timestamp?: string) => {
 
 type TxMessage = {
   label: string
-  lines: Array<string | JSX.Element>
+  lines: Array<string | ReactNode>
 }
 
-const renderActionLine = (parts: Array<string | JSX.Element>) => {
+const renderActionLine = (parts: Array<string | ReactNode>) => {
   const filtered = parts.filter((part) => part !== "")
   return (
     <span className={styles.messageLine}>
@@ -310,31 +309,6 @@ const renderAddressOrText = (address?: string, label?: string) => {
   }
   return renderAddressLink(address, label)
 }
-
-const renderAddressPair = (
-  from?: string,
-  to?: string,
-  resolve?: (address?: string) => string | undefined
-) => (
-  <span className={styles.addressPair}>
-    {renderAddressLink(from, resolve?.(from))}
-    <span className={styles.arrow}>→</span>
-    {renderAddressLink(to, resolve?.(to))}
-  </span>
-)
-
-const buildSendLine = (
-  from?: string,
-  to?: string,
-  amount?: CoinBalance[]
-) =>
-  renderActionLine([
-    renderAddressLink(from),
-    "send",
-    formatCoins(amount ?? []),
-    "to",
-    renderAddressLink(to)
-  ])
 
 const buildMessage = (
   msg: any,
@@ -511,15 +485,15 @@ const getTxMessages = (
         const sender = getAttr("sender")
         const recipient = getAttr("recipient")
         const amountRaw = getAttr("amount") ?? ""
-        const coins: CoinBalance[] = amountRaw
-          .split(",")
-          .filter(Boolean)
-          .map((entry) => {
-            const match = entry.match(/^([0-9]+)([a-zA-Z0-9/]+)$/)
-            return match
-              ? { amount: match[1], denom: match[2] }
-              : { amount: entry, denom: "" }
-          })
+          const coins: CoinBalance[] = amountRaw
+            .split(",")
+            .filter(Boolean)
+            .map((entry: string) => {
+              const match = entry.match(/^([0-9]+)([a-zA-Z0-9/]+)$/)
+              return match
+                ? { amount: match[1], denom: match[2] }
+                : { amount: entry, denom: "" }
+            })
         if (!recipient) return
         const key = `${sender ?? ""}|${recipient ?? ""}|${amountRaw}`
         if (sendKeys.has(key)) return

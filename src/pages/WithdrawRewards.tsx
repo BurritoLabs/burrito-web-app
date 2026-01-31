@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgWithdrawDelegatorReward } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
@@ -65,7 +65,14 @@ const getSymbol = (denom: string, ibcSymbol?: string) => {
   if (denom === CLASSIC_DENOMS.ustc.coinMinimalDenom)
     return CLASSIC_DENOMS.ustc.coinDenom
   if (denom.startsWith("ibc/") && ibcSymbol) return ibcSymbol
-  return denom.replace(/^u/, "").toUpperCase()
+  if (denom.startsWith("u")) {
+    const base = denom.slice(1)
+    if (base.length === 3) {
+      return `${base.slice(0, 2).toUpperCase()}TC`
+    }
+    return base.toUpperCase()
+  }
+  return denom.toUpperCase()
 }
 
 const formatRewardSummary = (
@@ -206,11 +213,28 @@ const WithdrawRewards = () => {
       return a.index - b.index
     })
 
+  const [feeDenom, setFeeDenom] = useState<string>(
+    CLASSIC_DENOMS.lunc.coinMinimalDenom
+  )
+  const [feeOpen, setFeeOpen] = useState(false)
+  const feeRef = useRef<HTMLDivElement | null>(null)
   const [fee, setFee] = useState("--")
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeError, setFeeError] = useState<string>()
   const [submitError, setSubmitError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!feeOpen) return
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (feeRef.current && !feeRef.current.contains(target)) {
+        setFeeOpen(false)
+      }
+    }
+    window.addEventListener("mousedown", handleClick)
+    return () => window.removeEventListener("mousedown", handleClick)
+  }, [feeOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -242,13 +266,13 @@ const WithdrawRewards = () => {
             validatorAddress: validator
           })
         }))
+        const gasPrice = GasPrice.fromString(`28.325${feeDenom}`)
         const client = await SigningStargateClient.connectWithSigner(
           CLASSIC_CHAIN.rpc,
           signer,
-          { gasPrice: GasPrice.fromString("28.325uluna") }
+          { gasPrice }
         )
         const gasUsed = await client.simulate(accountAddress, msgs, "")
-        const gasPrice = GasPrice.fromString("28.325uluna")
         const gasPriceAmount = Number(gasPrice.amount.toString())
         const feeMicro = Math.ceil(gasUsed * gasPriceAmount).toString()
         const feeDisplay = formatTokenAmount(
@@ -257,7 +281,7 @@ const WithdrawRewards = () => {
           6
         )
         if (!cancelled) {
-          setFee(feeDisplay === "--" ? "--" : `${feeDisplay} LUNC`)
+          setFee(feeDisplay === "--" ? "--" : feeDisplay)
         }
       } catch (err) {
         if (!cancelled) {
@@ -275,7 +299,7 @@ const WithdrawRewards = () => {
       cancelled = true
       if (timer) window.clearTimeout(timer)
     }
-  }, [accountAddress, selected])
+  }, [accountAddress, selected, feeDenom])
 
   const toggleAll = (value: boolean) => {
     setSelected(value ? rewards.map((item) => item.validator_address) : [])
@@ -311,7 +335,7 @@ const WithdrawRewards = () => {
       const client = await SigningStargateClient.connectWithSigner(
         CLASSIC_CHAIN.rpc,
         signer,
-        { gasPrice: GasPrice.fromString("28.325uluna") }
+        { gasPrice: GasPrice.fromString(`28.325${feeDenom}`) }
       )
       const msgs = selected.map((validator) => ({
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
@@ -418,6 +442,7 @@ const WithdrawRewards = () => {
                   )}
                 </span>
               </div>
+              <div className={styles.summaryDividerLine} />
               <div className={styles.summaryAmount}>
                 {formatTokenAmount(
                   amount.toString(),
@@ -430,10 +455,60 @@ const WithdrawRewards = () => {
         </div>
 
         <div className={`card ${styles.feeCard}`}>
-          <dl>
-            <dt>Fee</dt>
-            <dd>{feeLoading ? "Estimating..." : fee}</dd>
-          </dl>
+          <div className={styles.feeRow}>
+            <div className={styles.feeLeft} ref={feeRef}>
+              <span className={styles.feeLabel}>Fee</span>
+              <div className={styles.feeSelectWrap}>
+                <button
+                  type="button"
+                  className={styles.feeSelectButton}
+                  onClick={() => setFeeOpen((prev) => !prev)}
+                >
+                  {getSymbol(feeDenom)}
+                  <span className={styles.feeCaret} aria-hidden="true" />
+                </button>
+                {feeOpen ? (
+                  <div className={styles.feeDropdown}>
+                    <button
+                      type="button"
+                      className={`${styles.feeOption} ${
+                        feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+                          ? styles.feeOptionActive
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setFeeDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+                        setFeeOpen(false)
+                      }}
+                    >
+                      LUNC
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.feeOption} ${
+                        feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+                          ? styles.feeOptionActive
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setFeeDenom(CLASSIC_DENOMS.ustc.coinMinimalDenom)
+                        setFeeOpen(false)
+                      }}
+                    >
+                      USTC
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <span className={styles.feeValue}>
+              {feeLoading
+                ? "Estimating..."
+                : fee === "--"
+                ? "--"
+                : `${fee} ${getSymbol(feeDenom)}`}
+            </span>
+          </div>
           {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
         </div>
 
