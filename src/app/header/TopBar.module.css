@@ -90,6 +90,13 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--menu-text);
+  z-index: 200;
+}
+
+.walletMenuWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .actionGroup {
@@ -175,6 +182,78 @@
   border-color: rgba(82, 196, 26, 0.6);
 }
 
+.walletButtonContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.walletBadge {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #52c41a;
+}
+
+.walletBadge svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.walletMenu {
+  position: fixed;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 20, 17, 0.9);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 8px;
+  z-index: 9999;
+}
+
+.walletMenuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eaf5eb;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.walletMenuItem:hover {
+  border-color: rgba(82, 196, 26, 0.45);
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.walletMenuIcon {
+  width: 16px;
+  height: 16px;
+  color: rgba(234, 245, 235, 0.7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.walletMenuIcon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
 .latestTx {
   position: absolute;
   top: calc(100% + var(--grid-gap));
@@ -203,6 +282,30 @@
   border-radius: 10px;
   background: rgba(82, 196, 26, 0.15);
   border: var(--border-width) solid rgba(82, 196, 26, 0.35);
+}
+
+@keyframes txPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(82, 196, 26, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 14px rgba(82, 196, 26, 0.8);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(82, 196, 26, 0.4);
+  }
+}
+
+.latestTxPending .latestIcon {
+  animation: txPulse 1.2s ease-in-out infinite;
+}
+
+.latestTxError .latestIcon {
+  background: rgba(255, 77, 79, 0.15);
+  border-color: rgba(255, 77, 79, 0.45);
 }
 
 .latestTitle {

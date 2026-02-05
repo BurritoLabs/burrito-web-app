@@ -518,14 +518,16 @@ const WalletPanel = () => {
             value,
             chainCount: 1,
             whitelisted: Boolean(ibcToken),
-            iconCandidates: [
-              ...buildIconCandidates({
-                icon: ibcToken?.icon,
-                denom: ibcToken?.base_denom ?? coin.denom,
-                isClassic
-              }),
-              "/system/ibc.svg"
-            ]
+            iconCandidates: ibcToken
+              ? [
+                  ...buildIconCandidates({
+                    icon: ibcToken?.icon,
+                    denom: ibcToken?.base_denom ?? coin.denom,
+                    isClassic
+                  }).filter((item) => item !== "/system/cw20.svg"),
+                  "/system/ibc.svg"
+                ]
+              : ["/system/ibc.svg"]
           }
         }
 
@@ -1115,7 +1117,7 @@ const WalletPanel = () => {
                                 asset.amount,
                                 asset.decimals,
                                 2
-                              )} ${asset.symbol}`
+                              )}`
                             : "--"}
                         </div>
                       </div>

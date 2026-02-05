@@ -28,7 +28,9 @@
 .validatorHeader {
   display: flex;
   justify-content: space-between;
-  padding-bottom: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .validatorHeader dt,
@@ -41,14 +43,14 @@
 .validatorList {
   max-height: 150px;
   overflow: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 0;
 }
 
 .validatorRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
+  padding: 10px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -93,7 +95,7 @@
 .summaryDivider {
   display: flex;
   justify-content: center;
-  margin: 6px 0 8px;
+  margin: 10px 0 12px;
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -105,7 +107,7 @@
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-top: 14px;
 }
 
@@ -113,25 +115,32 @@
   border: 1px solid var(--card-border);
   border-radius: 8px;
   background: var(--card-bg-muted);
-  padding: 8px 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-height: 56px;
-  --reward-icon-size: 18px;
-  --reward-icon-gap: 6px;
+  min-width: 0;
+  --reward-icon-size: 24px;
+  --reward-icon-gap: 8px;
 }
 
 .summaryHeader {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--reward-icon-gap);
+  min-width: 0;
 }
 
 .summarySymbol {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   color: #ffffff;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .summaryDividerLine {

@@ -100,3 +100,27 @@ export const useCw20Contracts = () => {
     staleTime: 60 * 60 * 1000
   })
 }
+
+export type ValidatorLogoEntry = {
+  name?: string
+  identity?: string
+  website?: string
+  icon?: string
+  image?: string
+  logo?: string
+}
+
+export const useValidatorWhitelist = () => {
+  return useQuery({
+    queryKey: ["terra-assets", "validator-logos", CLASSIC_CHAIN.chainId],
+    queryFn: async () => {
+      const data = await fetchAsset<Record<string, Record<string, ValidatorLogoEntry>>>(
+        "validators/validators.json"
+      )
+      return (
+        pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
+      )
+    },
+    staleTime: 60 * 60 * 1000
+  })
+}

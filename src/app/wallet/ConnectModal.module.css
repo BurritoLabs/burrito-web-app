@@ -84,6 +84,27 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.connectedInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.connectedIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(82, 196, 26, 0.2);
+  border: 1px solid rgba(82, 196, 26, 0.45);
+  color: #52c41a;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
 .connectedLabel {
   font-size: var(--font-size-xxxs);
   letter-spacing: 0.12em;
@@ -91,11 +112,39 @@
   color: rgba(234, 245, 235, 0.55);
 }
 
-.connectedAddress {
+.connectedName {
   font-size: var(--font-size);
   font-weight: var(--bold);
   color: #ffffff;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+
+.connectedAddress {
+  font-size: var(--font-size);
+  color: rgba(234, 245, 235, 0.7);
+  margin-top: 2px;
+}
+
+.connectedActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.actionLink,
+.actionButton {
+  font-size: var(--font-size-small);
+  color: #52c41a;
+  text-decoration: none;
+  border: 1px solid rgba(82, 196, 26, 0.4);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.actionButton {
+  cursor: pointer;
 }
 
 .list {

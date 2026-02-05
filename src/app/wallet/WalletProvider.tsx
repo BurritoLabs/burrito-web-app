@@ -11,6 +11,14 @@ import { KEPLR_CHAIN_CONFIG } from "../chain"
 
 type WalletStatus = "disconnected" | "connecting" | "connected" | "error"
 type WalletConnectorId = "keplr" | "galaxy"
+type TxStatus = "idle" | "pending" | "success" | "error"
+
+type TxState = {
+  status: TxStatus
+  hash?: string
+  label?: string
+  error?: string
+}
 
 type WalletAccount = {
   address: string
@@ -32,6 +40,10 @@ type WalletContextValue = {
   connectors: WalletConnector[]
   connect: (id: WalletConnectorId) => Promise<void>
   disconnect: () => Promise<void>
+  txState: TxState
+  startTx: (label?: string) => void
+  finishTx: (hash?: string) => void
+  failTx: (error?: string) => void
 }
 
 type InjectedWallet = {
@@ -62,6 +74,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
   const [account, setAccount] = useState<WalletAccount>()
   const [error, setError] = useState<string>()
+  const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(false)
 
   const connectors = useMemo<WalletConnector[]>(() => {
@@ -132,6 +145,29 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
+  const startTx = useCallback((label?: string) => {
+    setTxState({ status: "pending", label })
+  }, [])
+
+  const finishTx = useCallback((hash?: string) => {
+    setTxState({ status: "success", hash })
+  }, [])
+
+  const failTx = useCallback((err?: string) => {
+    setTxState({ status: "error", error: err })
+  }, [])
+
+  useEffect(() => {
+    if (txState.status === "success" || txState.status === "error") {
+      const timer = window.setTimeout(
+        () => setTxState({ status: "idle" }),
+        6000
+      )
+      return () => window.clearTimeout(timer)
+    }
+    return undefined
+  }, [txState.status])
+
   useEffect(() => {
     if (autoConnectAttempted) return
     if (typeof window === "undefined") {
@@ -163,9 +199,25 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       error,
       connectors,
       connect,
-      disconnect
+      disconnect,
+      txState,
+      startTx,
+      finishTx,
+      failTx
     }),
-    [account, connectorId, connectors, connect, disconnect, error, status]
+    [
+      account,
+      connectorId,
+      connectors,
+      connect,
+      disconnect,
+      error,
+      status,
+      txState,
+      startTx,
+      finishTx,
+      failTx
+    ]
   )
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>

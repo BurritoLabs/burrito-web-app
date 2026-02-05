@@ -461,7 +461,8 @@ const buildMessage = (
 const getTxMessages = (
   tx: TxItem,
   resolveName?: (address?: string) => string | undefined,
-  accountAddress?: string
+  accountAddress?: string,
+  includeEventTransfers = true
 ): TxMessage[] => {
   const rawMessages = tx.tx?.body?.messages ?? tx.tx?.value?.msg ?? []
 
@@ -473,7 +474,7 @@ const getTxMessages = (
   }> = []
   const sendKeys = new Set<string>()
 
-  if (Array.isArray(tx.events)) {
+  if (includeEventTransfers && Array.isArray(tx.events)) {
     tx.events
       .filter((event) => event?.type === "transfer")
       .forEach((event) => {
@@ -785,16 +786,29 @@ const History = () => {
     () =>
       txs.map((tx) => {
         const isSuccess = !tx.code
-        const canonicalMessages = buildCanonicalMessages(tx, logMatcher, (line) =>
-          renderCanonicalLine(line, resolveName, resolveToken)
-        )
+        const rawMessages = tx.tx?.body?.messages ?? tx.tx?.value?.msg ?? []
+        const hasStakingAction = Array.isArray(rawMessages)
+          ? rawMessages.some((msg: any) => {
+              const type = String(msg?.["@type"] ?? msg?.type ?? "")
+              return (
+                type.includes("MsgDelegate") ||
+                type.includes("MsgUndelegate") ||
+                type.includes("MsgBeginRedelegate")
+              )
+            })
+          : false
+        const canonicalMessages = hasStakingAction
+          ? []
+          : buildCanonicalMessages(tx, logMatcher, (line) =>
+              renderCanonicalLine(line, resolveName, resolveToken)
+            )
         return {
           hash: tx.txhash ?? "--",
           status: isSuccess ? "success" : "failed",
           time: formatHistoryTimestamp(tx.timestamp),
           messages: canonicalMessages.length
             ? canonicalMessages
-            : getTxMessages(tx, resolveName, account?.address),
+            : getTxMessages(tx, resolveName, account?.address, !hasStakingAction),
           fee: formatCoins(tx.tx?.auth_info?.fee?.amount ?? []),
           memo: tx.tx?.body?.memo ?? "",
           log: tx.code ? tx.raw_log ?? "" : "",

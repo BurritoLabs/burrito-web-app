@@ -89,13 +89,29 @@ const formatRewardSummary = (
   const coin = lunc ?? ustc ?? rewards[0]
   const symbol = getSymbol(
     coin.denom,
-    coin.denom.startsWith("ibc/") ? ibcWhitelist?.[coin.denom]?.symbol : undefined
+    coin.denom.startsWith("ibc/")
+      ? ibcWhitelist?.[coin.denom.slice(4)]?.symbol
+      : undefined
   )
   return `${formatTokenAmount(
     coin.amount,
     CLASSIC_DENOMS.lunc.coinDecimals,
     6
   )} ${symbol}`
+}
+
+const formatRewardSymbol = (
+  denom: string,
+  ibcSymbol?: string
+) => {
+  if (denom.startsWith("ibc/") && !ibcSymbol) {
+    const hash = denom.slice(4)
+    if (hash.length > 10) {
+      return `IBC/${hash.slice(0, 4).toUpperCase()}…${hash.slice(-4).toUpperCase()}`
+    }
+    return `IBC/${hash.toUpperCase()}`
+  }
+  return getSymbol(denom, ibcSymbol)
 }
 
 const ASSET_URL = "https://assets.terra.dev"
@@ -149,7 +165,7 @@ const TokenIcon = ({
 }
 
 const WithdrawRewards = () => {
-  const { account } = useWallet()
+  const { account, startTx, finishTx, failTx } = useWallet()
   const accountAddress = account?.address
   const { data: rewardData } = useQuery({
     queryKey: ["rewardsByValidator", accountAddress],
@@ -210,6 +226,7 @@ const WithdrawRewards = () => {
         value === lunc ? 0 : value === ustc ? 1 : 2
       const rankDiff = rank(a.denom) - rank(b.denom)
       if (rankDiff !== 0) return rankDiff
+      if (a.amount !== b.amount) return a.amount > b.amount ? -1 : 1
       return a.index - b.index
     })
 
@@ -322,6 +339,7 @@ const WithdrawRewards = () => {
     if (!selected.length) return
     try {
       setSubmitting(true)
+      startTx("Withdraw rewards")
       const wallet = getWalletInstance()
       if (!wallet) throw new Error("Wallet extension not available")
       if (wallet.experimentalSuggestChain) {
@@ -344,9 +362,14 @@ const WithdrawRewards = () => {
           validatorAddress: validator
         })
       }))
-      await client.signAndBroadcast(accountAddress, msgs, "auto")
+      const result = await client.signAndBroadcast(accountAddress, msgs, "auto")
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Transaction failed")
+      }
+      finishTx((result as any).transactionHash ?? (result as any).txhash)
       setSubmitting(false)
     } catch (err) {
+      failTx(err instanceof Error ? err.message : "Submit failed")
       setSubmitError(err instanceof Error ? err.message : "Submit failed")
       setSubmitting(false)
     }
@@ -422,36 +445,42 @@ const WithdrawRewards = () => {
         </div>
 
         <div className={styles.summaryGrid}>
-          {totalsList.map(({ denom, amount }) => (
-            <div key={denom} className={`card ${styles.summaryCard}`}>
-              <div className={styles.summaryHeader}>
-                <TokenIcon
-                  symbol={getSymbol(
-                    denom,
-                    denom.startsWith("ibc/") ? ibcWhitelist?.[denom]?.symbol : undefined
+          {totalsList.map(({ denom, amount }) => {
+            const ibcToken =
+              denom.startsWith("ibc/") ? ibcWhitelist?.[denom.slice(4)] : undefined
+            return (
+              <div key={denom} className={`card ${styles.summaryCard}`}>
+                <div className={styles.summaryHeader}>
+                  <TokenIcon
+                    symbol={getSymbol(
+                      denom,
+                      denom.startsWith("ibc/") ? ibcToken?.symbol : undefined
+                    )}
+                    candidates={buildIconCandidates(
+                      denom,
+                      denom.startsWith("ibc/")
+                        ? ibcToken?.icon ?? "/system/ibc.svg"
+                        : undefined
+                    )}
+                  />
+                  <span className={styles.summarySymbol}>
+                    {formatRewardSymbol(
+                      denom,
+                      denom.startsWith("ibc/") ? ibcToken?.symbol : undefined
+                    )}
+                  </span>
+                </div>
+                <div className={styles.summaryDividerLine} />
+                <div className={styles.summaryAmount}>
+                  {formatTokenAmount(
+                    amount.toString(),
+                    CLASSIC_DENOMS.lunc.coinDecimals,
+                    6
                   )}
-                  candidates={buildIconCandidates(
-                    denom,
-                    denom.startsWith("ibc/") ? ibcWhitelist?.[denom]?.icon : undefined
-                  )}
-                />
-                <span className={styles.summarySymbol}>
-                  {getSymbol(
-                    denom,
-                    denom.startsWith("ibc/") ? ibcWhitelist?.[denom]?.symbol : undefined
-                  )}
-                </span>
+                </div>
               </div>
-              <div className={styles.summaryDividerLine} />
-              <div className={styles.summaryAmount}>
-                {formatTokenAmount(
-                  amount.toString(),
-                  CLASSIC_DENOMS.lunc.coinDecimals,
-                  6
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className={`card ${styles.feeCard}`}>

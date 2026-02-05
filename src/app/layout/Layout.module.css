@@ -101,7 +101,7 @@
   background: transparent;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 200;
 }
 
 .headerInner {
@@ -115,6 +115,7 @@
   max-width: none;
   margin: 0;
   white-space: nowrap;
+  overflow: visible;
   background: var(--glass-header);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));

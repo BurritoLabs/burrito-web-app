@@ -533,14 +533,16 @@ const Wallet = () => {
               price,
               value,
               isBuyable: false,
-              iconCandidates: [
-                ...buildIconCandidates({
-                  icon: ibcToken?.icon,
-                  denom: ibcToken?.base_denom ?? coin.denom,
-                  isClassic
-                }),
-                "/system/ibc.svg"
-              ]
+              iconCandidates: ibcToken
+                ? [
+                    ...buildIconCandidates({
+                      icon: ibcToken?.icon,
+                      denom: ibcToken?.base_denom ?? coin.denom,
+                      isClassic
+                    }).filter((item) => item !== "/system/cw20.svg"),
+                    "/system/ibc.svg"
+                  ]
+                : ["/system/ibc.svg"]
             }
           }
 

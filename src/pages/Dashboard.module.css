@@ -1,0 +1,152 @@
+.page {
+  display: grid;
+  gap: 20px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.metricCard {
+  display: grid;
+  gap: 8px;
+  padding: 20px 22px;
+}
+
+.metricLabel {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.7);
+  letter-spacing: 0.02em;
+}
+
+.metricValue {
+  font-size: 22px;
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.metricValue span {
+  font-size: var(--font-size-small);
+  font-weight: var(--normal);
+  color: rgba(234, 245, 235, 0.6);
+  margin-left: 6px;
+}
+
+.delta {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.up {
+  color: #52c41a;
+}
+
+.down {
+  color: #ff7a7a;
+}
+
+.neutral {
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.chartCard {
+  display: grid;
+  gap: 18px;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chartTitle {
+  font-size: var(--font-size-title-lg);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.rangeSwitch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.rangeButton {
+  border: none;
+  background: transparent;
+  color: rgba(234, 245, 235, 0.7);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.rangeButton:hover {
+  color: #ffffff;
+}
+
+.rangeButtonActive {
+  background: rgba(82, 196, 26, 0.2);
+  color: #ffffff;
+}
+
+.chart {
+  display: grid;
+  gap: 12px;
+}
+
+.chartBars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: stretch;
+  gap: 6px;
+  height: 180px;
+  padding: 12px 10px 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chartBar {
+  flex: 1 1 0;
+  min-width: 4px;
+  max-width: 36px;
+  border-radius: 5px 5px 3px 3px;
+  background: linear-gradient(180deg, rgba(82, 196, 26, 0.9) 0%, rgba(82, 196, 26, 0.4) 100%);
+}
+
+.chartAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: rgba(234, 245, 235, 0.45);
+}
+
+.chartEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  color: rgba(234, 245, 235, 0.5);
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 991.98px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .chartHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

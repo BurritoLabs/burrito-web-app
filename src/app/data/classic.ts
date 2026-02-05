@@ -208,6 +208,16 @@ export const fetchBalances = async (address: string) => {
   return data.balances ?? []
 }
 
+export const fetchSpendableBalances = async (address: string) => {
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/cosmos/bank/v1beta1/spendable_balances/${address}`,
+    { "pagination.limit": "200" }
+  )
+  const data = await fetchJson<{ balances?: CoinBalance[] }>(url)
+  return data.balances ?? []
+}
+
 export type DelegationResponse = {
   delegation?: { validator_address?: string }
   balance?: CoinBalance

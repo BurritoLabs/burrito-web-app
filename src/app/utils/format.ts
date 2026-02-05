@@ -1,8 +1,13 @@
 export const toUnitAmount = (
-  amount: string | number | undefined,
+  amount: string | number | bigint | undefined,
   decimals = 6
 ) => {
   if (amount === undefined || amount === null || amount === "") return 0
+  if (typeof amount === "bigint") {
+    const value = Number(amount)
+    if (!Number.isFinite(value)) return 0
+    return value / 10 ** decimals
+  }
   const value = typeof amount === "string" ? Number(amount) : amount
   if (!Number.isFinite(value)) return 0
   return value / 10 ** decimals
@@ -17,7 +22,7 @@ export const formatNumber = (
   }).format(value)
 
 export const formatTokenAmount = (
-  amount: string | number | undefined,
+  amount: string | number | bigint | undefined,
   decimals = 6,
   maximumFractionDigits = 2
 ) => {
@@ -55,9 +60,14 @@ export const formatTimestamp = (timestamp: string | undefined) => {
   })
 }
 
-export const sumAmounts = (amounts: Array<string | number | undefined>) =>
+export const sumAmounts = (amounts: Array<string | number | bigint | undefined>) =>
   amounts.reduce<number>((total, item) => {
     if (item === undefined || item === null || item === "") return total
+    if (typeof item === "bigint") {
+      const value = Number(item)
+      if (!Number.isFinite(value)) return total
+      return total + value
+    }
     const value = typeof item === "string" ? Number(item) : item
     if (!Number.isFinite(value)) return total
     return total + value

@@ -1,0 +1,213 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 8, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal {
+  width: min(420px, 90vw);
+  background: rgba(12, 20, 17, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 18px 20px 22px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  color: #eaf5eb;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.closeButton {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+}
+
+.closeButton span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 2px;
+  background: rgba(234, 245, 235, 0.8);
+  border-radius: 999px;
+}
+
+.closeButton span:first-child {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.closeButton span:last-child {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.addressCard {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  gap: 10px;
+}
+
+.chainLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(234, 245, 235, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.addressRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.addressText {
+  font-size: 14px;
+  font-weight: 600;
+  color: #eaf5eb;
+}
+
+.copyButton {
+  border: 1px solid rgba(82, 196, 26, 0.45);
+  background: rgba(82, 196, 26, 0.16);
+  color: #eaf5eb;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addressActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qrToggle {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: rgba(82, 196, 26, 0.85);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.qrToggle svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.qrBox {
+  width: 320px;
+  height: 320px;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.qrBox img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qrOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 8, 0.7);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+
+.qrModal {
+  width: 520px;
+  max-width: 90vw;
+  background: rgba(12, 20, 17, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 28px 28px 26px;
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.qrClose {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.qrClose span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 2px;
+  background: rgba(234, 245, 235, 0.85);
+  border-radius: 999px;
+}
+
+.qrClose span:first-child {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.qrClose span:last-child {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.qrAddress {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.7);
+  text-align: center;
+  word-break: break-all;
+}
+
+.qrTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(234, 245, 235, 0.9);
+  text-align: center;
+}

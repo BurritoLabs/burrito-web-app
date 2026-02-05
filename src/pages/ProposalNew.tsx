@@ -73,7 +73,7 @@ const getOfflineSigner = async () => {
 }
 
 const ProposalNew = () => {
-  const { account } = useWallet()
+  const { account, startTx, finishTx, failTx } = useWallet()
   const [proposalType, setProposalType] = useState<ProposalType>("TEXT")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -422,6 +422,7 @@ const ProposalNew = () => {
 
     try {
       setSubmitting(true)
+      startTx("Submit proposal")
       const wallet = getWalletInstance()
       if (!wallet) throw new Error("Wallet extension not available")
       if (wallet.experimentalSuggestChain) {
@@ -450,7 +451,9 @@ const ProposalNew = () => {
         throw new Error(result.rawLog || "Transaction failed")
       }
       setTxHash(result.transactionHash)
+      finishTx(result.transactionHash)
     } catch (err) {
+      failTx(err instanceof Error ? err.message : "Submission failed")
       setError(err instanceof Error ? err.message : "Submission failed")
     } finally {
       setSubmitting(false)

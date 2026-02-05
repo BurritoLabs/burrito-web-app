@@ -15,7 +15,7 @@
 }
 
 .chainHeader {
-  padding: var(--grid-gap);
+  padding: 0 var(--grid-gap);
   display: grid;
   gap: 12px;
   background: var(--card-bg);
@@ -23,6 +23,8 @@
   border-bottom: 0;
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
+  min-height: 60px;
+  align-items: center;
 }
 
 .chainTitle {
@@ -142,6 +144,33 @@
   text-overflow: ellipsis;
 }
 
+.legendLink {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.legendLinkText {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legendLinkArrow {
+  font-size: 11px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.legendLink:hover .legendLinkText {
+  text-decoration: underline;
+}
+
 .legendPercent {
   font-weight: var(--bold);
   color: #ffffff;
@@ -195,8 +224,14 @@
   padding: 0 16px;
 }
 
-.overviewBody :global(.listRow strong),
+.overviewBody :global(.listRow strong) {
+  font-size: var(--font-size);
+  line-height: 44px;
+  display: block;
+}
+
 .overviewBody :global(.listRow span) {
+  font-size: var(--font-size);
   line-height: 44px;
   display: block;
 }
@@ -206,9 +241,455 @@
   gap: 12px;
 }
 
+.stakeTabsCard {
+  margin-top: var(--grid-gap);
+  padding: 0;
+}
+
+.stakeTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: var(--border-width) solid var(--card-border);
+  overflow: hidden;
+  background: var(--card-bg);
+  min-height: 60px;
+}
+
+.stakeTab {
+  padding: 0 16px;
+  background: transparent;
+  color: rgba(234, 245, 235, 0.7);
+  font-size: var(--font-size);
+  font-weight: var(--bold);
+  border: 0;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stakeTab + .stakeTab {
+  border-left: var(--border-width) solid var(--card-border);
+}
+
+.stakeTabActive {
+  background: rgba(82, 196, 26, 0.12);
+  color: #ffffff;
+}
+
+.stakeTabBody {
+  padding: 20px var(--main-padding);
+  background: var(--card-bg-muted);
+}
+
+.myStakeCard {
+  display: grid;
+  grid-template-rows: min-content auto;
+  background: transparent;
+}
+
+.myStakeHeader {
+  padding: 0 0 12px;
+  background: transparent;
+  border: 0;
+}
+
+.myStakeTitle {
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.myStakeBody {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.myStakeList {
+  display: grid;
+  gap: 12px;
+}
+
+.myStakeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.6fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.myStakeInfo {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.myStakeHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.validatorLogoWrap {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+.validatorLogo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.validatorMeta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.validatorNameStrong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.validatorCommission {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.6);
+}
+
+.myStakeAmounts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+
+.amountBlock {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  text-align: center;
+}
+
+.amountLabel {
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.amountValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(234, 245, 235, 0.9);
+}
+
+.manageButton {
+  height: 32px;
+  padding: 0 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(82, 196, 26, 0.6);
+  background: rgba(82, 196, 26, 0.15);
+  color: #eaffea;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.validatorListCard {
+  display: grid;
+  align-content: start;
+  background: transparent;
+  border: 0;
+}
+
+.searchRow {
+  padding: 0 0 16px;
+  border-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchField {
+  position: relative;
+  margin: 0;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.searchInput {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  padding-left: 42px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
+}
+
+.activeToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.7);
+  user-select: none;
+}
+
+.activeToggle input {
+  accent-color: #52c41a;
+}
+
+.validatorListBody {
+  padding: 0;
+}
+
+.validatorTable {
+  display: grid;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.validatorHeaderRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr) minmax(0, 0.6fr) minmax(0, 0.6fr);
+  gap: 12px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(234, 245, 235, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  align-items: center;
+}
+
+.sortHeader {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.sortHeaderRight {
+  justify-self: end;
+  text-align: right;
+  justify-content: flex-end;
+}
+
+.sortHeaderRight .sorter {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.sortHeader:hover {
+  color: rgba(234, 245, 235, 0.95);
+}
+
+.sortHeader[data-active="true"] {
+  color: #ffffff;
+}
+
+.sorter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sortCarets {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1;
+}
+
+.sortCaret {
+  width: 6px;
+  height: 4px;
+  fill: currentColor;
+  opacity: 0.3;
+}
+
+.sortCaretActive {
+  opacity: 1;
+}
+
+.validatorHeaderAction {
+  text-align: right;
+}
+
+.validatorRows {
+  display: grid;
+}
+
+.validatorRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr) minmax(0, 0.6fr) minmax(0, 0.6fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+}
+
+.validatorRow:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.validatorMonikerCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.validatorRowIconWrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.validatorRowIcon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.validatorRowLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.validatorRowLinkText {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.validatorRowLinkArrow {
+  font-size: 11px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.validatorRowLink:hover .validatorRowLinkText {
+  text-decoration: underline;
+}
+
+.validatorCell {
+  text-align: right;
+  font-size: 13px;
+  color: rgba(234, 245, 235, 0.75);
+}
+
+.validatorActionCell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.validatorActionButton {
+  height: 28px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(82, 196, 26, 0.6);
+  background: rgba(82, 196, 26, 0.18);
+  color: #eaffea;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.emptyState {
+  padding: 24px 0;
+  text-align: center;
+  color: rgba(234, 245, 235, 0.6);
+  font-size: var(--font-size-small);
+}
+
 @media (max-width: 991.98px) {
   .summaryGrid {
     grid-template-columns: 1fr;
+  }
+
+  .stakeTabs {
+    grid-template-columns: 1fr;
+  }
+
+  .stakeTab + .stakeTab {
+    border-left: 0;
+    border-top: var(--border-width) solid var(--card-border);
   }
 }
 
