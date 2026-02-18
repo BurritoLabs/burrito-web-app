@@ -11,7 +11,10 @@ import {
   fetchSwapRates
 } from "../app/data/classic"
 import { useCw20Balances } from "../app/data/cw20"
-import { useCw20Whitelist, useIbcWhitelist } from "../app/data/terraAssets"
+import {
+  useCw20Whitelist,
+  useResolvedIbcWhitelist
+} from "../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../app/utils/format"
 
 type WalletAsset = {
@@ -44,6 +47,7 @@ const AssetIcon = ({
     <img
       src={candidates[index]}
       alt={symbol}
+      style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
       onError={() => {
         if (index < candidates.length - 1) {
           setIndex(index + 1)
@@ -343,7 +347,14 @@ const Wallet = () => {
   })
 
   const { data: cw20Whitelist } = useCw20Whitelist()
-  const { data: ibcWhitelist } = useIbcWhitelist()
+  const ibcDenoms = useMemo(
+    () =>
+      (balances ?? [])
+        .map((coin) => coin.denom)
+        .filter((denom) => denom.startsWith("ibc/")),
+    [balances]
+  )
+  const { data: ibcWhitelist } = useResolvedIbcWhitelist(ibcDenoms)
   const { data: cw20Balances = [] } = useCw20Balances(
     account?.address,
     cw20Whitelist

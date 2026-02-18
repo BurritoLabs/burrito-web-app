@@ -35,6 +35,21 @@ const toMicroAmount = (value: string) => {
   return Math.floor(num * 1_000_000).toString()
 }
 
+const GAS_PRICE_MICRO_LUNC = 28.325
+
+const FALLBACK_GAS_BY_TAB = {
+  Delegate: 500_000,
+  Redelegate: 560_000,
+  Undelegate: 500_000
+} as const
+
+const estimateFallbackFeeMicro = (
+  tab: "Delegate" | "Redelegate" | "Undelegate"
+) => {
+  const gas = FALLBACK_GAS_BY_TAB[tab]
+  return BigInt(Math.ceil(gas * GAS_PRICE_MICRO_LUNC))
+}
+
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
   const anyWindow = window as Window & {
@@ -177,6 +192,16 @@ const StakeManageModal = ({
     timer = window.setTimeout(async () => {
       setFeeLoading(true)
       setFeeError(undefined)
+      const fallbackFeeMicro = estimateFallbackFeeMicro(tab)
+      const fallbackFee = formatTokenAmount(
+        fallbackFeeMicro.toString(),
+        CLASSIC_DENOMS.lunc.coinDecimals,
+        6
+      )
+      if (!cancelled) {
+        setFee(fallbackFee === "--" ? "--" : fallbackFee)
+        setFeeMicro(fallbackFeeMicro)
+      }
       try {
         const wallet = getWalletInstance()
         if (!wallet) throw new Error("Wallet extension not available")
@@ -249,11 +274,8 @@ const StakeManageModal = ({
         }
       } catch (err) {
         if (!cancelled) {
-          setFee("--")
-          setFeeMicro(0n)
-          setFeeError(
-            err instanceof Error ? err.message : "Fee estimation failed"
-          )
+          // Keep fallback fee when simulation fails to avoid blank fee UI.
+          setFeeError(undefined)
         }
       } finally {
         if (!cancelled) setFeeLoading(false)
@@ -303,7 +325,7 @@ const StakeManageModal = ({
     try {
       setSubmitting(true)
       setSubmitError(undefined)
-      startTx(tab)
+      startTx(`${tab} stake`)
       const wallet = getWalletInstance()
       if (!wallet) throw new Error("Wallet extension not available")
       if (wallet.experimentalSuggestChain) {

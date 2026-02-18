@@ -3,16 +3,70 @@
   gap: 20px;
 }
 
+.section {
+  display: grid;
+  gap: 12px;
+}
+
+.sectionHeader {
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  color: rgba(234, 245, 235, 0.65);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
+  grid-auto-flow: dense;
+}
+
+.metricsTwo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.metricsTop {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.metricsSupply {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .metricCard {
   display: grid;
   gap: 8px;
   padding: 20px 22px;
+  min-height: 120px;
+}
+
+.metricCardLarge {
+  min-height: 120px;
+  padding: 20px 22px;
+}
+
+.metricCardLarge .metricValue {
+  font-size: 22px;
+}
+
+.metricCardLarge .metricLabel {
+  font-size: var(--font-size-small);
+}
+
+.metricWide {
+  grid-column: span 2;
+}
+
+.metricTall {
+  grid-row: span 2;
 }
 
 .metricLabel {
@@ -25,6 +79,7 @@
   font-size: 22px;
   font-weight: var(--bold);
   color: #ffffff;
+  min-width: 0;
 }
 
 .metricValue span {
@@ -35,6 +90,9 @@
 }
 
 .delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.55);
 }
@@ -141,12 +199,71 @@
 }
 
 @media (max-width: 991.98px) {
+  .metricsTop {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metricsSupply {
+    grid-template-columns: 1fr;
+  }
+
+  .metricsTwo {
+    grid-template-columns: 1fr;
+  }
+
   .metrics {
     grid-template-columns: 1fr;
+  }
+
+  .metricWide {
+    grid-column: span 1;
+  }
+
+  .metricTall {
+    grid-row: span 1;
   }
 
   .chartHeader {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .metricsTop {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    padding: 0 16px 20px;
+  }
+
+  .section {
+    gap: 10px;
+  }
+
+  .metricCard,
+  .metricCardLarge {
+    padding: 14px 14px;
+    min-height: 108px;
+  }
+
+  .metricValue,
+  .metricCardLarge .metricValue {
+    font-size: clamp(18px, 5vw, 22px);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .metricValue span {
+    font-size: 12px;
+    margin-left: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  .page {
+    padding: 0 14px 18px;
   }
 }

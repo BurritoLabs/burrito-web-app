@@ -177,6 +177,9 @@
   min-width: 50px;
   justify-content: center;
   height: 22px;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .messageBody {
@@ -317,6 +320,18 @@
   width: 16px;
   height: 16px;
   display: block;
+}
+
+@media (max-width: 640px) {
+  .message {
+    display: grid;
+    gap: 8px;
+  }
+
+  .tag {
+    width: fit-content;
+    max-width: 100%;
+  }
 }
 
 

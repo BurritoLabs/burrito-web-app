@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import QRCode from "qrcode"
 import styles from "./WalletAddressesModal.module.css"
 import { useWallet } from "./WalletProvider"
 
@@ -15,16 +16,51 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
   const { account } = useWallet()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
-
-  if (!open) return null
-  if (typeof document === "undefined") return null
+  const [qrDataUrl, setQrDataUrl] = useState("")
+  const [qrError, setQrError] = useState(false)
 
   const address = account?.address ?? ""
-  const qrUrl = address
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&color=52C41A&bgcolor=0C1411&data=${encodeURIComponent(
-        address
-      )}`
-    : ""
+
+  useEffect(() => {
+    let isMounted = true
+
+    const buildQr = async () => {
+      if (!open || !address || !showQr) {
+        setQrDataUrl("")
+        setQrError(false)
+        return
+      }
+
+      try {
+        const dataUrl = await QRCode.toDataURL(address, {
+          width: 280,
+          margin: 0,
+          color: {
+            dark: "#52C41A",
+            light: "#00000000",
+          },
+        })
+        if (isMounted) {
+          setQrDataUrl(dataUrl)
+          setQrError(false)
+        }
+      } catch {
+        if (isMounted) {
+          setQrDataUrl("")
+          setQrError(true)
+        }
+      }
+    }
+
+    buildQr()
+
+    return () => {
+      isMounted = false
+    }
+  }, [open, address, showQr])
+
+  const canRender = open && typeof document !== "undefined"
+  if (!canRender) return null
 
   return createPortal(
     <div
@@ -78,7 +114,7 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
           </div>
         </div>
 
-        {qrUrl && showQr
+        {showQr
           ? createPortal(
               <div
                 className={styles.qrOverlay}
@@ -98,7 +134,13 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
                   </button>
                   <div className={styles.qrTitle}>Wallet address</div>
                   <div className={styles.qrBox}>
-                    <img src={qrUrl} alt="Wallet address QR code" />
+                    {qrDataUrl ? (
+                      <img src={qrDataUrl} alt="Wallet address QR code" />
+                    ) : (
+                      <div className={styles.qrStatus}>
+                        {qrError ? "QR code unavailable" : "Loading QR code..."}
+                      </div>
+                    )}
                   </div>
                   <div className={styles.qrAddress}>{address}</div>
                 </div>

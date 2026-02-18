@@ -125,21 +125,34 @@
 }
 
 .qrBox {
-  width: 320px;
-  height: 320px;
-  border-radius: 0;
-  border: 0;
-  background: transparent;
+  width: 280px;
+  height: 280px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
   display: grid;
   place-items: center;
   overflow: hidden;
-  box-shadow: none;
+  box-shadow: none !important;
 }
 
 .qrBox img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  image-rendering: pixelated;
+  display: block;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.qrStatus {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(234, 245, 235, 0.8);
 }
 
 .qrOverlay {

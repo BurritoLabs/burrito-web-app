@@ -51,6 +51,10 @@ export const KEPLR_CHAIN_CONFIG = {
     {
       ...CLASSIC_DENOMS.lunc,
       gasPriceStep: GAS_PRICE_STEP
+    },
+    {
+      ...CLASSIC_DENOMS.ustc,
+      gasPriceStep: GAS_PRICE_STEP
     }
   ],
   stakeCurrency: CLASSIC_DENOMS.lunc

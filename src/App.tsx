@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { useNav } from "./app/routes"
 import Layout, {
   Content,
@@ -15,19 +15,18 @@ import LoadingBar from "./app/feedback/LoadingBar"
 function App() {
   const { element: routes } = useNav()
   const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const toggleMenu = useCallback(() => setMenuOpen((open) => !open), [])
 
   return (
     <Layout menuOpen={menuOpen}>
       <Sidebar>
-        <Nav isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
+        <Nav isOpen={menuOpen} onClose={closeMenu} />
         <Aside />
       </Sidebar>
 
       <Header>
-        <TopBar
-          onMenuClick={() => setMenuOpen((open) => !open)}
-          menuOpen={menuOpen}
-        />
+        <TopBar onMenuClick={toggleMenu} menuOpen={menuOpen} />
       </Header>
 
       <Content>

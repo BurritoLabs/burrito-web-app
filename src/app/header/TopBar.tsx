@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
+import { Link } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import styles from "./TopBar.module.css"
 import ConnectModal from "../wallet/ConnectModal"
@@ -9,6 +10,7 @@ import { useWallet } from "../wallet/WalletProvider"
 import { CLASSIC_CHAIN } from "../chain"
 import { fetchValidator } from "../data/classic"
 import { convertBech32Prefix } from "../utils/bech32"
+import BrandLogo from "../../components/brand/BrandLogo"
 
 type TopBarProps = {
   onMenuClick?: () => void
@@ -109,6 +111,13 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   return (
     <div className={styles.bar}>
       <div className={styles.leftRail}>
+        <Link
+          to="/"
+          className={`${styles.mobileBrand} ${styles.mobileBrandLink}`}
+          aria-label="Go to dashboard"
+        >
+          <BrandLogo textSize={20} iconSize={24} gap={6} />
+        </Link>
         <div className={styles.chainBadge}>Terra Classic</div>
       </div>
       <div className={styles.actions}>
@@ -231,11 +240,26 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
           onClick={onMenuClick}
           type="button"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
-          data-open={menuOpen ? "true" : "false"}
         >
-          <span />
-          <span />
-          <span />
+          {menuOpen ? (
+            <svg
+              className={styles.menuIcon}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          ) : (
+            <svg
+              className={styles.menuIcon}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+            </svg>
+          )}
         </button>
       </div>
 

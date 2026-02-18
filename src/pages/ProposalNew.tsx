@@ -39,6 +39,31 @@ const DENOMS = [
   CLASSIC_DENOMS.ustc.coinMinimalDenom
 ]
 
+const FEE_DENOM_OPTIONS = [
+  CLASSIC_DENOMS.lunc.coinMinimalDenom,
+  CLASSIC_DENOMS.ustc.coinMinimalDenom
+] as const
+
+const GAS_PRICE_MICRO = 28.325
+const PROPOSAL_GAS_ADJUSTMENT = 1
+const FALLBACK_GAS = 200000
+
+const getGasPriceMicro = (denom: string) => {
+  const feeCurrency = KEPLR_CHAIN_CONFIG.feeCurrencies.find(
+    (item) => item.coinMinimalDenom === denom
+  )
+  return feeCurrency?.gasPriceStep?.average ?? GAS_PRICE_MICRO
+}
+
+const buildEstimatedFee = (gasUsed: number, gasPriceMicro: number) => {
+  const gasWanted = Math.ceil(gasUsed * PROPOSAL_GAS_ADJUSTMENT)
+  const feeAmount = Math.max(1, Math.ceil(gasWanted * gasPriceMicro)).toString()
+  return { gasUsed, gasWanted, feeAmount }
+}
+
+const estimateFallbackFee = (gasPriceMicro: number) =>
+  buildEstimatedFee(FALLBACK_GAS, gasPriceMicro)
+
 const toMicroAmount = (value: string) => {
   const num = Number(value)
   if (!Number.isFinite(num) || num <= 0) return "0"
@@ -95,8 +120,14 @@ const ProposalNew = () => {
   const [txHash, setTxHash] = useState("")
   const [typeOpen, setTypeOpen] = useState(false)
   const typeRef = useRef<HTMLDivElement | null>(null)
+  const [feeDenom, setFeeDenom] = useState<(typeof FEE_DENOM_OPTIONS)[number]>(
+    CLASSIC_DENOMS.lunc.coinMinimalDenom
+  )
+  const [feeOpen, setFeeOpen] = useState(false)
+  const feeRef = useRef<HTMLDivElement | null>(null)
   const [feeEstimate, setFeeEstimate] = useState<{
     gasUsed: number
+    gasWanted: number
     feeAmount: string
   } | null>(null)
   const [feeLoading, setFeeLoading] = useState(false)
@@ -142,6 +173,16 @@ const ProposalNew = () => {
     )
     return item?.amount ?? "0"
   }, [balances])
+
+  const ustcBalance = useMemo(() => {
+    const item = balances.find(
+      (coin) => coin.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+    )
+    return item?.amount ?? "0"
+  }, [balances])
+
+  const getDenomLabel = (denom: string) =>
+    denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ? "LUNC" : "USTC"
 
   const validateAddress = (value: string) =>
     /^terra1[0-9a-z]{38}$/.test(value)
@@ -264,87 +305,33 @@ const ProposalNew = () => {
   ])
 
   useEffect(() => {
-    let cancelled = false
-    let timer: number | undefined
-
-    if (!canEstimateFee) {
+    if (!account?.address) {
       setFeeEstimate(null)
       setFeeError(undefined)
-      return undefined
+      setFeeLoading(false)
+      return
     }
 
-    timer = window.setTimeout(async () => {
-      setFeeLoading(true)
-      setFeeError(undefined)
-      try {
-        const wallet = getWalletInstance()
-        if (!wallet) throw new Error("Wallet extension not available")
-        if (wallet.experimentalSuggestChain) {
-          await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-        }
-        if (wallet.enable) {
-          await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-        }
-        const signer = await getOfflineSigner()
-        if (!signer) throw new Error("Wallet signer not available")
-        const registry = getRegistry()
-        const msg = buildMsg(registry)
-        const client = await SigningStargateClient.connectWithSigner(
-          CLASSIC_CHAIN.rpc,
-          signer,
-          {
-            registry,
-            gasPrice: GasPrice.fromString("28.325uluna")
-          }
-        )
-        const gasUsed = await client.simulate(account?.address ?? "", [msg], "")
-        const gasPrice = GasPrice.fromString("28.325uluna")
-        const gasPriceAmount = Number(gasPrice.amount.toString())
-        const feeMicro = Math.ceil(gasUsed * gasPriceAmount).toString()
-        if (!cancelled) {
-          setFeeEstimate({ gasUsed, feeAmount: feeMicro })
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setFeeEstimate(null)
-          setFeeError(err instanceof Error ? err.message : "Fee estimation failed")
-        }
-      } finally {
-        if (!cancelled) setFeeLoading(false)
-      }
-    }, 600)
-
-    return () => {
-      cancelled = true
-      if (timer) window.clearTimeout(timer)
-    }
-  }, [
-    canEstimateFee,
-    proposalType,
-    title,
-    description,
-    deposit,
-    spendRecipient,
-    spendAmount,
-    spendDenom,
-    changes,
-    runAs,
-    contractAddress,
-    executeMsg,
-    funds,
-    account?.address
-  ])
+    // Keep fee behavior stable and close to Station page behavior.
+    setFeeLoading(false)
+    setFeeError(undefined)
+    setFeeEstimate(estimateFallbackFee(getGasPriceMicro(feeDenom)))
+  }, [account?.address, feeDenom])
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
-      if (!typeRef.current) return
-      if (!typeRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (typeRef.current && !typeRef.current.contains(target)) {
         setTypeOpen(false)
+      }
+      if (feeRef.current && !feeRef.current.contains(target)) {
+        setFeeOpen(false)
       }
     }
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setTypeOpen(false)
+        setFeeOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClick)
@@ -371,21 +358,66 @@ const ProposalNew = () => {
   }, [deposit])
 
   const feeMicro = feeEstimate ? BigInt(feeEstimate.feeAmount) : 0n
-  const balanceMicro = BigInt(luncBalance || "0")
-  const maxSpendable = balanceMicro > feeMicro ? balanceMicro - feeMicro : 0n
-  const balanceAfter = balanceMicro - depositMicro - feeMicro
+  const luncBalanceMicro = BigInt(luncBalance || "0")
+  const ustcBalanceMicro = BigInt(ustcBalance || "0")
+  const maxSpendable =
+    feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+      ? luncBalanceMicro > feeMicro
+        ? luncBalanceMicro - feeMicro
+        : 0n
+      : luncBalanceMicro
+  const luncAfterTx =
+    luncBalanceMicro -
+    depositMicro -
+    (feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom ? feeMicro : 0n)
+  const ustcAfterTx =
+    ustcBalanceMicro -
+    (feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom ? feeMicro : 0n)
+  const hasBalanceError =
+    depositMicro > luncBalanceMicro ||
+    (feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom && luncAfterTx < 0n) ||
+    (feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom && ustcAfterTx < 0n)
+  const canSubmit =
+    !!account?.address &&
+    canEstimateFee &&
+    !!feeEstimate &&
+    !submitting &&
+    !feeLoading &&
+    !hasBalanceError
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (submitting || !account?.address) return
+    if (submitting || !account?.address || !canSubmit) return
     setError(undefined)
     setTxHash("")
     if (!account?.address) {
       setError("Please connect a wallet.")
       return
     }
+    if (!feeEstimate) {
+      setError("Fee estimation failed.")
+      return
+    }
     if (!title.trim() || !description.trim()) {
       setError("Title and description are required.")
+      return
+    }
+    if (depositMicro > luncBalanceMicro) {
+      setError("Initial deposit exceeds LUNC balance.")
+      return
+    }
+    if (
+      feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom &&
+      luncAfterTx < 0n
+    ) {
+      setError("Insufficient LUNC balance for deposit + fee.")
+      return
+    }
+    if (
+      feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom &&
+      ustcAfterTx < 0n
+    ) {
+      setError("Insufficient USTC balance for fee.")
       return
     }
     if (proposalType === "SPEND") {
@@ -443,10 +475,14 @@ const ProposalNew = () => {
         signer,
         {
           registry,
-          gasPrice: GasPrice.fromString("28.325uluna")
+          gasPrice: GasPrice.fromString(`${getGasPriceMicro(feeDenom)}${feeDenom}`)
         }
       )
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const finalFee = feeEstimate
+      const result = await client.signAndBroadcast(account.address, [msg], {
+        amount: [{ amount: finalFee.feeAmount, denom: feeDenom }],
+        gas: String(finalFee.gasWanted)
+      })
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }
@@ -810,19 +846,65 @@ const ProposalNew = () => {
 
           {account?.address ? (
             <div className={styles.feeCard}>
-              <dl>
-                <dt>Fee</dt>
-                <dd>
+              <div className={styles.feeTopRow}>
+                <div className={styles.feeTopLeft}>
+                  <span className={styles.feeTopLabel}>Fee</span>
+                  <div className={styles.feeSelectWrapper} ref={feeRef}>
+                    <button
+                      type="button"
+                      className={styles.feeSelectButton}
+                      aria-haspopup="listbox"
+                      aria-expanded={feeOpen}
+                      onClick={() => setFeeOpen((open) => !open)}
+                    >
+                      <span>{getDenomLabel(feeDenom)}</span>
+                      <span className={styles.selectChevron} aria-hidden="true" />
+                    </button>
+                    {feeOpen ? (
+                      <div className={styles.feeSelectMenu} role="listbox">
+                        {FEE_DENOM_OPTIONS.map((denom) => {
+                          const active = denom === feeDenom
+                          return (
+                            <button
+                              key={denom}
+                              type="button"
+                              role="option"
+                              aria-selected={active}
+                              className={`${styles.feeSelectOption} ${
+                                active ? styles.feeSelectOptionActive : ""
+                              }`}
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setFeeDenom(denom)
+                                setFeeOpen(false)
+                              }}
+                            >
+                              {getDenomLabel(denom)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className={styles.feeTopAmount}>
                   {feeLoading
                     ? "Estimating..."
                     : feeEstimate
-                    ? `${formatMicro(feeEstimate.feeAmount)} LUNC`
+                    ? `${formatMicro(feeEstimate.feeAmount)} ${getDenomLabel(feeDenom)}`
                     : "--"}
-                </dd>
+                </div>
+              </div>
+              <dl>
                 <dt>Balance</dt>
-                <dd>{formatMicro(balanceMicro)} LUNC</dd>
+                <dd>
+                  {formatMicro(luncBalanceMicro)} LUNC
+                </dd>
                 <dt>Balance after tx</dt>
-                <dd>{formatMicro(balanceAfter)} LUNC</dd>
+                <dd className={luncAfterTx < 0n ? styles.feeNegative : ""}>
+                  {formatMicro(luncAfterTx)} LUNC
+                </dd>
               </dl>
               {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
             </div>
@@ -831,7 +913,7 @@ const ProposalNew = () => {
             <button
               className={`uiButton uiButtonPrimary ${styles.submitButton}`}
               type="submit"
-              disabled={submitting || !account?.address}
+              disabled={!canSubmit}
             >
               {submitting ? "Submitting..." : "Submit"}
             </button>

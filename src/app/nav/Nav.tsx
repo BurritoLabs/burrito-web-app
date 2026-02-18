@@ -14,8 +14,8 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    if (isOpen && onClose) onClose()
-  }, [pathname, isOpen, onClose])
+    if (onClose) onClose()
+  }, [pathname, onClose])
 
   return (
     <nav className={styles.nav}>

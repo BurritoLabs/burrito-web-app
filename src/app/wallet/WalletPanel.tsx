@@ -13,7 +13,10 @@ import {
   getCachedPrices
 } from "../data/classic"
 import { useCw20Balances } from "../data/cw20"
-import { useCw20Whitelist, useIbcWhitelist } from "../data/terraAssets"
+import {
+  useCw20Whitelist,
+  useResolvedIbcWhitelist
+} from "../data/terraAssets"
 import ManageTokensModal from "./ManageTokensModal"
 import type { ManageTokenItem } from "./ManageTokensModal"
 import {
@@ -108,6 +111,7 @@ const AssetIcon = ({
     <img
       src={candidates[index]}
       alt={symbol}
+      style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
       onError={() => {
         if (index < candidates.length - 1) {
           setIndex(index + 1)
@@ -128,6 +132,19 @@ const WalletCloseIcon = (props: IconProps) => (
   </svg>
 )
 
+const WalletCloseIconMobile = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
+    <path
+      d="M6 6l12 12M18 6L6 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 const WalletIcon = (props: IconProps) => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" {...props}>
     <path
@@ -137,15 +154,9 @@ const WalletIcon = (props: IconProps) => (
   </svg>
 )
 
-const CloseIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
-    <path
-      d="M6 6l12 12M18 6l-12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
+const BackIcon = (props: IconProps) => (
+  <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true" {...props}>
+    <path d="M11.7 3.6L6.3 9l5.4 5.4L10.5 15.6 3.9 9l6.6-6.6 1.2 1.2Z" />
   </svg>
 )
 
@@ -302,7 +313,14 @@ const WalletPanel = () => {
   })
 
   const { data: cw20Whitelist } = useCw20Whitelist()
-  const { data: ibcWhitelist } = useIbcWhitelist()
+  const ibcDenoms = useMemo(
+    () =>
+      (balances ?? [])
+        .map((coin) => coin.denom)
+        .filter((denom) => denom.startsWith("ibc/")),
+    [balances]
+  )
+  const { data: ibcWhitelist } = useResolvedIbcWhitelist(ibcDenoms)
   const { data: cw20Balances = [] } = useCw20Balances(
     account?.address,
     cw20Whitelist
@@ -815,6 +833,14 @@ const WalletPanel = () => {
     }
   }
 
+  const handleBack = () => {
+    if (view !== "wallet") {
+      setView("wallet")
+      return
+    }
+    setIsOpen(false)
+  }
+
   const renderDetails = () => {
     if (view === "asset") {
       return (
@@ -1175,7 +1201,7 @@ const WalletPanel = () => {
           {isOpen ? (
             <>
               <WalletCloseIcon className={styles.closeIcon} />
-              <CloseIcon className={styles.closeIconMobile} />
+              <WalletCloseIconMobile className={styles.closeIconMobile} />
             </>
           ) : (
             <>
@@ -1184,14 +1210,14 @@ const WalletPanel = () => {
             </>
           )}
         </button>
-        {view !== "wallet" ? (
+        {isOpen && view !== "wallet" ? (
           <button
             className={styles.backButton}
             type="button"
-            onClick={() => setView("wallet")}
+            onClick={handleBack}
             aria-label="Back to wallet"
           >
-            <span />
+            <BackIcon className={styles.backIcon} />
           </button>
         ) : null}
         {renderDetails()}

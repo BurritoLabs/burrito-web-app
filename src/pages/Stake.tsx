@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, type SyntheticEvent } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Stake.module.css"
@@ -22,6 +22,9 @@ import {
 import { CLASSIC_DENOMS } from "../app/chain"
 import { useValidatorWhitelist } from "../app/data/terraAssets"
 import StakeManageModal from "./StakeManageModal"
+
+const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
+const SECONDARY_VALIDATOR_LOGO = "/brand/icon.png"
 
 const Stake = () => {
   const { account } = useWallet()
@@ -86,11 +89,16 @@ const Stake = () => {
           (item) => item.operator_address === validator
         )
         const key = validatorInfo?.description?.identity ?? ""
-        const whitelistEntry = key ? (validatorWhitelist as any)[key] : undefined
+        const whitelistEntry =
+          (key ? (validatorWhitelist as any)[key] : undefined) ??
+          (validatorInfo?.operator_address
+            ? (validatorWhitelist as any)[validatorInfo.operator_address]
+            : undefined)
         const icon =
+          whitelistEntry?.logo ??
+          whitelistEntry?.image ??
           whitelistEntry?.icon ??
           whitelistEntry?.image ??
-          whitelistEntry?.logo ??
           undefined
         const commissionRate = Number(
           validatorInfo?.commission?.commission_rates?.rate ?? 0
@@ -143,7 +151,31 @@ const Stake = () => {
     return () => {
       cancelled = true
     }
-  }, [keybasePictures, validatorDelegations])
+  }, [keybasePictures, validators, validatorDelegations])
+
+  const resolveValidatorLogo = (
+    identity?: string,
+    fallbackIcon?: string
+  ) => {
+    const keybasePicture = identity ? keybasePictures[identity] : ""
+    return (
+      keybasePicture ||
+      fallbackIcon ||
+      DEFAULT_VALIDATOR_LOGO
+    )
+  }
+
+  const handleValidatorLogoError = (
+    event: SyntheticEvent<HTMLImageElement>
+  ) => {
+    const target = event.currentTarget
+    if (target.dataset.fallback === "1") {
+      target.src = SECONDARY_VALIDATOR_LOGO
+      return
+    }
+    target.dataset.fallback = "1"
+    target.src = DEFAULT_VALIDATOR_LOGO
+  }
 
   const totalDelegated = useMemo(() => {
     return validatorDelegations.reduce((sum, item) => sum + item.amount, 0n)
@@ -541,17 +573,9 @@ const Stake = () => {
                           <span className={styles.validatorLogoWrap}>
                             <img
                               className={styles.validatorLogo}
-                              src={
-                                (item.identity
-                                  ? keybasePictures[item.identity]
-                                  : "") ||
-                                item.icon ||
-                                "/system/validator.png"
-                              }
+                              src={resolveValidatorLogo(item.identity, item.icon)}
                               alt={item.moniker}
-                              onError={(event) => {
-                                event.currentTarget.src = "/system/validator.png"
-                              }}
+                              onError={handleValidatorLogoError}
                             />
                           </span>
                           <div className={styles.validatorMeta}>
@@ -786,15 +810,15 @@ const Stake = () => {
                         validator.commission?.commission_rates?.rate ?? 0
                       )
                       const identity = validator.description?.identity ?? ""
-                      const whitelistEntry = identity
-                        ? (validatorWhitelist as any)[identity]
-                        : undefined
-                      const icon =
-                        keybasePictures[identity] ||
-                        whitelistEntry?.icon ||
-                        whitelistEntry?.image ||
-                        whitelistEntry?.logo ||
-                        "/system/validator.png"
+                              const whitelistEntry = identity
+                                ? (validatorWhitelist as any)[identity]
+                                : undefined
+                              const icon = resolveValidatorLogo(
+                                identity,
+                                whitelistEntry?.logo ??
+                                  whitelistEntry?.image ??
+                                  whitelistEntry?.icon
+                              )
                       const delegatedAmount =
                         delegationsByValidator.get(validator.operator_address) ?? 0n
                       const actionLabel =
@@ -811,9 +835,7 @@ const Stake = () => {
                                   className={styles.validatorRowIcon}
                                   src={icon}
                                   alt={validator.description?.moniker ?? "validator"}
-                                  onError={(event) => {
-                                    event.currentTarget.src = "/system/validator.png"
-                                  }}
+                                  onError={handleValidatorLogoError}
                                 />
                               </span>
                               <a
@@ -870,9 +892,7 @@ const Stake = () => {
                                 className={styles.validatorRowIcon}
                                 src={icon}
                                 alt={validator.description?.moniker ?? "validator"}
-                                onError={(event) => {
-                                  event.currentTarget.src = "/system/validator.png"
-                                }}
+                                onError={handleValidatorLogoError}
                               />
                             </span>
                             <a

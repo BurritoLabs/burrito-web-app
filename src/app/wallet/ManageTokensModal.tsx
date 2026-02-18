@@ -34,6 +34,7 @@ const TokenIcon = ({
     <img
       src={first}
       alt={symbol}
+      style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
       onError={(event) => {
         const target = event.currentTarget
         const next = rest.shift()

@@ -255,6 +255,90 @@ select.input:focus {
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
   padding: var(--card-padding-small);
+  display: grid;
+  gap: 10px;
+}
+
+.feeTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feeTopLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feeTopLabel {
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+}
+
+.feeSelectWrapper {
+  position: relative;
+}
+
+.feeSelectButton {
+  height: 28px;
+  min-width: 68px;
+  border-radius: 8px;
+  border: var(--border-width) solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+  padding: 0 10px;
+  font-size: var(--font-size-small);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feeSelectMenu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  min-width: 100%;
+  background: #0f1916;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 4px;
+  display: grid;
+  gap: 4px;
+  z-index: 20;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+.feeSelectOption {
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 8px;
+  color: rgba(234, 245, 235, 0.82);
+  font-size: var(--font-size-small);
+  font-family: var(--font-ui);
+}
+
+.feeSelectOption:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.feeSelectOptionActive {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.feeTopAmount {
+  color: #ffffff;
+  font-size: var(--font-size-small);
+  font-weight: 600;
 }
 
 .feeCard dl {
@@ -273,6 +357,10 @@ select.input:focus {
   margin: 0;
   text-align: right;
   color: #ffffff;
+}
+
+.feeNegative {
+  color: #ffb3b5 !important;
 }
 
 .feeError {

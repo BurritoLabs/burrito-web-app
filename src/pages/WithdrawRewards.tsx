@@ -12,7 +12,7 @@ import {
 } from "../app/data/classic"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
 import { formatTokenAmount } from "../app/utils/format"
-import { useIbcWhitelist } from "../app/data/terraAssets"
+import { useResolvedIbcWhitelist } from "../app/data/terraAssets"
 
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
@@ -148,6 +148,7 @@ const TokenIcon = ({
     <img
       src={first}
       alt={symbol}
+      style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
       onError={(event) => {
         const target = event.currentTarget
         const next = rest.shift()
@@ -177,7 +178,15 @@ const WithdrawRewards = () => {
     queryFn: fetchValidators,
     staleTime: 60_000
   })
-  const { data: ibcWhitelist = {} } = useIbcWhitelist()
+  const ibcDenoms = useMemo(
+    () =>
+      (rewardData?.rewards ?? [])
+        .flatMap((item) => item.reward ?? [])
+        .map((coin) => coin.denom)
+        .filter((denom) => denom.startsWith("ibc/")),
+    [rewardData?.rewards]
+  )
+  const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
 
   const validatorMap = useMemo(() => {
     const map = new Map<string, string>()

@@ -18,6 +18,7 @@ type TxState = {
   hash?: string
   label?: string
   error?: string
+  startedAt?: number
 }
 
 type WalletAccount = {
@@ -146,7 +147,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const startTx = useCallback((label?: string) => {
-    setTxState({ status: "pending", label })
+    setTxState({ status: "pending", label, startedAt: Date.now() })
   }, [])
 
   const finishTx = useCallback((hash?: string) => {
@@ -158,6 +159,14 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   useEffect(() => {
+    if (txState.status === "pending") {
+      const timer = window.setTimeout(() => {
+        setTxState((current) =>
+          current.status === "pending" ? { status: "idle" } : current
+        )
+      }, 90_000)
+      return () => window.clearTimeout(timer)
+    }
     if (txState.status === "success" || txState.status === "error") {
       const timer = window.setTimeout(
         () => setTxState({ status: "idle" }),

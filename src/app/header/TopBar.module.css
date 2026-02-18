@@ -18,6 +18,19 @@
   transition: transform 400ms ease;
 }
 
+.mobileBrand {
+  display: none;
+  align-items: center;
+  min-width: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.mobileBrandLink {
+  color: inherit;
+  text-decoration: none;
+}
+
 .chainBadge {
   display: inline-flex;
   align-items: center;
@@ -45,30 +58,16 @@
   background: transparent;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   padding: 20px;
   color: inherit;
+  line-height: 0;
 }
 
-.menuButton span {
+.menuIcon {
+  width: 24px;
+  height: 24px;
   display: block;
-  width: 18px;
-  height: 2px;
-  background: currentColor;
-  border-radius: 999px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-.menuButton[data-open="true"] span:nth-child(1) {
-  transform: translateY(6px) rotate(45deg);
-}
-
-.menuButton[data-open="true"] span:nth-child(2) {
-  opacity: 0;
-}
-
-.menuButton[data-open="true"] span:nth-child(3) {
-  transform: translateY(-6px) rotate(-45deg);
+  fill: currentColor;
 }
 
 .networkChip {
@@ -173,13 +172,35 @@
 }
 
 .connectButton {
+  border-color: rgba(234, 245, 235, 0.38);
+  background: transparent;
+  box-shadow: none;
+  height: var(--button-height-small);
+  min-width: 100px;
+  padding: 0 20px;
+  line-height: 1;
   font-weight: var(--bold);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+}
+
+.connectButton:hover {
+  border-color: rgba(234, 245, 235, 0.56);
+}
+
+.connectButton:focus-visible {
+  outline: none;
+  border-color: rgba(82, 196, 26, 0.75);
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
 }
 
 .connected {
   color: #52c41a;
   border-color: rgba(82, 196, 26, 0.6);
+  background: transparent;
+}
+
+.connected:hover {
+  border-color: rgba(82, 196, 26, 0.82);
 }
 
 .walletButtonContent {
@@ -320,12 +341,74 @@
 }
 
 @media (max-width: 991.98px) {
+  .bar {
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .mobileBrand {
+    display: inline-flex;
+    min-width: max-content;
+  }
+
+  .chainBadge {
+    display: none;
+  }
+
+  .leftRail {
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    transform: none;
+    margin: 0;
+    flex: 0 0 auto;
+  }
+
   .menuButton {
     display: inline-flex;
+    padding: 12px;
   }
 
   .actions {
-    right: var(--main-padding);
+    position: static;
+    transform: none;
+    margin-left: auto;
+    gap: 8px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .connectButton {
+    min-width: 0;
+    max-width: none;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .walletButtonContent {
+    min-width: 0;
+  }
+
+  .walletButtonContent > span:last-child {
+    display: inline-block;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 390px) {
+  .connectButton {
+    max-width: 158px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .walletButtonContent > span:last-child {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

@@ -84,6 +84,11 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   color: var(--text);
@@ -441,6 +446,18 @@ textarea::placeholder {
   .cardGrid.two,
   .cardGrid.three {
     grid-template-columns: 1fr;
+  }
+
+  html,
+  body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 }
 

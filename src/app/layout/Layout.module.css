@@ -1,14 +1,19 @@
 .layout {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: auto var(--header-height) 1fr;
-  grid-template-areas:
-    "banner banner"
-    "sidebar header"
-    "sidebar main";
   height: 100vh;
   background: transparent;
   position: relative;
+}
+
+@media (min-width: 992px) {
+  .layout {
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: auto var(--header-height) 1fr;
+    grid-template-areas:
+      "banner banner"
+      "sidebar header"
+      "sidebar main";
+  }
 }
 
 .layout > :not(.globalGlow) {
@@ -141,7 +146,11 @@
 
 @media (max-width: 991.98px) {
   .layout {
+    height: auto;
+    min-height: 100dvh;
     grid-template-columns: 1fr;
+    overflow-x: hidden;
+    overflow-y: auto;
     grid-template-rows: auto var(--header-height) 1fr;
     grid-template-areas:
       "banner"
@@ -150,22 +159,17 @@
   }
 
   .sidebar {
-    display: block;
+    display: none;
     position: fixed;
-    inset: 0 auto 0 0;
-    width: 82%;
-    max-width: 320px;
-    transform: translateX(-102%);
-    transition: transform 0.25s ease;
-    z-index: 30;
+    inset: 0;
+    z-index: 260;
   }
 
   .mainContainer {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "main"
-      "walletbar";
+    grid-template-areas: "main";
     height: auto;
+    min-height: calc(100dvh - var(--header-height));
   }
 
   .header,
@@ -173,17 +177,27 @@
     border-left: none;
   }
 
-  .headerInner {
-    padding: 0;
+  .main {
+    overflow: visible;
   }
-}
 
-.menuOpen .sidebar {
-  transform: translateX(0);
-  box-shadow: 12px 0 28px rgba(0, 0, 0, 0.5);
-}
+  .headerInner {
+    padding: 0 var(--main-padding);
+  }
 
-@media (max-width: 991.98px) {
+  .menuOpen {
+    height: 100dvh;
+    overflow: hidden;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "banner"
+      "sidebar";
+  }
+
+  .menuOpen .sidebar {
+    display: grid;
+  }
+
   .menuOpen .header,
   .menuOpen .main {
     display: none;
