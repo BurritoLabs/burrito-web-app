@@ -15,6 +15,7 @@ import {
   useCw20Whitelist,
   useResolvedIbcWhitelist
 } from "../app/data/terraAssets"
+import { useDexEstimatedPrices } from "../app/data/dexPrices"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../app/utils/format"
 
 type WalletAsset = {
@@ -269,7 +270,9 @@ const TokensSection = memo(
                     <div className={styles.assetAmount}>
                       {formatTokenAmount(asset.amount, asset.decimals, 2)}
                     </div>
-                    <div className={styles.assetValue}>≈ --</div>
+                    <div className={styles.assetValue}>
+                      ≈ {asset.value !== undefined ? formatUsd(asset.value) : "--"}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -360,8 +363,53 @@ const Wallet = () => {
     cw20Whitelist
   )
 
+  const dexAssetMetas = useMemo(() => {
+    const map = new Map<string, number>()
+
+    ;(balances ?? []).forEach((coin) => {
+      if (Number(coin.amount) <= 0) return
+      if (coin.denom.startsWith("ibc/")) {
+        const hash = coin.denom.replace("ibc/", "")
+        map.set(coin.denom, ibcWhitelist?.[hash]?.decimals ?? 6)
+        return
+      }
+      map.set(coin.denom, 6)
+    })
+
+    ;(cw20Balances ?? []).forEach((token) => {
+      if (Number(token.balance) <= 0) return
+      map.set(token.address, token.decimals ?? 6)
+    })
+
+    return Array.from(map.entries()).map(([key, decimals]) => ({
+      key,
+      decimals
+    }))
+  }, [balances, cw20Balances, ibcWhitelist])
+
+  const { data: dexEstimatedPrices } = useDexEstimatedPrices(dexAssetMetas)
+
   const luncPrice = prices?.lunc?.usd
   const ustcPrice = prices?.ustc?.usd
+
+  const resolveDexUsdValue = useCallback(
+    (assetKey: string, amount: string, decimals: number) => {
+      const normalizedKey = assetKey.startsWith("ibc/")
+        ? `ibc/${assetKey.slice(4).toUpperCase()}`
+        : assetKey.startsWith("terra1")
+        ? assetKey.toLowerCase()
+        : assetKey.toLowerCase()
+      const estimate = dexEstimatedPrices?.[normalizedKey]
+      if (!estimate) return undefined
+      const quoteUsd =
+        estimate.quoteDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+          ? ustcPrice
+          : luncPrice
+      if (quoteUsd === undefined) return undefined
+      return toUnitAmount(amount, decimals) * estimate.priceInQuote * quoteUsd
+    },
+    [dexEstimatedPrices, luncPrice, ustcPrice]
+  )
 
   const formatDenom = (denom: string, isClassic?: boolean) => {
     if (!denom) return ""
@@ -644,8 +692,16 @@ const Wallet = () => {
   }, [balances, fxRates?.MNT, fxRates?.TWD, ibcWhitelist, luncPrice, swapRates, ustcPrice])
 
   const ibcTokenRows = useMemo(
-    () => coinRows.filter((asset) => asset.kind === "ibc"),
-    [coinRows]
+    () =>
+      coinRows
+        .filter((asset) => asset.kind === "ibc")
+        .map((asset) => ({
+          ...asset,
+          value:
+            asset.value ??
+            resolveDexUsdValue(asset.denom, asset.amount, asset.decimals)
+        })),
+    [coinRows, resolveDexUsdValue]
   )
 
   const nativeCoinRows = useMemo(
@@ -657,17 +713,21 @@ const Wallet = () => {
     const cw20Rows =
       cw20Balances
         ?.filter((token) => Number(token.balance) > 0)
-        .map((token) => ({
-          kind: "cw20" as const,
-          denom: token.address,
-          symbol: token.symbol,
-          name: token.name ?? token.symbol,
-          decimals: token.decimals ?? 6,
-          amount: token.balance,
-          iconCandidates: [token.icon, "/system/cw20.svg"].filter(
-            Boolean
-          ) as string[]
-        })) ?? []
+        .map((token) => {
+          const decimals = token.decimals ?? 6
+          return {
+            kind: "cw20" as const,
+            denom: token.address,
+            symbol: token.symbol,
+            name: token.name ?? token.symbol,
+            decimals,
+            amount: token.balance,
+            value: resolveDexUsdValue(token.address, token.balance, decimals),
+            iconCandidates: [token.icon, "/system/cw20.svg"].filter(
+              Boolean
+            ) as string[]
+          }
+        }) ?? []
     const list = [...ibcTokenRows, ...cw20Rows]
     return list.sort((a, b) => {
       const aAmount = toUnitAmount(a.amount, a.decimals)
@@ -677,11 +737,17 @@ const Wallet = () => {
       }
       return bAmount - aAmount
     })
-  }, [cw20Balances, ibcTokenRows])
+  }, [cw20Balances, ibcTokenRows, resolveDexUsdValue])
 
   const filteredCoinRows = useMemo(() => {
+    const withDexFallback = nativeCoinRows.map((asset) => ({
+      ...asset,
+      value:
+        asset.value ?? resolveDexUsdValue(asset.denom, asset.amount, asset.decimals)
+    }))
+
     const list = hideLowBalanceCoins
-      ? nativeCoinRows.filter((asset) => {
+      ? withDexFallback.filter((asset) => {
           if (
             asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ||
             asset.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
@@ -690,7 +756,7 @@ const Wallet = () => {
           }
           return asset.value !== undefined && asset.value >= 1
         })
-      : nativeCoinRows
+      : withDexFallback
 
     return list.slice().sort((a, b) => {
       const aValue = a.value ?? 0
@@ -700,7 +766,7 @@ const Wallet = () => {
       }
       return bValue - aValue
     })
-  }, [nativeCoinRows, hideLowBalanceCoins])
+  }, [nativeCoinRows, hideLowBalanceCoins, resolveDexUsdValue])
 
   const luncBalance = balances.find(
     (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom

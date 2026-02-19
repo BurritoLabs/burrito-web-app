@@ -20,11 +20,13 @@ import {
   toUnitAmount
 } from "../app/utils/format"
 import { CLASSIC_DENOMS } from "../app/chain"
-import { useValidatorWhitelist } from "../app/data/terraAssets"
 import StakeManageModal from "./StakeManageModal"
 
+const KEYBASE_PROXY_URL = "https://keybase.burrito.money"
+const KEYBASE_FETCH_CONCURRENCY = 6
 const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
-const SECONDARY_VALIDATOR_LOGO = "/brand/icon.png"
+
+const normalizeIdentity = (value?: string) => value?.trim() || ""
 
 const Stake = () => {
   const { account } = useWallet()
@@ -70,8 +72,6 @@ const Stake = () => {
     return map
   }, [validators])
 
-  const { data: validatorWhitelist = {} } = useValidatorWhitelist()
-
   const validatorDelegations = useMemo(() => {
     if (!account) return []
     const map = new Map<string, bigint>()
@@ -88,18 +88,7 @@ const Stake = () => {
         const validatorInfo = validators.find(
           (item) => item.operator_address === validator
         )
-        const key = validatorInfo?.description?.identity ?? ""
-        const whitelistEntry =
-          (key ? (validatorWhitelist as any)[key] : undefined) ??
-          (validatorInfo?.operator_address
-            ? (validatorWhitelist as any)[validatorInfo.operator_address]
-            : undefined)
-        const icon =
-          whitelistEntry?.logo ??
-          whitelistEntry?.image ??
-          whitelistEntry?.icon ??
-          whitelistEntry?.image ??
-          undefined
+        const key = normalizeIdentity(validatorInfo?.description?.identity)
         const commissionRate = Number(
           validatorInfo?.commission?.commission_rates?.rate ?? 0
         )
@@ -107,60 +96,95 @@ const Stake = () => {
           validator,
           moniker: validatorMap.get(validator) ?? validator,
           amount,
-          icon,
           commissionRate,
-          identity: validatorInfo?.description?.identity
+          identity: key || undefined
         }
       })
       .sort((a, b) => (a.amount === b.amount ? 0 : a.amount > b.amount ? -1 : 1))
-  }, [account, delegations, validatorMap, validatorWhitelist, validators])
+  }, [account, delegations, validatorMap, validators])
 
-  const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>({})
+  const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>(
+    {}
+  )
 
   useEffect(() => {
-    const identities = validators
-      .map((item) => item.description?.identity)
-      .filter((id): id is string => Boolean(id))
+    const identities = Array.from(
+      new Set(
+        validators
+          .map((item) => normalizeIdentity(item.description?.identity))
+          .filter((id): id is string => Boolean(id))
+      )
+    )
     const pending = identities.filter((id) => !(id in keybasePictures))
     if (!pending.length) return
+
     let cancelled = false
+
+    const fetchPicture = async (identity: string) => {
+      try {
+        const response = await fetch(
+          `${KEYBASE_PROXY_URL}/?identity=${encodeURIComponent(identity)}`
+        )
+        const data = await response.json()
+        if (typeof data === "string") return data.trim()
+        if (typeof data?.picture === "string") return data.picture.trim()
+        if (typeof data?.url === "string") return data.url.trim()
+      } catch {
+        // Ignore; no fallback by request.
+      }
+      return ""
+    }
+
     const load = async () => {
-      const results = await Promise.all(
-        pending.map(async (identity) => {
-          try {
-            const response = await fetch(
-              `https://keybase.burrito.money/?identity=${identity}`
-            )
-            const data = await response.json()
-            return [identity, data?.picture ?? ""] as const
-          } catch {
-            return [identity, ""] as const
+      const queue = [...pending]
+      const results: Array<readonly [string, string]> = []
+      let cursor = 0
+
+      const worker = async () => {
+        while (true) {
+          const index = cursor
+          cursor += 1
+          if (index >= queue.length) return
+          const identity = queue[index]
+          const picture = await fetchPicture(identity)
+          if (picture) {
+            results.push([identity, picture] as const)
           }
-        })
+        }
+      }
+
+      await Promise.all(
+        Array.from({
+          length: Math.min(KEYBASE_FETCH_CONCURRENCY, queue.length)
+        }).map(() => worker())
       )
-      if (cancelled) return
+
+      if (cancelled || !results.length) return
+
       setKeybasePictures((prev) => {
         const next = { ...prev }
         results.forEach(([identity, picture]) => {
           next[identity] = picture
+          next[identity.toUpperCase()] = picture
+          next[identity.toLowerCase()] = picture
         })
         return next
       })
     }
+
     load()
     return () => {
       cancelled = true
     }
-  }, [keybasePictures, validators, validatorDelegations])
+  }, [keybasePictures, validators])
 
-  const resolveValidatorLogo = (
-    identity?: string,
-    fallbackIcon?: string
-  ) => {
-    const keybasePicture = identity ? keybasePictures[identity] : ""
+  const resolveValidatorLogo = (identity?: string) => {
+    const normalizedIdentity = normalizeIdentity(identity)
+    if (!normalizedIdentity) return DEFAULT_VALIDATOR_LOGO
     return (
-      keybasePicture ||
-      fallbackIcon ||
+      keybasePictures[normalizedIdentity] ||
+      keybasePictures[normalizedIdentity.toUpperCase()] ||
+      keybasePictures[normalizedIdentity.toLowerCase()] ||
       DEFAULT_VALIDATOR_LOGO
     )
   }
@@ -169,11 +193,7 @@ const Stake = () => {
     event: SyntheticEvent<HTMLImageElement>
   ) => {
     const target = event.currentTarget
-    if (target.dataset.fallback === "1") {
-      target.src = SECONDARY_VALIDATOR_LOGO
-      return
-    }
-    target.dataset.fallback = "1"
+    if (target.src.includes(DEFAULT_VALIDATOR_LOGO)) return
     target.src = DEFAULT_VALIDATOR_LOGO
   }
 
@@ -566,14 +586,16 @@ const Stake = () => {
                 <div className={styles.emptyState}>No delegations yet.</div>
               ) : (
                 <div className={styles.myStakeList}>
-                  {validatorDelegations.map((item) => (
+                  {validatorDelegations.map((item) => {
+                    const logo = resolveValidatorLogo(item.identity)
+                    return (
                     <div key={item.validator} className={styles.myStakeRow}>
                       <div className={styles.myStakeInfo}>
                         <div className={styles.myStakeHeaderRow}>
                           <span className={styles.validatorLogoWrap}>
                             <img
                               className={styles.validatorLogo}
-                              src={resolveValidatorLogo(item.identity, item.icon)}
+                              src={logo}
                               alt={item.moniker}
                               onError={handleValidatorLogoError}
                             />
@@ -624,7 +646,8 @@ const Stake = () => {
                         Manage Stake
                       </button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -809,16 +832,10 @@ const Stake = () => {
                       const rate = Number(
                         validator.commission?.commission_rates?.rate ?? 0
                       )
-                      const identity = validator.description?.identity ?? ""
-                              const whitelistEntry = identity
-                                ? (validatorWhitelist as any)[identity]
-                                : undefined
-                              const icon = resolveValidatorLogo(
-                                identity,
-                                whitelistEntry?.logo ??
-                                  whitelistEntry?.image ??
-                                  whitelistEntry?.icon
-                              )
+                      const identity = normalizeIdentity(
+                        validator.description?.identity
+                      )
+                      const icon = resolveValidatorLogo(identity)
                       const delegatedAmount =
                         delegationsByValidator.get(validator.operator_address) ?? 0n
                       const actionLabel =

@@ -12,6 +12,9 @@ type NavProps = {
 const Nav = ({ isOpen, onClose }: NavProps) => {
   const { menu } = useNav()
   const { pathname } = useLocation()
+  const handleNavigate = () => {
+    if (onClose) onClose()
+  }
 
   useEffect(() => {
     if (onClose) onClose()
@@ -20,7 +23,12 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>
-        <Link to="/" className={styles.brandLink} aria-label="Go to dashboard">
+        <Link
+          to="/"
+          className={styles.brandLink}
+          aria-label="Go to dashboard"
+          onClick={handleNavigate}
+        >
           <BrandLogo textSize={20} iconSize={24} gap={6} />
         </Link>
         {isOpen ? (
@@ -41,6 +49,7 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
           <NavLink
             key={path}
             to={path}
+            onClick={handleNavigate}
             className={({ isActive }) =>
               `${styles.link} ${isActive ? styles.active : ""}`
             }

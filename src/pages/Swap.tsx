@@ -155,6 +155,10 @@ const DEXES: readonly DexConfig[] = CLASSIC_SWAP_DEXES.map((dex) => ({
 }))
 
 const GAS_PRICE_MICRO_LUNC = 28.325
+const FALLBACK_GAS_NATIVE_SWAP = 220_000
+const FALLBACK_GAS_CW20_SWAP = 300_000
+const FALLBACK_GAS_NATIVE_FEE = 80_000
+const FALLBACK_GAS_CW20_FEE = 120_000
 const SWAP_MEMO = "Swapped via Burrito Swap"
 const PLATFORM_FEE_BPS = 20n // 0.20%
 const PLATFORM_FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
@@ -450,6 +454,17 @@ const buildPlatformFeeMessage = (
   throw new Error("unsupported fee asset")
 }
 
+const estimateFallbackFeeMicro = (offerAsset: SwapAsset, includePlatformFee: boolean) => {
+  const swapGas =
+    offerAsset.type === "cw20" ? FALLBACK_GAS_CW20_SWAP : FALLBACK_GAS_NATIVE_SWAP
+  const feeGas = includePlatformFee
+    ? offerAsset.type === "cw20"
+      ? FALLBACK_GAS_CW20_FEE
+      : FALLBACK_GAS_NATIVE_FEE
+    : 0
+  return BigInt(Math.ceil((swapGas + feeGas) * GAS_PRICE_MICRO_LUNC))
+}
+
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
   const walletWindow = window as WalletWindow
@@ -535,6 +550,7 @@ const Swap = () => {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string>()
   const [lastTxHash, setLastTxHash] = useState<string>()
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [pickerTarget, setPickerTarget] = useState<"from" | "to" | null>(null)
   const [pickerQuery, setPickerQuery] = useState("")
 
@@ -880,8 +896,20 @@ const Swap = () => {
     let cancelled = false
     let timer: number | undefined
 
-    if (!accountAddress || !selectedQuote || swapAmountMicro <= 0n) {
+    if (!selectedQuote || swapAmountMicro <= 0n) {
       setFeeDisplay("--")
+      setFeeLoading(false)
+      return undefined
+    }
+
+    const fallbackFee = `${formatTokenAmount(
+      estimateFallbackFeeMicro(fromAsset, platformFeeMicro > 0n).toString(),
+      6,
+      6
+    )} LUNC`
+
+    if (!accountAddress) {
+      setFeeDisplay(fallbackFee)
       setFeeLoading(false)
       return undefined
     }
@@ -919,7 +947,7 @@ const Swap = () => {
           setFeeDisplay(`${formatTokenAmount(feeMicro.toString(), 6, 6)} LUNC`)
         }
       } catch {
-        if (!cancelled) setFeeDisplay("--")
+        if (!cancelled) setFeeDisplay(fallbackFee)
       } finally {
         if (!cancelled) setFeeLoading(false)
       }
@@ -929,7 +957,14 @@ const Swap = () => {
       cancelled = true
       if (timer) window.clearTimeout(timer)
     }
-  }, [accountAddress, fromAsset, maxSpread, platformFeeMicro, selectedQuote, swapAmountMicro])
+  }, [
+    accountAddress,
+    fromAsset,
+    maxSpread,
+    platformFeeMicro,
+    selectedQuote,
+    swapAmountMicro
+  ])
 
   const handleSwapDirection = () => {
     setFromAssetId(toAsset.id)
@@ -1160,85 +1195,117 @@ const Swap = () => {
               </div>
             </div>
 
-            <div className={styles.detailsGrid}>
-              <div>
-                <label>Rate</label>
-                <strong>{rateDisplay}</strong>
-              </div>
-              <div>
-                <label>Best route</label>
-                <strong>{bestQuote?.label ?? "--"}</strong>
-              </div>
-              <div>
-                <label>Price impact</label>
-                <strong>{priceImpactDisplay}</strong>
-              </div>
-              <div>
-                <label>Slippage</label>
-                <strong>{(Number(slippageBps) / 100).toFixed(2)}%</strong>
-              </div>
-              <div>
-                <label>Estimated fee</label>
-                <strong>{feeLoading ? "Estimating..." : feeDisplay}</strong>
-              </div>
-              <div>
-                <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
-                <strong>
-                  {amountInMicro > 0n
-                    ? `${formatTokenAmount(
-                        platformFeeMicro.toString(),
-                        fromAsset.decimals,
-                        6
-                      )} ${fromAsset.symbol}`
-                    : "--"}
-                </strong>
-              </div>
-              <div>
-                <label>Route path</label>
-                <strong>
-                  {fromAsset.symbol} → {toAsset.symbol}
-                </strong>
-              </div>
-            </div>
+            <section className={styles.quoteAccordion}>
+              <button
+                type="button"
+                className={styles.quoteAccordionHeader}
+                onClick={() => setAdvancedOpen((current) => !current)}
+                aria-expanded={advancedOpen}
+              >
+                <span className={styles.quoteAccordionMain}>{rateDisplay}</span>
+                <span className={styles.quoteAccordionMeta}>
+                  {bestQuote?.label ?? "--"} · Impact {priceImpactDisplay}
+                </span>
+                <span className={styles.quoteAccordionMeta}>
+                  Fee {feeLoading ? "Estimating..." : feeDisplay}
+                </span>
+                <span className={styles.quoteAccordionToggle}>
+                  {advancedOpen ? "Hide details ▴" : "Show details ▾"}
+                </span>
+              </button>
 
-            <div className={styles.routesCard}>
-              <div className={styles.routesHeader}>
-                <h3>Liquidity routes</h3>
-                <span>{quoteLoading ? "Updating..." : "Best price auto-detected"}</span>
-              </div>
-              <div className={styles.routeList}>
-                {routeRows.map((quote, index) => {
-                  const selected = selectedQuote?.id === quote.id
-                  return (
-                    <button
-                      key={quote.id}
-                      type="button"
-                      className={`${styles.routeItem} ${selected ? styles.routeItemActive : ""}`}
-                      onClick={() => setSelectedDexId(quote.id)}
-                    >
-                      <div className={styles.routeName}>
-                        {quote.label}
-                        {index === 0 ? <span className={styles.bestTag}>Best price</span> : null}
-                      </div>
-                      <div className={styles.routeValue}>
-                        {formatTokenAmount(quote.returnAmount.toString(), toAsset.decimals, 6)}{" "}
-                        {toAsset.symbol}
-                      </div>
-                      <div className={styles.routeMeta}>
-                        {quote.lossBps > 0 ? `-${(quote.lossBps / 100).toFixed(2)}% vs best` : "Best"}
-                        {" · "}
-                        Fee:{" "}
-                        {formatTokenAmount(quote.commissionAmount.toString(), toAsset.decimals, 6)}{" "}
-                        {toAsset.symbol}
-                      </div>
-                    </button>
-                  )
-                })}
-                {!routeRows.length && !quoteLoading ? (
-                  <div className={styles.routeEmpty}>Enter amount and choose assets to fetch routes.</div>
-                ) : null}
-              </div>
-            </div>
+              {advancedOpen ? (
+                <div className={styles.quoteAccordionBody}>
+                  <div className={styles.detailsGrid}>
+                    <div>
+                      <label>Rate</label>
+                      <strong>{rateDisplay}</strong>
+                    </div>
+                    <div>
+                      <label>Best route</label>
+                      <strong>{bestQuote?.label ?? "--"}</strong>
+                    </div>
+                    <div>
+                      <label>Price impact</label>
+                      <strong>{priceImpactDisplay}</strong>
+                    </div>
+                    <div>
+                      <label>Slippage</label>
+                      <strong>{(Number(slippageBps) / 100).toFixed(2)}%</strong>
+                    </div>
+                    <div>
+                      <label>Estimated fee</label>
+                      <strong>{feeLoading ? "Estimating..." : feeDisplay}</strong>
+                    </div>
+                    <div>
+                      <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
+                      <strong>
+                        {amountInMicro > 0n
+                          ? `${formatTokenAmount(
+                              platformFeeMicro.toString(),
+                              fromAsset.decimals,
+                              6
+                            )} ${fromAsset.symbol}`
+                          : "--"}
+                      </strong>
+                    </div>
+                    <div>
+                      <label>Route path</label>
+                      <strong>
+                        {fromAsset.symbol} → {toAsset.symbol}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className={styles.routesCard}>
+                    <div className={styles.routesHeader}>
+                      <h3>Liquidity routes</h3>
+                      <span>{quoteLoading ? "Updating..." : "Best price auto-detected"}</span>
+                    </div>
+                    <div className={styles.routeList}>
+                      {routeRows.map((quote, index) => {
+                        const selected = selectedQuote?.id === quote.id
+                        return (
+                          <button
+                            key={quote.id}
+                            type="button"
+                            className={`${styles.routeItem} ${selected ? styles.routeItemActive : ""}`}
+                            onClick={() => setSelectedDexId(quote.id)}
+                          >
+                            <div className={styles.routeName}>
+                              {quote.label}
+                              {index === 0 ? <span className={styles.bestTag}>Best price</span> : null}
+                            </div>
+                            <div className={styles.routeValue}>
+                              {formatTokenAmount(quote.returnAmount.toString(), toAsset.decimals, 6)}{" "}
+                              {toAsset.symbol}
+                            </div>
+                            <div className={styles.routeMeta}>
+                              {quote.lossBps > 0
+                                ? `-${(quote.lossBps / 100).toFixed(2)}% vs best`
+                                : "Best"}
+                              {" · "}
+                              Fee:{" "}
+                              {formatTokenAmount(
+                                quote.commissionAmount.toString(),
+                                toAsset.decimals,
+                                6
+                              )}{" "}
+                              {toAsset.symbol}
+                            </div>
+                          </button>
+                        )
+                      })}
+                      {!routeRows.length && !quoteLoading ? (
+                        <div className={styles.routeEmpty}>
+                          Enter amount and choose assets to fetch routes.
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </section>
 
             {insufficientBalance ? (
               <p className={styles.error}>Insufficient {fromAsset.symbol} balance.</p>

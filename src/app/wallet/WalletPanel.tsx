@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { SVGProps } from "react"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletProvider"
@@ -17,6 +17,7 @@ import {
   useCw20Whitelist,
   useResolvedIbcWhitelist
 } from "../data/terraAssets"
+import { useDexEstimatedPrices } from "../data/dexPrices"
 import ManageTokensModal from "./ManageTokensModal"
 import type { ManageTokenItem } from "./ManageTokensModal"
 import {
@@ -326,6 +327,32 @@ const WalletPanel = () => {
     cw20Whitelist
   )
 
+  const dexAssetMetas = useMemo(() => {
+    const map = new Map<string, number>()
+
+    ;(balances ?? []).forEach((coin) => {
+      if (Number(coin.amount) <= 0) return
+      if (coin.denom.startsWith("ibc/")) {
+        const hash = coin.denom.replace("ibc/", "")
+        map.set(coin.denom, ibcWhitelist?.[hash]?.decimals ?? 6)
+        return
+      }
+      map.set(coin.denom, 6)
+    })
+
+    ;(cw20Balances ?? []).forEach((token) => {
+      if (Number(token.balance) <= 0) return
+      map.set(token.address, token.decimals ?? 6)
+    })
+
+    return Array.from(map.entries()).map(([key, decimals]) => ({
+      key,
+      decimals
+    }))
+  }, [balances, cw20Balances, ibcWhitelist])
+
+  const { data: dexEstimatedPrices } = useDexEstimatedPrices(dexAssetMetas)
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(
@@ -397,6 +424,25 @@ const WalletPanel = () => {
   const luncChange = prices?.lunc?.usd_24h_change
   const ustcChange = prices?.ustc?.usd_24h_change
 
+  const resolveDexUsdValue = useCallback(
+    (assetKey: string, amount: string, decimals: number) => {
+      const normalizedKey = assetKey.startsWith("ibc/")
+        ? `ibc/${assetKey.slice(4).toUpperCase()}`
+        : assetKey.startsWith("terra1")
+        ? assetKey.toLowerCase()
+        : assetKey.toLowerCase()
+      const estimate = dexEstimatedPrices?.[normalizedKey]
+      if (!estimate) return undefined
+      const quoteUsd =
+        estimate.quoteDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+          ? ustcPrice
+          : luncPrice
+      if (quoteUsd === undefined) return undefined
+      return toUnitAmount(amount, decimals) * estimate.priceInQuote * quoteUsd
+    },
+    [dexEstimatedPrices, luncPrice, ustcPrice]
+  )
+
   const assetRows = useMemo<AssetRow[]>(() => {
     const swapRateMap = new Map(
       swapRates.map((item) => [item.denom, Number(item.swaprate)])
@@ -446,7 +492,12 @@ const WalletPanel = () => {
             luncPrice !== undefined
               ? toUnitAmount(coin.amount, CLASSIC_DENOMS.lunc.coinDecimals) *
                 luncPrice
-              : valueFromSwaprate
+              : valueFromSwaprate ??
+                resolveDexUsdValue(
+                  coin.denom,
+                  coin.amount,
+                  CLASSIC_DENOMS.lunc.coinDecimals
+                )
           const unitAmount = toUnitAmount(
             coin.amount,
             CLASSIC_DENOMS.lunc.coinDecimals
@@ -479,7 +530,12 @@ const WalletPanel = () => {
             ustcPrice !== undefined
               ? toUnitAmount(coin.amount, CLASSIC_DENOMS.ustc.coinDecimals) *
                 ustcPrice
-              : valueFromSwaprate
+              : valueFromSwaprate ??
+                resolveDexUsdValue(
+                  coin.denom,
+                  coin.amount,
+                  CLASSIC_DENOMS.ustc.coinDecimals
+                )
           const unitAmount = toUnitAmount(
             coin.amount,
             CLASSIC_DENOMS.ustc.coinDecimals
@@ -516,11 +572,10 @@ const WalletPanel = () => {
           const unitAmount = toUnitAmount(coin.amount, decimals)
           const baseDenom = ibcToken?.base_denom ?? coin.denom
           const isClassicStableIbc = formatDenom(baseDenom, true).endsWith("TC")
-          const value = calcValueFromSwaprate(
-            coin.amount,
-            swaprate,
-            isClassicStableIbc
-          ) ?? calcFxFallback(coin.amount, baseDenom)
+          const value =
+            calcValueFromSwaprate(coin.amount, swaprate, isClassicStableIbc) ??
+            calcFxFallback(coin.amount, baseDenom) ??
+            resolveDexUsdValue(coin.denom, coin.amount, decimals)
           const price =
             value !== undefined && unitAmount > 0 ? value / unitAmount : undefined
 
@@ -551,7 +606,10 @@ const WalletPanel = () => {
 
         const displaySymbol = formatDenom(coin.denom, true)
         const unitAmount = toUnitAmount(coin.amount, 6)
-        const value = valueFromSwaprate ?? calcFxFallback(coin.amount, coin.denom)
+        const value =
+          valueFromSwaprate ??
+          calcFxFallback(coin.amount, coin.denom) ??
+          resolveDexUsdValue(coin.denom, coin.amount, 6)
         const price =
           value !== undefined && unitAmount > 0 ? value / unitAmount : undefined
 
@@ -638,7 +696,8 @@ const WalletPanel = () => {
       cw20Balances
         ?.filter((token) => Number(token.balance) > 0)
         .map((token): AssetRow => {
-          const unitAmount = toUnitAmount(token.balance, token.decimals ?? 6)
+          const decimals = token.decimals ?? 6
+          const unitAmount = toUnitAmount(token.balance, decimals)
           const price =
             token.symbol === "LUNC"
               ? luncPrice
@@ -646,16 +705,21 @@ const WalletPanel = () => {
               ? ustcPrice
               : undefined
           const value =
-            price !== undefined && unitAmount > 0 ? unitAmount * price : undefined
+            (price !== undefined && unitAmount > 0
+              ? unitAmount * price
+              : undefined) ??
+            resolveDexUsdValue(token.address, token.balance, decimals)
+          const resolvedPrice =
+            value !== undefined && unitAmount > 0 ? value / unitAmount : price
 
           return {
             kind: "cw20",
             denom: token.address,
             symbol: token.symbol,
             name: token.name ?? token.symbol,
-            decimals: token.decimals ?? 6,
+            decimals,
             amount: token.balance,
-            price,
+            price: resolvedPrice,
             change: undefined,
             value,
             chainCount: 1,
@@ -709,6 +773,7 @@ const WalletPanel = () => {
     ibcWhitelist,
     luncChange,
     luncPrice,
+    resolveDexUsdValue,
     swapRates,
     ustcChange,
     ustcPrice
@@ -817,7 +882,9 @@ const WalletPanel = () => {
   const selectedSymbol = selectedAssetRow?.symbol ?? selectedAsset.symbol
   const selectedIconCandidates = selectedAssetRow?.iconCandidates ?? []
   const selectedValue =
-    selectedPrice !== undefined
+    selectedAssetRow?.value !== undefined
+      ? selectedAssetRow.value
+      : selectedPrice !== undefined
       ? toUnitAmount(selectedBalance, selectedDecimals) * selectedPrice
       : undefined
   const selectedAmountDisplay = formatTokenAmount(

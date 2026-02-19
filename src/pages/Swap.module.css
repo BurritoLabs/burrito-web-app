@@ -63,9 +63,9 @@
 }
 
 .fieldCard {
-  border: var(--border-width) solid rgba(119, 153, 232, 0.28);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(9, 20, 44, 0.96), rgba(8, 18, 40, 0.93));
+  background: linear-gradient(180deg, rgba(9, 22, 16, 0.95), rgba(8, 18, 13, 0.92));
   padding: 14px;
   display: grid;
   gap: 8px;
@@ -77,11 +77,11 @@
   justify-content: space-between;
   gap: 10px;
   font-size: 11px;
-  color: rgba(190, 209, 255, 0.64);
+  color: rgba(234, 245, 235, 0.64);
 }
 
 .fieldHeader span:first-child {
-  color: rgba(228, 238, 255, 0.88);
+  color: rgba(234, 245, 235, 0.88);
   font-weight: var(--bold);
 }
 
@@ -153,8 +153,8 @@
   min-width: 144px;
   height: 44px;
   border-radius: 8px;
-  border: var(--border-width) solid rgba(119, 153, 232, 0.34);
-  background: rgba(9, 24, 56, 0.82);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
   color: #f4f8ff;
   cursor: pointer;
   display: inline-flex;
@@ -167,7 +167,7 @@
 }
 
 .assetPickerButton:hover {
-  border-color: rgba(170, 195, 255, 0.55);
+  border-color: rgba(82, 196, 26, 0.55);
 }
 
 .assetPickerValue {
@@ -196,7 +196,7 @@
 }
 
 .assetPickerCaret {
-  color: rgba(190, 209, 255, 0.84);
+  color: rgba(234, 245, 235, 0.78);
   font-size: 13px;
   line-height: 1;
 }
@@ -208,13 +208,13 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
-  color: rgba(188, 207, 255, 0.84);
-  border-top: var(--border-width) solid rgba(119, 153, 232, 0.24);
+  color: rgba(234, 245, 235, 0.74);
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.12);
   padding-top: 8px;
 }
 
 .usdHint {
-  color: rgba(188, 207, 255, 0.95);
+  color: rgba(234, 245, 235, 0.92);
   font-weight: 600;
 }
 
@@ -254,6 +254,50 @@
   border-color: rgba(82, 196, 26, 0.58);
   color: var(--green);
   background: rgba(82, 196, 26, 0.08);
+}
+
+.quoteAccordion {
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.quoteAccordionHeader {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.quoteAccordionMain {
+  font-size: 14px;
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.quoteAccordionMeta {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.74);
+}
+
+.quoteAccordionToggle {
+  font-size: 12px;
+  color: rgba(82, 196, 26, 0.95);
+  font-weight: var(--bold);
+  white-space: nowrap;
+}
+
+.quoteAccordionBody {
+  padding: 0 12px 12px;
+  display: grid;
+  gap: 10px;
 }
 
 .detailsGrid {
@@ -603,6 +647,16 @@
 
   .detailsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quoteAccordionHeader {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 10px 12px;
+  }
+
+  .quoteAccordionToggle {
+    margin-top: 2px;
   }
 
   .amountInput,

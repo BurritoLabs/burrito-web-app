@@ -683,13 +683,129 @@
     grid-template-columns: 1fr;
   }
 
-  .stakeTabs {
+  .chartContent {
     grid-template-columns: 1fr;
+    align-items: start;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .donut {
+    height: auto;
+    padding-top: 8px;
+  }
+
+  .donutSvg {
+    width: min(72vw, 220px);
+    height: min(72vw, 220px);
+  }
+
+  .legend {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .stakeTabBody {
+    padding: 16px;
   }
 
   .stakeTab + .stakeTab {
-    border-left: 0;
-    border-top: var(--border-width) solid var(--card-border);
+    border-top: 0;
+    border-left: var(--border-width) solid var(--card-border);
+  }
+
+  .myStakeRow {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .myStakeAmounts {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .amountBlock {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .manageButton {
+    width: 100%;
+    height: 34px;
+  }
+
+  .searchRow {
+    flex-wrap: wrap;
+    align-items: stretch;
+    row-gap: 10px;
+  }
+
+  .searchField {
+    width: 100%;
+  }
+
+  .activeToggle {
+    margin-left: auto;
+  }
+
+  .validatorListBody {
+    overflow-x: auto;
+  }
+
+  .validatorTable {
+    min-width: 680px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .chainHeader {
+    min-height: 56px;
+    padding: 0 14px;
+  }
+
+  .stakeTabBody {
+    padding: 14px;
+  }
+
+  .validatorHeaderRow {
+    padding: 0 12px;
+  }
+
+  .validatorRow {
+    min-height: 52px;
+    padding: 10px 12px;
+  }
+
+  .validatorRowIconWrap {
+    width: 28px;
+    height: 28px;
+  }
+
+  .validatorRowIcon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+@media (max-width: 479.98px) {
+  .stakeTab {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .myStakeAmounts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .amountValue {
+    font-size: 13px;
+  }
+
+  .validatorTable {
+    min-width: 620px;
   }
 }
 
