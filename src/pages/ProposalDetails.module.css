@@ -704,6 +704,127 @@
   background-color: #f6c343;
 }
 
+.voteModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.voteModal {
+  width: min(460px, 100%);
+  border-radius: var(--radius-lg);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 18, 15, 0.92);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  overflow: hidden;
+}
+
+.voteModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+}
+
+.voteModalTitle {
+  font-size: 18px;
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.voteModalClose {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  position: relative;
+  opacity: 0.7;
+}
+
+.voteModalClose:hover {
+  opacity: 1;
+}
+
+.voteModalClose span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.voteModalClose span:first-child {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.voteModalClose span:last-child {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.voteModalBody {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.voteOptionList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.voteOptionButton {
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(234, 245, 235, 0.82);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.voteOptionButton:hover {
+  border-color: rgba(82, 196, 26, 0.5);
+  background: rgba(82, 196, 26, 0.12);
+}
+
+.voteOptionButtonActive {
+  border-color: rgba(82, 196, 26, 0.7);
+  background: rgba(82, 196, 26, 0.22);
+  color: #ffffff;
+}
+
+.voteOptionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.voteModalError {
+  font-size: var(--font-size-small);
+  color: #ff6b6b;
+}
+
+.voteModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 18px 18px;
+}
+
 @media (max-width: 991.98px) {
   .detailGrid {
     grid-template-columns: 1fr;
@@ -721,5 +842,9 @@
   .tallyBody {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .voteOptionList {
+    grid-template-columns: 1fr;
   }
 }

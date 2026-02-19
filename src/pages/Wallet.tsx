@@ -856,9 +856,14 @@ const Wallet = () => {
             <div className={styles.sideText}>
               Try out various dApps built on Terra
             </div>
-            <button className={styles.sideLink} type="button">
+            <a
+              className={styles.sideLink}
+              href="https://terra-classic.io/"
+              target="_blank"
+              rel="noreferrer"
+            >
               Learn more →
-            </button>
+            </a>
           </div>
         </div>
       </div>

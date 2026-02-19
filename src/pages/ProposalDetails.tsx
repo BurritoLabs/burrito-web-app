@@ -6,8 +6,11 @@ import {
   useState,
   type ReactNode
 } from "react"
+import { createPortal } from "react-dom"
 import { useLocation, useParams } from "react-router-dom"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
+import { MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./ProposalDetails.module.css"
 import {
@@ -28,7 +31,12 @@ import {
   truncateHash
 } from "../app/utils/format"
 import { convertBech32Prefix } from "../app/utils/bech32"
-import { CLASSIC_DENOMS } from "../app/chain"
+import {
+  CLASSIC_CHAIN,
+  CLASSIC_DENOMS,
+  KEPLR_CHAIN_CONFIG
+} from "../app/chain"
+import { useWallet } from "../app/wallet/WalletProvider"
 import type {
   GovTally,
   GovTallyParams,
@@ -39,10 +47,54 @@ import type {
   ValidatorItem
 } from "../app/data/classic"
 
+const GAS_PRICE_MICRO = 28.325
+
+const getWalletInstance = () => {
+  if (typeof window === "undefined") return undefined
+  const anyWindow = window as Window & {
+    keplr?: any
+    station?: any
+    galaxyStation?: any
+    getOfflineSigner?: any
+    getOfflineSignerAuto?: any
+  }
+  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+}
+
+const getOfflineSigner = async () => {
+  if (typeof window === "undefined") return undefined
+  const anyWindow = window as Window & {
+    getOfflineSigner?: any
+    getOfflineSignerAuto?: any
+  }
+  if (anyWindow.getOfflineSignerAuto) {
+    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
+  }
+  if (anyWindow.getOfflineSigner) {
+    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  }
+  return undefined
+}
+
+type VoteChoice = "YES" | "NO" | "NO_WITH_VETO" | "ABSTAIN"
+
+const VOTE_OPTION_VALUES: Record<VoteChoice, number> = {
+  YES: 1,
+  ABSTAIN: 2,
+  NO: 3,
+  NO_WITH_VETO: 4
+}
+
 const ProposalDetails = () => {
   const params = useParams()
   const proposalId = params.id ?? ""
   const location = useLocation()
+  const queryClient = useQueryClient()
+  const { account, startTx, finishTx, failTx } = useWallet()
+  const [voteModalOpen, setVoteModalOpen] = useState(false)
+  const [voteChoice, setVoteChoice] = useState<VoteChoice>("YES")
+  const [voteSubmitting, setVoteSubmitting] = useState(false)
+  const [voteError, setVoteError] = useState<string>()
 
   const { data: proposal } = useQuery<ProposalItem>({
     queryKey: ["proposal", proposalId],
@@ -554,11 +606,87 @@ const ProposalDetails = () => {
     }
   ]
 
-  const actionLabel =
-    statusLabel === "Voting" ? "Vote" : statusLabel === "Deposit" ? "Deposit" : null
+  const isVotingPeriod = statusLabel === "Voting"
+  const canVote = isVotingPeriod && Boolean(account?.address)
+  const actionLabel = isVotingPeriod ? (canVote ? "Vote" : "Connect wallet") : null
 
   const backTo =
     (location.state as { from?: string } | undefined)?.from ?? "/gov"
+
+  const submitVote = async () => {
+    if (!proposalId) return
+    if (!account?.address) {
+      setVoteError("Please connect a wallet first.")
+      return
+    }
+
+    try {
+      setVoteSubmitting(true)
+      setVoteError(undefined)
+      startTx("Vote proposal")
+
+      const wallet = getWalletInstance()
+      if (!wallet) throw new Error("Wallet extension not available")
+      if (wallet.experimentalSuggestChain) {
+        await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
+      }
+      if (wallet.enable) {
+        await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
+      }
+      const signer = await getOfflineSigner()
+      if (!signer) throw new Error("Wallet signer not available")
+
+      const client = await SigningStargateClient.connectWithSigner(
+        CLASSIC_CHAIN.rpc,
+        signer,
+        {
+          gasPrice: GasPrice.fromString(
+            `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
+          )
+        }
+      )
+
+      let proposalIdValue: bigint
+      try {
+        proposalIdValue = BigInt(proposalId)
+      } catch {
+        throw new Error("Invalid proposal id")
+      }
+
+      const msg = {
+        typeUrl: "/cosmos.gov.v1beta1.MsgVote",
+        value: MsgVote.fromPartial({
+          proposalId: proposalIdValue,
+          voter: account.address,
+          option: VOTE_OPTION_VALUES[voteChoice]
+        })
+      }
+
+      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Vote transaction failed")
+      }
+
+      finishTx(result.transactionHash)
+      setVoteModalOpen(false)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["proposal", proposalId] }),
+        queryClient.invalidateQueries({ queryKey: ["proposalTally", proposalId] }),
+        queryClient.invalidateQueries({ queryKey: ["proposalVotes", proposalId] })
+      ])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Vote failed"
+      failTx(message)
+      setVoteError(message)
+    } finally {
+      setVoteSubmitting(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!voteModalOpen) return
+    setVoteError(undefined)
+  }, [voteModalOpen])
 
   return (
     <PageShell
@@ -567,7 +695,12 @@ const ProposalDetails = () => {
       backLabel=""
       extra={
         actionLabel ? (
-          <button className="uiButton uiButtonPrimary" type="button">
+          <button
+            className="uiButton uiButtonPrimary"
+            type="button"
+            onClick={() => setVoteModalOpen(true)}
+            disabled={!canVote}
+          >
             {actionLabel}
           </button>
         ) : null
@@ -927,6 +1060,89 @@ const ProposalDetails = () => {
           </div>
         </div>
       </div>
+
+      {voteModalOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className={styles.voteModalBackdrop}
+              role="dialog"
+              aria-modal="true"
+              onClick={() => {
+                if (voteSubmitting) return
+                setVoteModalOpen(false)
+              }}
+            >
+              <div
+                className={styles.voteModal}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={styles.voteModalHeader}>
+                  <div className={styles.voteModalTitle}>Vote proposal</div>
+                  <button
+                    type="button"
+                    className={styles.voteModalClose}
+                    onClick={() => {
+                      if (voteSubmitting) return
+                      setVoteModalOpen(false)
+                    }}
+                    aria-label="Close vote modal"
+                  >
+                    <span />
+                    <span />
+                  </button>
+                </div>
+
+                <div className={styles.voteModalBody}>
+                  <div className={styles.voteOptionList}>
+                    {(
+                      [
+                        { key: "YES", label: "Yes" },
+                        { key: "NO", label: "No" },
+                        { key: "NO_WITH_VETO", label: "No with veto" },
+                        { key: "ABSTAIN", label: "Abstain" }
+                      ] as const
+                    ).map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        className={`${styles.voteOptionButton} ${
+                          voteChoice === item.key ? styles.voteOptionButtonActive : ""
+                        }`}
+                        onClick={() => setVoteChoice(item.key)}
+                        disabled={voteSubmitting}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  {voteError ? (
+                    <div className={styles.voteModalError}>{voteError}</div>
+                  ) : null}
+                </div>
+
+                <div className={styles.voteModalActions}>
+                  <button
+                    type="button"
+                    className="uiButton uiButtonOutline"
+                    onClick={() => setVoteModalOpen(false)}
+                    disabled={voteSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="uiButton uiButtonPrimary"
+                    onClick={submitVote}
+                    disabled={voteSubmitting || !canVote}
+                  >
+                    {voteSubmitting ? "Submitting..." : "Submit vote"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </PageShell>
   )
 }
