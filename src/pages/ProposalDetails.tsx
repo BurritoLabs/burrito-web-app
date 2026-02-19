@@ -11,6 +11,7 @@ import { useLocation, useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./ProposalDetails.module.css"
 import {
@@ -48,6 +49,7 @@ import type {
 } from "../app/data/classic"
 
 const GAS_PRICE_MICRO = 28.325
+const VOTE_GAS_LIMIT = 220000
 
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
@@ -74,6 +76,13 @@ const getOfflineSigner = async () => {
     return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
+}
+
+const parseSequenceMismatchExpected = (message: string) => {
+  const matched = message.match(/expected\s+(\d+)\s*,\s*got\s+\d+/i)
+  if (!matched) return undefined
+  const value = Number(matched[1])
+  return Number.isFinite(value) ? value : undefined
 }
 
 type VoteChoice = "YES" | "NO" | "NO_WITH_VETO" | "ABSTAIN"
@@ -633,19 +642,6 @@ const ProposalDetails = () => {
       if (wallet.enable) {
         await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
       }
-      const signer = await getOfflineSigner()
-      if (!signer) throw new Error("Wallet signer not available")
-
-      const client = await SigningStargateClient.connectWithSigner(
-        CLASSIC_CHAIN.rpc,
-        signer,
-        {
-          gasPrice: GasPrice.fromString(
-            `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
-          )
-        }
-      )
-
       let proposalIdValue: bigint
       try {
         proposalIdValue = BigInt(proposalId)
@@ -661,13 +657,78 @@ const ProposalDetails = () => {
           option: VOTE_OPTION_VALUES[voteChoice]
         })
       }
-
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
-      if (result.code !== 0) {
-        throw new Error(result.rawLog || "Vote transaction failed")
+      const feeAmount = Math.max(
+        1,
+        Math.ceil(VOTE_GAS_LIMIT * GAS_PRICE_MICRO)
+      ).toString()
+      const fee = {
+        amount: [
+          {
+            amount: feeAmount,
+            denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+          }
+        ],
+        gas: String(VOTE_GAS_LIMIT)
       }
 
-      finishTx(result.transactionHash)
+      let sequenceHint: number | undefined
+      let result:
+        | Awaited<ReturnType<SigningStargateClient["broadcastTxSync"]>>
+        | undefined
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const signer = await getOfflineSigner()
+          if (!signer) throw new Error("Wallet signer not available")
+
+          const client = await SigningStargateClient.connectWithSigner(
+            CLASSIC_CHAIN.rpc,
+            signer,
+            {
+              gasPrice: GasPrice.fromString(
+                `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
+              )
+            }
+          )
+          const signerState = await client.getSequence(account.address)
+          const sequenceToUse = sequenceHint ?? signerState.sequence
+
+          const signed = await client.sign(
+            account.address,
+            [msg],
+            fee,
+            "",
+            {
+              accountNumber: signerState.accountNumber,
+              sequence: Number(sequenceToUse),
+              chainId: CLASSIC_CHAIN.chainId
+            }
+          )
+          const txBytes = TxRaw.encode(signed).finish()
+          const txHash = await client.broadcastTxSync(txBytes)
+          if (!txHash) {
+            throw new Error("Vote transaction failed")
+          }
+          result = txHash
+          break
+        } catch (innerErr) {
+          const message =
+            innerErr instanceof Error ? innerErr.message : String(innerErr)
+          const expectedSequence = parseSequenceMismatchExpected(message)
+          if (expectedSequence !== undefined && attempt < 2) {
+            sequenceHint = expectedSequence
+            await new Promise((resolve) => setTimeout(resolve, 220))
+            continue
+          }
+          throw innerErr
+        }
+      }
+
+      if (!result) {
+        throw new Error("Vote transaction failed")
+      }
+
+      finishTx(result)
       setVoteModalOpen(false)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["proposal", proposalId] }),

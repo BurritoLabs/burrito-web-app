@@ -528,6 +528,27 @@
   padding: 8px;
   display: grid;
   gap: 6px;
+  scrollbar-color: rgba(82, 196, 26, 0.55) rgba(255, 255, 255, 0.04);
+  scrollbar-width: thin;
+}
+
+.pickerList::-webkit-scrollbar {
+  width: 10px;
+}
+
+.pickerList::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+}
+
+.pickerList::-webkit-scrollbar-thumb {
+  background: rgba(82, 196, 26, 0.55);
+  border-radius: 10px;
+  border: 2px solid rgba(11, 20, 16, 0.96);
+}
+
+.pickerList::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 196, 26, 0.75);
 }
 
 .pickerItem {

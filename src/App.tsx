@@ -11,6 +11,7 @@ import Nav from "./app/nav/Nav"
 import WalletPanel from "./app/wallet/WalletPanel"
 import Aside from "./app/aside/Aside"
 import LoadingBar from "./app/feedback/LoadingBar"
+import TxStatusModal from "./app/feedback/TxStatusModal"
 
 function App() {
   const { element: routes } = useNav()
@@ -32,6 +33,7 @@ function App() {
       <Content>
         <MainContainer>
           <LoadingBar />
+          <TxStatusModal />
           <div className="pageArea">{routes}</div>
           <WalletPanel />
         </MainContainer>

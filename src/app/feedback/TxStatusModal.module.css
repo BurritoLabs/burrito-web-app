@@ -1,0 +1,146 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(4, 9, 8, 0.56);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.modal {
+  position: relative;
+  width: min(420px, calc(100vw - 36px));
+  padding: 24px 22px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(12, 20, 17, 0.92);
+  box-shadow:
+    0 26px 56px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+
+.closeButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  opacity: 0.8;
+}
+
+.closeButton:hover {
+  opacity: 1;
+}
+
+.closeButton span {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 10px;
+  height: 1.5px;
+  background: rgba(234, 245, 235, 0.75);
+}
+
+.closeButton span:first-child {
+  transform: rotate(45deg);
+}
+
+.closeButton span:last-child {
+  transform: rotate(-45deg);
+}
+
+.iconWrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.iconCircle {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.iconCircle svg {
+  width: 34px;
+  height: 34px;
+}
+
+.pending {
+  color: rgba(234, 245, 235, 0.88);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.success {
+  color: #52c41a;
+  background: rgba(82, 196, 26, 0.14);
+  border-color: rgba(82, 196, 26, 0.45);
+}
+
+.error {
+  color: #ff7777;
+  background: rgba(255, 119, 119, 0.12);
+  border-color: rgba(255, 119, 119, 0.42);
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2.5px solid rgba(234, 245, 235, 0.24);
+  border-top-color: #52c41a;
+  animation: spin 0.8s linear infinite;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.detail {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(234, 245, 235, 0.8);
+  word-break: break-word;
+}
+
+.hashLink {
+  margin-top: 12px;
+  display: inline-flex;
+  color: #52c41a;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.hashLink:hover {
+  text-decoration: underline;
+}
+
+.confirmButton {
+  margin-top: 16px;
+  width: 100%;
+  min-height: 38px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

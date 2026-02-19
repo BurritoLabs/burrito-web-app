@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, type SyntheticEvent } from "react"
+import { useMemo, useState, useEffect, useRef, type SyntheticEvent } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Stake.module.css"
@@ -23,10 +23,72 @@ import { CLASSIC_DENOMS } from "../app/chain"
 import StakeManageModal from "./StakeManageModal"
 
 const KEYBASE_PROXY_URL = "https://keybase.burrito.money"
-const KEYBASE_FETCH_CONCURRENCY = 6
+const KEYBASE_FETCH_CONCURRENCY = 10
 const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
+const KEYBASE_CACHE_STORAGE_KEY = "burrito:keybase-pictures:v1"
+const KEYBASE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14
 
 const normalizeIdentity = (value?: string) => value?.trim() || ""
+
+type KeybasePictureCacheEntry = {
+  url: string
+  updatedAt: number
+}
+
+type KeybasePictureCacheStore = Record<string, KeybasePictureCacheEntry>
+
+const toBigIntOrZero = (value?: string) => {
+  try {
+    return BigInt(value ?? "0")
+  } catch {
+    return 0n
+  }
+}
+
+const pruneKeybaseCacheStore = (
+  store: KeybasePictureCacheStore
+): KeybasePictureCacheStore => {
+  const cutoff = Date.now() - KEYBASE_CACHE_TTL_MS
+  const next: KeybasePictureCacheStore = {}
+  Object.entries(store).forEach(([identity, entry]) => {
+    if (!entry?.url) return
+    if (typeof entry.updatedAt !== "number" || entry.updatedAt < cutoff) return
+    next[identity] = entry
+  })
+  return next
+}
+
+const readKeybaseCacheStore = (): KeybasePictureCacheStore => {
+  if (typeof window === "undefined") return {}
+  try {
+    const raw = window.localStorage.getItem(KEYBASE_CACHE_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as KeybasePictureCacheStore
+    return pruneKeybaseCacheStore(parsed ?? {})
+  } catch {
+    return {}
+  }
+}
+
+const writeKeybaseCacheStore = (store: KeybasePictureCacheStore) => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      KEYBASE_CACHE_STORAGE_KEY,
+      JSON.stringify(pruneKeybaseCacheStore(store))
+    )
+  } catch {
+    // Ignore storage limits and private mode restrictions.
+  }
+}
+
+const cacheStoreToPictureMap = (store: KeybasePictureCacheStore) => {
+  const map: Record<string, string> = {}
+  Object.entries(store).forEach(([identity, entry]) => {
+    if (entry?.url) map[identity] = entry.url
+  })
+  return map
+}
 
 const Stake = () => {
   const { account } = useWallet()
@@ -103,22 +165,53 @@ const Stake = () => {
       .sort((a, b) => (a.amount === b.amount ? 0 : a.amount > b.amount ? -1 : 1))
   }, [account, delegations, validatorMap, validators])
 
-  const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>(
-    {}
+  const keybaseCacheRef = useRef<KeybasePictureCacheStore>(
+    readKeybaseCacheStore()
   )
 
-  useEffect(() => {
-    const identities = Array.from(
-      new Set(
-        validators
-          .map((item) => normalizeIdentity(item.description?.identity))
-          .filter((id): id is string => Boolean(id))
-      )
+  const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>(
+    () => cacheStoreToPictureMap(keybaseCacheRef.current)
+  )
+
+  const inFlightIdentitiesRef = useRef<Set<string>>(new Set())
+
+  const prioritizedIdentities = useMemo(() => {
+    const result: string[] = []
+    const seen = new Set<string>()
+    const addIdentity = (identity?: string) => {
+      const normalized = normalizeIdentity(identity).toLowerCase()
+      if (!normalized || seen.has(normalized)) return
+      seen.add(normalized)
+      result.push(normalized)
+    }
+
+    validatorDelegations.forEach((item) => addIdentity(item.identity))
+
+    const topByVotingPower = [...validators]
+      .sort((a, b) => {
+        const tokensA = toBigIntOrZero(a.tokens)
+        const tokensB = toBigIntOrZero(b.tokens)
+        return tokensA === tokensB ? 0 : tokensA > tokensB ? -1 : 1
+      })
+      .slice(0, 36)
+    topByVotingPower.forEach((validator) =>
+      addIdentity(validator.description?.identity)
     )
-    const pending = identities.filter((id) => !(id in keybasePictures))
+
+    validators.forEach((validator) => addIdentity(validator.description?.identity))
+
+    return result
+  }, [validatorDelegations, validators])
+
+  useEffect(() => {
+    const pending = prioritizedIdentities.filter(
+      (identity) =>
+        !keybasePictures[identity] && !inFlightIdentitiesRef.current.has(identity)
+    )
     if (!pending.length) return
 
     let cancelled = false
+    pending.forEach((identity) => inFlightIdentitiesRef.current.add(identity))
 
     const fetchPicture = async (identity: string) => {
       try {
@@ -137,7 +230,6 @@ const Stake = () => {
 
     const load = async () => {
       const queue = [...pending]
-      const results: Array<readonly [string, string]> = []
       let cursor = 0
 
       const worker = async () => {
@@ -147,8 +239,17 @@ const Stake = () => {
           if (index >= queue.length) return
           const identity = queue[index]
           const picture = await fetchPicture(identity)
-          if (picture) {
-            results.push([identity, picture] as const)
+          inFlightIdentitiesRef.current.delete(identity)
+          if (!cancelled && picture) {
+            setKeybasePictures((prev) => {
+              if (prev[identity] === picture) return prev
+              return { ...prev, [identity]: picture }
+            })
+            keybaseCacheRef.current[identity] = {
+              url: picture,
+              updatedAt: Date.now()
+            }
+            writeKeybaseCacheStore(keybaseCacheRef.current)
           }
         }
       }
@@ -158,35 +259,18 @@ const Stake = () => {
           length: Math.min(KEYBASE_FETCH_CONCURRENCY, queue.length)
         }).map(() => worker())
       )
-
-      if (cancelled || !results.length) return
-
-      setKeybasePictures((prev) => {
-        const next = { ...prev }
-        results.forEach(([identity, picture]) => {
-          next[identity] = picture
-          next[identity.toUpperCase()] = picture
-          next[identity.toLowerCase()] = picture
-        })
-        return next
-      })
     }
 
     load()
     return () => {
       cancelled = true
     }
-  }, [keybasePictures, validators])
+  }, [keybasePictures, prioritizedIdentities])
 
   const resolveValidatorLogo = (identity?: string) => {
-    const normalizedIdentity = normalizeIdentity(identity)
+    const normalizedIdentity = normalizeIdentity(identity).toLowerCase()
     if (!normalizedIdentity) return DEFAULT_VALIDATOR_LOGO
-    return (
-      keybasePictures[normalizedIdentity] ||
-      keybasePictures[normalizedIdentity.toUpperCase()] ||
-      keybasePictures[normalizedIdentity.toLowerCase()] ||
-      DEFAULT_VALIDATOR_LOGO
-    )
+    return keybasePictures[normalizedIdentity] || DEFAULT_VALIDATOR_LOGO
   }
 
   const handleValidatorLogoError = (

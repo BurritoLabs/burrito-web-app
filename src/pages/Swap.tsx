@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import type { OfflineSigner } from "@cosmjs/proto-signing"
@@ -1328,70 +1329,78 @@ const Swap = () => {
               </p>
             ) : null}
 
-            {pickerTarget ? (
-              <div className={styles.pickerBackdrop} role="dialog" aria-modal="true" onClick={closePicker}>
-                <div className={styles.pickerModal} onClick={(event) => event.stopPropagation()}>
-                  <div className={styles.pickerHeader}>
-                    <h3>Select token</h3>
-                    <button type="button" onClick={closePicker} aria-label="Close">
-                      ×
-                    </button>
-                  </div>
-                  <div className={styles.pickerSearchRow}>
-                    <input
-                      type="text"
-                      value={pickerQuery}
-                      onChange={(event) => setPickerQuery(event.target.value)}
-                      placeholder="Search token or address"
-                      autoFocus
-                    />
-                  </div>
-                  <div className={styles.pickerList}>
-                    {pickerAssets.map((asset) => {
-                      const isSelected =
-                        (pickerTarget === "from" && asset.id === fromAsset.id) ||
-                        (pickerTarget === "to" && asset.id === toAsset.id)
-                      return (
-                        <button
-                          key={asset.id}
-                          type="button"
-                          className={`${styles.pickerItem} ${
-                            isSelected ? styles.pickerItemSelected : ""
-                          }`}
-                          onClick={() => handlePickAsset(asset.id)}
-                        >
-                          <div className={styles.pickerItemLeft}>
-                            <span className={styles.pickerItemIcon}>
-                              <AssetIcon
-                                symbol={asset.symbol}
-                                candidates={asset.iconCandidates}
-                                size={22}
-                              />
-                            </span>
-                            <span className={styles.pickerItemText}>
-                              <strong>{asset.symbol}</strong>
-                              <small>
-                                {asset.type === "native" ? "Native" : "CW20"} · Balance{" "}
-                                {formatTokenAmount(
-                                  (assetBalanceMap.get(asset.id) ?? 0n).toString(),
-                                  asset.decimals,
-                                  6
-                                )}{" "}
-                                {asset.symbol}
-                              </small>
-                            </span>
-                          </div>
-                          {isSelected ? <span className={styles.pickerCheck}>✓</span> : null}
+            {pickerTarget && typeof document !== "undefined"
+              ? createPortal(
+                  <div
+                    className={styles.pickerBackdrop}
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={closePicker}
+                  >
+                    <div className={styles.pickerModal} onClick={(event) => event.stopPropagation()}>
+                      <div className={styles.pickerHeader}>
+                        <h3>Select token</h3>
+                        <button type="button" onClick={closePicker} aria-label="Close">
+                          ×
                         </button>
-                      )
-                    })}
-                    {!pickerAssets.length ? (
-                      <div className={styles.pickerEmpty}>No token found.</div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ) : null}
+                      </div>
+                      <div className={styles.pickerSearchRow}>
+                        <input
+                          type="text"
+                          value={pickerQuery}
+                          onChange={(event) => setPickerQuery(event.target.value)}
+                          placeholder="Search token or address"
+                          autoFocus
+                        />
+                      </div>
+                      <div className={styles.pickerList}>
+                        {pickerAssets.map((asset) => {
+                          const isSelected =
+                            (pickerTarget === "from" && asset.id === fromAsset.id) ||
+                            (pickerTarget === "to" && asset.id === toAsset.id)
+                          return (
+                            <button
+                              key={asset.id}
+                              type="button"
+                              className={`${styles.pickerItem} ${
+                                isSelected ? styles.pickerItemSelected : ""
+                              }`}
+                              onClick={() => handlePickAsset(asset.id)}
+                            >
+                              <div className={styles.pickerItemLeft}>
+                                <span className={styles.pickerItemIcon}>
+                                  <AssetIcon
+                                    symbol={asset.symbol}
+                                    candidates={asset.iconCandidates}
+                                    size={22}
+                                  />
+                                </span>
+                                <span className={styles.pickerItemText}>
+                                  <strong>{asset.symbol}</strong>
+                                  <small>
+                                    {asset.type === "native" ? "Native" : "CW20"} · Balance{" "}
+                                    {formatTokenAmount(
+                                      (assetBalanceMap.get(asset.id) ?? 0n).toString(),
+                                      asset.decimals,
+                                      6
+                                    )}{" "}
+                                    {asset.symbol}
+                                  </small>
+                                </span>
+                              </div>
+                              {isSelected ? <span className={styles.pickerCheck}>✓</span> : null}
+                            </button>
+                          )
+                        })}
+                        {!pickerAssets.length ? (
+                          <div className={styles.pickerEmpty}>No token found.</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )
+              : null}
 
             {!accountAddress ? (
               <button

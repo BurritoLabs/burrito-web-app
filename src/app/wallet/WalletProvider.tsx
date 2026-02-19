@@ -45,6 +45,7 @@ type WalletContextValue = {
   startTx: (label?: string) => void
   finishTx: (hash?: string) => void
   failTx: (error?: string) => void
+  clearTx: () => void
 }
 
 type InjectedWallet = {
@@ -158,6 +159,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     setTxState({ status: "error", error: err })
   }, [])
 
+  const clearTx = useCallback(() => {
+    setTxState({ status: "idle" })
+  }, [])
+
   useEffect(() => {
     if (txState.status === "pending") {
       const timer = window.setTimeout(() => {
@@ -212,7 +217,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       txState,
       startTx,
       finishTx,
-      failTx
+      failTx,
+      clearTx
     }),
     [
       account,
@@ -225,7 +231,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       txState,
       startTx,
       finishTx,
-      failTx
+      failTx,
+      clearTx
     ]
   )
 
