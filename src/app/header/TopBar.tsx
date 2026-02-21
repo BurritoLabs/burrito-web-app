@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import styles from "./TopBar.module.css"
 import ConnectModal from "../wallet/ConnectModal"
@@ -18,6 +18,7 @@ type TopBarProps = {
 }
 
 const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
+  const navigate = useNavigate()
   const { account, txState, connectorId, disconnect } = useWallet()
   const [connectOpen, setConnectOpen] = useState(false)
   const [addressesOpen, setAddressesOpen] = useState(false)
@@ -57,7 +58,8 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     enabled: Boolean(valoperAddress),
     staleTime: 60_000
   })
-  const showValidator = Boolean(validator)
+  const validatorMoniker = validator?.description?.moniker?.trim() ?? ""
+  const showValidator = Boolean(validatorMoniker)
   const showTx = txState.status !== "idle"
   const txTitle =
     txState.status === "pending"
@@ -125,8 +127,10 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
           <button
             className={`uiButton uiButtonOutline ${styles.validatorButton}`}
             type="button"
+            onClick={() => navigate("/commission")}
+            title={validatorMoniker}
           >
-            Validator
+            <span className={styles.validatorLabel}>{validatorMoniker}</span>
           </button>
         ) : null}
         <div className={styles.walletMenuWrapper} ref={walletMenuRef}>

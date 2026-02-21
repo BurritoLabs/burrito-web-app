@@ -5,6 +5,7 @@ import Swap from "../pages/Swap"
 import History from "../pages/History"
 import Stake from "../pages/Stake"
 import WithdrawRewards from "../pages/WithdrawRewards"
+import WithdrawCommission from "../pages/WithdrawCommission"
 import Governance from "../pages/Governance"
 import ProposalDetails from "../pages/ProposalDetails"
 import ProposalNew from "../pages/ProposalNew"
@@ -66,6 +67,7 @@ export const useNav = () => {
     { path: "/proposal/new", element: <ProposalNew /> },
     { path: "/proposal/:id", element: <ProposalDetails /> },
     { path: "/rewards", element: <WithdrawRewards /> },
+    { path: "/commission", element: <WithdrawCommission /> },
     ...menu,
     { path: "*", element: <NotFound /> }
   ]

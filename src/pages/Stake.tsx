@@ -685,9 +685,22 @@ const Stake = () => {
                             />
                           </span>
                           <div className={styles.validatorMeta}>
-                            <span className={styles.validatorNameStrong}>
-                              {item.moniker}
-                            </span>
+                            <a
+                              className={styles.validatorNameLink}
+                              href={`https://finder.burrito.money/classic/validator/${item.validator}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <span className={styles.validatorNameStrong}>
+                                {item.moniker}
+                              </span>
+                              <span
+                                className={styles.validatorNameArrow}
+                                aria-hidden="true"
+                              >
+                                ↗
+                              </span>
+                            </a>
                             <span className={styles.validatorCommission}>
                               Commission {formatPercent(item.commissionRate * 100)}
                             </span>

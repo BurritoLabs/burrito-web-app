@@ -298,6 +298,15 @@ export const fetchRewardsByValidator = async (address: string) => {
   }
 }
 
+export const fetchValidatorCommission = async (validatorAddress: string) => {
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/cosmos/distribution/v1beta1/validators/${validatorAddress}/commission`
+  )
+  const data = await fetchJson<{ commission?: { commission?: CoinBalance[] } }>(url)
+  return data.commission?.commission ?? []
+}
+
 export const fetchValidators = async () => {
   const items: ValidatorItem[] = []
   let nextKey: string | undefined

@@ -169,6 +169,15 @@
 .validatorButton {
   color: #52c41a;
   background: transparent;
+  max-width: 190px;
+}
+
+.validatorLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
 }
 
 .connectButton {

@@ -1,0 +1,232 @@
+.pageCard {
+  display: grid;
+  gap: 16px;
+  padding: var(--card-padding);
+}
+
+.emptyState {
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 16px;
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.75);
+}
+
+.header {
+  display: grid;
+  gap: 6px;
+}
+
+.moniker {
+  font-size: 18px;
+  font-weight: var(--bold);
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.valoper {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.72);
+  overflow-wrap: anywhere;
+}
+
+.sectionTitle {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: var(--bold);
+  color: rgba(234, 245, 235, 0.78);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.commissionList {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-bg-muted);
+  overflow: hidden;
+}
+
+.commissionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  color: rgba(234, 245, 235, 0.84);
+}
+
+.commissionLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.commissionIcon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(234, 245, 235, 0.88);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.commissionIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.commissionIconFallback {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.commissionRow:last-child {
+  border-bottom: 0;
+}
+
+.commissionRow strong {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: var(--bold);
+}
+
+.feeCard {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-bg-muted);
+  padding: 12px 14px;
+}
+
+.feeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feeLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feeLabel {
+  font-size: 12px;
+  font-weight: var(--bold);
+  color: rgba(234, 245, 235, 0.78);
+}
+
+.feeSelectWrap {
+  position: relative;
+}
+
+.feeSelectButton {
+  height: 24px;
+  min-width: 62px;
+  padding: 0 22px 0 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.2);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  text-transform: uppercase;
+}
+
+.feeCaret {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-40%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(255, 255, 255, 0.75);
+}
+
+.feeDropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 20, 17, 0.95);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  z-index: 20;
+}
+
+.feeOption {
+  height: 26px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  padding: 0 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.feeOption:hover {
+  background: rgba(82, 196, 26, 0.16);
+  color: #ffffff;
+}
+
+.feeOptionActive {
+  background: rgba(82, 196, 26, 0.24);
+  color: #ffffff;
+}
+
+.feeValue {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.feeError {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ff8c8c;
+}
+
+.submit {
+  height: 40px;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: #0c1411;
+  font-size: 14px;
+  font-weight: var(--bold);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.submitError {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #ff8c8c;
+}
