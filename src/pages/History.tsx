@@ -700,7 +700,7 @@ const History = () => {
           batch.map(async (address) => {
             try {
               const info = await fetchContractInfo(address)
-              const label = info?.label ?? info?.name ?? undefined
+              const label = info?.label ?? undefined
               return [address, label] as const
             } catch {
               return [address, undefined] as const

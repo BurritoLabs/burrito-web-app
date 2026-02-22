@@ -108,6 +108,30 @@ export type TxItem = {
   }
 }
 
+export type ContractInfo = {
+  address: string
+  code_id: string
+  creator: string
+  admin?: string
+  label?: string
+  created?: {
+    block_height?: string
+    tx_index?: string
+  }
+  ibc_port_id?: string
+  extension?: unknown
+}
+
+export type ContractHistoryEntry = {
+  operation?: string
+  code_id?: string
+  updated?: {
+    block_height?: string
+    tx_index?: string
+  }
+  msg?: unknown
+}
+
 export type PriceMap = {
   lunc?: { usd: number; usd_24h_change?: number }
   ustc?: { usd: number; usd_24h_change?: number }
@@ -1111,8 +1135,71 @@ export const fetchContractInfo = async (address: string) => {
     CLASSIC_CHAIN.lcd,
     `/cosmwasm/wasm/v1/contract/${address}`
   )
-  const data = await fetchJson<{ contract_info?: any }>(url)
-  return data.contract_info ?? null
+  const data = await fetchJson<{ contract_info?: Omit<ContractInfo, "address"> }>(url)
+  if (!data.contract_info) return null
+  return {
+    address,
+    ...data.contract_info
+  }
+}
+
+export const fetchContractHistory = async (address: string) => {
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/cosmwasm/wasm/v1/contract/${address}/history`,
+    { "pagination.limit": "50" }
+  )
+  const data = await fetchJson<{ entries?: ContractHistoryEntry[] }>(url)
+  return data.entries ?? []
+}
+
+export const fetchContractInitMsg = async (address: string) => {
+  const history = await fetchContractHistory(address)
+  const instantiate =
+    history.find((entry) => entry.msg) ??
+    history.find((entry) => entry.operation?.includes("INIT")) ??
+    history[0]
+  return instantiate?.msg
+}
+
+const encodeContractSmartQuery = (raw: string) => {
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ""
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
+  return btoa(binary)
+}
+
+export const queryContractSmart = async <T = unknown>(
+  address: string,
+  query: Record<string, unknown>
+) => {
+  const payload = encodeContractSmartQuery(JSON.stringify(query))
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/cosmwasm/wasm/v1/contract/${address}/smart/${payload}`
+  )
+
+  const response = await fetch(url)
+  const text = await response.text()
+  let parsed: any
+  try {
+    parsed = text ? JSON.parse(text) : undefined
+  } catch {
+    parsed = undefined
+  }
+  if (!response.ok) {
+    const message =
+      parsed?.message ??
+      parsed?.error ??
+      parsed?.details ??
+      text ??
+      `Request failed: ${response.status}`
+    throw new Error(message)
+  }
+
+  return (parsed?.data ?? parsed) as T
 }
 
 export const fetchPrices = async (): Promise<PriceMap> => {
