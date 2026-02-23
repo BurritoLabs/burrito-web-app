@@ -24,6 +24,19 @@ export const WalletIcon = (props: IconProps) => (
   </svg>
 )
 
+export const MarketIcon = (props: IconProps) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+    <path
+      d="M5 19.5h14a1 1 0 1 0 0-2H5a1 1 0 1 0 0 2Z"
+      fill="currentColor"
+    />
+    <path
+      d="M6.7 15.5h2.1c.4 0 .7-.3.7-.7V7.1c0-.4-.3-.7-.7-.7H6.7c-.4 0-.7.3-.7.7v7.7c0 .4.3.7.7.7Zm4.8 0h2.1c.4 0 .7-.3.7-.7V4.6c0-.4-.3-.7-.7-.7h-2.1c-.4 0-.7.3-.7.7v10.2c0 .4.3.7.7.7Zm4.8 0h2.1c.4 0 .7-.3.7-.7V9.9c0-.4-.3-.7-.7-.7h-2.1c-.4 0-.7.3-.7.7v4.9c0 .4.3.7.7.7Z"
+      fill="currentColor"
+    />
+  </svg>
+)
+
 export const HistoryIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path
