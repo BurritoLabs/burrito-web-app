@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run build:market-all",
     "build": "tsc -b && vite build",
+    "build:market-index": "node scripts/build-market-index.mjs",
+    "build:market-candles": "node scripts/build-market-candles.mjs",
+    "build:market-all": "npm run build:market-index && npm run build:market-candles",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -16,6 +20,7 @@
     "@tanstack/react-query": "^5.90.20",
     "@terra-money/log-finder-ruleset": "^3.0.3",
     "cosmjs-types": "^0.10.1",
+    "lightweight-charts": "^5.1.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

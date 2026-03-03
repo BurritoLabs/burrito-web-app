@@ -1,0 +1,395 @@
+.toolbar {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.toolbarMain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 10px;
+}
+
+.searchInput,
+.sortSelect {
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fbff;
+  outline: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.searchInput {
+  padding: 0 14px;
+}
+
+.searchInput::placeholder {
+  color: rgba(234, 245, 235, 0.45);
+}
+
+.sortSelect {
+  appearance: none;
+  padding: 0 34px 0 12px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(234, 245, 235, 0.72) 50%),
+    linear-gradient(135deg, rgba(234, 245, 235, 0.72) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% - 2px),
+    calc(100% - 9px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.sortSelect option {
+  color: #0e1a12;
+}
+
+.toolbarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.meta {
+  font-size: 12px;
+  color: rgba(234, 245, 235, 0.62);
+}
+
+.timeframe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 17, 13, 0.72);
+}
+
+.timeButton {
+  border: 0;
+  background: transparent;
+  color: rgba(234, 245, 235, 0.65);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: var(--bold);
+  height: 28px;
+  min-width: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.timeButtonActive {
+  color: #0e1a12;
+  background: rgba(82, 196, 26, 0.95);
+}
+
+.empty {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: rgba(234, 245, 235, 0.7);
+  font-size: 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.poolCardLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.poolCard {
+  padding: 10px;
+  display: grid;
+  gap: 7px;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.poolCardLink:hover .poolCard,
+.poolCardLink:focus-visible .poolCard {
+  transform: translateY(-1px);
+  border-color: rgba(82, 196, 26, 0.38);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.poolCardLink:focus-visible {
+  outline: none;
+}
+
+.cardHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+}
+
+.pairIcons {
+  width: 56px;
+  align-self: stretch;
+  flex: 0 0 56px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.pairStack {
+  position: relative;
+  width: 48px;
+  height: 42px;
+}
+
+.headerRight {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.headerTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pairIcons img,
+.assetIconFallback {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 24, 20, 0.86);
+}
+
+.pairIconPrimary,
+.pairIconSecondary {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pairIconPrimary {
+  left: 0;
+  top: 0;
+  z-index: 1;
+}
+
+.pairIconSecondary {
+  right: -2px;
+  bottom: -2px;
+  z-index: 2;
+}
+
+.assetIconFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: var(--bold);
+  color: #0e1a12;
+  background: rgba(82, 196, 26, 0.88);
+}
+
+.pairTitle {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: var(--bold);
+  letter-spacing: -0.012em;
+}
+
+.pairBase {
+  color: #ffffff;
+}
+
+.pairDivider {
+  color: rgba(234, 245, 235, 0.54);
+}
+
+.pairQuote {
+  color: rgba(234, 245, 235, 0.72);
+}
+
+.rank {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: var(--bold);
+  color: rgba(234, 245, 235, 0.64);
+  line-height: 1;
+  align-self: flex-start;
+}
+
+.tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dexTag {
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 7px;
+}
+
+.dexTag {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(234, 245, 235, 0.74);
+}
+
+.dexVersionTag {
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(82, 196, 26, 0.34);
+  background: rgba(82, 196, 26, 0.14);
+  color: rgba(133, 230, 91, 0.92);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: var(--bold);
+  padding: 3px 7px;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.leftMetrics {
+  display: grid;
+  gap: 3px;
+}
+
+.metricLine {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 11.5px;
+  color: rgba(234, 245, 235, 0.62);
+  white-space: nowrap;
+}
+
+.metricLine strong {
+  color: rgba(234, 245, 235, 0.92);
+  font-size: 11.5px;
+  font-weight: var(--bold);
+}
+
+.rightMetrics {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+}
+
+.price {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: var(--bold);
+  letter-spacing: -0.015em;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.priceZeroCount {
+  font-size: 0.62em;
+  line-height: 1;
+  vertical-align: baseline;
+  position: relative;
+  bottom: 0;
+  margin: 0 1px;
+  color: rgba(234, 245, 235, 0.8);
+}
+
+.change {
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: var(--bold);
+}
+
+.changeUp {
+  color: rgba(88, 232, 77, 0.95);
+}
+
+.changeDown {
+  color: rgba(255, 105, 105, 0.95);
+}
+
+.changeFlat {
+  color: rgba(234, 245, 235, 0.55);
+}
+
+.loadMoreWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.loadMore {
+  min-width: 160px;
+}
+
+@media (max-width: 1439.98px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .toolbarMain {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbarFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .toolbar,
+  .poolCard {
+    padding: 12px;
+  }
+
+  .pairTitle {
+    font-size: 20px;
+  }
+
+  .price {
+    font-size: 20px;
+  }
+
+  .content {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .rightMetrics {
+    justify-items: start;
+  }
+}

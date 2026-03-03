@@ -742,6 +742,18 @@ const WalletPanel = () => {
       return bValue - aValue
     }
 
+    const sortByAmountDesc = (
+      a: { amount: string; decimals: number; symbol: string },
+      b: { amount: string; decimals: number; symbol: string }
+    ) => {
+      const aAmount = toUnitAmount(a.amount, a.decimals)
+      const bAmount = toUnitAmount(b.amount, b.decimals)
+      if (aAmount === bAmount) {
+        return a.symbol.localeCompare(b.symbol)
+      }
+      return bAmount - aAmount
+    }
+
     const luncRow = nativeRows.find(
       (row) => row.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
     )
@@ -758,7 +770,8 @@ const WalletPanel = () => {
 
     const sortedNative = nativeNonIbc.sort(sortByValueDesc)
     const sortedIbc = ibcRows.sort(sortByValueDesc)
-    const sortedCw20 = cw20Rows.sort(sortByValueDesc)
+    // Match main wallet tokens sorting: CW20 sorted by token amount (desc).
+    const sortedCw20 = cw20Rows.sort(sortByAmountDesc)
 
     return [
       luncRow,

@@ -133,8 +133,20 @@ export type ContractHistoryEntry = {
 }
 
 export type PriceMap = {
-  lunc?: { usd: number; usd_24h_change?: number }
-  ustc?: { usd: number; usd_24h_change?: number }
+  lunc?: {
+    usd: number
+    usd_1h_change?: number
+    usd_24h_change?: number
+    usd_7d_change?: number
+    usd_market_cap?: number
+  }
+  ustc?: {
+    usd: number
+    usd_1h_change?: number
+    usd_24h_change?: number
+    usd_7d_change?: number
+    usd_market_cap?: number
+  }
 }
 
 export type SwapRateItem = {
@@ -1205,29 +1217,86 @@ export const queryContractSmart = async <T = unknown>(
 export const fetchPrices = async (): Promise<PriceMap> => {
   const base =
     import.meta.env.DEV ? "/coingecko" : "https://api.coingecko.com/api/v3"
-  const url = `${base}/simple/price?ids=terra-luna,terraclassicusd,terrausd&vs_currencies=usd&include_24hr_change=true`
+  const marketsUrl = `${base}/coins/markets?vs_currency=usd&ids=terra-luna,terraclassicusd,terrausd&price_change_percentage=1h,24h,7d&sparkline=false`
+  const simpleUrl = `${base}/simple/price?ids=terra-luna,terraclassicusd,terrausd&vs_currencies=usd&include_24hr_change=true`
   const cached = getCachedPrices()
   try {
-    const data = await fetchJson<
-      Record<string, { usd: number; usd_24h_change?: number }>
-    >(url)
+    const marketRows = await fetchJson<
+      Array<{
+        id?: string
+        current_price?: number
+        market_cap?: number
+        price_change_percentage_1h_in_currency?: number
+        price_change_percentage_24h?: number
+        price_change_percentage_7d_in_currency?: number
+      }>
+    >(marketsUrl)
+
+    const byId = new Map(
+      (marketRows ?? []).map((row) => [row?.id ?? "", row])
+    )
+
+    const luncRow = byId.get("terra-luna")
+    const ustcRow = byId.get("terraclassicusd") ?? byId.get("terrausd")
+
     const result: PriceMap = {
-      lunc: data["terra-luna"] ?? cached?.data?.lunc,
+      lunc:
+        luncRow?.current_price !== undefined
+          ? {
+              usd: luncRow.current_price,
+              usd_1h_change: luncRow.price_change_percentage_1h_in_currency,
+              usd_24h_change: luncRow.price_change_percentage_24h,
+              usd_7d_change: luncRow.price_change_percentage_7d_in_currency,
+              usd_market_cap: luncRow.market_cap ?? cached?.data?.lunc?.usd_market_cap
+            }
+          : cached?.data?.lunc,
       ustc:
-        data["terraclassicusd"] ??
-        data["terrausd"] ??
-        cached?.data?.ustc
+        ustcRow?.current_price !== undefined
+          ? {
+              usd: ustcRow.current_price,
+              usd_1h_change: ustcRow.price_change_percentage_1h_in_currency,
+              usd_24h_change: ustcRow.price_change_percentage_24h,
+              usd_7d_change: ustcRow.price_change_percentage_7d_in_currency,
+              usd_market_cap: ustcRow.market_cap ?? cached?.data?.ustc?.usd_market_cap
+            }
+          : cached?.data?.ustc
     }
+
+    // Fallback to simple/price if market endpoint doesn't return current price.
+    if (!result.lunc || !result.ustc) {
+      const simple = await fetchJson<
+        Record<string, { usd: number; usd_24h_change?: number }>
+      >(simpleUrl)
+      if (!result.lunc && simple["terra-luna"]) {
+        result.lunc = {
+          usd: simple["terra-luna"].usd,
+          usd_24h_change: simple["terra-luna"].usd_24h_change,
+          usd_market_cap: cached?.data?.lunc?.usd_market_cap
+        }
+      }
+      if (!result.ustc && (simple["terraclassicusd"] || simple["terrausd"])) {
+        const source = simple["terraclassicusd"] ?? simple["terrausd"]
+        result.ustc = {
+          usd: source.usd,
+          usd_24h_change: source.usd_24h_change,
+          usd_market_cap: cached?.data?.ustc?.usd_market_cap
+        }
+      }
+    }
+
     if (!result.ustc) {
       try {
         const paprika = await fetchJson<{
-          quotes?: { USD?: { price?: number; percent_change_24h?: number } }
+          quotes?: {
+            USD?: { price?: number; percent_change_24h?: number; market_cap?: number }
+          }
         }>("https://api.coinpaprika.com/v1/tickers/ust-terrausd")
         const price = paprika?.quotes?.USD?.price
         if (price) {
           result.ustc = {
             usd: price,
-            usd_24h_change: paprika?.quotes?.USD?.percent_change_24h
+            usd_24h_change: paprika?.quotes?.USD?.percent_change_24h,
+            usd_market_cap: paprika?.quotes?.USD?.market_cap ?? cached?.data?.ustc?.usd_market_cap
           }
         }
       } catch {

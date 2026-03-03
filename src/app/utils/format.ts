@@ -21,6 +21,58 @@ export const formatNumber = (
     maximumFractionDigits
   }).format(value)
 
+const numberToPlainString = (value: number) => {
+  if (!Number.isFinite(value)) return String(value)
+  const raw = value.toString()
+  if (!raw.toLowerCase().includes("e")) return raw
+
+  const sign = raw.startsWith("-") ? "-" : ""
+  const normalized = sign ? raw.slice(1) : raw
+  const [coefficient, exponentPart] = normalized.toLowerCase().split("e")
+  const exponent = Number(exponentPart)
+  const [intPart, fracPart = ""] = coefficient.split(".")
+  const digits = `${intPart}${fracPart}`
+  const decimalIndex = intPart.length + exponent
+
+  if (decimalIndex <= 0) {
+    return `${sign}0.${"0".repeat(Math.abs(decimalIndex))}${digits}`
+  }
+  if (decimalIndex >= digits.length) {
+    return `${sign}${digits}${"0".repeat(decimalIndex - digits.length)}`
+  }
+  return `${sign}${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`
+}
+
+export const formatNumberNoRoundByNonZeroFractionDigits = (
+  value: number,
+  maxNonZeroFractionDigits = 4,
+  hardFractionCap = 18
+) => {
+  if (!Number.isFinite(value)) return String(value)
+
+  const sign = value < 0 ? "-" : ""
+  const plain = numberToPlainString(Math.abs(value))
+  let [intPart, fracPart = ""] = plain.split(".")
+  const withGrouping = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+
+  if (!fracPart) return `${sign}${withGrouping}`
+
+  let kept = ""
+  let nonZeroCount = 0
+  for (const digit of fracPart) {
+    if (kept.length >= hardFractionCap) break
+    kept += digit
+    if (digit !== "0") {
+      nonZeroCount += 1
+      if (nonZeroCount >= maxNonZeroFractionDigits) break
+    }
+  }
+
+  if (nonZeroCount === 0) return `${sign}${withGrouping}`
+  kept = kept.replace(/0+$/, "")
+  return `${sign}${withGrouping}.${kept}`
+}
+
 export const formatTokenAmount = (
   amount: string | number | bigint | undefined,
   decimals = 6,

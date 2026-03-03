@@ -4,6 +4,8 @@ import { CLASSIC_SWAP_DEXES } from "./dexFactories"
 
 const HEXXAGON_DEX_PAIRS_URL =
   "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main/cw20/dex_pairs/mainnet/terra.js"
+const LOCAL_MARKET_INDEX_URL = "/market/index.json"
+const LOCAL_MARKET_CANDLES_BASE_URL = "/market/candles"
 
 type HexxagonDexPair = {
   token?: string
@@ -49,6 +51,115 @@ export type MarketPoolSnapshot = {
   ]
 }
 
+type TxEventAttribute = {
+  key?: string
+  value?: string
+}
+
+type TxEvent = {
+  type?: string
+  attributes?: TxEventAttribute[]
+}
+
+type TxResponse = {
+  txhash?: string
+  timestamp?: string
+  events?: TxEvent[]
+  logs?: Array<{
+    events?: TxEvent[]
+  }>
+}
+
+type TxListResponse = {
+  tx_responses?: TxResponse[]
+}
+
+type LocalCandle = {
+  bucketStart?: number
+  open?: number
+  high?: number
+  low?: number
+  close?: number
+  volumeQuote?: number
+}
+
+type LocalPairCandlePayload = {
+  candles?: Partial<Record<"1h" | "24h" | "7d", Record<string, LocalCandle[]>>>
+}
+
+type SwapTick = {
+  timestamp: number
+  price: number
+  volumeQuote: number
+}
+
+export type PairCandle = {
+  bucketStart: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volumeQuote: number
+}
+
+export type PairTrade = {
+  txhash: string
+  timestamp: number
+  side: "buy" | "sell"
+  price: number
+  amountBase: number
+  amountQuote: number
+  trader: string
+}
+
+export type PairTradesResult = {
+  trades: PairTrade[]
+  hasMore: boolean
+}
+
+type FactoryPairEntry =
+  | {
+      contract_addr?: string
+      asset_infos?: unknown[]
+    }
+  | {
+      contract?: string
+      asset1?: unknown
+      asset2?: unknown
+    }
+
+type FactoryPairsResponse = {
+  pairs?: FactoryPairEntry[]
+}
+
+const FACTORY_PAIR_CACHE_TTL = 30 * 60 * 1000
+const LOCAL_INDEX_CACHE_TTL = 5 * 60 * 1000
+let factoryPairDexCache:
+  | { at: number; map: Map<string, { dexId: string; dexLabel: string }> }
+  | null = null
+let factoryPairDexInFlight:
+  | Promise<Map<string, { dexId: string; dexLabel: string }>>
+  | null = null
+let localMarketIndexCache:
+  | {
+      at: number
+      pairs: MarketDexPair[]
+      pools: Map<string, MarketPoolSnapshot>
+    }
+  | null = null
+let localMarketIndexInFlight:
+  | Promise<{
+      pairs: MarketDexPair[]
+      pools: Map<string, MarketPoolSnapshot>
+    } | null>
+  | null = null
+const LOCAL_CANDLES_CACHE_TTL = 5 * 60 * 1000
+const localPairCandlesCache = new Map<
+  string,
+  { at: number; payload: LocalPairCandlePayload | null }
+>()
+const localPairCandlesInFlight = new Map<Promise<LocalPairCandlePayload | null>, string>()
+
 const parseCommonJsArray = <T,>(source: string): T[] => {
   const normalized = source.replace(/^\uFEFF/, "").trim()
   if (!/^module\.exports\s*=/.test(normalized)) {
@@ -66,6 +177,310 @@ const parseCommonJsArray = <T,>(source: string): T[] => {
 }
 
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
+
+const normalizeAssetKey = (value: string) => {
+  if (!value) return value
+  if (value.startsWith("ibc/")) return `ibc/${value.slice(4).toUpperCase()}`
+  if (value.startsWith("terra1")) return value.toLowerCase()
+  return value.toLowerCase()
+}
+
+const buildLcdUrl = (path: string, params: Record<string, string>) => {
+  const url = new URL(`${CLASSIC_CHAIN.lcd}${path}`)
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+  return url.toString()
+}
+
+const resolveTimeframeFromBucketMs = (bucketMs: number) => {
+  // Pair details page uses finer buckets for better intra-window granularity.
+  if (bucketMs === 5 * 60 * 1000) return "1h"
+  if (bucketMs === 30 * 60 * 1000) return "24h"
+  if (bucketMs === 2 * 60 * 60 * 1000) return "7d"
+
+  // Keep compatibility with legacy callers using full-window buckets.
+  if (bucketMs === 60 * 60 * 1000) return "1h"
+  if (bucketMs === 24 * 60 * 60 * 1000) return "24h"
+  if (bucketMs === 7 * 24 * 60 * 60 * 1000) return "7d"
+  return null
+}
+
+const normalizeLocalCandle = (raw: LocalCandle): PairCandle | null => {
+  const bucketStart = Number(raw.bucketStart)
+  const open = Number(raw.open)
+  const high = Number(raw.high)
+  const low = Number(raw.low)
+  const close = Number(raw.close)
+  const volumeQuote = Number(raw.volumeQuote ?? 0)
+
+  if (
+    !Number.isFinite(bucketStart) ||
+    !Number.isFinite(open) ||
+    !Number.isFinite(high) ||
+    !Number.isFinite(low) ||
+    !Number.isFinite(close) ||
+    !Number.isFinite(volumeQuote)
+  ) {
+    return null
+  }
+
+  return { bucketStart, open, high, low, close, volumeQuote }
+}
+
+const parseSwapTicksFromTxResponse = ({
+  response,
+  pairAddress,
+  leftKey,
+  rightKey,
+  leftDecimals,
+  rightDecimals
+}: {
+  response: TxResponse
+  pairAddress: string
+  leftKey: string
+  rightKey: string
+  leftDecimals: number
+  rightDecimals: number
+}): SwapTick[] => {
+  const timestamp = Date.parse(response.timestamp ?? "")
+  if (!Number.isFinite(timestamp)) return []
+
+  const ticks: SwapTick[] = []
+  const pairLower = pairAddress.toLowerCase()
+  const logEvents = response.logs?.flatMap((log) => log.events ?? []) ?? []
+  const events = logEvents.length ? logEvents : (response.events ?? [])
+
+  events.forEach((event) => {
+    if (event.type !== "wasm") return
+    const attrs = event.attributes ?? []
+    const getAttr = (key: string) => attrs.find((attr) => attr.key === key)?.value
+
+    const contractAddress = getAttr("_contract_address")?.toLowerCase()
+    if (!contractAddress || contractAddress !== pairLower) return
+
+    const action = (getAttr("action") ?? "").toLowerCase()
+    const offerAsset = getAttr("offer_asset") ?? ""
+    const askAsset = getAttr("ask_asset") ?? ""
+    const offerAmountRaw = Number(getAttr("offer_amount") ?? NaN)
+    const returnAmountRaw = Number(getAttr("return_amount") ?? NaN)
+
+    if (action !== "swap") return
+    if (!offerAsset || !askAsset) return
+    if (!Number.isFinite(offerAmountRaw) || !Number.isFinite(returnAmountRaw)) return
+    if (offerAmountRaw <= 0 || returnAmountRaw <= 0) return
+
+    const offerKey = normalizeAssetKey(offerAsset)
+    const askKey = normalizeAssetKey(askAsset)
+
+    if (offerKey === leftKey && askKey === rightKey) {
+      const offerAmount = offerAmountRaw / 10 ** leftDecimals
+      const returnAmount = returnAmountRaw / 10 ** rightDecimals
+      if (offerAmount <= 0 || returnAmount <= 0) return
+      ticks.push({
+        timestamp,
+        price: returnAmount / offerAmount,
+        volumeQuote: returnAmount
+      })
+      return
+    }
+
+    if (offerKey === rightKey && askKey === leftKey) {
+      const offerAmount = offerAmountRaw / 10 ** rightDecimals
+      const returnAmount = returnAmountRaw / 10 ** leftDecimals
+      if (offerAmount <= 0 || returnAmount <= 0) return
+      ticks.push({
+        timestamp,
+        price: offerAmount / returnAmount,
+        volumeQuote: offerAmount
+      })
+    }
+  })
+
+  return ticks
+}
+
+const getTxMessageSender = (events: TxEvent[]) => {
+  for (const event of events) {
+    if (event.type !== "message") continue
+    for (const attr of event.attributes ?? []) {
+      if (attr.key !== "sender" || !attr.value) continue
+      if (attr.value.startsWith("terra1")) return attr.value.toLowerCase()
+    }
+  }
+  return ""
+}
+
+const getAllResponseEvents = (response: TxResponse) => {
+  const logEvents = response.logs?.flatMap((log) => log.events ?? []) ?? []
+  return [...logEvents, ...(response.events ?? [])]
+}
+
+const parseSwapTradesFromTxResponse = ({
+  response,
+  pairAddress,
+  leftKey,
+  rightKey,
+  leftDecimals,
+  rightDecimals
+}: {
+  response: TxResponse
+  pairAddress: string
+  leftKey: string
+  rightKey: string
+  leftDecimals: number
+  rightDecimals: number
+}): PairTrade[] => {
+  const timestamp = Date.parse(response.timestamp ?? "")
+  if (!Number.isFinite(timestamp)) return []
+
+  const txhash = response.txhash ?? ""
+  if (!txhash) return []
+
+  const trades: PairTrade[] = []
+  const pairLower = pairAddress.toLowerCase()
+  const logEvents = response.logs?.flatMap((log) => log.events ?? []) ?? []
+  const events = logEvents.length ? logEvents : (response.events ?? [])
+  const fallbackSender = getTxMessageSender(getAllResponseEvents(response))
+
+  events.forEach((event) => {
+    if (event.type !== "wasm") return
+    const attrs = event.attributes ?? []
+    const getAttr = (key: string) => attrs.find((attr) => attr.key === key)?.value
+
+    const contractAddress = getAttr("_contract_address")?.toLowerCase()
+    if (!contractAddress || contractAddress !== pairLower) return
+
+    const action = (getAttr("action") ?? "").toLowerCase()
+    const offerAsset = getAttr("offer_asset") ?? ""
+    const askAsset = getAttr("ask_asset") ?? ""
+    const offerAmountRaw = Number(getAttr("offer_amount") ?? NaN)
+    const returnAmountRaw = Number(getAttr("return_amount") ?? NaN)
+    const sender = (getAttr("sender") ?? fallbackSender).toLowerCase()
+
+    if (action !== "swap") return
+    if (!offerAsset || !askAsset) return
+    if (!Number.isFinite(offerAmountRaw) || !Number.isFinite(returnAmountRaw)) return
+    if (offerAmountRaw <= 0 || returnAmountRaw <= 0) return
+
+    const offerKey = normalizeAssetKey(offerAsset)
+    const askKey = normalizeAssetKey(askAsset)
+
+    if (offerKey === leftKey && askKey === rightKey) {
+      const offerAmount = offerAmountRaw / 10 ** leftDecimals
+      const returnAmount = returnAmountRaw / 10 ** rightDecimals
+      if (offerAmount <= 0 || returnAmount <= 0) return
+      trades.push({
+        txhash,
+        timestamp,
+        side: "sell",
+        price: returnAmount / offerAmount,
+        amountBase: offerAmount,
+        amountQuote: returnAmount,
+        trader: sender
+      })
+      return
+    }
+
+    if (offerKey === rightKey && askKey === leftKey) {
+      const offerAmount = offerAmountRaw / 10 ** rightDecimals
+      const returnAmount = returnAmountRaw / 10 ** leftDecimals
+      if (offerAmount <= 0 || returnAmount <= 0) return
+      trades.push({
+        txhash,
+        timestamp,
+        side: "buy",
+        price: offerAmount / returnAmount,
+        amountBase: returnAmount,
+        amountQuote: offerAmount,
+        trader: sender
+      })
+    }
+  })
+
+  return trades
+}
+
+const buildCandles = ({
+  ticks,
+  bucketMs,
+  lookbackStart,
+  maxCandles
+}: {
+  ticks: SwapTick[]
+  bucketMs: number
+  lookbackStart: number
+  maxCandles: number
+}) => {
+  const sorted = [...ticks]
+    .filter((tick) => tick.timestamp >= lookbackStart)
+    .sort((a, b) => a.timestamp - b.timestamp)
+
+  if (!sorted.length) return [] as PairCandle[]
+
+  const buckets = new Map<number, PairCandle>()
+  sorted.forEach((tick) => {
+    const bucketStart = Math.floor(tick.timestamp / bucketMs) * bucketMs
+    const existing = buckets.get(bucketStart)
+    if (!existing) {
+      buckets.set(bucketStart, {
+        bucketStart,
+        open: tick.price,
+        high: tick.price,
+        low: tick.price,
+        close: tick.price,
+        volumeQuote: tick.volumeQuote
+      })
+      return
+    }
+    existing.high = Math.max(existing.high, tick.price)
+    existing.low = Math.min(existing.low, tick.price)
+    existing.close = tick.price
+    existing.volumeQuote += tick.volumeQuote
+  })
+
+  return Array.from(buckets.values())
+    .sort((a, b) => a.bucketStart - b.bucketStart)
+    .slice(-maxCandles)
+}
+
+const sanitizeSwapTicks = (ticks: SwapTick[]) => {
+  const valid = ticks.filter(
+    (tick) =>
+      Number.isFinite(tick.timestamp) &&
+      Number.isFinite(tick.price) &&
+      tick.price > 0 &&
+      Number.isFinite(tick.volumeQuote) &&
+      tick.volumeQuote >= 0
+  )
+  if (!valid.length) return valid
+
+  const prices = valid.map((tick) => tick.price).sort((a, b) => a - b)
+  const median = prices[Math.floor(prices.length / 2)] ?? 0
+  if (!Number.isFinite(median) || median <= 0) return valid
+
+  // Filter extreme outliers from malformed/multi-hop event parsing.
+  return valid.filter((tick) => {
+    const ratio = tick.price / median
+    return ratio >= 0.05 && ratio <= 20
+  })
+}
+
+const candlesMatchExpectedPrice = (candles: PairCandle[], expectedPrice?: number) => {
+  if (!candles.length) return false
+  if (!expectedPrice || !Number.isFinite(expectedPrice) || expectedPrice <= 0) return true
+
+  const closes = candles
+    .map((candle) => candle.close)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+  if (!closes.length) return false
+
+  const median = closes[Math.floor(closes.length / 2)]
+  const ratio = median / expectedPrice
+  // Guard against inverted/invalid price orientation while allowing normal market drift.
+  return ratio >= 0.2 && ratio <= 5
+}
 
 const ACTIVE_DEX_LABEL_BY_ID = new Map(
   CLASSIC_SWAP_DEXES.map((dex) => [dex.id.toLowerCase(), dex.label])
@@ -105,7 +520,284 @@ const resolveAssetId = (info: PoolAssetInfo, fallback?: string) => {
   return "native:unknown"
 }
 
+const toFallbackAsset = (assetId: string) => {
+  if (assetId.startsWith("native:")) return assetId.slice("native:".length)
+  if (assetId.startsWith("cw20:")) return assetId.slice("cw20:".length)
+  return assetId
+}
+
+const normalizeMarketAssetId = (value: string) => {
+  if (!value) return "native:unknown"
+  if (value.startsWith("native:") || value.startsWith("cw20:")) return value
+  return looksLikeTerraAddress(value)
+    ? `cw20:${value.toLowerCase()}`
+    : `native:${value}`
+}
+
+type MarketIndexPayload = {
+  generatedAt?: string
+  pairs?: Array<{
+    pair?: string
+    dexId?: string
+    dexLabel?: string
+    type?: string
+    assets?: string[]
+    poolAssets?: Array<{ id?: string; amount?: string }>
+  }>
+}
+
+const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
+  const entries = payload?.pairs ?? []
+  const pairs: MarketDexPair[] = []
+  const pools = new Map<string, MarketPoolSnapshot>()
+
+  entries.forEach((entry) => {
+    const pair = typeof entry?.pair === "string" ? entry.pair.toLowerCase() : ""
+    if (!pair) return
+
+    const poolAssets = Array.isArray(entry.poolAssets) ? entry.poolAssets : []
+    if (poolAssets.length < 2) return
+
+    const leftId = normalizeMarketAssetId(poolAssets[0]?.id ?? "")
+    const rightId = normalizeMarketAssetId(poolAssets[1]?.id ?? "")
+    const leftAmount = poolAssets[0]?.amount ?? "0"
+    const rightAmount = poolAssets[1]?.amount ?? "0"
+
+    const dexId = (entry.dexId ?? "unknown").toLowerCase()
+    const dexLabel = entry.dexLabel ?? pickDexLabel(dexId)
+    const type = entry.type ?? "xyk"
+    const fallbackAssets =
+      Array.isArray(entry.assets) && entry.assets.length >= 2
+        ? [entry.assets[0], entry.assets[1]]
+        : [toFallbackAsset(leftId), toFallbackAsset(rightId)]
+
+    const pairRecord: MarketDexPair = {
+      pair,
+      dexId,
+      dexLabel,
+      type,
+      assets: [fallbackAssets[0] ?? "", fallbackAssets[1] ?? ""]
+    }
+    const poolRecord: MarketPoolSnapshot = {
+      pair,
+      dexId,
+      dexLabel,
+      type,
+      poolAssets: [
+        { id: leftId, amount: leftAmount },
+        { id: rightId, amount: rightAmount }
+      ]
+    }
+
+    pairs.push(pairRecord)
+    pools.set(pair, poolRecord)
+  })
+
+  return { pairs, pools }
+}
+
+const fetchLocalMarketIndex = async () => {
+  if (localMarketIndexCache && Date.now() - localMarketIndexCache.at < LOCAL_INDEX_CACHE_TTL) {
+    return localMarketIndexCache
+  }
+  if (localMarketIndexInFlight) return localMarketIndexInFlight
+
+  localMarketIndexInFlight = fetch(LOCAL_MARKET_INDEX_URL, { cache: "no-store" })
+    .then(async (response) => {
+      if (!response.ok) return null
+      const payload = (await response.json()) as MarketIndexPayload
+      const parsed = parseLocalMarketIndex(payload)
+      if (!parsed.pairs.length) return null
+      const next = { at: Date.now(), ...parsed }
+      localMarketIndexCache = next
+      return next
+    })
+    .catch(() => null)
+    .finally(() => {
+      localMarketIndexInFlight = null
+    })
+
+  return localMarketIndexInFlight
+}
+
+const loadLocalPairCandlesFile = async (pairAddress: string) => {
+  const normalizedPair = pairAddress.toLowerCase()
+  const cached = localPairCandlesCache.get(normalizedPair)
+  if (cached && Date.now() - cached.at < LOCAL_CANDLES_CACHE_TTL) {
+    return cached.payload
+  }
+
+  for (const [inFlight, key] of localPairCandlesInFlight.entries()) {
+    if (key === normalizedPair) return inFlight
+  }
+
+  const fetchPromise = fetch(
+    `${LOCAL_MARKET_CANDLES_BASE_URL}/${encodeURIComponent(normalizedPair)}.json`,
+    { cache: "no-store" }
+  )
+    .then(async (response) => {
+      if (!response.ok) return null
+      return (await response.json()) as LocalPairCandlePayload
+    })
+    .catch(() => null)
+    .then((payload) => {
+      localPairCandlesCache.set(normalizedPair, { at: Date.now(), payload })
+      return payload
+    })
+    .finally(() => {
+      localPairCandlesInFlight.delete(fetchPromise)
+    })
+
+  localPairCandlesInFlight.set(fetchPromise, normalizedPair)
+  return fetchPromise
+}
+
+const fetchPairCandlesFromLocal = async ({
+  pairAddress,
+  timeframe,
+  leftAssetKey,
+  rightAssetKey,
+  maxCandles
+}: {
+  pairAddress: string
+  timeframe: "1h" | "24h" | "7d"
+  leftAssetKey: string
+  rightAssetKey: string
+  maxCandles: number
+}) => {
+  const payload = await loadLocalPairCandlesFile(pairAddress)
+  if (!payload?.candles) return null
+
+  const normalizedLeft = normalizeAssetKey(leftAssetKey)
+  const normalizedRight = normalizeAssetKey(rightAssetKey)
+  const directKey = `${normalizedLeft}|${normalizedRight}`
+  const reverseKey = `${normalizedRight}|${normalizedLeft}`
+
+  const directRaw = payload.candles?.[timeframe]?.[directKey]
+  const reverseRaw = payload.candles?.[timeframe]?.[reverseKey]
+
+  const useReverse =
+    (!Array.isArray(directRaw) || !directRaw.length) &&
+    Array.isArray(reverseRaw) &&
+    reverseRaw.length > 0
+
+  const raw = useReverse ? reverseRaw : directRaw
+  if (!Array.isArray(raw) || !raw.length) return null
+
+  const candles = raw
+    .map((item) => normalizeLocalCandle(item))
+    .filter((item): item is PairCandle => item !== null)
+    .map((item) => {
+      if (!useReverse) return item
+
+      // Reverse candles are stored as right/left; invert OHLC into left/right.
+      if (item.open <= 0 || item.high <= 0 || item.low <= 0 || item.close <= 0) return null
+      return {
+        bucketStart: item.bucketStart,
+        open: 1 / item.open,
+        high: 1 / item.low,
+        low: 1 / item.high,
+        close: 1 / item.close,
+        volumeQuote: item.volumeQuote
+      } satisfies PairCandle
+    })
+    .filter((item): item is PairCandle => item !== null)
+    .sort((a, b) => a.bucketStart - b.bucketStart)
+
+  if (!candles.length) return null
+  return candles.slice(-maxCandles)
+}
+
+const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) => {
+  const pairContracts = new Set<string>()
+  const limit = 30
+
+  // Garuda pair query schema is different and currently small enough for a single page.
+  if (dex.mode === "garuda") {
+    try {
+      const data = await queryContractSmart<FactoryPairsResponse>(dex.factory, {
+        pairs: { limit: 1000 }
+      })
+      ;(data?.pairs ?? []).forEach((pair) => {
+        const contract = "contract" in pair ? pair.contract : undefined
+        if (contract) pairContracts.add(contract.toLowerCase())
+      })
+    } catch {
+      // Ignore single dex failures.
+    }
+    return pairContracts
+  }
+
+  let startAfter: unknown[] | undefined
+  const seenCursors = new Set<string>()
+
+  for (let page = 0; page < 100; page += 1) {
+    try {
+      const query = startAfter
+        ? { pairs: { limit, start_after: startAfter } }
+        : { pairs: { limit } }
+      const data = await queryContractSmart<FactoryPairsResponse>(dex.factory, query)
+      const pairs = data?.pairs ?? []
+      if (!pairs.length) break
+
+      pairs.forEach((pair) => {
+        const contract = "contract_addr" in pair ? pair.contract_addr : undefined
+        if (contract) pairContracts.add(contract.toLowerCase())
+      })
+
+      const last = pairs[pairs.length - 1]
+      const nextStartAfter = "asset_infos" in last ? last.asset_infos : undefined
+      if (!nextStartAfter || pairs.length < limit) break
+
+      const cursorKey = JSON.stringify(nextStartAfter)
+      if (seenCursors.has(cursorKey)) break
+      seenCursors.add(cursorKey)
+      startAfter = nextStartAfter
+    } catch {
+      break
+    }
+  }
+
+  return pairContracts
+}
+
+const fetchPairDexMapFromFactories = async () => {
+  const map = new Map<string, { dexId: string; dexLabel: string }>()
+  await Promise.all(
+    CLASSIC_SWAP_DEXES.map(async (dex) => {
+      const pairs = await loadFactoryPairsForDex(dex)
+      pairs.forEach((pairAddress) => {
+        map.set(pairAddress, { dexId: dex.id, dexLabel: dex.label })
+      })
+    })
+  )
+  return map
+}
+
+const getPairDexMap = async () => {
+  if (factoryPairDexCache && Date.now() - factoryPairDexCache.at < FACTORY_PAIR_CACHE_TTL) {
+    return factoryPairDexCache.map
+  }
+  if (factoryPairDexInFlight) return factoryPairDexInFlight
+
+  factoryPairDexInFlight = fetchPairDexMapFromFactories()
+    .then((map) => {
+      factoryPairDexCache = { at: Date.now(), map }
+      return map
+    })
+    .finally(() => {
+      factoryPairDexInFlight = null
+    })
+
+  return factoryPairDexInFlight
+}
+
 export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
+  const local = await fetchLocalMarketIndex()
+  if (local?.pairs.length) {
+    return local.pairs
+  }
+
   const response = await fetch(HEXXAGON_DEX_PAIRS_URL)
   if (!response.ok) {
     throw new Error(`Failed to load DEX pairs: ${response.status}`)
@@ -131,7 +823,10 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
     }))
 }
 
-const fetchPoolForPair = async (pair: MarketDexPair): Promise<MarketPoolSnapshot | null> => {
+const fetchPoolForPair = async (
+  pair: MarketDexPair,
+  pairDexMap: Map<string, { dexId: string; dexLabel: string }>
+): Promise<MarketPoolSnapshot | null> => {
   try {
     const data = await queryContractSmart<PoolResponse>(pair.pair, { pool: {} })
     const assets = data?.assets
@@ -142,10 +837,12 @@ const fetchPoolForPair = async (pair: MarketDexPair): Promise<MarketPoolSnapshot
     const leftFallback = pair.assets[0]
     const rightFallback = pair.assets[1]
 
+    const matchedDex = pairDexMap.get(pair.pair.toLowerCase())
+
     return {
       pair: pair.pair,
-      dexId: pair.dexId,
-      dexLabel: pair.dexLabel,
+      dexId: matchedDex?.dexId ?? pair.dexId,
+      dexLabel: matchedDex?.dexLabel ?? pair.dexLabel,
       type: pair.type,
       poolAssets: [
         {
@@ -164,12 +861,23 @@ const fetchPoolForPair = async (pair: MarketDexPair): Promise<MarketPoolSnapshot
 }
 
 export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
+  const local = await fetchLocalMarketIndex()
+  if (local?.pools.size) {
+    const fromLocal = pairs
+      .map((pair) => local.pools.get(pair.pair.toLowerCase()))
+      .filter((item): item is MarketPoolSnapshot => Boolean(item))
+    if (fromLocal.length === pairs.length) {
+      return fromLocal
+    }
+  }
+
   const snapshots: MarketPoolSnapshot[] = []
   const chunkSize = 8
+  const pairDexMap = await getPairDexMap()
 
   for (let index = 0; index < pairs.length; index += chunkSize) {
     const chunk = pairs.slice(index, index + chunkSize)
-    const resolved = await Promise.all(chunk.map(fetchPoolForPair))
+    const resolved = await Promise.all(chunk.map((pair) => fetchPoolForPair(pair, pairDexMap)))
     resolved.forEach((item) => {
       if (item) snapshots.push(item)
     })
@@ -186,6 +894,224 @@ export const getMarketPoolIbcDenoms = (pairs: MarketDexPair[]) => {
     })
   })
   return Array.from(denoms)
+}
+
+export const fetchPairCandles = async ({
+  pairAddress,
+  leftAssetKey,
+  rightAssetKey,
+  leftDecimals,
+  rightDecimals,
+  expectedPrice,
+  bucketMs,
+  lookbackBuckets = 120,
+  maxCandles = 120,
+  maxPages = 80,
+  minCandles = 0,
+  expandedLookbackMultiplier = 12,
+  includeLocalFallback = false
+}: {
+  pairAddress: string
+  leftAssetKey: string
+  rightAssetKey: string
+  leftDecimals: number
+  rightDecimals: number
+  expectedPrice?: number
+  bucketMs: number
+  lookbackBuckets?: number
+  maxCandles?: number
+  maxPages?: number
+  minCandles?: number
+  expandedLookbackMultiplier?: number
+  includeLocalFallback?: boolean
+}): Promise<PairCandle[]> => {
+  const fetchFromTx = async (effectiveLookbackBuckets: number) => {
+    const now = Date.now()
+    const lookbackStart = now - bucketMs * effectiveLookbackBuckets
+    const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
+    const normalizedRightKey = normalizeAssetKey(rightAssetKey)
+    const ticks: SwapTick[] = []
+
+    let stop = false
+    for (let page = 1; page <= maxPages && !stop; page += 1) {
+      const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
+        events: `wasm._contract_address='${pairAddress}'`,
+        order_by: "2",
+        page: String(page),
+        limit: "100"
+      })
+
+      let data: TxListResponse
+      try {
+        const response = await fetch(url)
+        if (!response.ok) break
+        data = (await response.json()) as TxListResponse
+      } catch {
+        break
+      }
+
+      const responses = data.tx_responses ?? []
+      if (!responses.length) break
+
+      for (const response of responses) {
+        const timestamp = Date.parse(response.timestamp ?? "")
+        if (Number.isFinite(timestamp) && timestamp < lookbackStart) {
+          stop = true
+          break
+        }
+
+        ticks.push(
+          ...parseSwapTicksFromTxResponse({
+            response,
+            pairAddress,
+            leftKey: normalizedLeftKey,
+            rightKey: normalizedRightKey,
+            leftDecimals,
+            rightDecimals
+          })
+        )
+      }
+
+      if (responses.length < 100) break
+    }
+
+    return buildCandles({
+      ticks: sanitizeSwapTicks(ticks),
+      bucketMs,
+      lookbackStart,
+      maxCandles
+    })
+  }
+
+  const timeframe = resolveTimeframeFromBucketMs(bucketMs)
+
+  // Prioritize on-chain tx-derived candles when they already have enough bars.
+  const txCandles = await fetchFromTx(lookbackBuckets)
+  const txCandlesValid = candlesMatchExpectedPrice(txCandles, expectedPrice)
+  if (txCandlesValid && txCandles.length >= minCandles) return txCandles
+
+  const candidates: PairCandle[][] = []
+  if (txCandlesValid && txCandles.length > 0) candidates.push(txCandles)
+
+  if (expandedLookbackMultiplier > 1) {
+    const expandedLookbackBuckets = Math.max(
+      lookbackBuckets,
+      Math.floor(lookbackBuckets * expandedLookbackMultiplier)
+    )
+
+    if (expandedLookbackBuckets > lookbackBuckets) {
+      const expandedTxCandles = await fetchFromTx(expandedLookbackBuckets)
+      if (candlesMatchExpectedPrice(expandedTxCandles, expectedPrice) && expandedTxCandles.length > 0) {
+        candidates.push(expandedTxCandles)
+      }
+    }
+  }
+
+  // Optional fallback to static precomputed candles when on-chain tx data is sparse.
+  if (includeLocalFallback && timeframe) {
+    const localCandles = await fetchPairCandlesFromLocal({
+      pairAddress,
+      timeframe,
+      leftAssetKey,
+      rightAssetKey,
+      maxCandles
+    })
+    if (localCandles?.length && candlesMatchExpectedPrice(localCandles, expectedPrice)) {
+      candidates.push(localCandles)
+    }
+  }
+
+  if (!candidates.length) return []
+
+  const candidatesAboveMin = candidates.filter((candles) => candles.length >= minCandles)
+  const preferred = candidatesAboveMin.length ? candidatesAboveMin : candidates
+  preferred.sort((a, b) => b.length - a.length)
+  return preferred[0] ?? []
+}
+
+export const fetchPairTrades = async ({
+  pairAddress,
+  leftAssetKey,
+  rightAssetKey,
+  leftDecimals,
+  rightDecimals,
+  offset = 0,
+  limit = 25,
+  maxPages = 120
+}: {
+  pairAddress: string
+  leftAssetKey: string
+  rightAssetKey: string
+  leftDecimals: number
+  rightDecimals: number
+  offset?: number
+  limit?: number
+  maxPages?: number
+}): Promise<PairTradesResult> => {
+  const targetCount = Math.max(0, offset) + Math.max(1, limit) + 1
+  const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
+  const normalizedRightKey = normalizeAssetKey(rightAssetKey)
+
+  const trades: PairTrade[] = []
+  let reachedEnd = false
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
+      events: `wasm._contract_address='${pairAddress}'`,
+      order_by: "2",
+      page: String(page),
+      limit: "100"
+    })
+
+    let data: TxListResponse
+    try {
+      const response = await fetch(url)
+      if (!response.ok) break
+      data = (await response.json()) as TxListResponse
+    } catch {
+      break
+    }
+
+    const responses = data.tx_responses ?? []
+    if (!responses.length) {
+      reachedEnd = true
+      break
+    }
+
+    for (const response of responses) {
+      trades.push(
+        ...parseSwapTradesFromTxResponse({
+          response,
+          pairAddress,
+          leftKey: normalizedLeftKey,
+          rightKey: normalizedRightKey,
+          leftDecimals,
+          rightDecimals
+        })
+      )
+
+      if (trades.length >= targetCount) break
+    }
+
+    if (trades.length >= targetCount) break
+    if (responses.length < 100) {
+      reachedEnd = true
+      break
+    }
+  }
+
+  // Keep a deterministic order for pagination slices.
+  trades.sort((a, b) => {
+    if (a.timestamp === b.timestamp) return b.txhash.localeCompare(a.txhash)
+    return b.timestamp - a.timestamp
+  })
+
+  const start = Math.max(0, offset)
+  const end = start + Math.max(1, limit)
+  return {
+    trades: trades.slice(start, end),
+    hasMore: !reachedEnd || trades.length > end
+  }
 }
 
 export const getMarketEndpointInfo = () => ({

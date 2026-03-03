@@ -8,6 +8,7 @@ export type Cw20Balance = Cw20Token & {
 }
 
 const CACHE_TTL = 5 * 60 * 1000
+const SUPPLY_CACHE_TTL = 15 * 60 * 1000
 
 const loadCache = (key: string) => {
   if (typeof window === "undefined") return undefined
@@ -112,5 +113,115 @@ export const useCw20Balances = (
     queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}),
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
     staleTime: 60_000
+  })
+}
+
+type Cw20TokenInfoResponse = {
+  data?: {
+    total_supply?: string
+    decimals?: number
+  }
+}
+
+export type Cw20SupplyInfo = {
+  totalSupply: string
+  decimals: number
+  units: number
+}
+
+const toUnits = (amount: string, decimals: number) => {
+  const parsed = Number(amount)
+  if (!Number.isFinite(parsed)) return 0
+  return parsed / 10 ** Math.max(0, decimals)
+}
+
+export const fetchCw20Supplies = async (
+  contracts: string[],
+  whitelist: Record<string, Cw20Token>
+) => {
+  const unique = Array.from(
+    new Set(
+      contracts
+        .map((contract) => contract.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  )
+  if (!unique.length) return {}
+
+  const cacheKey = `cw20supply:classic:${unique.join(",")}`
+  const cached = loadCache(cacheKey) as Record<string, string> | undefined
+  if (cached) {
+    const restored: Record<string, Cw20SupplyInfo> = {}
+    Object.entries(cached).forEach(([contract, payload]) => {
+      try {
+        const parsed = JSON.parse(payload) as Cw20SupplyInfo
+        restored[contract] = parsed
+      } catch {
+        // ignore invalid cache entry
+      }
+    })
+    if (Object.keys(restored).length) return restored
+  }
+
+  const results: Record<string, Cw20SupplyInfo> = {}
+  const limit = 4
+  let index = 0
+
+  const workers = Array.from({ length: Math.min(limit, unique.length) }, async () => {
+    while (index < unique.length) {
+      const current = index
+      index += 1
+      const contract = unique[current]
+      try {
+        const query = btoa(JSON.stringify({ token_info: {} }))
+        const res = await fetch(
+          `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        )
+        if (!res.ok) continue
+        const data = (await res.json()) as Cw20TokenInfoResponse
+        const tokenInfo = data?.data
+        const totalSupply = tokenInfo?.total_supply
+        if (!totalSupply) continue
+        const decimals = tokenInfo?.decimals ?? whitelist[contract]?.decimals ?? 6
+        results[contract] = {
+          totalSupply,
+          decimals,
+          units: toUnits(totalSupply, decimals)
+        }
+      } catch {
+        // Ignore per-contract failure.
+      }
+    }
+  })
+
+  await Promise.all(workers)
+
+  if (Object.keys(results).length) {
+    const serializable = Object.fromEntries(
+      Object.entries(results).map(([contract, info]) => [contract, JSON.stringify(info)])
+    )
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        cacheKey,
+        JSON.stringify({ ts: Date.now(), data: serializable })
+      )
+    }
+  }
+  return results
+}
+
+export const useCw20Supplies = (
+  contracts: string[],
+  whitelist?: Record<string, Cw20Token>
+) => {
+  const normalized = Array.from(
+    new Set(contracts.map((contract) => contract.trim().toLowerCase()).filter(Boolean))
+  ).sort()
+
+  return useQuery({
+    queryKey: ["cw20-supplies", normalized.join(",")],
+    queryFn: () => fetchCw20Supplies(normalized, whitelist ?? {}),
+    enabled: normalized.length > 0,
+    staleTime: SUPPLY_CACHE_TTL
   })
 }

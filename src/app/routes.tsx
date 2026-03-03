@@ -1,6 +1,8 @@
 import { useRoutes } from "react-router-dom"
 import Dashboard from "../pages/Dashboard"
 import Wallet from "../pages/Wallet"
+import Market from "../pages/Market"
+import MarketPairDetails from "../pages/MarketPairDetails"
 import Swap from "../pages/Swap"
 import History from "../pages/History"
 import Stake from "../pages/Stake"
@@ -15,6 +17,7 @@ import {
   ContractIcon,
   GovIcon,
   HistoryIcon,
+  MarketIcon,
   StakeIcon,
   SwapIcon,
   WalletIcon
@@ -35,6 +38,12 @@ export const useNav = () => {
       element: <Swap />,
       title: "Swap",
       icon: <SwapIcon {...ICON_SIZE} />
+    },
+    {
+      path: "/market",
+      element: <Market />,
+      title: "Market",
+      icon: <MarketIcon {...ICON_SIZE} />
     },
     {
       path: "/history",
@@ -64,6 +73,8 @@ export const useNav = () => {
 
   const routes = [
     { path: "/", element: <Dashboard /> },
+    { path: "/market/pair/:dexId/:pair", element: <MarketPairDetails /> },
+    { path: "/market/pair/:pairId", element: <MarketPairDetails /> },
     { path: "/proposal/new", element: <ProposalNew /> },
     { path: "/proposal/:id", element: <ProposalDetails /> },
     { path: "/rewards", element: <WithdrawRewards /> },
