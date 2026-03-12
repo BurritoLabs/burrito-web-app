@@ -444,6 +444,57 @@ const buildCandles = ({
     .slice(-maxCandles)
 }
 
+const buildCandlesFromTrades = ({
+  trades,
+  bucketMs,
+  lookbackStart,
+  maxCandles
+}: {
+  trades: PairTrade[]
+  bucketMs: number
+  lookbackStart: number
+  maxCandles: number
+}) => {
+  const sorted = [...trades]
+    .filter(
+      (trade) =>
+        Number.isFinite(trade.timestamp) &&
+        trade.timestamp >= lookbackStart &&
+        Number.isFinite(trade.price) &&
+        trade.price > 0
+    )
+    .sort((a, b) => a.timestamp - b.timestamp)
+
+  if (!sorted.length) return [] as PairCandle[]
+
+  const buckets = new Map<number, PairCandle>()
+  sorted.forEach((trade) => {
+    const bucketStart = Math.floor(trade.timestamp / bucketMs) * bucketMs
+    const existing = buckets.get(bucketStart)
+    if (!existing) {
+      buckets.set(bucketStart, {
+        bucketStart,
+        open: trade.price,
+        high: trade.price,
+        low: trade.price,
+        close: trade.price,
+        volumeQuote: Number.isFinite(trade.amountQuote) && trade.amountQuote > 0 ? trade.amountQuote : 0
+      })
+      return
+    }
+    existing.high = Math.max(existing.high, trade.price)
+    existing.low = Math.min(existing.low, trade.price)
+    existing.close = trade.price
+    if (Number.isFinite(trade.amountQuote) && trade.amountQuote > 0) {
+      existing.volumeQuote += trade.amountQuote
+    }
+  })
+
+  return Array.from(buckets.values())
+    .sort((a, b) => a.bucketStart - b.bucketStart)
+    .slice(-maxCandles)
+}
+
 const sanitizeSwapTicks = (ticks: SwapTick[]) => {
   const valid = ticks.filter(
     (tick) =>
@@ -480,6 +531,74 @@ const candlesMatchExpectedPrice = (candles: PairCandle[], expectedPrice?: number
   const ratio = median / expectedPrice
   // Guard against inverted/invalid price orientation while allowing normal market drift.
   return ratio >= 0.2 && ratio <= 5
+}
+
+type CandleQuality = {
+  score: number
+  isAcceptable: boolean
+  uniqueBuckets: number
+  uniqueCloses: number
+  nonZeroVolumeRatio: number
+}
+
+const roundForSet = (value: number) => {
+  if (!Number.isFinite(value)) return 0
+  return Number(value.toPrecision(12))
+}
+
+const evaluateCandleQuality = ({
+  candles,
+  bucketMs,
+  minCandles
+}: {
+  candles: PairCandle[]
+  bucketMs: number
+  minCandles: number
+}): CandleQuality => {
+  if (!candles.length) {
+    return {
+      score: 0,
+      isAcceptable: false,
+      uniqueBuckets: 0,
+      uniqueCloses: 0,
+      nonZeroVolumeRatio: 0
+    }
+  }
+
+  const sorted = [...candles].sort((a, b) => a.bucketStart - b.bucketStart)
+  const uniqueBuckets = new Set(sorted.map((candle) => candle.bucketStart)).size
+  const closes = sorted
+    .map((candle) => candle.close)
+    .filter((value) => Number.isFinite(value) && value > 0)
+  const uniqueCloses = new Set(closes.map((value) => roundForSet(value))).size
+  const nonZeroVolumeCount = sorted.filter((candle) => candle.volumeQuote > 0).length
+  const nonZeroVolumeRatio = nonZeroVolumeCount / sorted.length
+
+  const firstBucket = sorted[0]?.bucketStart ?? 0
+  const lastBucket = sorted[sorted.length - 1]?.bucketStart ?? firstBucket
+  const expectedBucketSpan = Math.max(1, Math.floor((lastBucket - firstBucket) / bucketMs) + 1)
+  const coverage = Math.min(1, uniqueBuckets / expectedBucketSpan)
+
+  const minBarsForQuality = Math.max(4, Math.min(12, minCandles || 6))
+  const lengthScore = Math.min(1.5, sorted.length / minBarsForQuality)
+  const bucketScore = Math.min(1.5, uniqueBuckets / minBarsForQuality)
+  const closeScore = Math.min(1.5, uniqueCloses / Math.max(2, Math.floor(minBarsForQuality / 2)))
+  const volumeScore = Math.min(1, nonZeroVolumeRatio / 0.2)
+
+  const score = lengthScore * 0.35 + bucketScore * 0.25 + closeScore * 0.25 + coverage * 0.1 + volumeScore * 0.05
+  const isAcceptable =
+    sorted.length >= Math.max(4, Math.floor(minBarsForQuality * 0.5)) &&
+    uniqueBuckets >= Math.max(4, Math.floor(minBarsForQuality * 0.5)) &&
+    uniqueCloses >= 2 &&
+    nonZeroVolumeRatio >= 0.03
+
+  return {
+    score,
+    isAcceptable,
+    uniqueBuckets,
+    uniqueCloses,
+    nonZeroVolumeRatio
+  }
 }
 
 const ACTIVE_DEX_LABEL_BY_ID = new Map(
@@ -925,6 +1044,14 @@ export const fetchPairCandles = async ({
   expandedLookbackMultiplier?: number
   includeLocalFallback?: boolean
 }): Promise<PairCandle[]> => {
+  const maxLookbackBuckets = Math.max(
+    lookbackBuckets,
+    expandedLookbackMultiplier > 1
+      ? Math.floor(lookbackBuckets * expandedLookbackMultiplier)
+      : lookbackBuckets
+  )
+  const lookbackStartForFallback = Date.now() - bucketMs * maxLookbackBuckets
+
   const fetchFromTx = async (effectiveLookbackBuckets: number) => {
     const now = Date.now()
     const lookbackStart = now - bucketMs * effectiveLookbackBuckets
@@ -1007,6 +1134,32 @@ export const fetchPairCandles = async ({
     }
   }
 
+  // Second fallback: build candles from parsed recent trades if swap-tick parsing is sparse.
+  try {
+    const tradeWindowLimit = Math.max(maxCandles * 8, 320)
+    const tradesForCandles = await fetchPairTrades({
+      pairAddress,
+      leftAssetKey,
+      rightAssetKey,
+      leftDecimals,
+      rightDecimals,
+      offset: 0,
+      limit: tradeWindowLimit,
+      maxPages
+    })
+    const tradeCandles = buildCandlesFromTrades({
+      trades: tradesForCandles.trades,
+      bucketMs,
+      lookbackStart: lookbackStartForFallback,
+      maxCandles
+    })
+    if (candlesMatchExpectedPrice(tradeCandles, expectedPrice) && tradeCandles.length > 0) {
+      candidates.push(tradeCandles)
+    }
+  } catch {
+    // Keep chart resilient even if trade-derived fallback fails.
+  }
+
   // Optional fallback to static precomputed candles when on-chain tx data is sparse.
   if (includeLocalFallback && timeframe) {
     const localCandles = await fetchPairCandlesFromLocal({
@@ -1023,10 +1176,26 @@ export const fetchPairCandles = async ({
 
   if (!candidates.length) return []
 
-  const candidatesAboveMin = candidates.filter((candles) => candles.length >= minCandles)
-  const preferred = candidatesAboveMin.length ? candidatesAboveMin : candidates
-  preferred.sort((a, b) => b.length - a.length)
-  return preferred[0] ?? []
+  const rankedCandidates = candidates
+    .map((candles) => ({
+      candles,
+      quality: evaluateCandleQuality({
+        candles,
+        bucketMs,
+        minCandles
+      })
+    }))
+    .sort((a, b) => {
+      if (b.quality.score !== a.quality.score) return b.quality.score - a.quality.score
+      if (b.candles.length !== a.candles.length) return b.candles.length - a.candles.length
+      const bLatest = b.candles[b.candles.length - 1]?.bucketStart ?? 0
+      const aLatest = a.candles[a.candles.length - 1]?.bucketStart ?? 0
+      return bLatest - aLatest
+    })
+
+  const acceptable = rankedCandidates.filter((candidate) => candidate.quality.isAcceptable)
+  const selection = acceptable.length ? acceptable : rankedCandidates
+  return selection[0]?.candles ?? []
 }
 
 export const fetchPairTrades = async ({

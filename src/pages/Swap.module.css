@@ -15,6 +15,143 @@
   gap: 14px;
 }
 
+.swapCardEmbedded {
+  height: 100%;
+}
+
+.swapCardEmbedded .swapCardBody {
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  gap: 10px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.swapCardEmbedded .topMeta {
+  gap: 8px;
+}
+
+.swapCardEmbedded .formHint {
+  font-size: 11px;
+}
+
+.swapCardEmbedded .slippageControl {
+  gap: 4px;
+  padding: 3px;
+}
+
+.swapCardEmbedded .slippageButton {
+  height: 26px;
+  min-width: 44px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.swapCardEmbedded .swapPanel {
+  gap: 6px;
+}
+
+.swapCardEmbedded .fieldCard {
+  padding: 11px 12px;
+  gap: 6px;
+}
+
+.swapCardEmbedded .fieldBody {
+  gap: 8px;
+}
+
+.swapCardEmbedded .amountInput,
+.swapCardEmbedded .readonlyAmount {
+  font-size: clamp(22px, 2.2vw, 28px);
+}
+
+.swapCardEmbedded .assetPickerButton {
+  min-width: 128px;
+  height: 40px;
+  font-size: 14px;
+}
+
+.swapCardEmbedded .fieldFooter {
+  min-height: 18px;
+  padding-top: 6px;
+  font-size: 11px;
+}
+
+.swapCardEmbedded .switchButton {
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+}
+
+.swapCardEmbedded .quoteAccordion {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.swapCardEmbedded .quoteAccordionHeader {
+  gap: 8px;
+  padding: 10px 11px;
+}
+
+.swapCardEmbedded .quoteAccordionMain {
+  font-size: 13px;
+}
+
+.swapCardEmbedded .quoteAccordionMeta,
+.swapCardEmbedded .quoteAccordionToggle {
+  font-size: 11px;
+}
+
+.swapCardEmbedded .quoteAccordionBody {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 10px;
+}
+
+.swapCardEmbedded .detailsGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.swapCardEmbedded .detailsGrid div {
+  min-height: 54px;
+  padding: 8px 10px;
+}
+
+.swapCardEmbedded .detailsGrid strong,
+.swapCardEmbedded .routeValue,
+.swapCardEmbedded .routeName {
+  font-size: 12px;
+}
+
+.swapCardEmbedded .routesCard {
+  padding: 10px;
+  gap: 8px;
+}
+
+.swapCardEmbedded .routesHeader h3 {
+  font-size: 14px;
+}
+
+.swapCardEmbedded .routesHeader span,
+.swapCardEmbedded .routeMeta {
+  font-size: 10px;
+}
+
+.swapCardEmbedded .routeList {
+  gap: 6px;
+}
+
+.swapCardEmbedded .routeItem {
+  padding: 8px 10px;
+}
+
+.swapCardEmbedded .submitButton {
+  height: 40px;
+  font-size: 13px;
+}
+
 .topMeta {
   display: flex;
   align-items: center;

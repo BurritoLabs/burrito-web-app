@@ -1,21 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { useMemo, useState } from "react"
+import { useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import {
-  CandlestickSeries,
-  ColorType,
-  HistogramSeries,
-  createChart,
-  type BusinessDay,
-  type UTCTimestamp
-} from "lightweight-charts"
 import PageShell from "./PageShell"
+import SwapPanel from "./components/SwapPanel"
 import styles from "./MarketPairDetails.module.css"
 import { fetchPrices } from "../app/data/classic"
 import { fetchCurrentDashboardSnapshot } from "../app/data/dashboard"
 import {
-  type PairCandle,
-  fetchPairCandles,
   fetchPairTrades,
   fetchMarketDexPairs,
   fetchMarketPools,
@@ -34,23 +25,12 @@ import {
 
 type Timeframe = "1h" | "24h" | "7d"
 
-const TIMEFRAME_BUCKET_MS: Record<Timeframe, number> = {
-  "1h": 5 * 60 * 1000,
-  "24h": 30 * 60 * 1000,
-  "7d": 2 * 60 * 60 * 1000
+const TIMEFRAME_LOOKBACK_MS: Record<Timeframe, number> = {
+  "1h": 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000
 }
-
-const TIMEFRAME_LOOKBACK_BUCKETS: Record<Timeframe, number> = {
-  "1h": 12,
-  "24h": 48,
-  "7d": 84
-}
-
-const MIN_CANDLES_FOR_CHART: Record<Timeframe, number> = {
-  "1h": 6,
-  "24h": 12,
-  "7d": 18
-}
+const CHART_RECENT_TRADES_LIMIT = 250
 
 type ResolvedAsset = {
   id: string
@@ -175,7 +155,7 @@ const formatUsdNoRound = (value: number) => {
 }
 
 const formatAxisPrice = (value: number) => {
-  return formatNumberNoRoundByNonZeroFractionDigits(value, 4)
+  return formatNumberNoRoundByNonZeroFractionDigits(value, 6)
 }
 
 const formatTradeTime = (timestamp: number) =>
@@ -187,6 +167,15 @@ const formatTradeTime = (timestamp: number) =>
     second: "2-digit",
     hour12: false
   }).format(new Date(timestamp))
+
+const formatTrendEdgeTime = (timestampMs: number, tf: Timeframe) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: tf === "1h" ? undefined : "short",
+    day: tf === "1h" ? undefined : "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(new Date(timestampMs))
 
 const formatTradePrice = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) return "--"
@@ -238,9 +227,10 @@ const AssetIcon = ({
 const MarketPairDetails = () => {
   const params = useParams<{ pairId?: string; dexId?: string; pair?: string }>()
   const [timeframe, setTimeframe] = useState<Timeframe>("24h")
-  const [tradesLimit, setTradesLimit] = useState(25)
-  const [activeCandleTime, setActiveCandleTime] = useState<number | null>(null)
-  const chartHostRef = useRef<HTMLDivElement | null>(null)
+  const [tradePager, setTradePager] = useState<{ pair: string; limit: number }>({
+    pair: "",
+    limit: 25
+  })
 
   const decodedPairId = useMemo(() => {
     const decode = (value?: string) => {
@@ -422,7 +412,7 @@ const MarketPairDetails = () => {
     return undefined
   }
 
-  const detail = useMemo(() => {
+  const detail = (() => {
     if (!selectedPool) return undefined
 
     let left = resolveAsset(selectedPool.poolAssets[0].id)
@@ -501,13 +491,16 @@ const MarketPairDetails = () => {
         "7d": getPairChange("7d")
       } as Record<Timeframe, number | undefined>
     }
-  }, [selectedPool, prices, dashboardSnapshot, dexEstimatedPrices, ibcWhitelist, cw20Whitelist])
+  })()
 
-  useEffect(() => {
-    setTradesLimit(25)
-  }, [detail?.pool.pair])
+  const tradesLimit =
+    detail?.pool.pair && tradePager.pair === detail.pool.pair ? tradePager.limit : 25
 
-  const { data: tradesData, isLoading: isTradesLoading } = useQuery({
+  const {
+    data: tradesData,
+    isLoading: isTradesLoading,
+    dataUpdatedAt: tradesUpdatedAt
+  } = useQuery({
     queryKey: [
       "market",
       "pair-trades",
@@ -533,211 +526,133 @@ const MarketPairDetails = () => {
     refetchInterval: 90_000
   })
 
-  const trades = tradesData?.trades ?? []
+  const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
   const hasMoreTrades = Boolean(tradesData?.hasMore)
 
-  const { data: fallbackCandles = [], isLoading: isFallbackCandlesLoading } = useQuery({
+  const {
+    data: chartTradesData,
+    isLoading: isChartTradesLoading,
+    dataUpdatedAt: chartTradesUpdatedAt
+  } = useQuery({
     queryKey: [
       "market",
-      "pair-candles",
+      "pair-trades-chart",
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
       detail?.left.decimals,
-      detail?.right.decimals,
-      timeframe
+      detail?.right.decimals
     ],
     queryFn: () =>
-      fetchPairCandles({
+      fetchPairTrades({
         pairAddress: detail!.pool.pair,
         leftAssetKey: detail!.left.key,
         rightAssetKey: detail!.right.key,
         leftDecimals: detail!.left.decimals,
         rightDecimals: detail!.right.decimals,
-        expectedPrice: detail!.priceValue,
-        bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
-        lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
-        maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
-        minCandles: MIN_CANDLES_FOR_CHART[timeframe],
-        includeLocalFallback: true
+        offset: 0,
+        limit: CHART_RECENT_TRADES_LIMIT
       }),
-    enabled: Boolean(detail?.pool?.pair),
-    staleTime: 60_000,
-    refetchInterval: 120_000
+    enabled: Boolean(detail?.pool.pair),
+    staleTime: 30_000,
+    refetchInterval: 60_000
   })
 
-  const candles = useMemo(() => fallbackCandles, [fallbackCandles])
+  const chartPoints = useMemo(() => {
+    if (!detail) return [] as Array<{ time: number; value: number }>
+    const lookbackMs = TIMEFRAME_LOOKBACK_MS[timeframe]
+    const referenceNow = Math.max(chartTradesUpdatedAt, tradesUpdatedAt, 0)
+    const cutoff = referenceNow > 0 ? referenceNow - lookbackMs : 0
+    const chartTrades = chartTradesData?.trades ?? trades
 
-  const displayCandles = useMemo(() => {
-    const quoteUsd = detail?.priceQuoteUsd
-    if (!candles.length) return []
-    if (!quoteUsd) return candles
-    return candles.map((item) => ({
-      ...item,
-      open: item.open * quoteUsd,
-      high: item.high * quoteUsd,
-      low: item.low * quoteUsd,
-      close: item.close * quoteUsd,
-      volumeQuote: item.volumeQuote * quoteUsd
-    }))
-  }, [candles, detail?.priceQuoteUsd])
+    const sortedAll = [...chartTrades]
+      .sort((a, b) => a.timestamp - b.timestamp)
 
-  const isCandlesLoading = !displayCandles.length && isFallbackCandlesLoading
+    const inRange = sortedAll.filter((trade) => trade.timestamp >= cutoff)
+    const source = inRange.length >= 2 ? inRange : sortedAll.slice(-80)
 
-  const timeframeChangeFromCandles = useMemo(() => {
-    if (displayCandles.length < 2) return undefined
-    const first = displayCandles[0]
-    const last = displayCandles[displayCandles.length - 1]
-    if (!first || !last || first.open <= 0) return undefined
-    return ((last.close - first.open) / first.open) * 100
-  }, [displayCandles])
-
-  useEffect(() => {
-    if (!displayCandles.length || !chartHostRef.current) return
-
-    const chart = createChart(chartHostRef.current, {
-      autoSize: true,
-      height: 460,
-      layout: {
-        background: { type: ColorType.Solid, color: "rgba(10, 16, 13, 0.72)" },
-        textColor: "rgba(234, 245, 235, 0.65)",
-        fontFamily: "Montserrat, sans-serif",
-        attributionLogo: true
-      },
-      grid: {
-        vertLines: { color: "rgba(255, 255, 255, 0.06)" },
-        horzLines: { color: "rgba(255, 255, 255, 0.10)" }
-      },
-      rightPriceScale: {
-        borderVisible: false,
-        scaleMargins: { top: 0.08, bottom: 0.32 }
-      },
-      leftPriceScale: { visible: false },
-      crosshair: {
-        vertLine: {
-          color: "rgba(255, 255, 255, 0.28)",
-          width: 1,
-          labelBackgroundColor: "rgba(11, 20, 15, 0.95)"
-        },
-        horzLine: {
-          color: "rgba(255, 255, 255, 0.28)",
-          width: 1,
-          labelBackgroundColor: "rgba(11, 20, 15, 0.95)"
-        }
-      },
-      timeScale: {
-        borderVisible: false,
-        fixLeftEdge: true,
-        fixRightEdge: true,
-        timeVisible: timeframe === "1h",
-        secondsVisible: false
-      },
-      localization: {
-        priceFormatter: (value: number) => formatAxisPrice(value)
-      }
-    })
-
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "rgba(101, 228, 48, 0.95)",
-      downColor: "rgba(255, 106, 106, 0.95)",
-      borderVisible: true,
-      borderUpColor: "rgba(101, 228, 48, 0.98)",
-      borderDownColor: "rgba(255, 106, 106, 0.98)",
-      wickUpColor: "rgba(101, 228, 48, 0.98)",
-      wickDownColor: "rgba(255, 106, 106, 0.98)",
-      priceLineVisible: false,
-      lastValueVisible: true,
-      priceFormat: {
-        type: "custom",
-        minMove: 0.000000000000000001,
-        formatter: (value: number) => formatAxisPrice(value)
-      }
-    })
-
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      priceScaleId: "",
-      priceFormat: { type: "volume" },
-      lastValueVisible: false,
-      priceLineVisible: false
-    })
-    chart.priceScale("").applyOptions({
-      visible: false,
-      scaleMargins: {
-        top: 0.76,
-        bottom: 0
-      }
-    })
-
-    const toTimestamp = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp
-    const candleByTimestamp = new Map<number, PairCandle>()
-
-    candleSeries.setData(
-      displayCandles.map((candle) => {
-        const time = toTimestamp(candle.bucketStart)
-        const tiny = Math.max(Math.abs(candle.close) * 1e-8, 1e-12)
-        const normalizedHigh =
-          candle.high === candle.low ? candle.high + tiny : candle.high
-        const normalizedLow =
-          candle.high === candle.low ? Math.max(candle.low - tiny, 0) : candle.low
-        candleByTimestamp.set(Number(time), candle)
-        return {
-          time,
-          open: candle.open,
-          high: normalizedHigh,
-          low: normalizedLow,
-          close: candle.close
-        }
-      })
-    )
-
-    volumeSeries.setData(
-      displayCandles.map((candle) => ({
-        time: toTimestamp(candle.bucketStart),
-        value: candle.volumeQuote,
-        color:
-          candle.close >= candle.open
-            ? "rgba(101, 228, 48, 0.34)"
-            : "rgba(255, 106, 106, 0.34)"
+    return source
+      .map((trade) => ({
+        time: trade.timestamp,
+        // Keep chart and trade table in the same price basis (left/right pair price).
+        value: trade.price
       }))
-    )
+      .filter((point) => Number.isFinite(point.value) && point.value > 0)
+  }, [detail, timeframe, trades, tradesUpdatedAt, chartTradesData, chartTradesUpdatedAt])
 
-    chart.subscribeCrosshairMove((param) => {
-      if (!param.time) {
-        setActiveCandleTime(null)
-        return
-      }
+  const trendGeometry = useMemo(() => {
+    if (!chartPoints.length) return undefined
 
-      let timeValue: number
-      if (typeof param.time === "number") {
-        timeValue = param.time
-      } else if (typeof param.time === "string") {
-        const parsed = Date.parse(param.time)
-        if (!Number.isFinite(parsed)) {
-          setActiveCandleTime(null)
-          return
-        }
-        timeValue = Math.floor(parsed / 1000)
-      } else {
-        const businessDay = param.time as BusinessDay
-        timeValue = Math.floor(
-          Date.UTC(businessDay.year, businessDay.month - 1, businessDay.day) / 1000
-        )
-      }
+    const width = 1000
+    const height = 320
+    const padX = 14
+    const padY = 16
+    const usableW = width - padX * 2
+    const usableH = height - padY * 2
 
-      if (!candleByTimestamp.has(timeValue)) {
-        setActiveCandleTime(null)
-        return
-      }
-      setActiveCandleTime(timeValue * 1000)
+    const rawMin = Math.min(...chartPoints.map((point) => point.value))
+    const rawMax = Math.max(...chartPoints.map((point) => point.value))
+    const rawSpan = rawMax - rawMin
+    const spanPad = rawSpan > 0 ? rawSpan * 0.08 : Math.max(Math.abs(rawMax) * 0.02, 1e-8)
+    const minValue = Math.max(rawMin - spanPad, 0)
+    const maxValue = rawMax + spanPad
+    const valueSpan = Math.max(maxValue - minValue, 1e-12)
+
+    // Keep x positions evenly distributed so the simple trend never renders blank.
+    const divisor = Math.max(chartPoints.length - 1, 1)
+    const points = chartPoints.map((point, index) => {
+      const x = padX + (index / divisor) * usableW
+      const y = padY + (1 - (point.value - minValue) / valueSpan) * usableH
+      return { x, y }
     })
 
-    chart.timeScale().fitContent()
+    const renderPoints = points.length === 1
+      ? [
+          points[0],
+          { x: padX + usableW, y: points[0].y }
+        ]
+      : points
 
-    return () => {
-      setActiveCandleTime(null)
-      chart.remove()
+    const linePath = renderPoints
+      .map(
+        (point, index) =>
+          `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`
+      )
+      .join(" ")
+
+    const areaPath = `${linePath} L ${(padX + usableW).toFixed(2)} ${(padY + usableH).toFixed(
+      2
+    )} L ${padX.toFixed(2)} ${(padY + usableH).toFixed(2)} Z`
+
+    return {
+      width,
+      height,
+      padX,
+      padY,
+      usableW,
+      usableH,
+      minTime: chartPoints[0].time,
+      maxTime: chartPoints[chartPoints.length - 1].time,
+      linePath,
+      areaPath,
+      points: renderPoints
     }
-  }, [displayCandles, timeframe])
+  }, [chartPoints])
+
+  const chartStats = useMemo(() => {
+    if (!chartPoints.length) return undefined
+    const first = chartPoints[0].value
+    const last = chartPoints[chartPoints.length - 1].value
+    const high = Math.max(...chartPoints.map((point) => point.value))
+    const low = Math.min(...chartPoints.map((point) => point.value))
+    return {
+      start: first,
+      last,
+      high,
+      low,
+      change: first > 0 ? ((last - first) / first) * 100 : undefined
+    }
+  }, [chartPoints])
 
   const loading = isPairsLoading || isPoolsLoading
 
@@ -761,19 +676,8 @@ const MarketPairDetails = () => {
 
   const { dexName, dexVersion } = splitDexLabel(detail.pool.dexLabel)
 
-  const timeframeValue = timeframeChangeFromCandles ?? detail.changes[timeframe]
-  const activeCandle = activeCandleTime
-    ? displayCandles.find((candle) => candle.bucketStart === activeCandleTime)
-    : undefined
-  const chartCandle =
-    activeCandle ?? (displayCandles.length ? displayCandles[displayCandles.length - 1] : undefined)
-  const chartCandleChange =
-    chartCandle && chartCandle.open > 0
-      ? ((chartCandle.close - chartCandle.open) / chartCandle.open) * 100
-      : undefined
-  const chartPairLabel = detail.priceQuoteUsd
-    ? `${detail.left.symbol}/USD`
-    : `${detail.left.symbol}/${detail.right.symbol}`
+  const timeframeValue = chartStats?.change ?? detail.changes[timeframe]
+  const chartPairLabel = `${detail.left.symbol}/${detail.right.symbol}`
 
   return (
     <PageShell
@@ -798,10 +702,20 @@ const MarketPairDetails = () => {
         <div className={styles.heroLeft}>
           <div className={styles.pairIcons}>
             <span className={styles.pairIconPrimary}>
-              <AssetIcon symbol={detail.left.symbol} candidates={detail.left.iconCandidates} size={40} />
+              <AssetIcon
+                key={detail.left.id}
+                symbol={detail.left.symbol}
+                candidates={detail.left.iconCandidates}
+                size={48}
+              />
             </span>
             <span className={styles.pairIconSecondary}>
-              <AssetIcon symbol={detail.right.symbol} candidates={detail.right.iconCandidates} size={24} />
+              <AssetIcon
+                key={detail.right.id}
+                symbol={detail.right.symbol}
+                candidates={detail.right.iconCandidates}
+                size={30}
+              />
             </span>
           </div>
           <div>
@@ -813,6 +727,27 @@ const MarketPairDetails = () => {
             <div className={styles.tags}>
               <span className={styles.dexTag}>{dexName}</span>
               {dexVersion ? <span className={styles.dexVersionTag}>{dexVersion}</span> : null}
+            </div>
+            <div className={styles.heroMeta}>
+              <span className={styles.heroMetaItem}>
+                <em>Mkt Cap</em>
+                <strong>{formatUsdCompact(detail.marketCapUsd)}</strong>
+              </span>
+              <span className={styles.heroMetaItem}>
+                <em>Liquidity</em>
+                <strong>{detail.liquidityUsd !== undefined ? formatUsd(detail.liquidityUsd) : "--"}</strong>
+              </span>
+              <span className={styles.heroMetaItem}>
+                <em>Reserves</em>
+                <strong className={styles.reserveValue}>
+                  {formatNumber(detail.leftAmount, 2)} {detail.left.symbol} · {formatNumber(detail.rightAmount, 2)}{" "}
+                  {detail.right.symbol}
+                </strong>
+              </span>
+              <span className={styles.heroMetaItem}>
+                <em>Pool</em>
+                <strong className={styles.poolValue}>{truncateHash(detail.pool.pair, 10, 8)}</strong>
+              </span>
             </div>
           </div>
         </div>
@@ -839,180 +774,182 @@ const MarketPairDetails = () => {
         </div>
       </section>
 
-      <section className={styles.statsGrid}>
-        <article className={`card ${styles.statCard}`}>
-          <span className={styles.statLabel}>Mkt Cap</span>
-          <strong className={styles.statValue}>{formatUsdCompact(detail.marketCapUsd)}</strong>
-        </article>
-        <article className={`card ${styles.statCard}`}>
-          <span className={styles.statLabel}>Liquidity</span>
-          <strong className={styles.statValue}>{detail.liquidityUsd !== undefined ? formatUsd(detail.liquidityUsd) : "--"}</strong>
-        </article>
-        <article className={`card ${styles.statCard}`}>
-          <span className={styles.statLabel}>Pool</span>
-          <a
-            href={`https://finder.burrito.money/classic/address/${detail.pool.pair}`}
-            target="_blank"
-            rel="noreferrer"
-            className={styles.poolLink}
-          >
-            {detail.pool.pair.slice(0, 10)}...{detail.pool.pair.slice(-6)}
-          </a>
-        </article>
-      </section>
-
-      <section className={`card ${styles.chartSection}`}>
-        <header className={styles.chartHeader}>
-          <span className={styles.sectionTitle}>Price chart</span>
-          <span className={styles.chartSymbol}>{chartPairLabel}</span>
-        </header>
-        <header className={styles.ohlcHeader}>
-          {chartCandle ? (
-            <>
-              <span>O {formatAxisPrice(chartCandle.open)}</span>
-              <span>H {formatAxisPrice(chartCandle.high)}</span>
-              <span>L {formatAxisPrice(chartCandle.low)}</span>
-              <span>C {formatAxisPrice(chartCandle.close)}</span>
-              <span
-                className={
-                  chartCandleChange === undefined
-                    ? styles.ohlcFlat
-                    : chartCandleChange >= 0
-                      ? styles.ohlcUp
-                      : styles.ohlcDown
-                }
-              >
-                {chartCandleChange === undefined ? "--" : formatPercent(chartCandleChange)}
-              </span>
-            </>
-          ) : (
-            <span className={styles.ohlcFlat}>No candle data yet</span>
-          )}
-        </header>
-        {isCandlesLoading ? (
-          <div className={styles.chartFallback}>Loading candles from on-chain swaps...</div>
-        ) : !displayCandles.length ? (
-          <div className={styles.chartFallback}>No recent swaps to build candles for this timeframe.</div>
-        ) : (
-          <div className={styles.chartCanvas}>
-            <div
-              ref={chartHostRef}
-              className={styles.chartHost}
-              aria-label={`${chartPairLabel} ${timeframe} candlestick chart`}
-            />
-            <div className={styles.chartAttribution}>Chart by TradingView</div>
-          </div>
-        )}
-      </section>
-
-      <section className={`card ${styles.tradesSection}`}>
-        <header className={styles.tradesHeader}>
-          <span className={styles.sectionTitle}>Recent trades</span>
-          <span className={styles.tradesCount}>{trades.length} shown</span>
-        </header>
-        {isTradesLoading ? (
-          <div className={styles.tradesFallback}>Loading recent swaps...</div>
-        ) : !trades.length ? (
-          <div className={styles.tradesFallback}>No recent swaps found for this pair.</div>
-        ) : (
-          <>
-            <div className={styles.tradesTableWrap}>
-              <table className={styles.tradesTable}>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Side</th>
-                    <th>Price</th>
-                    <th>Amount</th>
-                    <th>Trader</th>
-                    <th>Tx</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trades.map((trade) => (
-                    <tr key={`${trade.txhash}-${trade.timestamp}-${trade.side}`}>
-                      <td>{formatTradeTime(trade.timestamp)}</td>
-                      <td>
-                        <span
-                          className={`${styles.sideBadge} ${
-                            trade.side === "buy" ? styles.sideBuy : styles.sideSell
-                          }`}
-                        >
-                          {trade.side}
-                        </span>
-                      </td>
-                      <td>{formatTradePrice(trade.price)}</td>
-                      <td>
-                        {formatTradeAmount(trade.amountBase)} {detail.left.symbol}
-                      </td>
-                      <td>
-                        <a
-                          href={`https://finder.burrito.money/classic/address/${trade.trader}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={styles.tradesLink}
-                        >
-                          {truncateHash(trade.trader, 8, 6)}
-                        </a>
-                      </td>
-                      <td>
-                        <a
-                          href={`https://finder.burrito.money/classic/tx/${trade.txhash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={styles.tradesLink}
-                        >
-                          {truncateHash(trade.txhash, 8, 6)}
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {hasMoreTrades ? (
-              <div className={styles.tradesActions}>
-                <button
-                  type="button"
-                  className={`uiButton uiButtonOutline ${styles.loadMoreButton}`}
-                  onClick={() => setTradesLimit((prev) => prev + 25)}
+      <div className={styles.marketLayout}>
+        <section className={`card ${styles.chartSection}`}>
+          <header className={styles.chartHeader}>
+            <span className={styles.sectionTitle}>Price chart</span>
+            <span className={styles.chartSymbol}>{chartPairLabel}</span>
+          </header>
+          <header className={styles.ohlcHeader}>
+            {chartStats ? (
+              <>
+                <span>Start {formatAxisPrice(chartStats.start)}</span>
+                <span>High {formatAxisPrice(chartStats.high)}</span>
+                <span>Low {formatAxisPrice(chartStats.low)}</span>
+                <span>Last {formatAxisPrice(chartStats.last)}</span>
+                <span
+                  className={
+                    chartStats.change === undefined
+                      ? styles.ohlcFlat
+                      : chartStats.change >= 0
+                        ? styles.ohlcUp
+                        : styles.ohlcDown
+                  }
                 >
-                  Load more
-                </button>
+                  {chartStats.change === undefined ? "--" : formatPercent(chartStats.change)}
+                </span>
+              </>
+            ) : (
+              <span className={styles.ohlcFlat}>No trade data yet</span>
+            )}
+          </header>
+          {(isTradesLoading || isChartTradesLoading) && !chartPoints.length ? (
+            <div className={styles.chartFallback}>Loading recent swaps...</div>
+          ) : !chartPoints.length ? (
+            <div className={styles.chartFallback}>
+              No recent swaps to draw trend in this timeframe.
+            </div>
+          ) : (
+            <div className={styles.chartCanvas}>
+              {trendGeometry ? (
+                <>
+                  <svg
+                    className={styles.trendSvg}
+                    viewBox={`0 0 ${trendGeometry.width} ${trendGeometry.height}`}
+                    preserveAspectRatio="none"
+                    aria-label={`${chartPairLabel} ${timeframe} price trend chart`}
+                  >
+                    {[0, 1, 2, 3, 4].map((row) => {
+                      const y = trendGeometry.padY + (trendGeometry.usableH / 4) * row
+                      return (
+                        <line
+                          key={`grid-${row}`}
+                          x1={trendGeometry.padX}
+                          x2={trendGeometry.padX + trendGeometry.usableW}
+                          y1={y}
+                          y2={y}
+                          className={styles.trendGrid}
+                        />
+                      )
+                    })}
+                    <path d={trendGeometry.areaPath} className={styles.trendArea} />
+                    <path d={trendGeometry.linePath} className={styles.trendLine} />
+                    {trendGeometry.points.map((point, index) => (
+                      <circle
+                        key={`trend-point-${index}`}
+                        cx={point.x}
+                        cy={point.y}
+                        r={index === trendGeometry.points.length - 1 ? 3.6 : 2.2}
+                        className={styles.trendPoint}
+                      />
+                    ))}
+                  </svg>
+                  <div className={styles.trendEdgeTimes}>
+                    <span>{formatTrendEdgeTime(trendGeometry.minTime, timeframe)}</span>
+                    <span>{formatTrendEdgeTime(trendGeometry.maxTime, timeframe)}</span>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          )}
+        </section>
+
+        <aside className={styles.marketRight}>
+          <section className={styles.swapEmbed}>
+            <SwapPanel
+              key={`${detail.left.id}:${detail.right.id}`}
+              embedded
+              defaultFromAssetId={detail.left.id}
+              defaultToAssetId={detail.right.id}
+            />
+          </section>
+        </aside>
+
+        <section className={`card ${styles.tradesSection}`}>
+          <header className={styles.tradesHeader}>
+            <span className={styles.sectionTitle}>Recent trades</span>
+            <span className={styles.tradesCount}>{trades.length} shown</span>
+          </header>
+          {isTradesLoading ? (
+            <div className={styles.tradesFallback}>Loading recent swaps...</div>
+          ) : !trades.length ? (
+            <div className={styles.tradesFallback}>No recent swaps found for this pair.</div>
+          ) : (
+            <>
+              <div className={styles.tradesTableWrap}>
+                <table className={styles.tradesTable}>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Side</th>
+                      <th>Price</th>
+                      <th>Amount</th>
+                      <th>Trader</th>
+                      <th>Tx</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trades.map((trade) => (
+                      <tr key={`${trade.txhash}-${trade.timestamp}-${trade.side}`}>
+                        <td>{formatTradeTime(trade.timestamp)}</td>
+                        <td>
+                          <span
+                            className={`${styles.sideBadge} ${
+                              trade.side === "buy" ? styles.sideBuy : styles.sideSell
+                            }`}
+                          >
+                            {trade.side}
+                          </span>
+                        </td>
+                        <td>{formatTradePrice(trade.price)}</td>
+                        <td>
+                          {formatTradeAmount(trade.amountBase)} {detail.left.symbol}
+                        </td>
+                        <td>
+                          <a
+                            href={`https://finder.burrito.money/classic/address/${trade.trader}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={styles.tradesLink}
+                          >
+                            {truncateHash(trade.trader, 8, 6)}
+                          </a>
+                        </td>
+                        <td>
+                          <a
+                            href={`https://finder.burrito.money/classic/tx/${trade.txhash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={styles.tradesLink}
+                          >
+                            {truncateHash(trade.txhash, 8, 6)}
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ) : null}
-          </>
-        )}
-      </section>
-
-      <section className={`card ${styles.reserves}`}>
-        <header className={styles.sectionTitle}>Reserves</header>
-        <div className={styles.reserveGrid}>
-          <article className={styles.reserveCard}>
-            <div className={styles.reserveAsset}>
-              <AssetIcon symbol={detail.left.symbol} candidates={detail.left.iconCandidates} size={26} />
-              <span>{detail.left.symbol}</span>
-            </div>
-            <strong>{formatNumber(detail.leftAmount, 6)}</strong>
-          </article>
-          <article className={styles.reserveCard}>
-            <div className={styles.reserveAsset}>
-              <AssetIcon symbol={detail.right.symbol} candidates={detail.right.iconCandidates} size={26} />
-              <span>{detail.right.symbol}</span>
-            </div>
-            <strong>{formatNumber(detail.rightAmount, 6)}</strong>
-          </article>
-        </div>
-      </section>
-
-      <section className={`card ${styles.actions}`}>
-        <div className={styles.actionsInfo}>
-          Trade this pair with Burrito Swap route aggregation.
-        </div>
-        <Link className={`uiButton uiButtonPrimary ${styles.tradeButton}`} to="/swap">
-          Open swap
-        </Link>
-      </section>
+              {hasMoreTrades ? (
+                <div className={styles.tradesActions}>
+                  <button
+                    type="button"
+                    className={`uiButton uiButtonOutline ${styles.loadMoreButton}`}
+                    onClick={() =>
+                      setTradePager((prev) => ({
+                        pair: detail.pool.pair,
+                        limit: prev.pair === detail.pool.pair ? prev.limit + 25 : 50
+                      }))
+                    }
+                  >
+                    Load more
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
+      </div>
     </PageShell>
   )
 }

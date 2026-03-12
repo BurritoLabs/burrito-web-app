@@ -37,25 +37,25 @@
 }
 
 .hero {
-  padding: 16px;
+  padding: 14px 16px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
 }
 
 .heroLeft {
   min-width: 0;
   display: inline-flex;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .pairIcons {
   position: relative;
-  width: 50px;
-  height: 42px;
-  flex: 0 0 50px;
+  width: 56px;
+  height: 46px;
+  flex: 0 0 56px;
 }
 
 .pairIcons img,
@@ -80,8 +80,8 @@
 }
 
 .pairIconSecondary {
-  right: -2px;
-  bottom: -2px;
+  right: -4px;
+  bottom: -4px;
   z-index: 2;
 }
 
@@ -96,14 +96,15 @@
 }
 
 .pairTitle {
-  display: inline-flex;
+  display: flex;
   align-items: baseline;
-  gap: 6px;
-  font-size: clamp(24px, 2.4vw, 36px);
+  gap: 8px;
+  font-size: clamp(22px, 2vw, 30px);
   line-height: 1;
   font-weight: var(--bold);
   letter-spacing: -0.015em;
   color: #ffffff;
+  margin-bottom: 2px;
 }
 
 .pairTitle span {
@@ -111,10 +112,62 @@
 }
 
 .tags {
-  margin-top: 8px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.heroMeta {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.heroMetaItem {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
+  border-radius: 8px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 9px;
+  min-height: 22px;
+  min-width: 0;
+}
+
+.heroMetaItem em {
+  font-style: normal;
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.62);
+}
+
+.heroMetaItem strong {
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(234, 245, 235, 0.9);
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+}
+
+.reserveValue {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poolValue {
+  display: block;
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dexTag {
@@ -122,7 +175,7 @@
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   font-size: 11px;
   line-height: 1;
-  padding: 4px 8px;
+  padding: 5px 10px;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(234, 245, 235, 0.74);
 }
@@ -135,19 +188,20 @@
   font-size: 11px;
   line-height: 1;
   font-weight: var(--bold);
-  padding: 4px 8px;
+  padding: 5px 10px;
 }
 
 .heroRight {
   flex: 0 0 auto;
   display: grid;
   justify-items: end;
-  gap: 5px;
+  gap: 6px;
   text-align: right;
+  padding-top: 2px;
 }
 
 .priceMain {
-  font-size: clamp(28px, 3vw, 44px);
+  font-size: clamp(22px, 2vw, 30px);
   line-height: 1;
   font-weight: var(--bold);
   letter-spacing: -0.02em;
@@ -178,45 +232,35 @@
   color: rgba(234, 245, 235, 0.64);
 }
 
-.statsGrid {
+.marketLayout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.marketLeft {
+  min-width: 0;
+  display: grid;
   gap: 12px;
 }
 
-.statCard {
-  padding: 16px;
-  display: grid;
-  gap: 6px;
+.marketRight {
+  min-width: 0;
+  position: sticky;
+  top: 12px;
+  align-self: stretch;
+  display: flex;
 }
 
-.statLabel {
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(234, 245, 235, 0.64);
+.marketRight > * {
+  flex: 1 1 auto;
 }
 
-.statValue {
-  font-size: 24px;
-  line-height: 1.1;
-  color: #ffffff;
-  font-weight: var(--bold);
-  letter-spacing: -0.012em;
-}
-
-.poolLink {
-  color: rgba(133, 230, 91, 0.95);
-  font-weight: var(--bold);
-  font-size: 16px;
-  text-decoration: none;
-}
-
-.poolLink:hover {
-  text-decoration: underline;
-}
-
-.reserves {
-  padding: 16px;
+.chartSection {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .sectionTitle {
@@ -224,11 +268,6 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(234, 245, 235, 0.62);
-}
-
-.chartSection {
-  padding: 0;
-  overflow: hidden;
 }
 
 .chartHeader {
@@ -278,21 +317,46 @@
   height: 460px;
   background: rgba(10, 16, 13, 0.72);
   overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr auto;
 }
 
-.chartHost {
+.trendSvg {
   width: 100%;
   height: 100%;
   display: block;
 }
 
-.chartAttribution {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
+.trendGrid {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.trendArea {
+  fill: rgba(101, 228, 48, 0.18);
+}
+
+.trendLine {
+  fill: none;
+  stroke: rgba(101, 228, 48, 0.95);
+  stroke-width: 2.4;
+}
+
+.trendPoint {
+  fill: rgba(101, 228, 48, 0.95);
+  stroke: rgba(8, 18, 13, 0.92);
+  stroke-width: 1.2;
+}
+
+.trendEdgeTimes {
+  height: 24px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.08);
   font-size: 11px;
-  color: rgba(234, 245, 235, 0.45);
-  pointer-events: none;
+  color: rgba(234, 245, 235, 0.58);
 }
 
 .chartFallback {
@@ -306,6 +370,8 @@
 }
 
 .tradesSection {
+  grid-column: 1 / -1;
+  min-width: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -409,52 +475,11 @@
   min-width: 160px;
 }
 
-.reserveGrid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.reserveCard {
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.reserveAsset {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: rgba(234, 245, 235, 0.76);
-  min-width: 0;
-}
-
-.reserveCard strong {
-  font-size: 18px;
-  line-height: 1.15;
-  color: #ffffff;
-}
-
-.actions {
-  padding: 16px;
+.swapEmbed {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.actionsInfo {
-  color: rgba(234, 245, 235, 0.72);
-  font-size: 13px;
-}
-
-.tradeButton {
-  min-width: 160px;
 }
 
 @media (max-width: 991.98px) {
@@ -469,12 +494,46 @@
     text-align: left;
   }
 
-  .statsGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .marketLayout {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .marketRight {
+    position: static;
+    display: block;
   }
 }
 
 @media (max-width: 700px) {
+  .pairIcons {
+    width: 50px;
+    height: 40px;
+    flex-basis: 50px;
+  }
+
+  .pairTitle {
+    font-size: 22px;
+  }
+
+  .heroMeta {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .heroMetaItem {
+    min-height: 22px;
+    padding: 3px 8px;
+  }
+
+  .heroMetaItem em {
+    font-size: 10px;
+  }
+
+  .heroMetaItem strong {
+    font-size: 11px;
+  }
+
   .chartCanvas {
     height: 360px;
   }
@@ -484,20 +543,7 @@
     padding: 10px 12px;
   }
 
-  .statsGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .reserveGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .tradeButton {
-    width: 100%;
+  .swapEmbed {
+    height: auto;
   }
 }
