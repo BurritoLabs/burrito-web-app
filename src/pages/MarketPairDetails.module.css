@@ -37,32 +37,45 @@
 }
 
 .hero {
-  padding: 14px 16px;
+  padding: 14px 16px 13px;
+  display: grid;
+  gap: 11px;
+}
+
+.heroTop {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
 }
 
 .heroLeft {
   min-width: 0;
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 16px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.heroHeading {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
 }
 
 .pairIcons {
   position: relative;
-  width: 56px;
-  height: 46px;
-  flex: 0 0 56px;
+  width: 58px;
+  height: 48px;
+  flex: 0 0 58px;
 }
 
 .pairIcons img,
 .assetIconFallback {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(15, 24, 20, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 24, 20, 0.9);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 
 .pairIconPrimary,
@@ -98,13 +111,13 @@
 .pairTitle {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  font-size: clamp(22px, 2vw, 30px);
+  gap: 6px;
+  font-size: clamp(24px, 2vw, 32px);
   line-height: 1;
   font-weight: var(--bold);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.025em;
   color: #ffffff;
-  margin-bottom: 2px;
+  margin: 0;
 }
 
 .pairTitle span {
@@ -112,47 +125,106 @@
 }
 
 .tags {
-  margin-top: 14px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .heroMeta {
-  margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
 }
 
 .heroMetaItem {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: 6px;
-  border-radius: 8px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 4px 9px;
-  min-height: 22px;
+  border-radius: 12px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  padding: 10px 12px;
+  min-height: 56px;
   min-width: 0;
 }
 
 .heroMetaItem em {
   font-style: normal;
   font-size: 11px;
-  color: rgba(234, 245, 235, 0.62);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(234, 245, 235, 0.56);
 }
 
 .heroMetaItem strong {
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(234, 245, 235, 0.9);
+  font-size: clamp(16px, 1.1vw, 19px);
+  line-height: 1.05;
+  color: #ffffff;
   min-width: 0;
-  margin-left: auto;
-  text-align: right;
+  text-align: left;
+}
+
+.heroInfoRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding-top: 9px;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.08);
+}
+
+.heroInfoItem {
+  min-width: 0;
+  flex: 1 1 320px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.heroInfoItem em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(234, 245, 235, 0.5);
+}
+
+.heroInfoItem strong {
+  min-width: 0;
+  color: rgba(234, 245, 235, 0.86);
+  font-size: 12px;
+  font-weight: var(--bold);
+}
+
+.poolLink {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(234, 245, 235, 0.86);
+  font-size: 12px;
+  font-weight: var(--bold);
+  text-decoration: none;
+  transition: color 0.16s ease;
+}
+
+.poolLink::after {
+  content: "↗";
+  flex: 0 0 auto;
+  font-size: 0.82em;
+  opacity: 0.72;
+}
+
+.poolLink:hover {
+  color: rgba(133, 230, 91, 0.92);
+}
+
+.poolLink:hover .poolValue {
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-underline-offset: 2px;
 }
 
 .reserveValue {
@@ -173,9 +245,9 @@
 .dexTag {
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
-  padding: 5px 10px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(234, 245, 235, 0.74);
 }
@@ -185,51 +257,66 @@
   border: var(--border-width) solid rgba(82, 196, 26, 0.34);
   background: rgba(82, 196, 26, 0.14);
   color: rgba(133, 230, 91, 0.92);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
   font-weight: var(--bold);
-  padding: 5px 10px;
+  padding: 4px 8px;
 }
 
 .heroRight {
   flex: 0 0 auto;
   display: grid;
   justify-items: end;
-  gap: 6px;
+  gap: 8px;
   text-align: right;
-  padding-top: 2px;
+  padding: 1px 0 1px 18px;
+  min-width: 220px;
+  border-left: var(--border-width) solid rgba(255, 255, 255, 0.08);
 }
 
 .priceMain {
-  font-size: clamp(22px, 2vw, 30px);
+  font-size: clamp(24px, 2.2vw, 32px);
   line-height: 1;
   font-weight: var(--bold);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   color: #ffffff;
   white-space: nowrap;
 }
 
 .priceChange {
-  font-size: 13px;
-  line-height: 1.1;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  line-height: 1;
   font-weight: var(--bold);
+  border: var(--border-width) solid transparent;
 }
 
 .changeUp {
   color: rgba(88, 232, 77, 0.95);
+  border-color: rgba(88, 232, 77, 0.16);
+  background: rgba(88, 232, 77, 0.12);
 }
 
 .changeDown {
   color: rgba(255, 105, 105, 0.95);
+  border-color: rgba(255, 105, 105, 0.16);
+  background: rgba(255, 105, 105, 0.12);
 }
 
 .changeFlat {
   color: rgba(234, 245, 235, 0.55);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .priceHint {
-  font-size: 12px;
-  color: rgba(234, 245, 235, 0.64);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(234, 245, 235, 0.58);
+  max-width: 220px;
 }
 
 .marketLayout {
@@ -281,16 +368,17 @@
 }
 
 .ohlcHeader {
-  min-height: 36px;
-  padding: 0 16px;
+  min-height: 44px;
+  padding: 8px 16px;
   border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  row-gap: 6px;
   font-size: 12px;
   font-weight: var(--bold);
   color: rgba(234, 245, 235, 0.72);
-  white-space: nowrap;
 }
 
 .ohlcUp {
@@ -317,46 +405,133 @@
   height: 460px;
   background: rgba(10, 16, 13, 0.72);
   overflow: hidden;
+  isolation: isolate;
+}
+
+.chartCanvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(92, 226, 54, 0.12), transparent 28%),
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.04), transparent 22%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chartCanvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chartHost {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.chartTooltip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  width: 216px;
+  border-radius: 14px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(14, 30, 22, 0.97) 0%, rgba(8, 17, 13, 0.94) 100%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+  padding: 11px 12px;
   display: grid;
-  grid-template-rows: 1fr auto;
+  gap: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  backdrop-filter: blur(10px);
 }
 
-.trendSvg {
-  width: 100%;
-  height: 100%;
-  display: block;
+.chartTooltipTime {
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.62);
 }
 
-.trendGrid {
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 1;
+.chartTooltipPrice {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: var(--bold);
+  color: #ffffff;
 }
 
-.trendArea {
-  fill: rgba(101, 228, 48, 0.18);
+.chartTooltipSubprice {
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.7);
 }
 
-.trendLine {
-  fill: none;
-  stroke: rgba(101, 228, 48, 0.95);
-  stroke-width: 2.4;
-}
-
-.trendPoint {
-  fill: rgba(101, 228, 48, 0.95);
-  stroke: rgba(8, 18, 13, 0.92);
-  stroke-width: 1.2;
-}
-
-.trendEdgeTimes {
-  height: 24px;
-  padding: 0 14px;
+.chartTooltipMeta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  gap: 10px;
+  margin-top: 1px;
+}
+
+.chartTooltipChange {
+  border-radius: 999px;
+  padding: 2px 8px;
   font-size: 11px;
-  color: rgba(234, 245, 235, 0.58);
+  font-weight: var(--bold);
+  letter-spacing: 0.01em;
+}
+
+.chartTooltipChangeUp {
+  color: rgba(118, 245, 81, 0.98);
+  background: rgba(95, 228, 55, 0.12);
+  border: 1px solid rgba(95, 228, 55, 0.22);
+}
+
+.chartTooltipChangeDown {
+  color: rgba(255, 124, 124, 0.98);
+  background: rgba(255, 106, 106, 0.12);
+  border: 1px solid rgba(255, 106, 106, 0.2);
+}
+
+.chartTooltipChangeFlat {
+  color: rgba(234, 245, 235, 0.75);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.chartTooltipMetaLabel {
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.56);
+}
+
+.chartTooltipDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 2px 0 4px;
+}
+
+.chartTooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.chartTooltipRow span {
+  color: rgba(234, 245, 235, 0.62);
+}
+
+.chartTooltipRow strong {
+  color: #ffffff;
+  font-weight: var(--bold);
+  text-align: right;
 }
 
 .chartFallback {
@@ -483,7 +658,7 @@
 }
 
 @media (max-width: 991.98px) {
-  .hero {
+  .heroTop {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -492,6 +667,14 @@
     width: 100%;
     justify-items: start;
     text-align: left;
+    padding: 14px 0 0;
+    min-width: 0;
+    border-left: 0;
+    border-top: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  }
+
+  .priceHint {
+    max-width: none;
   }
 
   .marketLayout {
@@ -507,9 +690,9 @@
 
 @media (max-width: 700px) {
   .pairIcons {
-    width: 50px;
-    height: 40px;
-    flex-basis: 50px;
+    width: 56px;
+    height: 46px;
+    flex-basis: 56px;
   }
 
   .pairTitle {
@@ -522,8 +705,8 @@
   }
 
   .heroMetaItem {
-    min-height: 22px;
-    padding: 3px 8px;
+    min-height: 52px;
+    padding: 9px 11px;
   }
 
   .heroMetaItem em {
@@ -531,11 +714,26 @@
   }
 
   .heroMetaItem strong {
-    font-size: 11px;
+    font-size: 16px;
+  }
+
+  .heroInfoRow {
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .heroInfoItem {
+    flex-basis: 100%;
+    display: grid;
+    gap: 4px;
   }
 
   .chartCanvas {
     height: 360px;
+  }
+
+  .chartTooltip {
+    width: 196px;
   }
 
   .tradesTable thead th,

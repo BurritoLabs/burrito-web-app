@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { toUtf8 } from "@cosmjs/encoding"
-import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
+import type { OfflineSigner } from "@cosmjs/proto-signing"
 import {
   MsgInstantiateContract,
   MsgStoreCode
@@ -14,8 +14,9 @@ import {
   fetchContractInitMsg,
   queryContractSmart
 } from "../app/data/classic"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
+import { CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
 import { truncateHash } from "../app/utils/format"
+import { connectClassicSigningClient } from "../app/wallet/signingClient"
 import { useWallet } from "../app/wallet/WalletProvider"
 
 type IconProps = {
@@ -31,31 +32,34 @@ const CLOSE_ICON = (
 
 const DEFAULT_QUERY = '{\n  "token_info": {}\n}'
 const DEFAULT_INSTANTIATE_MSG = '{\n  "count": 0\n}'
-const GAS_PRICE_MICRO = 28.325
+
+type InjectedWallet = {
+  enable?: (chainId: string) => Promise<void>
+  experimentalSuggestChain?: (config: unknown) => Promise<void>
+}
+
+type WalletWindow = Window & {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+  getOfflineSigner?: (chainId: string) => OfflineSigner
+  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
+}
 
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    keplr?: any
-    station?: any
-    galaxyStation?: any
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
-  }
-  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+  const walletWindow = window as WalletWindow
+  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
 }
 
 const getOfflineSigner = async () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
+  const walletWindow = window as WalletWindow
+  if (walletWindow.getOfflineSignerAuto) {
+    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (anyWindow.getOfflineSignerAuto) {
-    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (anyWindow.getOfflineSigner) {
-    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  if (walletWindow.getOfflineSigner) {
+    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
@@ -263,11 +267,7 @@ const Contract = () => {
     }
     const signer = await getOfflineSigner()
     if (!signer) throw new Error("Wallet signer not available")
-    return SigningStargateClient.connectWithSigner(CLASSIC_CHAIN.rpc, signer, {
-      gasPrice: GasPrice.fromString(
-        `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
-      )
-    })
+    return connectClassicSigningClient(signer)
   }
 
   const handleUploadSubmit = async (event: FormEvent<HTMLFormElement>) => {

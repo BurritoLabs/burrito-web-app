@@ -1,12 +1,23 @@
-import { useMemo, useState } from "react"
+import { startTransition, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
+import {
+  CandlestickSeries,
+  ColorType,
+  HistogramSeries,
+  LineStyle,
+  createChart,
+  type Time,
+  type UTCTimestamp
+} from "lightweight-charts"
 import PageShell from "./PageShell"
 import SwapPanel from "./components/SwapPanel"
 import styles from "./MarketPairDetails.module.css"
 import { fetchPrices } from "../app/data/classic"
 import { fetchCurrentDashboardSnapshot } from "../app/data/dashboard"
 import {
+  type PairCandle,
+  fetchPairCandles,
   fetchPairTrades,
   fetchMarketDexPairs,
   fetchMarketPools,
@@ -25,12 +36,23 @@ import {
 
 type Timeframe = "1h" | "24h" | "7d"
 
-const TIMEFRAME_LOOKBACK_MS: Record<Timeframe, number> = {
-  "1h": 60 * 60 * 1000,
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000
+const TIMEFRAME_BUCKET_MS: Record<Timeframe, number> = {
+  "1h": 5 * 60 * 1000,
+  "24h": 30 * 60 * 1000,
+  "7d": 2 * 60 * 60 * 1000
 }
-const CHART_RECENT_TRADES_LIMIT = 250
+
+const TIMEFRAME_LOOKBACK_BUCKETS: Record<Timeframe, number> = {
+  "1h": 12,
+  "24h": 48,
+  "7d": 84
+}
+
+const MIN_CANDLES_FOR_CHART: Record<Timeframe, number> = {
+  "1h": 6,
+  "24h": 12,
+  "7d": 18
+}
 
 type ResolvedAsset = {
   id: string
@@ -158,6 +180,49 @@ const formatAxisPrice = (value: number) => {
   return formatNumberNoRoundByNonZeroFractionDigits(value, 6)
 }
 
+const formatChartAxisPrice = (value: number) => {
+  if (!Number.isFinite(value)) return String(value)
+
+  const abs = Math.abs(value)
+  if (abs >= 1_000) return formatNumber(value, 0)
+  if (abs >= 1) return formatNumberNoRoundByNonZeroFractionDigits(value, 2, 8)
+  if (abs >= 0.01) return formatNumberNoRoundByNonZeroFractionDigits(value, 3, 8)
+  return formatNumberNoRoundByNonZeroFractionDigits(value, 2, 10)
+}
+
+const formatChartAxisUsd = (value: number, quoteUsd?: number) => {
+  if (quoteUsd === undefined) return formatChartAxisPrice(value)
+  const usdValue = value * quoteUsd
+  if (!Number.isFinite(usdValue)) return String(usdValue)
+
+  const sign = usdValue < 0 ? "-" : ""
+  const abs = Math.abs(usdValue)
+  const body =
+    abs >= 1_000
+      ? formatNumber(abs, 0)
+      : abs >= 1
+        ? formatNumberNoRoundByNonZeroFractionDigits(abs, 2, 8)
+        : abs >= 0.01
+          ? formatNumberNoRoundByNonZeroFractionDigits(abs, 3, 8)
+          : formatNumberNoRoundByNonZeroFractionDigits(abs, 2, 10)
+
+  return `${sign}$${body}`
+}
+
+const formatChartDetailUsd = (value: number) => {
+  if (!Number.isFinite(value)) return String(value)
+  const sign = value < 0 ? "-" : ""
+  const abs = Math.abs(value)
+  return `${sign}$${formatNumberNoRoundByNonZeroFractionDigits(abs, 4, 12)}`
+}
+
+const formatChartUsdPerBase = (value: number, quoteUsd?: number, baseSymbol?: string) => {
+  if (quoteUsd === undefined) return "--"
+  const formatted = formatChartDetailUsd(value * quoteUsd)
+  if (!baseSymbol) return formatted
+  return `≈ ${formatted} per ${baseSymbol}`
+}
+
 const formatTradeTime = (timestamp: number) =>
   new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -168,7 +233,7 @@ const formatTradeTime = (timestamp: number) =>
     hour12: false
   }).format(new Date(timestamp))
 
-const formatTrendEdgeTime = (timestampMs: number, tf: Timeframe) =>
+const formatChartTime = (timestampMs: number, tf: Timeframe) =>
   new Intl.DateTimeFormat("en-US", {
     month: tf === "1h" ? undefined : "short",
     day: tf === "1h" ? undefined : "2-digit",
@@ -176,6 +241,26 @@ const formatTrendEdgeTime = (timestampMs: number, tf: Timeframe) =>
     minute: "2-digit",
     hour12: false
   }).format(new Date(timestampMs))
+
+const formatChartTickTime = (timestampSeconds: number, tf: Timeframe) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: tf === "7d" ? "short" : undefined,
+    day: tf === "7d" ? "2-digit" : undefined,
+    hour: "2-digit",
+    minute: tf === "1h" ? "2-digit" : undefined,
+    hour12: false
+  }).format(new Date(timestampSeconds * 1000))
+
+const resolveChartEventTime = (time: Time): number | null => {
+  if (typeof time === "number") return time * 1000
+  if (typeof time === "string") {
+    const parsed = Date.parse(time)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  const parsed = Date.UTC(time.year, time.month - 1, time.day)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 const formatTradePrice = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) return "--"
@@ -231,6 +316,9 @@ const MarketPairDetails = () => {
     pair: "",
     limit: 25
   })
+  const [activeCandleTime, setActiveCandleTime] = useState<number | null>(null)
+  const chartHostRef = useRef<HTMLDivElement | null>(null)
+  const chartTooltipRef = useRef<HTMLDivElement | null>(null)
 
   const decodedPairId = useMemo(() => {
     const decode = (value?: string) => {
@@ -496,11 +584,7 @@ const MarketPairDetails = () => {
   const tradesLimit =
     detail?.pool.pair && tradePager.pair === detail.pool.pair ? tradePager.limit : 25
 
-  const {
-    data: tradesData,
-    isLoading: isTradesLoading,
-    dataUpdatedAt: tradesUpdatedAt
-  } = useQuery({
+  const { data: tradesData, isLoading: isTradesLoading } = useQuery({
     queryKey: [
       "market",
       "pair-trades",
@@ -529,122 +613,86 @@ const MarketPairDetails = () => {
   const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
   const hasMoreTrades = Boolean(tradesData?.hasMore)
 
-  const {
-    data: chartTradesData,
-    isLoading: isChartTradesLoading,
-    dataUpdatedAt: chartTradesUpdatedAt
-  } = useQuery({
+  const { data: candlesData = [], isLoading: isCandlesLoading } = useQuery({
     queryKey: [
       "market",
-      "pair-trades-chart",
+      "pair-candles",
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
       detail?.left.decimals,
-      detail?.right.decimals
+      detail?.right.decimals,
+      timeframe
     ],
     queryFn: () =>
-      fetchPairTrades({
+      fetchPairCandles({
         pairAddress: detail!.pool.pair,
         leftAssetKey: detail!.left.key,
         rightAssetKey: detail!.right.key,
         leftDecimals: detail!.left.decimals,
         rightDecimals: detail!.right.decimals,
-        offset: 0,
-        limit: CHART_RECENT_TRADES_LIMIT
+        expectedPrice: detail!.priceValue,
+        bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
+        lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        minCandles: MIN_CANDLES_FOR_CHART[timeframe],
+        includeLocalFallback: true
       }),
     enabled: Boolean(detail?.pool.pair),
-    staleTime: 30_000,
-    refetchInterval: 60_000
+    staleTime: 60_000,
+    refetchInterval: 120_000
   })
 
-  const chartPoints = useMemo(() => {
-    if (!detail) return [] as Array<{ time: number; value: number }>
-    const lookbackMs = TIMEFRAME_LOOKBACK_MS[timeframe]
-    const referenceNow = Math.max(chartTradesUpdatedAt, tradesUpdatedAt, 0)
-    const cutoff = referenceNow > 0 ? referenceNow - lookbackMs : 0
-    const chartTrades = chartTradesData?.trades ?? trades
+  const candles = useMemo(
+    () => {
+      const merged = new Map<number, PairCandle>()
 
-    const sortedAll = [...chartTrades]
-      .sort((a, b) => a.timestamp - b.timestamp)
+      ;[...candlesData]
+        .filter(
+          (candle) =>
+            Number.isFinite(candle.bucketStart) &&
+            Number.isFinite(candle.open) &&
+            Number.isFinite(candle.high) &&
+            Number.isFinite(candle.low) &&
+            Number.isFinite(candle.close)
+        )
+        .sort((a, b) => a.bucketStart - b.bucketStart)
+        .forEach((candle) => {
+          const existing = merged.get(candle.bucketStart)
+          if (!existing) {
+            merged.set(candle.bucketStart, candle)
+            return
+          }
 
-    const inRange = sortedAll.filter((trade) => trade.timestamp >= cutoff)
-    const source = inRange.length >= 2 ? inRange : sortedAll.slice(-80)
+          merged.set(candle.bucketStart, {
+            bucketStart: candle.bucketStart,
+            open: existing.open,
+            high: Math.max(existing.high, candle.high),
+            low: Math.min(existing.low, candle.low),
+            close: candle.close,
+            volumeQuote: existing.volumeQuote + candle.volumeQuote
+          })
+        })
 
-    return source
-      .map((trade) => ({
-        time: trade.timestamp,
-        // Keep chart and trade table in the same price basis (left/right pair price).
-        value: trade.price
-      }))
-      .filter((point) => Number.isFinite(point.value) && point.value > 0)
-  }, [detail, timeframe, trades, tradesUpdatedAt, chartTradesData, chartTradesUpdatedAt])
+      return [...merged.values()].sort((a, b) => a.bucketStart - b.bucketStart)
+    },
+    [candlesData]
+  )
 
-  const trendGeometry = useMemo(() => {
-    if (!chartPoints.length) return undefined
-
-    const width = 1000
-    const height = 320
-    const padX = 14
-    const padY = 16
-    const usableW = width - padX * 2
-    const usableH = height - padY * 2
-
-    const rawMin = Math.min(...chartPoints.map((point) => point.value))
-    const rawMax = Math.max(...chartPoints.map((point) => point.value))
-    const rawSpan = rawMax - rawMin
-    const spanPad = rawSpan > 0 ? rawSpan * 0.08 : Math.max(Math.abs(rawMax) * 0.02, 1e-8)
-    const minValue = Math.max(rawMin - spanPad, 0)
-    const maxValue = rawMax + spanPad
-    const valueSpan = Math.max(maxValue - minValue, 1e-12)
-
-    // Keep x positions evenly distributed so the simple trend never renders blank.
-    const divisor = Math.max(chartPoints.length - 1, 1)
-    const points = chartPoints.map((point, index) => {
-      const x = padX + (index / divisor) * usableW
-      const y = padY + (1 - (point.value - minValue) / valueSpan) * usableH
-      return { x, y }
-    })
-
-    const renderPoints = points.length === 1
-      ? [
-          points[0],
-          { x: padX + usableW, y: points[0].y }
-        ]
-      : points
-
-    const linePath = renderPoints
-      .map(
-        (point, index) =>
-          `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`
-      )
-      .join(" ")
-
-    const areaPath = `${linePath} L ${(padX + usableW).toFixed(2)} ${(padY + usableH).toFixed(
-      2
-    )} L ${padX.toFixed(2)} ${(padY + usableH).toFixed(2)} Z`
-
-    return {
-      width,
-      height,
-      padX,
-      padY,
-      usableW,
-      usableH,
-      minTime: chartPoints[0].time,
-      maxTime: chartPoints[chartPoints.length - 1].time,
-      linePath,
-      areaPath,
-      points: renderPoints
-    }
-  }, [chartPoints])
+  const activeCandle = useMemo(() => {
+    if (!candles.length) return undefined
+    return candles.find((candle) => candle.bucketStart === activeCandleTime) ?? candles[candles.length - 1]
+  }, [activeCandleTime, candles])
+  const baseSymbol = detail?.left.symbol ?? ""
+  const chartQuoteUsd = detail?.priceQuoteUsd
+  const quoteSymbol = detail?.right.symbol ?? ""
 
   const chartStats = useMemo(() => {
-    if (!chartPoints.length) return undefined
-    const first = chartPoints[0].value
-    const last = chartPoints[chartPoints.length - 1].value
-    const high = Math.max(...chartPoints.map((point) => point.value))
-    const low = Math.min(...chartPoints.map((point) => point.value))
+    if (!candles.length) return undefined
+    const first = candles[0].open
+    const last = candles[candles.length - 1].close
+    const high = Math.max(...candles.map((candle) => candle.high))
+    const low = Math.min(...candles.map((candle) => candle.low))
     return {
       start: first,
       last,
@@ -652,7 +700,262 @@ const MarketPairDetails = () => {
       low,
       change: first > 0 ? ((last - first) / first) * 100 : undefined
     }
-  }, [chartPoints])
+  }, [candles])
+
+  useEffect(() => {
+    if (!chartHostRef.current || !candles.length) return undefined
+
+    const host = chartHostRef.current
+    const tooltipEl = chartTooltipRef.current
+    const candleByTimestamp = new Map<number, PairCandle>()
+    const firstCandle = candles[0]
+    const lastCandle = candles[candles.length - 1]
+    const trendLineColor = "rgba(108, 236, 61, 0.98)"
+    const trendLineSoft = "rgba(108, 236, 61, 0.36)"
+
+    const chart = createChart(host, {
+      autoSize: true,
+      height: 460,
+      layout: {
+        background: { type: ColorType.Solid, color: "rgba(10, 16, 13, 0.72)" },
+        textColor: "rgba(234, 245, 235, 0.64)",
+        fontFamily: "Montserrat, sans-serif",
+        attributionLogo: true
+      },
+      grid: {
+        vertLines: { color: "rgba(255, 255, 255, 0.04)" },
+        horzLines: { color: "rgba(255, 255, 255, 0.075)" }
+      },
+      rightPriceScale: {
+        borderVisible: false,
+        ticksVisible: false,
+        scaleMargins: { top: 0.08, bottom: 0.28 }
+      },
+      leftPriceScale: { visible: false },
+      crosshair: {
+        vertLine: {
+          color: "rgba(255, 255, 255, 0.28)",
+          width: 1,
+          style: 2,
+          labelBackgroundColor: "rgba(11, 20, 15, 0.96)"
+        },
+        horzLine: {
+          color: "rgba(255, 255, 255, 0.22)",
+          width: 1,
+          style: 2,
+          labelBackgroundColor: "rgba(11, 20, 15, 0.96)"
+        }
+      },
+      timeScale: {
+        borderVisible: false,
+        rightOffset: 6,
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: (time: Time) => {
+          if (typeof time !== "number") return null
+          return formatChartTickTime(time, timeframe)
+        }
+      },
+      localization: {
+        priceFormatter: (value: number) => formatChartAxisUsd(value, chartQuoteUsd)
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: true
+      }
+    })
+
+    const priceSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "rgba(108, 236, 61, 0.92)",
+      downColor: "rgba(255, 106, 106, 0.92)",
+      borderVisible: true,
+      borderUpColor: "rgba(108, 236, 61, 0.98)",
+      borderDownColor: "rgba(255, 106, 106, 0.98)",
+      wickUpColor: "rgba(108, 236, 61, 0.96)",
+      wickDownColor: "rgba(255, 106, 106, 0.96)",
+      priceLineVisible: false,
+      lastValueVisible: false,
+      priceFormat: {
+        type: "custom",
+        minMove: 0.00000001,
+        formatter: (value: number) => formatChartAxisUsd(value, chartQuoteUsd)
+      }
+    })
+
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceScaleId: "",
+      priceFormat: { type: "volume" },
+      lastValueVisible: false,
+      priceLineVisible: false,
+      base: 0
+    })
+
+    chart.priceScale("").applyOptions({
+      visible: false,
+      scaleMargins: {
+        top: 0.78,
+        bottom: 0
+      }
+    })
+
+    priceSeries.setData(
+      candles.map((candle) => {
+        const time = Math.floor(candle.bucketStart / 1000) as UTCTimestamp
+        const minMove = Math.max(Math.abs(candle.close) * 1e-8, 1e-12)
+        const high = candle.high === candle.low ? candle.high + minMove : candle.high
+        const low = candle.high === candle.low ? Math.max(candle.low - minMove, 0) : candle.low
+        candleByTimestamp.set(Number(time), candle)
+        return {
+          time,
+          open: candle.open,
+          high,
+          low,
+          close: candle.close
+        }
+      })
+    )
+
+    volumeSeries.setData(
+      candles.map((candle) => ({
+        time: Math.floor(candle.bucketStart / 1000) as UTCTimestamp,
+        value: candle.volumeQuote,
+        color:
+          candle.close >= candle.open
+            ? "rgba(101, 228, 48, 0.28)"
+            : "rgba(255, 106, 106, 0.28)"
+      }))
+    )
+
+    priceSeries.createPriceLine({
+      price: lastCandle.close,
+      color: trendLineSoft,
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      lineVisible: true,
+      axisLabelVisible: true,
+      axisLabelColor: trendLineColor,
+      axisLabelTextColor: "#08110d"
+    })
+    priceSeries.createPriceLine({
+      price: firstCandle.open,
+      color: "rgba(234, 245, 235, 0.14)",
+      lineWidth: 1,
+      lineStyle: LineStyle.Dotted,
+      lineVisible: true,
+      axisLabelVisible: false
+    })
+
+    const hideTooltip = () => {
+      if (tooltipEl) {
+        tooltipEl.style.opacity = "0"
+        tooltipEl.style.transform = "translateY(4px)"
+      }
+    }
+
+    let hoveredCandleTime: number | null = null
+
+    chart.subscribeCrosshairMove((param) => {
+      if (
+        !param.point ||
+        !param.time ||
+        param.point.x < 0 ||
+        param.point.y < 0 ||
+        param.point.x > host.clientWidth ||
+        param.point.y > host.clientHeight
+      ) {
+        hideTooltip()
+        if (hoveredCandleTime !== null) {
+          hoveredCandleTime = null
+          startTransition(() => setActiveCandleTime(null))
+        }
+        return
+      }
+
+      const timestampMs = resolveChartEventTime(param.time)
+      if (timestampMs === null) {
+        hideTooltip()
+        return
+      }
+
+      const candle = candleByTimestamp.get(Math.floor(timestampMs / 1000))
+      if (!candle) {
+        hideTooltip()
+        return
+      }
+
+      if (hoveredCandleTime !== candle.bucketStart) {
+        hoveredCandleTime = candle.bucketStart
+        startTransition(() => setActiveCandleTime(candle.bucketStart))
+      }
+
+      if (!tooltipEl) return
+      const currentPairPrice = `${formatAxisPrice(candle.close)} ${quoteSymbol}`.trim()
+      const currentUsd = formatChartUsdPerBase(candle.close, chartQuoteUsd, baseSymbol)
+      const openPair = `${formatAxisPrice(candle.open)} ${quoteSymbol}`.trim()
+      const highPair = `${formatAxisPrice(candle.high)} ${quoteSymbol}`.trim()
+      const lowPair = `${formatAxisPrice(candle.low)} ${quoteSymbol}`.trim()
+      const closePair = `${formatAxisPrice(candle.close)} ${quoteSymbol}`.trim()
+      const intrabarChange = candle.open > 0 ? ((candle.close - candle.open) / candle.open) * 100 : undefined
+      const changeClass =
+        intrabarChange === undefined
+          ? styles.chartTooltipChangeFlat
+          : intrabarChange >= 0
+            ? styles.chartTooltipChangeUp
+            : styles.chartTooltipChangeDown
+
+      tooltipEl.innerHTML = `
+        <div class="${styles.chartTooltipTime}">${formatChartTime(candle.bucketStart, timeframe)}</div>
+        <div class="${styles.chartTooltipPrice}">${currentPairPrice}</div>
+        <div class="${styles.chartTooltipSubprice}">${currentUsd}</div>
+        <div class="${styles.chartTooltipMeta}">
+          <span class="${styles.chartTooltipChange} ${changeClass}">${
+            intrabarChange === undefined ? "--" : formatPercent(intrabarChange)
+          }</span>
+          <span class="${styles.chartTooltipMetaLabel}">vs open</span>
+        </div>
+        <div class="${styles.chartTooltipDivider}"></div>
+        <div class="${styles.chartTooltipRow}">
+          <span>Open</span><strong>${openPair}</strong>
+        </div>
+        <div class="${styles.chartTooltipRow}">
+          <span>High</span><strong>${highPair}</strong>
+        </div>
+        <div class="${styles.chartTooltipRow}">
+          <span>Low</span><strong>${lowPair}</strong>
+        </div>
+        <div class="${styles.chartTooltipRow}">
+          <span>Close</span><strong>${closePair}</strong>
+        </div>
+        <div class="${styles.chartTooltipRow}">
+          <span>Vol</span><strong>${formatNumber(candle.volumeQuote, 2)} ${quoteSymbol}</strong>
+        </div>
+      `
+
+      const tooltipWidth = 216
+      const tooltipHeight = 204
+      const left = Math.min(Math.max(param.point.x + 14, 10), host.clientWidth - tooltipWidth - 10)
+      const top = Math.min(Math.max(param.point.y - tooltipHeight - 14, 10), host.clientHeight - tooltipHeight - 10)
+
+      tooltipEl.style.left = `${left}px`
+      tooltipEl.style.top = `${top}px`
+      tooltipEl.style.opacity = "1"
+      tooltipEl.style.transform = "translateY(0)"
+    })
+
+    chart.timeScale().fitContent()
+
+    return () => {
+      hideTooltip()
+      chart.remove()
+    }
+  }, [baseSymbol, candles, chartQuoteUsd, quoteSymbol, timeframe])
 
   const loading = isPairsLoading || isPoolsLoading
 
@@ -678,6 +981,11 @@ const MarketPairDetails = () => {
 
   const timeframeValue = chartStats?.change ?? detail.changes[timeframe]
   const chartPairLabel = `${detail.left.symbol}/${detail.right.symbol}`
+  const candleChange =
+    activeCandle && activeCandle.open > 0
+      ? ((activeCandle.close - activeCandle.open) / activeCandle.open) * 100
+      : undefined
+  const candleTimeLabel = activeCandle ? formatChartTime(activeCandle.bucketStart, timeframe) : chartPairLabel
 
   return (
     <PageShell
@@ -699,78 +1007,90 @@ const MarketPairDetails = () => {
       }
     >
       <section className={`card ${styles.hero}`}>
-        <div className={styles.heroLeft}>
-          <div className={styles.pairIcons}>
-            <span className={styles.pairIconPrimary}>
-              <AssetIcon
-                key={detail.left.id}
-                symbol={detail.left.symbol}
-                candidates={detail.left.iconCandidates}
-                size={48}
-              />
-            </span>
-            <span className={styles.pairIconSecondary}>
-              <AssetIcon
-                key={detail.right.id}
-                symbol={detail.right.symbol}
-                candidates={detail.right.iconCandidates}
-                size={30}
-              />
-            </span>
+        <div className={styles.heroTop}>
+          <div className={styles.heroLeft}>
+            <div className={styles.pairIcons}>
+              <span className={styles.pairIconPrimary}>
+                <AssetIcon
+                  key={detail.left.id}
+                  symbol={detail.left.symbol}
+                  candidates={detail.left.iconCandidates}
+                  size={48}
+                />
+              </span>
+              <span className={styles.pairIconSecondary}>
+                <AssetIcon
+                  key={detail.right.id}
+                  symbol={detail.right.symbol}
+                  candidates={detail.right.iconCandidates}
+                  size={30}
+                />
+              </span>
+            </div>
+            <div className={styles.heroHeading}>
+              <div className={styles.pairTitle}>
+                {detail.left.symbol}
+                <span>/</span>
+                {detail.right.symbol}
+              </div>
+              <div className={styles.tags}>
+                <span className={styles.dexTag}>{dexName}</span>
+                {dexVersion ? <span className={styles.dexVersionTag}>{dexVersion}</span> : null}
+              </div>
+            </div>
           </div>
-          <div>
-            <div className={styles.pairTitle}>
-              {detail.left.symbol}
-              <span>/</span>
-              {detail.right.symbol}
+          <div className={styles.heroRight}>
+            <div className={styles.priceMain}>
+              {detail.priceUsd !== undefined ? formatUsdNoRound(detail.priceUsd) : "--"}
             </div>
-            <div className={styles.tags}>
-              <span className={styles.dexTag}>{dexName}</span>
-              {dexVersion ? <span className={styles.dexVersionTag}>{dexVersion}</span> : null}
+            <div
+              className={`${styles.priceChange} ${
+                timeframeValue === undefined
+                  ? styles.changeFlat
+                  : timeframeValue >= 0
+                    ? styles.changeUp
+                    : styles.changeDown
+              }`}
+            >
+              {timeframe}: {timeframeValue === undefined ? "--" : formatPercent(timeframeValue)}
             </div>
-            <div className={styles.heroMeta}>
-              <span className={styles.heroMetaItem}>
-                <em>Mkt Cap</em>
-                <strong>{formatUsdCompact(detail.marketCapUsd)}</strong>
-              </span>
-              <span className={styles.heroMetaItem}>
-                <em>Liquidity</em>
-                <strong>{detail.liquidityUsd !== undefined ? formatUsd(detail.liquidityUsd) : "--"}</strong>
-              </span>
-              <span className={styles.heroMetaItem}>
-                <em>Reserves</em>
-                <strong className={styles.reserveValue}>
-                  {formatNumber(detail.leftAmount, 2)} {detail.left.symbol} · {formatNumber(detail.rightAmount, 2)}{" "}
-                  {detail.right.symbol}
-                </strong>
-              </span>
-              <span className={styles.heroMetaItem}>
-                <em>Pool</em>
-                <strong className={styles.poolValue}>{truncateHash(detail.pool.pair, 10, 8)}</strong>
-              </span>
+            <div className={styles.priceHint}>
+              1 {detail.priceBase.symbol} ≈{" "}
+              {formatNumberNoRoundByNonZeroFractionDigits(detail.priceValue, 4)}{" "}
+              {detail.priceQuote.symbol}
             </div>
           </div>
         </div>
-        <div className={styles.heroRight}>
-          <div className={styles.priceMain}>
-            {detail.priceUsd !== undefined ? formatUsdNoRound(detail.priceUsd) : "--"}
-          </div>
-          <div
-            className={`${styles.priceChange} ${
-              timeframeValue === undefined
-                ? styles.changeFlat
-                : timeframeValue >= 0
-                  ? styles.changeUp
-                  : styles.changeDown
-            }`}
-          >
-            {timeframe}: {timeframeValue === undefined ? "--" : formatPercent(timeframeValue)}
-          </div>
-          <div className={styles.priceHint}>
-            1 {detail.priceBase.symbol} ≈{" "}
-            {formatNumberNoRoundByNonZeroFractionDigits(detail.priceValue, 4)}{" "}
-            {detail.priceQuote.symbol}
-          </div>
+        <div className={styles.heroMeta}>
+          <span className={styles.heroMetaItem}>
+            <em>Mkt Cap</em>
+            <strong>{formatUsdCompact(detail.marketCapUsd)}</strong>
+          </span>
+          <span className={styles.heroMetaItem}>
+            <em>Liquidity</em>
+            <strong>{detail.liquidityUsd !== undefined ? formatUsd(detail.liquidityUsd) : "--"}</strong>
+          </span>
+        </div>
+        <div className={styles.heroInfoRow}>
+          <span className={styles.heroInfoItem}>
+            <em>Reserves</em>
+            <strong className={styles.reserveValue}>
+              {formatNumber(detail.leftAmount, 2)} {detail.left.symbol} · {formatNumber(detail.rightAmount, 2)}{" "}
+              {detail.right.symbol}
+            </strong>
+          </span>
+          <span className={styles.heroInfoItem}>
+            <em>Pool</em>
+            <a
+              className={styles.poolLink}
+              href={`https://finder.burrito.money/classic/address/${detail.pool.pair}`}
+              target="_blank"
+              rel="noreferrer"
+              title={detail.pool.pair}
+            >
+              <span className={styles.poolValue}>{truncateHash(detail.pool.pair, 10, 8)}</span>
+            </a>
+          </span>
         </div>
       </section>
 
@@ -778,78 +1098,49 @@ const MarketPairDetails = () => {
         <section className={`card ${styles.chartSection}`}>
           <header className={styles.chartHeader}>
             <span className={styles.sectionTitle}>Price chart</span>
-            <span className={styles.chartSymbol}>{chartPairLabel}</span>
+            <span className={styles.chartSymbol}>{candleTimeLabel}</span>
           </header>
           <header className={styles.ohlcHeader}>
-            {chartStats ? (
+            {activeCandle ? (
               <>
-                <span>Start {formatAxisPrice(chartStats.start)}</span>
-                <span>High {formatAxisPrice(chartStats.high)}</span>
-                <span>Low {formatAxisPrice(chartStats.low)}</span>
-                <span>Last {formatAxisPrice(chartStats.last)}</span>
+                <span>O {formatAxisPrice(activeCandle.open)} {detail.right.symbol}</span>
+                <span>H {formatAxisPrice(activeCandle.high)} {detail.right.symbol}</span>
+                <span>L {formatAxisPrice(activeCandle.low)} {detail.right.symbol}</span>
+                <span>C {formatAxisPrice(activeCandle.close)} {detail.right.symbol}</span>
+                <span>Vol {formatNumber(activeCandle.volumeQuote, 2)} {detail.right.symbol}</span>
+                <span className={styles.ohlcFlat}>
+                  {formatChartUsdPerBase(activeCandle.close, chartQuoteUsd, detail.left.symbol)}
+                </span>
                 <span
                   className={
-                    chartStats.change === undefined
+                    candleChange === undefined
                       ? styles.ohlcFlat
-                      : chartStats.change >= 0
+                      : candleChange >= 0
                         ? styles.ohlcUp
                         : styles.ohlcDown
                   }
                 >
-                  {chartStats.change === undefined ? "--" : formatPercent(chartStats.change)}
+                  {candleChange === undefined ? "--" : formatPercent(candleChange)}
                 </span>
               </>
             ) : (
-              <span className={styles.ohlcFlat}>No trade data yet</span>
+              <span className={styles.ohlcFlat}>No candle data yet</span>
             )}
           </header>
-          {(isTradesLoading || isChartTradesLoading) && !chartPoints.length ? (
+          {isCandlesLoading && !candles.length ? (
             <div className={styles.chartFallback}>Loading recent swaps...</div>
-          ) : !chartPoints.length ? (
+          ) : !candles.length ? (
             <div className={styles.chartFallback}>
-              No recent swaps to draw trend in this timeframe.
+              No recent swaps to build candles for this timeframe.
             </div>
           ) : (
             <div className={styles.chartCanvas}>
-              {trendGeometry ? (
-                <>
-                  <svg
-                    className={styles.trendSvg}
-                    viewBox={`0 0 ${trendGeometry.width} ${trendGeometry.height}`}
-                    preserveAspectRatio="none"
-                    aria-label={`${chartPairLabel} ${timeframe} price trend chart`}
-                  >
-                    {[0, 1, 2, 3, 4].map((row) => {
-                      const y = trendGeometry.padY + (trendGeometry.usableH / 4) * row
-                      return (
-                        <line
-                          key={`grid-${row}`}
-                          x1={trendGeometry.padX}
-                          x2={trendGeometry.padX + trendGeometry.usableW}
-                          y1={y}
-                          y2={y}
-                          className={styles.trendGrid}
-                        />
-                      )
-                    })}
-                    <path d={trendGeometry.areaPath} className={styles.trendArea} />
-                    <path d={trendGeometry.linePath} className={styles.trendLine} />
-                    {trendGeometry.points.map((point, index) => (
-                      <circle
-                        key={`trend-point-${index}`}
-                        cx={point.x}
-                        cy={point.y}
-                        r={index === trendGeometry.points.length - 1 ? 3.6 : 2.2}
-                        className={styles.trendPoint}
-                      />
-                    ))}
-                  </svg>
-                  <div className={styles.trendEdgeTimes}>
-                    <span>{formatTrendEdgeTime(trendGeometry.minTime, timeframe)}</span>
-                    <span>{formatTrendEdgeTime(trendGeometry.maxTime, timeframe)}</span>
-                  </div>
-                </>
-              ) : null}
+              <div
+                ref={chartHostRef}
+                className={styles.chartHost}
+                aria-label={`${chartPairLabel} ${timeframe} price chart`}
+              />
+              <div ref={chartTooltipRef} className={styles.chartTooltip} />
             </div>
           )}
         </section>

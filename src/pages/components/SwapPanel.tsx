@@ -3,7 +3,6 @@ import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import type { OfflineSigner } from "@cosmjs/proto-signing"
-import { GasPrice, SigningStargateClient } from "@cosmjs/stargate"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
 import styles from "../Swap.module.css"
@@ -13,6 +12,7 @@ import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
 import { useCw20Balances } from "../../app/data/cw20"
 import { useCw20Whitelist } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
+import { connectClassicSigningClient } from "../../app/wallet/signingClient"
 import { useWallet } from "../../app/wallet/WalletProvider"
 
 type AssetType = "native" | "cw20"
@@ -961,13 +961,7 @@ const SwapPanel = ({
         if (!wallet) throw new Error("Wallet extension not available")
         const signer = await getOfflineSigner()
         if (!signer) throw new Error("Wallet signer not available")
-        const client = await SigningStargateClient.connectWithSigner(
-          CLASSIC_CHAIN.rpc,
-          signer,
-          {
-            gasPrice: GasPrice.fromString(`28.325${CLASSIC_DENOMS.lunc.coinMinimalDenom}`)
-          }
-        )
+        const client = await connectClassicSigningClient(signer)
         const feeMsg = buildPlatformFeeMessage(accountAddress, fromAsset, platformFeeMicro)
         const msg = buildSwapMessage(
           accountAddress,
@@ -1069,14 +1063,7 @@ const SwapPanel = ({
       if (!wallet) throw new Error("Wallet extension not available")
       const signer = await getOfflineSigner()
       if (!signer) throw new Error("Wallet signer not available")
-
-      const client = await SigningStargateClient.connectWithSigner(
-        CLASSIC_CHAIN.rpc,
-        signer,
-        {
-          gasPrice: GasPrice.fromString(`28.325${CLASSIC_DENOMS.lunc.coinMinimalDenom}`)
-        }
-      )
+      const client = await connectClassicSigningClient(signer)
 
       const feeMsg = buildPlatformFeeMessage(accountAddress, fromAsset, platformFeeMicro)
       const msg = buildSwapMessage(
