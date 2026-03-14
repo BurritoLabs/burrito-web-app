@@ -10,15 +10,15 @@ const HEXXAGON_TOKENS_URL =
   "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main/cw20/tokens/mainnet/terra.js";
 
 const BUCKET_MS = {
-  "1h": 60 * 60 * 1000,
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
+  "1h": 5 * 60 * 1000,
+  "24h": 30 * 60 * 1000,
+  "7d": 2 * 60 * 60 * 1000,
 };
 
 const LOOKBACK_BUCKETS = {
-  "1h": 120,
-  "24h": 120,
-  "7d": 120,
+  "1h": 12,
+  "24h": 48,
+  "7d": 84,
 };
 
 const MAX_LOOKBACK_MS = Math.max(
@@ -37,10 +37,26 @@ const toInt = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const toPositiveIntOrAll = (value, fallback) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === "all") return Number.POSITIVE_INFINITY;
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 const INDEX_FILE = path.resolve(process.cwd(), readArg("index", DEFAULT_INDEX_FILE));
 const OUT_DIR = path.resolve(process.cwd(), readArg("out-dir", DEFAULT_OUT_DIR));
 const MAX_PAGES = toInt(readArg("max-pages", process.env.MARKET_CANDLE_MAX_PAGES), 120);
 const PAGE_LIMIT = toInt(readArg("page-limit", process.env.MARKET_CANDLE_PAGE_LIMIT), 100);
+const HOT_PAIR_LIMIT = toPositiveIntOrAll(
+  readArg("pair-limit", process.env.MARKET_CANDLE_PAIR_LIMIT),
+  100
+);
+const PAIR_QUERY_CONCURRENCY = toInt(
+  readArg("pair-concurrency", process.env.MARKET_CANDLE_PAIR_CONCURRENCY),
+  6
+);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -92,6 +108,19 @@ const normalizeAssetId = (value) => {
   if (value.startsWith("native:") || value.startsWith("cw20:")) return value;
   if (value.startsWith("terra1")) return `cw20:${value.toLowerCase()}`;
   return `native:${value}`;
+};
+
+const parseBigInt = (value) => {
+  try {
+    return BigInt(String(value ?? "0"));
+  } catch {
+    return 0n;
+  }
+};
+
+const toUnits = (amount, decimals) => {
+  const numeric = Number(amount);
+  return Number.isFinite(numeric) ? numeric / 10 ** Math.max(0, decimals) : 0;
 };
 
 const toAssetMeta = (assetId, cw20Decimals) => {
@@ -170,7 +199,11 @@ const parseTxEvents = (response) => {
   if (!Number.isFinite(timestamp)) return [];
 
   const ticks = [];
-  const events = Array.isArray(response?.events) ? response.events : [];
+  const logEvents = Array.isArray(response?.logs)
+    ? response.logs.flatMap((log) => (Array.isArray(log?.events) ? log.events : []))
+    : [];
+  const responseEvents = Array.isArray(response?.events) ? response.events : [];
+  const events = logEvents.length ? logEvents : responseEvents;
 
   for (const event of events) {
     if (event?.type !== "wasm") continue;
@@ -178,7 +211,9 @@ const parseTxEvents = (response) => {
     const getAttr = (key) => attrs.find((item) => item?.key === key)?.value;
 
     const pair = String(getAttr("_contract_address") ?? "").toLowerCase();
+    const action = String(getAttr("action") ?? "").toLowerCase();
     if (!pair) continue;
+    if (action !== "swap") continue;
 
     const offerAsset = String(getAttr("offer_asset") ?? "");
     const askAsset = String(getAttr("ask_asset") ?? "");
@@ -234,25 +269,6 @@ const toTickForOrientation = ({
   return null;
 };
 
-const loadCw20Decimals = async () => {
-  const source = await fetchJson(HEXXAGON_TOKENS_URL);
-  const payload = Array.isArray(source)
-    ? source
-    : parseCommonJsArray(typeof source === "string" ? source : "");
-
-  const map = new Map();
-  for (const token of payload) {
-    const idRaw = typeof token?.token === "string" ? token.token : "";
-    const decimalsRaw = token?.decimals;
-    const decimals = Number.isFinite(Number(decimalsRaw)) ? Number(decimalsRaw) : null;
-    if (!idRaw || decimals === null) continue;
-    const key = normalizeAssetKey(idRaw);
-    if (!key || map.has(key)) continue;
-    map.set(key, decimals);
-  }
-  return map;
-};
-
 const fetchCw20Decimals = async () => {
   const response = await fetch(HEXXAGON_TOKENS_URL, { cache: "no-store" });
   if (!response.ok) throw new Error(`Failed to load cw20 tokens: HTTP ${response.status}`);
@@ -273,12 +289,129 @@ const fetchCw20Decimals = async () => {
   return map;
 };
 
+const updateBestAnchorQuote = ({
+  map,
+  targetKey,
+  quoteKey,
+  targetUnits,
+  quoteUnits,
+}) => {
+  if (!targetKey || !quoteKey) return;
+  if (!Number.isFinite(targetUnits) || !Number.isFinite(quoteUnits)) return;
+  if (targetUnits <= 0 || quoteUnits <= 0) return;
+
+  const next = {
+    quoteKey,
+    priceInQuote: quoteUnits / targetUnits,
+    liquidityQuote: quoteUnits,
+  };
+  const current = map.get(targetKey);
+  if (!current || next.liquidityQuote > current.liquidityQuote) {
+    map.set(targetKey, next);
+  }
+};
+
+const estimateHotPairs = (pairMetas) => {
+  let bestLuncInUstc;
+  let bestLuncLiquidity = 0;
+  const anchorQuotes = new Map();
+
+  for (const meta of pairMetas) {
+    const leftIsUstc = meta.leftKey === "uusd";
+    const rightIsUstc = meta.rightKey === "uusd";
+    const leftIsLunc = meta.leftKey === "uluna";
+    const rightIsLunc = meta.rightKey === "uluna";
+
+    if ((leftIsLunc && rightIsUstc) || (leftIsUstc && rightIsLunc)) {
+      const luncUnits = leftIsLunc ? meta.leftUnits : meta.rightUnits;
+      const ustcUnits = leftIsUstc ? meta.leftUnits : meta.rightUnits;
+      if (luncUnits > 0 && ustcUnits > 0 && ustcUnits > bestLuncLiquidity) {
+        bestLuncLiquidity = ustcUnits;
+        bestLuncInUstc = ustcUnits / luncUnits;
+      }
+    }
+
+    if (leftIsUstc || leftIsLunc) {
+      updateBestAnchorQuote({
+        map: anchorQuotes,
+        targetKey: meta.rightKey,
+        quoteKey: meta.leftKey,
+        targetUnits: meta.rightUnits,
+        quoteUnits: meta.leftUnits,
+      });
+    }
+    if (rightIsUstc || rightIsLunc) {
+      updateBestAnchorQuote({
+        map: anchorQuotes,
+        targetKey: meta.leftKey,
+        quoteKey: meta.rightKey,
+        targetUnits: meta.leftUnits,
+        quoteUnits: meta.rightUnits,
+      });
+    }
+  }
+
+  const resolvePriceInUstc = (key) => {
+    if (key === "uusd") return 1;
+    if (key === "uluna") return bestLuncInUstc;
+
+    const quote = anchorQuotes.get(key);
+    if (!quote) return undefined;
+    if (quote.quoteKey === "uusd") return quote.priceInQuote;
+    if (quote.quoteKey === "uluna" && bestLuncInUstc !== undefined) {
+      return quote.priceInQuote * bestLuncInUstc;
+    }
+    return undefined;
+  };
+
+  const ranked = pairMetas
+    .map((meta) => {
+      const leftPrice = resolvePriceInUstc(meta.leftKey);
+      const rightPrice = resolvePriceInUstc(meta.rightKey);
+      const leftValue = leftPrice !== undefined ? meta.leftUnits * leftPrice : undefined;
+      const rightValue = rightPrice !== undefined ? meta.rightUnits * rightPrice : undefined;
+      const score =
+        leftValue !== undefined && rightValue !== undefined
+          ? leftValue + rightValue
+          : leftValue !== undefined
+            ? leftValue * 2
+            : rightValue !== undefined
+              ? rightValue * 2
+              : 0;
+
+      return {
+        pair: meta.pair,
+        score,
+      };
+    })
+    .sort((a, b) => (b.score === a.score ? a.pair.localeCompare(b.pair) : b.score - a.score));
+
+  const orderedPairs = [];
+  const seen = new Set();
+  const addPair = (pair) => {
+    if (!pair || seen.has(pair)) return;
+    seen.add(pair);
+    orderedPairs.push(pair);
+  };
+
+  ranked.forEach((entry) => {
+    if (entry.score > 0) addPair(entry.pair);
+  });
+  pairMetas.forEach((meta) => addPair(meta.pair));
+
+  return {
+    orderedPairs,
+    scoredPairs: ranked.filter((entry) => entry.score > 0).length,
+  };
+};
+
 const loadPairMeta = async () => {
   const source = await fs.readFile(INDEX_FILE, "utf8");
   const payload = JSON.parse(source);
   const cw20Decimals = await fetchCw20Decimals();
 
   const map = new Map();
+  const metas = [];
   const pairs = Array.isArray(payload?.pairs) ? payload.pairs : [];
 
   for (const pair of pairs) {
@@ -289,26 +422,42 @@ const loadPairMeta = async () => {
     const leftAsset = toAssetMeta(poolAssets[0]?.id ?? "", cw20Decimals);
     const rightAsset = toAssetMeta(poolAssets[1]?.id ?? "", cw20Decimals);
     if (!leftAsset.key || !rightAsset.key) continue;
+    const leftUnits = toUnits(parseBigInt(poolAssets[0]?.amount ?? "0"), leftAsset.decimals);
+    const rightUnits = toUnits(parseBigInt(poolAssets[1]?.amount ?? "0"), rightAsset.decimals);
 
     const leftToRightKey = `${leftAsset.key}|${rightAsset.key}`;
     const rightToLeftKey = `${rightAsset.key}|${leftAsset.key}`;
 
-    map.set(pairAddress, {
+    const meta = {
       pair: pairAddress,
       leftKey: leftAsset.key,
       rightKey: rightAsset.key,
       leftDecimals: leftAsset.decimals,
       rightDecimals: rightAsset.decimals,
+      leftUnits,
+      rightUnits,
       keys: [leftToRightKey, rightToLeftKey],
-    });
+    };
+
+    map.set(pairAddress, meta);
+    metas.push(meta);
   }
 
-  return map;
+  const { orderedPairs, scoredPairs } = estimateHotPairs(metas);
+  const limitedPairs = Number.isFinite(HOT_PAIR_LIMIT)
+    ? orderedPairs.slice(0, HOT_PAIR_LIMIT)
+    : orderedPairs;
+
+  return {
+    pairMetaMap: map,
+    selectedPairs: limitedPairs,
+    scoredPairs,
+  };
 };
 
-const fetchSwapTxPage = async (page) => {
+const fetchPairTxPage = async (pairAddress, page) => {
   const url = new URL(`${LCD}/cosmos/tx/v1beta1/txs`);
-  url.searchParams.set("events", "wasm.action='swap'");
+  url.searchParams.set("events", `wasm._contract_address='${pairAddress}'`);
   url.searchParams.set("order_by", "2");
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(PAGE_LIMIT));
@@ -317,39 +466,41 @@ const fetchSwapTxPage = async (page) => {
   return Array.isArray(payload?.tx_responses) ? payload.tx_responses : [];
 };
 
-const clearDirectory = async (dir) => {
-  try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    await Promise.all(
-      entries.map((entry) =>
-        fs.rm(path.join(dir, entry.name), { recursive: true, force: true })
-      )
-    );
-  } catch {
-    // Ignore if folder does not exist yet.
-  }
+const mapWithConcurrency = async (items, limit, mapper) => {
+  const results = [];
+  let cursor = 0;
+
+  const workers = Array.from(
+    { length: Math.max(1, Math.min(limit, items.length || 1)) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        // eslint-disable-next-line no-await-in-loop
+        const result = await mapper(items[index], index);
+        if (result !== undefined && result !== null) {
+          results.push(result);
+        }
+      }
+    }
+  );
+
+  await Promise.all(workers);
+  return results;
 };
 
-const run = async () => {
-  const startedAt = Date.now();
-  const now = Date.now();
-  const oldestAllowed = now - MAX_LOOKBACK_MS;
-
-  const pairMetaMap = await loadPairMeta();
-  const pairTicks = new Map();
-  for (const meta of pairMetaMap.values()) {
-    pairTicks.set(meta.pair, {
-      [meta.keys[0]]: [],
-      [meta.keys[1]]: [],
-    });
-  }
+const collectPairTicks = async ({ meta, oldestAllowed }) => {
+  const store = {
+    [meta.keys[0]]: [],
+    [meta.keys[1]]: [],
+  };
 
   let scannedTx = 0;
   let matchedEvents = 0;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     // eslint-disable-next-line no-await-in-loop
-    const txs = await fetchSwapTxPage(page);
+    const txs = await fetchPairTxPage(meta.pair, page);
     if (!txs.length) break;
 
     scannedTx += txs.length;
@@ -360,14 +511,10 @@ const run = async () => {
       if (!rows.length) continue;
 
       for (const row of rows) {
+        if (row.pair !== meta.pair) continue;
+
         oldestOnPage = Math.min(oldestOnPage, row.timestamp);
         if (row.timestamp < oldestAllowed) continue;
-
-        const meta = pairMetaMap.get(row.pair);
-        if (!meta) continue;
-
-        const store = pairTicks.get(row.pair);
-        if (!store) continue;
 
         const forwardTick = toTickForOrientation({
           row,
@@ -399,17 +546,60 @@ const run = async () => {
     if (reachedLookback || txs.length < PAGE_LIMIT) {
       break;
     }
-
-    if (page % 10 === 0) {
-      console.log(`scanned ${page} pages (${scannedTx} tx)`);
-    }
   }
+
+  return {
+    pair: meta.pair,
+    store,
+    scannedTx,
+    matchedEvents,
+  };
+};
+
+const clearDirectory = async (dir) => {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    await Promise.all(
+      entries.map((entry) =>
+        fs.rm(path.join(dir, entry.name), { recursive: true, force: true })
+      )
+    );
+  } catch {
+    // Ignore if folder does not exist yet.
+  }
+};
+
+const run = async () => {
+  const startedAt = Date.now();
+  const now = Date.now();
+  const oldestAllowed = now - MAX_LOOKBACK_MS;
+
+  const { pairMetaMap, selectedPairs, scoredPairs } = await loadPairMeta();
+  const selectedMetas = selectedPairs
+    .map((pair) => pairMetaMap.get(pair))
+    .filter(Boolean);
+
+  const pairResults = await mapWithConcurrency(
+    selectedMetas,
+    PAIR_QUERY_CONCURRENCY,
+    async (meta, index) => {
+      const result = await collectPairTicks({ meta, oldestAllowed });
+      console.log(
+        `[${index + 1}/${selectedMetas.length}] ${meta.pair} -> ${result.matchedEvents} ticks from ${result.scannedTx} tx`
+      );
+      return result;
+    }
+  );
+
+  const pairTicks = new Map(pairResults.map((result) => [result.pair, result.store]));
+  const scannedTx = pairResults.reduce((sum, result) => sum + result.scannedTx, 0);
+  const matchedEvents = pairResults.reduce((sum, result) => sum + result.matchedEvents, 0);
 
   await fs.mkdir(OUT_DIR, { recursive: true });
   await clearDirectory(OUT_DIR);
 
   let filesWritten = 0;
-  for (const meta of pairMetaMap.values()) {
+  for (const meta of selectedMetas) {
     const store = pairTicks.get(meta.pair);
     if (!store) continue;
 
@@ -465,6 +655,8 @@ const run = async () => {
 
   console.log(`\nFinished market candles build`);
   console.log(`- Pair metadata: ${pairMetaMap.size}`);
+  console.log(`- Hot pairs selected: ${selectedMetas.length}`);
+  console.log(`- Hot pairs with liquidity score: ${scoredPairs}`);
   console.log(`- Scanned tx: ${scannedTx}`);
   console.log(`- Matched swap ticks: ${matchedEvents}`);
   console.log(`- Candle files: ${filesWritten}`);

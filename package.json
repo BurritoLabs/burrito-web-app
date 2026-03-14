@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "npm run build:market-all",
     "build": "tsc -b && vite build",
+    "build:release": "npm run build:market-all && npm run build",
     "build:market-index": "node scripts/build-market-index.mjs",
     "build:market-candles": "node scripts/build-market-candles.mjs",
     "build:market-all": "npm run build:market-index && npm run build:market-candles",
