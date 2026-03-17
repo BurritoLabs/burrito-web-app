@@ -22,6 +22,11 @@ export type DashboardSnapshot = {
   blockTimeMs?: number
 }
 
+export type CirculatingSnapshot = Pick<
+  DashboardSnapshot,
+  "circulatingLunc" | "circulatingUstc"
+>
+
 export type TxVolumePoint = {
   time: number
   value: number
@@ -180,8 +185,31 @@ export const fetchTxVolume = async () => {
 
 type FcdTxList = {
   next?: number
-  txs?: Array<any>
+  txs?: FcdTx[]
 }
+
+type FeeCoin = {
+  denom?: string
+  amount?: string
+}
+
+type FcdTx = {
+  timestamp?: string
+  tx?: {
+    auth_info?: { fee?: { amount?: unknown } }
+    value?: { fee?: { amount?: unknown } }
+    fee?: { amount?: unknown }
+  }
+  fee?: { amount?: unknown }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+const isFeeCoin = (value: unknown): value is FeeCoin =>
+  isRecord(value) &&
+  (value.denom === undefined || typeof value.denom === "string") &&
+  (value.amount === undefined || typeof value.amount === "string")
 
 export const fetchTaxProceeds = async (height?: number) => {
   const params: Record<string, string> = {}
@@ -248,15 +276,17 @@ export const fetchTxCountBuckets = async (
   return counts
 }
 
-const normalizeFeeCoins = (value: any): Array<{ denom?: string; amount?: string }> => {
+const normalizeFeeCoins = (value: unknown): FeeCoin[] => {
   if (!value) return []
-  if (Array.isArray(value)) return value
-  if (typeof value === "object" && value.denom && value.amount) return [value]
-  if (typeof value === "object" && Array.isArray(value.amount)) return value.amount
+  if (Array.isArray(value)) return value.filter(isFeeCoin)
+  if (isFeeCoin(value) && value.denom && value.amount) return [value]
+  if (isRecord(value) && Array.isArray(value.amount)) {
+    return value.amount.filter(isFeeCoin)
+  }
   return []
 }
 
-const extractFeeCoins = (tx: any) => {
+const extractFeeCoins = (tx: FcdTx) => {
   return (
     tx?.tx?.auth_info?.fee?.amount ??
     tx?.tx?.value?.fee?.amount ??
@@ -387,7 +417,7 @@ const findHeightByTimestamp = async (targetMs: number) => {
   const avgBlockMs = 6000
   const diffBlocks = Math.max(1, Math.round((latest.timeMs - targetMs) / avgBlockMs))
   let low = Math.max(1, latest.height - diffBlocks * 2)
-  let high = latest.height
+  const high = latest.height
 
   let lowBlock = await fetchBlockByHeight(low)
   if (!lowBlock) {
@@ -553,12 +583,40 @@ const fetchClassicCirculatingSupply = async (
   denom: "lunc" | "ustc",
   height?: number
 ) => {
+  if (typeof window !== "undefined") {
+    return 0
+  }
   const path = denom === "lunc" ? "/api/v1/csupply" : "/api/v1/csupply/ustc"
   const params: Record<string, string> = {}
   if (height) params.height = String(height)
   const url = buildUrl(CLASSICTERRA_BASE, path, params)
   const data = await fetchJson<number | string>(url)
   return toNumber(data)
+}
+
+export const fetchCirculatingSnapshot = async (): Promise<CirculatingSnapshot> => {
+  const [data, circulatingLuncRaw, circulatingUstcRaw] = await Promise.all([
+    fetchFcdDashboard(),
+    fetchClassicCirculatingSupply("lunc"),
+    fetchClassicCirculatingSupply("ustc")
+  ])
+
+  const issuances = data?.issuances ?? {}
+  const pool = data?.communityPool ?? {}
+  const luncSupply = toUnit(issuances[CLASSIC_DENOMS.lunc.coinMinimalDenom] ?? "0")
+  const ustcSupply = toUnit(issuances[CLASSIC_DENOMS.ustc.coinMinimalDenom] ?? "0")
+  const luncCommunity = sumCommunity(pool, CLASSIC_DENOMS.lunc.coinMinimalDenom)
+  const ustcCommunity = sumCommunity(pool, CLASSIC_DENOMS.ustc.coinMinimalDenom)
+  const stakedLunc = toUnit(data?.stakingPool?.bondedTokens ?? "0")
+  const circulatingLuncFallback = Math.max(luncSupply - luncCommunity - stakedLunc, 0)
+  const circulatingUstcFallback = Math.max(ustcSupply - ustcCommunity, 0)
+
+  return {
+    circulatingLunc:
+      circulatingLuncRaw > 0 ? circulatingLuncRaw : circulatingLuncFallback,
+    circulatingUstc:
+      circulatingUstcRaw > 0 ? circulatingUstcRaw : circulatingUstcFallback
+  }
 }
 
 export const fetchCurrentDashboardSnapshot = async (): Promise<DashboardSnapshot> => {

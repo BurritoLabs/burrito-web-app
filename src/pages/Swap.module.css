@@ -153,15 +153,15 @@
 }
 
 .topMeta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .formHint {
   margin: 0;
+  min-width: 0;
   font-size: 12px;
   color: rgba(234, 245, 235, 0.58);
 }
@@ -170,6 +170,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-self: end;
   padding: 4px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
@@ -236,6 +237,7 @@
 
 .amountInput {
   width: 100%;
+  min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
@@ -247,17 +249,37 @@
   text-align: right;
 }
 
+.amountInputCompact {
+  font-size: clamp(26px, 3.6vw, 31px);
+}
+
+.amountInputTiny {
+  font-size: clamp(22px, 3vw, 27px);
+  letter-spacing: -0.02em;
+}
+
 .amountInput::placeholder {
   color: rgba(234, 245, 235, 0.3);
 }
 
 .readonlyAmount {
+  min-width: 0;
   font-size: clamp(28px, 3.6vw, 36px);
   line-height: 1.1;
   letter-spacing: -0.01em;
   font-weight: var(--bold);
   color: #f8fbff;
   text-align: right;
+  white-space: nowrap;
+}
+
+.readonlyAmountCompact {
+  font-size: clamp(25px, 3.3vw, 30px);
+}
+
+.readonlyAmountTiny {
+  font-size: clamp(21px, 2.8vw, 26px);
+  letter-spacing: -0.02em;
 }
 
 .assetSelect {
@@ -398,6 +420,22 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
   overflow: hidden;
+}
+
+.quotePlaceholder {
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 14px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.quotePlaceholder span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(234, 245, 235, 0.58);
 }
 
 .quoteAccordionHeader {
@@ -790,8 +828,8 @@
   }
 
   .topMeta {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
 
   .fieldBody {
@@ -801,6 +839,23 @@
   .assetSelect,
   .assetPickerButton {
     width: 100%;
+  }
+
+  .assetPickerButton {
+    min-width: 126px;
+    height: 42px;
+    padding: 0 9px;
+    font-size: 15px;
+  }
+
+  .assetPickerValue {
+    gap: 6px;
+  }
+
+  .assetPickerValue img,
+  .assetIconFallback {
+    width: 20px;
+    height: 20px;
   }
 
   .detailsGrid {
@@ -821,9 +876,49 @@
   .readonlyAmount {
     font-size: 30px;
   }
+
+  .amountInputCompact,
+  .readonlyAmountCompact {
+    font-size: 24px;
+  }
+
+  .amountInputTiny,
+  .readonlyAmountTiny {
+    font-size: 19px;
+  }
 }
 
 @media (max-width: 479.98px) {
+  .topMeta {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .slippageControl {
+    justify-self: end;
+  }
+
+  .fieldBody {
+    gap: 8px;
+  }
+
+  .assetPickerButton {
+    min-width: 110px;
+    height: 40px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .assetPickerValue {
+    gap: 5px;
+  }
+
+  .assetPickerValue img,
+  .assetIconFallback {
+    width: 18px;
+    height: 18px;
+  }
+
   .detailsGrid {
     grid-template-columns: 1fr;
   }
@@ -833,11 +928,49 @@
     font-size: 27px;
   }
 
+  .amountInputCompact,
+  .readonlyAmountCompact {
+    font-size: 19px;
+  }
+
+  .amountInputTiny,
+  .readonlyAmountTiny {
+    font-size: 15px;
+  }
+
   .routeItem {
     padding: 9px 10px;
   }
 
   .pickerModal {
     max-height: min(84vh, 680px);
+  }
+}
+
+@media (max-width: 359.98px) {
+  .assetPickerButton {
+    min-width: 98px;
+    padding: 0 7px;
+    font-size: 13px;
+  }
+
+  .assetPickerValue {
+    gap: 4px;
+  }
+
+  .assetPickerValue img,
+  .assetIconFallback {
+    width: 16px;
+    height: 16px;
+  }
+
+  .amountInputCompact,
+  .readonlyAmountCompact {
+    font-size: 17px;
+  }
+
+  .amountInputTiny,
+  .readonlyAmountTiny {
+    font-size: 14px;
   }
 }

@@ -9,6 +9,7 @@ type PageShellProps = PropsWithChildren<{
   banner?: ReactNode
   backTo?: string
   backLabel?: string
+  onBack?: () => void
 }>
 
 const PageShell = ({
@@ -18,6 +19,7 @@ const PageShell = ({
   banner,
   backTo,
   backLabel = "Back",
+  onBack,
   children
 }: PageShellProps) => {
   return (
@@ -25,12 +27,23 @@ const PageShell = ({
       className={`${styles.page} ${small ? styles.small : ""} ${
         banner ? styles.withBanner : ""
       }`}
+      data-page-shell="true"
     >
       {banner ? <div className={styles.banner}>{banner}</div> : null}
       <div className={styles.grid}>
         <header className={styles.header}>
           <div className={styles.titleWrapper}>
-            {backTo ? (
+            {onBack ? (
+              <button
+                type="button"
+                className={styles.backButton}
+                onClick={onBack}
+                aria-label={backLabel || "Back"}
+              >
+                <span className={styles.backIcon} aria-hidden="true" />
+                {backLabel ? <span className={styles.backLabel}>{backLabel}</span> : null}
+              </button>
+            ) : backTo ? (
               <Link
                 className={styles.backButton}
                 to={backTo}

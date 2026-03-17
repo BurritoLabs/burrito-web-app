@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
+import { sanitizeAssetIconUrl } from "../utils/assetIcons"
 
 const ASSET_URL = "https://assets.terra.dev"
 const HEXXAGON_REGISTRY_URL = "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main"
@@ -22,6 +23,14 @@ export type IbcToken = {
   icon?: string
   decimals?: number
   path?: string
+}
+
+export type NativeToken = {
+  denom: string
+  symbol: string
+  name: string
+  icon?: string
+  decimals?: number
 }
 
 type HexxagonCw20Token = {
@@ -61,14 +70,42 @@ type BankMetadataResponse = {
   }
 }
 
+type Cw20TokenInfoResponse = {
+  data?: {
+    name?: string
+    symbol?: string
+    decimals?: number | string
+  }
+}
+
 type IbcCacheEntry = {
   ts: number
   token: IbcToken
 }
 
+type Cw20TokenInfoCacheEntry = {
+  ts: number
+  token: {
+    name?: string
+    symbol?: string
+    decimals?: number
+  }
+}
+
+type NativeTokenCacheEntry = {
+  ts: number
+  token: NativeToken
+}
+
 const IBC_CACHE_KEY = "burritoIbcTraceCacheV1"
 const IBC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV1"
+const NATIVE_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV1"
+const CW20_TOKEN_INFO_CACHE_TTL = 24 * 60 * 60 * 1000
 let ibcCache: Record<string, IbcCacheEntry> | null = null
+let nativeTokenCache: Record<string, NativeTokenCacheEntry> | null = null
+let cw20TokenInfoCache: Record<string, Cw20TokenInfoCacheEntry> | null = null
 
 export const fetchAsset = async <T,>(path: string): Promise<T> => {
   const res = await fetch(`${ASSET_URL}/${path}`)
@@ -107,6 +144,70 @@ const writeIbcCache = (next: Record<string, IbcCacheEntry>) => {
   }
 }
 
+const readNativeTokenCache = () => {
+  if (nativeTokenCache) return nativeTokenCache
+  if (typeof window === "undefined") {
+    nativeTokenCache = {}
+    return nativeTokenCache
+  }
+  try {
+    const raw = window.localStorage.getItem(NATIVE_TOKEN_CACHE_KEY)
+    if (!raw) {
+      nativeTokenCache = {}
+      return nativeTokenCache
+    }
+    const parsed = JSON.parse(raw) as Record<string, NativeTokenCacheEntry>
+    nativeTokenCache = parsed && typeof parsed === "object" ? parsed : {}
+    return nativeTokenCache
+  } catch {
+    nativeTokenCache = {}
+    return nativeTokenCache
+  }
+}
+
+const writeNativeTokenCache = (next: Record<string, NativeTokenCacheEntry>) => {
+  nativeTokenCache = next
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(NATIVE_TOKEN_CACHE_KEY, JSON.stringify(next))
+  } catch {
+    // Ignore cache write failures.
+  }
+}
+
+const readCw20TokenInfoCache = () => {
+  if (cw20TokenInfoCache) return cw20TokenInfoCache
+  if (typeof window === "undefined") {
+    cw20TokenInfoCache = {}
+    return cw20TokenInfoCache
+  }
+  try {
+    const raw = window.localStorage.getItem(CW20_TOKEN_INFO_CACHE_KEY)
+    if (!raw) {
+      cw20TokenInfoCache = {}
+      return cw20TokenInfoCache
+    }
+    const parsed = JSON.parse(raw) as Record<string, Cw20TokenInfoCacheEntry>
+    cw20TokenInfoCache = parsed && typeof parsed === "object" ? parsed : {}
+    return cw20TokenInfoCache
+  } catch {
+    cw20TokenInfoCache = {}
+    return cw20TokenInfoCache
+  }
+}
+
+const writeCw20TokenInfoCache = (
+  next: Record<string, Cw20TokenInfoCacheEntry>
+) => {
+  cw20TokenInfoCache = next
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(CW20_TOKEN_INFO_CACHE_KEY, JSON.stringify(next))
+  } catch {
+    // Ignore cache write failures.
+  }
+}
+
 const getCachedIbcToken = (hash: string) => {
   const cache = readIbcCache()
   const cached = cache[hash]
@@ -128,8 +229,81 @@ const cacheIbcToken = (hash: string, token: IbcToken) => {
   })
 }
 
+const getCachedNativeToken = (denom: string) => {
+  const cache = readNativeTokenCache()
+  const cached = cache[denom]
+  if (!cached) return undefined
+  if (Date.now() - cached.ts > NATIVE_TOKEN_CACHE_TTL) {
+    const next = { ...cache }
+    delete next[denom]
+    writeNativeTokenCache(next)
+    return undefined
+  }
+  return cached.token
+}
+
+const cacheNativeToken = (denom: string, token: NativeToken) => {
+  const cache = readNativeTokenCache()
+  writeNativeTokenCache({
+    ...cache,
+    [denom]: { ts: Date.now(), token }
+  })
+}
+
+const getCachedCw20TokenInfo = (contract: string) => {
+  const cache = readCw20TokenInfoCache()
+  const cached = cache[contract]
+  if (!cached) return undefined
+  if (Date.now() - cached.ts > CW20_TOKEN_INFO_CACHE_TTL) {
+    const next = { ...cache }
+    delete next[contract]
+    writeCw20TokenInfoCache(next)
+    return undefined
+  }
+  return cached.token
+}
+
+const cacheCw20TokenInfo = (
+  contract: string,
+  token: { name?: string; symbol?: string; decimals?: number }
+) => {
+  const cache = readCw20TokenInfoCache()
+  writeCw20TokenInfoCache({
+    ...cache,
+    [contract]: { ts: Date.now(), token }
+  })
+}
+
 const looksLikeHttpUrl = (value?: string) =>
   Boolean(value && /^https?:\/\//i.test(value))
+
+const mergeCw20TokenMetadata = ({
+  contract,
+  fallback,
+  onChain
+}: {
+  contract: string
+  fallback?: Cw20Token
+  onChain?: { name?: string; symbol?: string; decimals?: number }
+}): Cw20Token => {
+  const symbol = onChain?.symbol?.trim() || fallback?.symbol || contract.slice(0, 6).toUpperCase()
+  const name =
+    onChain?.name?.trim() ||
+    fallback?.name?.trim() ||
+    onChain?.symbol?.trim() ||
+    fallback?.symbol ||
+    contract
+  return {
+    token: contract,
+    symbol,
+    name,
+    protocol: fallback?.protocol,
+    icon: sanitizeAssetIconUrl(fallback?.icon),
+    decimals: Number.isFinite(onChain?.decimals)
+      ? onChain?.decimals
+      : (fallback?.decimals ?? 6)
+  }
+}
 
 const deriveSymbolFromDenom = (denom?: string) => {
   if (!denom) return "IBC"
@@ -144,6 +318,23 @@ const deriveSymbolFromDenom = (denom?: string) => {
   }
   const leaf = denom.split("/").pop() ?? denom
   return leaf.toUpperCase()
+}
+
+const CLASSIC_NATIVE_DEFAULTS: Record<string, NativeToken> = {
+  uluna: {
+    denom: "uluna",
+    symbol: "LUNC",
+    name: "Terra Classic",
+    decimals: 6,
+    icon: "/system/lunc.svg"
+  },
+  uusd: {
+    denom: "uusd",
+    symbol: "USTC",
+    name: "TerraClassicUSD",
+    decimals: 6,
+    icon: "/system/ustc.png"
+  }
 }
 
 const getDecimalsFromMetadata = (metadata?: BankMetadataResponse["metadata"]) => {
@@ -196,11 +387,48 @@ const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> =
     base_denom: baseDenom,
     symbol,
     name,
-    icon: looksLikeHttpUrl(metadata?.uri) ? metadata?.uri : "/system/ibc.svg",
+    icon: looksLikeHttpUrl(metadata?.uri)
+      ? sanitizeAssetIconUrl(metadata?.uri) ?? "/system/ibc.svg"
+      : "/system/ibc.svg",
     decimals: getDecimalsFromMetadata(metadata) ?? 6,
     path: tracePayload?.denom_trace?.path
   }
   cacheIbcToken(hash, token)
+  return token
+}
+
+const fetchNativeMetadataToken = async (
+  denom: string
+): Promise<NativeToken | undefined> => {
+  const normalized = denom.trim().toLowerCase()
+  if (!normalized || normalized.startsWith("ibc/") || normalized.startsWith("terra1")) {
+    return undefined
+  }
+
+  const predefined = CLASSIC_NATIVE_DEFAULTS[normalized]
+  if (predefined) return predefined
+
+  const cached = getCachedNativeToken(normalized)
+  if (cached) return cached
+
+  const response = await fetch(
+    `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
+  )
+  if (!response.ok) return undefined
+  const payload = (await response.json()) as BankMetadataResponse
+  const metadata = payload?.metadata
+  if (!metadata) return undefined
+
+  const symbol = metadata.symbol?.trim() || deriveSymbolFromDenom(normalized)
+  const name = metadata.name?.trim() || symbol
+  const token: NativeToken = {
+    denom: normalized,
+    symbol,
+    name,
+    decimals: getDecimalsFromMetadata(metadata) ?? 6,
+    icon: undefined
+  }
+  cacheNativeToken(normalized, token)
   return token
 }
 
@@ -274,7 +502,7 @@ export const useCw20Whitelist = () => {
           symbol,
           name: token.name?.trim() || symbol,
           protocol: token.protocol?.trim() || undefined,
-          icon: token.icon,
+          icon: sanitizeAssetIconUrl(token.icon),
           decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : 6
         }
         return acc
@@ -285,6 +513,145 @@ export const useCw20Whitelist = () => {
     },
     staleTime: 60 * 60 * 1000
   })
+}
+
+export const fetchCw20TokenInfos = async (
+  contracts: string[],
+  fallback: Record<string, Cw20Token> = {}
+) => {
+  const normalized = Array.from(
+    new Set(contracts.map((contract) => contract.trim().toLowerCase()).filter(Boolean))
+  )
+  if (!normalized.length) return {}
+
+  const results: Record<string, Cw20Token> = {}
+  const missing: string[] = []
+
+  normalized.forEach((contract) => {
+    const cached = getCachedCw20TokenInfo(contract)
+    if (cached) {
+      results[contract] = mergeCw20TokenMetadata({
+        contract,
+        fallback: fallback[contract],
+        onChain: cached
+      })
+      return
+    }
+    missing.push(contract)
+  })
+
+  let index = 0
+  const concurrency = 8
+
+  const workers = Array.from({ length: Math.min(concurrency, missing.length) }, async () => {
+    while (index < missing.length) {
+      const current = index
+      index += 1
+      const contract = missing[current]
+      try {
+        const query = btoa(JSON.stringify({ token_info: {} }))
+        const response = await fetch(
+          `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        )
+        if (!response.ok) continue
+        const payload = (await response.json()) as Cw20TokenInfoResponse
+        const info = payload.data
+        const symbol = info?.symbol?.trim()
+        const name = info?.name?.trim()
+        const parsedDecimals = Number(info?.decimals)
+        const onChain = {
+          symbol: symbol || undefined,
+          name: name || undefined,
+          decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : undefined
+        }
+        if (!onChain.symbol && !onChain.name && onChain.decimals === undefined) continue
+        cacheCw20TokenInfo(contract, onChain)
+        results[contract] = mergeCw20TokenMetadata({
+          contract,
+          fallback: fallback[contract],
+          onChain
+        })
+      } catch {
+        // Ignore per-contract metadata failures.
+      }
+    }
+  })
+
+  await Promise.all(workers)
+  return results
+}
+
+export const useResolvedCw20Whitelist = (contracts?: string[]) => {
+  const tokenQuery = useCw20Whitelist()
+  const contractsQuery = useCw20Contracts()
+  const base = useMemo(() => {
+    const tokens = tokenQuery.data ?? {}
+    const contractMeta = contractsQuery.data ?? {}
+    const addresses = new Set([...Object.keys(tokens), ...Object.keys(contractMeta)])
+
+    return Object.fromEntries(
+      Array.from(addresses).map((address) => {
+        const token = tokens[address]
+        const contract = contractMeta[address]
+        const fallbackSymbol = address.slice(0, 6).toUpperCase()
+
+        return [
+          address,
+          {
+            token: address,
+            symbol: token?.symbol ?? contract?.name?.trim() ?? fallbackSymbol,
+            name:
+              token?.name?.trim() ||
+              contract?.name?.trim() ||
+              token?.protocol?.trim() ||
+              contract?.protocol?.trim() ||
+              token?.symbol ||
+              fallbackSymbol,
+            protocol: token?.protocol?.trim() || contract?.protocol?.trim() || undefined,
+            icon: token?.icon || contract?.icon,
+            decimals: token?.decimals ?? 6
+          } satisfies Cw20Token
+        ]
+      })
+    )
+  }, [contractsQuery.data, tokenQuery.data])
+  const normalized = useMemo(
+    () =>
+      Array.from(
+        new Set((contracts ?? []).map((contract) => contract.trim().toLowerCase()).filter(Boolean))
+      ),
+    [contracts]
+  )
+
+  const resolvedQuery = useQuery({
+    queryKey: ["terra-assets", "cw20-resolved", CLASSIC_CHAIN.chainId, normalized.join(",")],
+    queryFn: () => fetchCw20TokenInfos(normalized, base),
+    enabled: normalized.length > 0,
+    staleTime: 24 * 60 * 60 * 1000
+  })
+
+  const resolvedData = useMemo(() => {
+    const combined = {
+      ...base,
+      ...(resolvedQuery.data ?? {})
+    }
+
+    if (!normalized.length) return combined
+
+    return Object.fromEntries(
+      normalized
+        .map((contract) => [contract, combined[contract]])
+        .filter((entry): entry is [string, Cw20Token] => Boolean(entry[1]))
+    )
+  }, [base, normalized, resolvedQuery.data])
+
+  return {
+    ...tokenQuery,
+    data: resolvedData,
+    isFetching: tokenQuery.isFetching || contractsQuery.isFetching || resolvedQuery.isFetching,
+    isError: tokenQuery.isError || contractsQuery.isError || resolvedQuery.isError,
+    error: (tokenQuery.error ?? contractsQuery.error ?? resolvedQuery.error) as Error | null
+  }
 }
 
 export const useIbcWhitelist = () => {
@@ -304,7 +671,7 @@ export const useIbcWhitelist = () => {
 
 export const useResolvedIbcWhitelist = (denoms?: string[]) => {
   const baseQuery = useIbcWhitelist()
-  const base = baseQuery.data ?? {}
+  const base = useMemo(() => baseQuery.data ?? {}, [baseQuery.data])
 
   const hashes = useMemo(() => {
     const set = new Set<string>()
@@ -341,16 +708,58 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
     staleTime: 24 * 60 * 60 * 1000
   })
 
-  return {
-    ...baseQuery,
-    data: {
+  const resolvedData = useMemo(
+    () => ({
       ...base,
       ...(resolvedQuery.data ?? {})
-    },
+    }),
+    [base, resolvedQuery.data]
+  )
+
+  return {
+    ...baseQuery,
+    data: resolvedData,
     isFetching: baseQuery.isFetching || resolvedQuery.isFetching,
     isError: baseQuery.isError || resolvedQuery.isError,
     error: (baseQuery.error ?? resolvedQuery.error) as Error | null
   }
+}
+
+export const useResolvedNativeWhitelist = (denoms?: string[]) => {
+  const normalized = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (denoms ?? [])
+            .map((denom) => denom.trim().toLowerCase())
+            .filter(
+              (denom) =>
+                Boolean(denom) && !denom.startsWith("ibc/") && !denom.startsWith("terra1")
+            )
+        )
+      ),
+    [denoms]
+  )
+
+  return useQuery({
+    queryKey: [
+      "terra-assets",
+      "native-resolved",
+      CLASSIC_CHAIN.chainId,
+      normalized.join(",")
+    ],
+    queryFn: async () => {
+      const entries = await Promise.all(
+        normalized.map(async (denom) => {
+          const token = await fetchNativeMetadataToken(denom)
+          return token ? [denom, token] : undefined
+        })
+      )
+      return Object.fromEntries(entries.filter(Boolean) as [string, NativeToken][])
+    },
+    enabled: normalized.length > 0,
+    staleTime: 24 * 60 * 60 * 1000
+  })
 }
 
 export const useCw20Contracts = () => {
@@ -367,7 +776,7 @@ export const useCw20Contracts = () => {
         acc[address] = {
           protocol: contract.protocol?.trim() || undefined,
           name: contract.name?.trim() || undefined,
-          icon: contract.icon
+          icon: sanitizeAssetIconUrl(contract.icon)
         }
         return acc
       }, {})

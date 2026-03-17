@@ -327,8 +327,28 @@ const parseOutArg = () => {
   return DEFAULT_OUT;
 };
 
+const readExistingVolumeMap = async (outFile) => {
+  try {
+    const payload = JSON.parse(await fs.readFile(outFile, "utf8"));
+    const pairs = Array.isArray(payload?.pairs) ? payload.pairs : [];
+    const volumesByPair = new Map();
+
+    pairs.forEach((entry) => {
+      const pair = typeof entry?.pair === "string" ? entry.pair.toLowerCase() : "";
+      const volumes = entry?.volumes;
+      if (!pair || !volumes || typeof volumes !== "object") return;
+      volumesByPair.set(pair, volumes);
+    });
+
+    return volumesByPair;
+  } catch {
+    return new Map();
+  }
+};
+
 const run = async () => {
   const outFile = parseOutArg();
+  const existingVolumes = await readExistingVolumeMap(outFile);
   const records = [];
 
   for (const dex of DEXES) {
@@ -359,11 +379,16 @@ const run = async () => {
     if (!byPair.has(entry.pair)) byPair.set(entry.pair, entry);
   }
 
-  const pairs = Array.from(byPair.values()).sort((a, b) =>
-    a.dexLabel === b.dexLabel
-      ? a.pair.localeCompare(b.pair)
-      : a.dexLabel.localeCompare(b.dexLabel)
-  );
+  const pairs = Array.from(byPair.values())
+    .sort((a, b) =>
+      a.dexLabel === b.dexLabel
+        ? a.pair.localeCompare(b.pair)
+        : a.dexLabel.localeCompare(b.dexLabel)
+    )
+    .map((entry) => {
+      const volumes = existingVolumes.get(entry.pair);
+      return volumes ? { ...entry, volumes } : entry;
+    });
 
   const dexCounts = DEXES.map((dex) => ({
     id: dex.id,

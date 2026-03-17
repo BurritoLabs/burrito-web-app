@@ -58,6 +58,8 @@ const PAIR_QUERY_CONCURRENCY = toInt(
   6
 );
 
+const TIMEFRAMES = Object.keys(BUCKET_MS);
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const fetchJson = async (url, retries = 2) => {
@@ -489,6 +491,69 @@ const mapWithConcurrency = async (items, limit, mapper) => {
   return results;
 };
 
+const summarizeCandleVolumes = (candlesByTf) => {
+  const summary = {};
+
+  for (const tf of TIMEFRAMES) {
+    const byKey = candlesByTf[tf];
+    if (!byKey || typeof byKey !== "object") continue;
+
+    const totals = Object.entries(byKey).reduce((acc, [key, candles]) => {
+      if (!Array.isArray(candles) || !candles.length) return acc;
+      const total = candles.reduce((sum, candle) => {
+        const volume = Number(candle?.volumeQuote ?? 0);
+        return Number.isFinite(volume) && volume > 0 ? sum + volume : sum;
+      }, 0);
+
+      if (Number.isFinite(total) && total >= 0) {
+        acc[key] = total;
+      }
+      return acc;
+    }, {});
+
+    if (Object.keys(totals).length) {
+      summary[tf] = totals;
+    }
+  }
+
+  return summary;
+};
+
+const mergeVolumeSummariesIntoIndex = async ({ indexFile, volumesByPair }) => {
+  let payload;
+  try {
+    payload = JSON.parse(await fs.readFile(indexFile, "utf8"));
+  } catch {
+    return 0;
+  }
+
+  const pairs = Array.isArray(payload?.pairs) ? payload.pairs : null;
+  if (!pairs) return 0;
+
+  let updated = 0;
+  payload.pairs = pairs.map((entry) => {
+    const pair = typeof entry?.pair === "string" ? entry.pair.toLowerCase() : "";
+    if (!pair) return entry;
+
+    const next = { ...entry };
+    const volumes = volumesByPair.get(pair);
+
+    if (volumes && Object.keys(volumes).length) {
+      next.volumes = volumes;
+      updated += 1;
+      return next;
+    }
+
+    if ("volumes" in next) {
+      delete next.volumes;
+    }
+    return next;
+  });
+
+  await fs.writeFile(indexFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  return updated;
+};
+
 const collectPairTicks = async ({ meta, oldestAllowed }) => {
   const store = {
     [meta.keys[0]]: [],
@@ -599,6 +664,7 @@ const run = async () => {
   await clearDirectory(OUT_DIR);
 
   let filesWritten = 0;
+  const volumeSummaries = new Map();
   for (const meta of selectedMetas) {
     const store = pairTicks.get(meta.pair);
     if (!store) continue;
@@ -647,11 +713,21 @@ const run = async () => {
       candles: candlesByTf,
     };
 
+    const volumeSummary = summarizeCandleVolumes(candlesByTf);
+    if (Object.keys(volumeSummary).length) {
+      volumeSummaries.set(meta.pair, volumeSummary);
+    }
+
     const outFile = path.join(OUT_DIR, `${meta.pair}.json`);
     // eslint-disable-next-line no-await-in-loop
     await fs.writeFile(outFile, `${JSON.stringify(payload)}\n`, "utf8");
     filesWritten += 1;
   }
+
+  const indexVolumesUpdated = await mergeVolumeSummariesIntoIndex({
+    indexFile: INDEX_FILE,
+    volumesByPair: volumeSummaries,
+  });
 
   console.log(`\nFinished market candles build`);
   console.log(`- Pair metadata: ${pairMetaMap.size}`);
@@ -660,6 +736,7 @@ const run = async () => {
   console.log(`- Scanned tx: ${scannedTx}`);
   console.log(`- Matched swap ticks: ${matchedEvents}`);
   console.log(`- Candle files: ${filesWritten}`);
+  console.log(`- Index volume summaries: ${indexVolumesUpdated}`);
   console.log(`- Output: ${OUT_DIR}`);
   console.log(`- Duration: ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
 };

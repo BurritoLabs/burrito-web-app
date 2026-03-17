@@ -396,6 +396,20 @@
   gap: 6px;
 }
 
+.txToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(234, 245, 235, 0.82);
+  font-size: var(--font-size-small);
+  font-weight: var(--normal);
+}
+
+.txToggle input {
+  margin: 0;
+  accent-color: var(--green);
+}
+
 .txResult {
   display: grid;
   gap: 4px;

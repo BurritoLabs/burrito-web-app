@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { Link, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
@@ -6,7 +6,7 @@ import styles from "./TopBar.module.css"
 import ConnectModal from "../wallet/ConnectModal"
 import WalletAddressesModal from "../wallet/WalletAddressesModal"
 import { WalletIcon } from "../icons"
-import { useWallet } from "../wallet/WalletProvider"
+import { useWallet } from "../wallet/WalletContext"
 import { CLASSIC_CHAIN } from "../chain"
 import { fetchValidator } from "../data/classic"
 import { convertBech32Prefix } from "../utils/bech32"
@@ -44,13 +44,12 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     ? walletName ||
       `${account.address.slice(0, 6)}...${account.address.slice(-4)}`
     : "Connect"
-  const valoperAddress = useMemo(() => {
-    if (!account?.address) return null
-    return convertBech32Prefix(
-      account.address,
-      `${CLASSIC_CHAIN.bech32Prefix}valoper`
-    )
-  }, [account?.address])
+  const valoperAddress = account?.address
+    ? convertBech32Prefix(
+        account.address,
+        `${CLASSIC_CHAIN.bech32Prefix}valoper`
+      )
+    : null
 
   const { data: validator } = useQuery({
     queryKey: ["validator", valoperAddress],

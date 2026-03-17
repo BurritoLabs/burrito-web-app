@@ -1,12 +1,14 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import {
   CandlestickSeries,
   ColorType,
   HistogramSeries,
   LineStyle,
+  TickMarkType,
   createChart,
+  type MouseEventHandler,
   type Time,
   type UTCTimestamp
 } from "lightweight-charts"
@@ -14,16 +16,19 @@ import PageShell from "./PageShell"
 import SwapPanel from "./components/SwapPanel"
 import styles from "./MarketPairDetails.module.css"
 import { fetchPrices } from "../app/data/classic"
-import { fetchCurrentDashboardSnapshot } from "../app/data/dashboard"
+import { fetchCirculatingSnapshot } from "../app/data/dashboard"
 import {
   type PairCandle,
   fetchPairCandles,
   fetchPairTrades,
   fetchMarketDexPairs,
-  fetchMarketPools,
-  getMarketPoolIbcDenoms
+  fetchMarketPools
 } from "../app/data/market"
-import { useCw20Whitelist, useResolvedIbcWhitelist } from "../app/data/terraAssets"
+import {
+  useResolvedNativeWhitelist,
+  useResolvedIbcWhitelist,
+  useResolvedCw20Whitelist
+} from "../app/data/terraAssets"
 import { useDexEstimatedPrices } from "../app/data/dexPrices"
 import {
   formatNumber,
@@ -33,8 +38,22 @@ import {
   truncateHash,
   toUnitAmount
 } from "../app/utils/format"
+import {
+  buildClassicNativeIconCandidates,
+  buildCw20IconCandidates,
+  buildIbcAssetIconCandidates
+} from "../app/utils/assetIcons"
 
 type Timeframe = "1h" | "24h" | "7d"
+
+type MarketDetailLocationState = {
+  fromMarket?: boolean
+  marketLocation?: {
+    pathname?: string
+    search?: string
+    hash?: string
+  }
+}
 
 const TIMEFRAME_BUCKET_MS: Record<Timeframe, number> = {
   "1h": 5 * 60 * 1000,
@@ -65,8 +84,6 @@ type ResolvedAsset = {
   isUstc: boolean
 }
 
-const ASSET_URL = "https://assets.terra.dev"
-
 const normalizeAssetKey = (key: string) => {
   if (!key) return key
   if (key.startsWith("terra1")) return key.toLowerCase()
@@ -86,45 +103,24 @@ const formatNativeSymbol = (denom: string) => {
   return denom.toUpperCase()
 }
 
-const buildNativeIconCandidates = (denom: string, symbol: string) => {
-  const iconDenom = denom === "uluna" ? "LUNC" : symbol
-  const upper = iconDenom.toUpperCase()
-  const lower = iconDenom.toLowerCase()
-  return [
-    `${ASSET_URL}/icon/60/${iconDenom}.png`,
-    `${ASSET_URL}/icon/svg/${iconDenom}.svg`,
-    `${ASSET_URL}/icon/60/${upper}.png`,
-    `${ASSET_URL}/icon/svg/${upper}.svg`,
-    `${ASSET_URL}/icon/60/${lower}.png`,
-    ...(upper === "USTC"
-      ? [`${ASSET_URL}/icon/svg/USTC.svg`, `${ASSET_URL}/icon/60/USTC.png`, "/system/ustc.png"]
-      : []),
-    ...(upper === "LUNC" ? ["/system/lunc.svg"] : []),
-    "/system/cw20.svg"
-  ]
-}
+const buildNativeIconCandidates = (denom: string, symbol: string) =>
+  buildClassicNativeIconCandidates({ denom, symbol })
 
 const buildIbcIconCandidates = ({
-  symbol,
   ibcIcon,
-  hexxagonIcon
+  hexxagonIcon,
+  symbol,
+  baseDenom
 }: {
-  symbol: string
   ibcIcon?: string
   hexxagonIcon?: string
-}) => {
-  const cleanSymbol = symbol.trim()
-  return [
-    hexxagonIcon,
-    ibcIcon,
-    cleanSymbol
-      ? `https://assets.hexxagon.io/icon/svg/ibc/${encodeURIComponent(cleanSymbol)}.svg`
-      : undefined,
-    cleanSymbol ? `${ASSET_URL}/icon/svg/${cleanSymbol}.svg` : undefined,
-    cleanSymbol ? `${ASSET_URL}/icon/60/${cleanSymbol}.png` : undefined,
-    "/system/ibc.svg"
-  ].filter(Boolean) as string[]
-}
+  symbol?: string
+  baseDenom?: string
+}) =>
+  buildIbcAssetIconCandidates([hexxagonIcon, ibcIcon], "/system/ibc.svg", {
+    symbol,
+    baseDenom
+  })
 
 const shouldSwapForDisplay = (left: ResolvedAsset, right: ResolvedAsset) => {
   const leftIsCw20 = left.id.startsWith("cw20:")
@@ -233,6 +229,8 @@ const formatTradeTime = (timestamp: number) =>
     hour12: false
   }).format(new Date(timestamp))
 
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
 const formatChartTime = (timestampMs: number, tf: Timeframe) =>
   new Intl.DateTimeFormat("en-US", {
     month: tf === "1h" ? undefined : "short",
@@ -242,14 +240,38 @@ const formatChartTime = (timestampMs: number, tf: Timeframe) =>
     hour12: false
   }).format(new Date(timestampMs))
 
-const formatChartTickTime = (timestampSeconds: number, tf: Timeframe) =>
-  new Intl.DateTimeFormat("en-US", {
-    month: tf === "7d" ? "short" : undefined,
-    day: tf === "7d" ? "2-digit" : undefined,
-    hour: "2-digit",
-    minute: tf === "1h" ? "2-digit" : undefined,
-    hour12: false
-  }).format(new Date(timestampSeconds * 1000))
+const formatChartTickTime = (
+  timestampSeconds: number,
+  tf: Timeframe,
+  tickMarkType: TickMarkType
+) => {
+  const date = new Date(timestampSeconds * 1000)
+  if (Number.isNaN(date.getTime())) return ""
+
+  const month = MONTH_SHORT[date.getMonth()] ?? ""
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+
+  if (tf === "1h") return `${hours}:${minutes}`
+
+  if (tf === "24h") {
+    if (
+      tickMarkType === TickMarkType.DayOfMonth ||
+      tickMarkType === TickMarkType.Month ||
+      tickMarkType === TickMarkType.Year
+    ) {
+      return `${month} ${day}`
+    }
+    return `${hours}:${minutes}`
+  }
+
+  if (tickMarkType === TickMarkType.Year) {
+    return `${month} ${day}, ${date.getFullYear()}`
+  }
+
+  return `${month} ${day}`
+}
 
 const resolveChartEventTime = (time: Time): number | null => {
   if (typeof time === "number") return time * 1000
@@ -273,6 +295,19 @@ const formatTradeAmount = (value: number) => {
 }
 
 const AssetIcon = ({
+  symbol,
+  candidates,
+  size
+}: {
+  symbol: string
+  candidates: string[]
+  size: number
+}) => {
+  const candidateKey = `${symbol}:${candidates.join("|")}`
+  return <AssetIconInner key={candidateKey} symbol={symbol} candidates={candidates} size={size} />
+}
+
+const AssetIconInner = ({
   symbol,
   candidates,
   size
@@ -311,6 +346,8 @@ const AssetIcon = ({
 
 const MarketPairDetails = () => {
   const params = useParams<{ pairId?: string; dexId?: string; pair?: string }>()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [timeframe, setTimeframe] = useState<Timeframe>("24h")
   const [tradePager, setTradePager] = useState<{ pair: string; limit: number }>({
     pair: "",
@@ -319,6 +356,30 @@ const MarketPairDetails = () => {
   const [activeCandleTime, setActiveCandleTime] = useState<number | null>(null)
   const chartHostRef = useRef<HTMLDivElement | null>(null)
   const chartTooltipRef = useRef<HTMLDivElement | null>(null)
+  const handleBack = useCallback(() => {
+    const state = location.state as MarketDetailLocationState | null
+    const historyIndex =
+      typeof window !== "undefined" && typeof window.history.state?.idx === "number"
+        ? window.history.state.idx
+        : 0
+
+    if (state?.fromMarket && historyIndex > 0) {
+      navigate(-1)
+      return
+    }
+
+    const fallbackLocation = state?.marketLocation
+    if (fallbackLocation?.pathname === "/market") {
+      navigate({
+        pathname: fallbackLocation.pathname,
+        search: fallbackLocation.search ?? "",
+        hash: fallbackLocation.hash ?? ""
+      })
+      return
+    }
+
+    navigate("/market")
+  }, [location.state, navigate])
 
   const decodedPairId = useMemo(() => {
     const decode = (value?: string) => {
@@ -356,19 +417,53 @@ const MarketPairDetails = () => {
     refetchInterval: 4 * 60 * 1000
   })
 
-  const ibcDenoms = useMemo(() => {
-    const set = new Set<string>(getMarketPoolIbcDenoms(pairs))
-    pools.forEach((pool) => {
+  const selectedPool = useMemo(() => {
+    if (!decodedPairId) return undefined
+    const lowerPairId = decodedPairId.toLowerCase()
+    return pools.find((pool) => `${pool.dexId}:${pool.pair}`.toLowerCase() === lowerPairId)
+  }, [decodedPairId, pools])
+
+  const poolsForMetadata = useMemo(
+    () => (selectedPool ? [selectedPool] : []),
+    [selectedPool]
+  )
+
+  const cw20Contracts = useMemo(() => {
+    const set = new Set<string>()
+    poolsForMetadata.forEach((pool) => {
       pool.poolAssets.forEach((asset) => {
-        if (!asset.id.startsWith("native:ibc/")) return
-        set.add(asset.id.slice("native:".length))
+        if (!asset.id.startsWith("cw20:")) return
+        set.add(asset.id.slice(5).toLowerCase())
       })
     })
     return Array.from(set)
-  }, [pairs, pools])
+  }, [poolsForMetadata])
+  const nativeDenoms = useMemo(() => {
+    const set = new Set<string>()
+    poolsForMetadata.forEach((pool) => {
+      pool.poolAssets.forEach((asset) => {
+        if (!asset.id.startsWith("native:")) return
+        const denom = asset.id.slice(7)
+        if (!denom || denom.startsWith("ibc/")) return
+        set.add(denom.toLowerCase())
+      })
+    })
+    return Array.from(set)
+  }, [poolsForMetadata])
+  const ibcDenoms = useMemo(() => {
+    const set = new Set<string>()
+    poolsForMetadata.forEach((pool) => {
+      pool.poolAssets.forEach((asset) => {
+        if (!asset.id.startsWith("native:ibc/")) return
+        set.add(asset.id.slice(7))
+      })
+    })
+    return Array.from(set)
+  }, [poolsForMetadata])
 
+  const { data: nativeWhitelist = {} } = useResolvedNativeWhitelist(nativeDenoms)
   const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
-  const { data: cw20Whitelist = {} } = useCw20Whitelist()
+  const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(cw20Contracts)
 
   const { data: prices } = useQuery({
     queryKey: ["prices"],
@@ -378,15 +473,15 @@ const MarketPairDetails = () => {
   })
 
   const { data: dashboardSnapshot } = useQuery({
-    queryKey: ["dashboard", "snapshot", "market-pair"],
-    queryFn: fetchCurrentDashboardSnapshot,
+    queryKey: ["dashboard", "circulating", "market-pair"],
+    queryFn: fetchCirculatingSnapshot,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000
   })
 
   const assetMetas = useMemo(() => {
     const map = new Map<string, number>()
-    pools.forEach((pool) => {
+    poolsForMetadata.forEach((pool) => {
       pool.poolAssets.forEach((asset) => {
         if (!asset.id) return
         if (asset.id.startsWith("native:")) {
@@ -397,7 +492,7 @@ const MarketPairDetails = () => {
             ? (ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
               cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
               6)
-            : 6
+            : (nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6)
           map.set(key, decimals)
           return
         }
@@ -410,15 +505,9 @@ const MarketPairDetails = () => {
       })
     })
     return Array.from(map.entries()).map(([key, decimals]) => ({ key, decimals }))
-  }, [cw20Whitelist, ibcWhitelist, pools])
+  }, [cw20Whitelist, ibcWhitelist, nativeWhitelist, poolsForMetadata])
 
   const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
-
-  const selectedPool = useMemo(() => {
-    if (!decodedPairId) return undefined
-    const lowerPairId = decodedPairId.toLowerCase()
-    return pools.find((pool) => `${pool.dexId}:${pool.pair}`.toLowerCase() === lowerPairId)
-  }, [decodedPairId, pools])
 
   const resolveAsset = (assetId: string): ResolvedAsset => {
     if (assetId.startsWith("native:")) {
@@ -435,23 +524,25 @@ const MarketPairDetails = () => {
           key: normalizeAssetKey(denom),
           symbol,
           name,
-          decimals: ibc?.decimals ?? ibcHexxagon?.decimals ?? 6,
-          iconCandidates: buildIbcIconCandidates({
-            symbol,
-            ibcIcon: ibc?.icon,
-            hexxagonIcon: ibcHexxagon?.icon
-          }),
+            decimals: ibc?.decimals ?? ibcHexxagon?.decimals ?? 6,
+            iconCandidates: buildIbcIconCandidates({
+              ibcIcon: ibc?.icon,
+              hexxagonIcon: ibcHexxagon?.icon,
+              symbol,
+              baseDenom: ibc?.base_denom
+            }),
           isLunc: false,
           isUstc: false
         }
       }
-      const symbol = formatNativeSymbol(denom)
+      const nativeToken = nativeWhitelist[denom.toLowerCase()]
+      const symbol = nativeToken?.symbol ?? formatNativeSymbol(denom)
       return {
         id: assetId,
         key: normalizeAssetKey(denom),
         symbol,
-        name: symbol,
-        decimals: 6,
+        name: nativeToken?.name ?? symbol,
+        decimals: nativeToken?.decimals ?? 6,
         iconCandidates: buildNativeIconCandidates(denom, symbol),
         isLunc: denom === "uluna",
         isUstc: denom === "uusd"
@@ -467,7 +558,7 @@ const MarketPairDetails = () => {
       symbol,
       name: token?.name || symbol,
       decimals: token?.decimals ?? 6,
-      iconCandidates: [token?.icon, "/system/cw20.svg"].filter(Boolean) as string[],
+      iconCandidates: buildCw20IconCandidates(token?.icon, token?.symbol),
       isLunc: false,
       isUstc: false
     }
@@ -751,9 +842,9 @@ const MarketPairDetails = () => {
         rightOffset: 6,
         timeVisible: true,
         secondsVisible: false,
-        tickMarkFormatter: (time: Time) => {
+        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) => {
           if (typeof time !== "number") return null
-          return formatChartTickTime(time, timeframe)
+          return formatChartTickTime(time, timeframe, tickMarkType)
         }
       },
       localization: {
@@ -861,7 +952,7 @@ const MarketPairDetails = () => {
 
     let hoveredCandleTime: number | null = null
 
-    chart.subscribeCrosshairMove((param) => {
+    const handleCrosshairMove: MouseEventHandler<Time> = (param) => {
       if (
         !param.point ||
         !param.time ||
@@ -873,7 +964,7 @@ const MarketPairDetails = () => {
         hideTooltip()
         if (hoveredCandleTime !== null) {
           hoveredCandleTime = null
-          startTransition(() => setActiveCandleTime(null))
+          setActiveCandleTime(null)
         }
         return
       }
@@ -892,7 +983,7 @@ const MarketPairDetails = () => {
 
       if (hoveredCandleTime !== candle.bucketStart) {
         hoveredCandleTime = candle.bucketStart
-        startTransition(() => setActiveCandleTime(candle.bucketStart))
+        setActiveCandleTime(candle.bucketStart)
       }
 
       if (!tooltipEl) return
@@ -947,13 +1038,24 @@ const MarketPairDetails = () => {
       tooltipEl.style.top = `${top}px`
       tooltipEl.style.opacity = "1"
       tooltipEl.style.transform = "translateY(0)"
-    })
+    }
+
+    chart.subscribeCrosshairMove(handleCrosshairMove)
 
     chart.timeScale().fitContent()
 
     return () => {
       hideTooltip()
-      chart.remove()
+      try {
+        chart.unsubscribeCrosshairMove(handleCrosshairMove)
+      } catch {
+        // ignore chart teardown race during route changes
+      }
+      try {
+        chart.remove()
+      } catch {
+        // ignore chart teardown race during route changes
+      }
     }
   }, [baseSymbol, candles, chartQuoteUsd, quoteSymbol, timeframe])
 
@@ -978,7 +1080,6 @@ const MarketPairDetails = () => {
   }
 
   const { dexName, dexVersion } = splitDexLabel(detail.pool.dexLabel)
-
   const timeframeValue = chartStats?.change ?? detail.changes[timeframe]
   const chartPairLabel = `${detail.left.symbol}/${detail.right.symbol}`
   const candleChange =
@@ -990,7 +1091,7 @@ const MarketPairDetails = () => {
   return (
     <PageShell
       title={`${detail.left.symbol}/${detail.right.symbol}`}
-      backTo="/market"
+      onBack={handleBack}
       extra={
         <div className={styles.timeframe}>
           {(["1h", "24h", "7d"] as Timeframe[]).map((tf) => (

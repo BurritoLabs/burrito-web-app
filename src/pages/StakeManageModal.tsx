@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import {
   MsgDelegate,
   MsgBeginRedelegate,
   MsgUndelegate
 } from "cosmjs-types/cosmos/staking/v1beta1/tx"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import styles from "./StakeManageModal.module.css"
 import {
   CLASSIC_CHAIN,
@@ -13,6 +14,19 @@ import {
   KEPLR_CHAIN_CONFIG
 } from "../app/chain"
 import { formatTokenAmount } from "../app/utils/format"
+
+type InjectedWallet = {
+  enable?: (chainId: string) => Promise<void>
+  experimentalSuggestChain?: (config: unknown) => Promise<void>
+}
+
+type WalletWindow = Window & {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+  getOfflineSigner?: (chainId: string) => OfflineSigner
+  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
+}
 
 type DelegationItem = {
   validator: string
@@ -52,27 +66,18 @@ const estimateFallbackFeeMicro = (
 
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    keplr?: any
-    station?: any
-    galaxyStation?: any
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
-  }
-  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+  const walletWindow = window as WalletWindow
+  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
 }
 
 const getOfflineSigner = async () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
+  const walletWindow = window as WalletWindow
+  if (walletWindow.getOfflineSignerAuto) {
+    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (anyWindow.getOfflineSignerAuto) {
-    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (anyWindow.getOfflineSigner) {
-    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  if (walletWindow.getOfflineSigner) {
+    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
@@ -163,7 +168,6 @@ const StakeManageModal = ({
   useEffect(() => {
     if (!open) return
     let cancelled = false
-    let timer: number | undefined
 
     if (!accountAddress) {
       setFee("--")
@@ -189,7 +193,7 @@ const StakeManageModal = ({
       return undefined
     }
 
-    timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(async () => {
       setFeeLoading(true)
       setFeeError(undefined)
       const fallbackFeeMicro = estimateFallbackFeeMicro(tab)
@@ -272,7 +276,7 @@ const StakeManageModal = ({
           setFee(feeDisplay === "--" ? "--" : feeDisplay)
           setFeeMicro(BigInt(feeMicro))
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           // Keep fallback fee when simulation fails to avoid blank fee UI.
           setFeeError(undefined)
@@ -284,7 +288,7 @@ const StakeManageModal = ({
 
     return () => {
       cancelled = true
-      if (timer) window.clearTimeout(timer)
+      window.clearTimeout(timer)
     }
   }, [
     accountAddress,
@@ -383,7 +387,6 @@ const StakeManageModal = ({
         signer,
         { gasPrice }
       )
-      console.log("Stake tx", tab, msg)
       const amountCoin = {
         denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
         amount: microAmount
@@ -413,7 +416,7 @@ const StakeManageModal = ({
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }
-      finishTx((result as any).transactionHash ?? (result as any).txhash)
+      finishTx(result.transactionHash)
       onClose()
     } catch (err) {
       failTx(err instanceof Error ? err.message : "Transaction failed")

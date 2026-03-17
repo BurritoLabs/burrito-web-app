@@ -11,7 +11,7 @@ const LoadingBar = () => {
     if (isFetching > 0) {
       timer = window.setTimeout(() => setVisible(true), 120)
     } else {
-      setVisible(false)
+      timer = window.setTimeout(() => setVisible(false), 0)
     }
 
     return () => {

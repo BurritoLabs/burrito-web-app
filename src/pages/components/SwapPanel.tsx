@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
@@ -10,10 +10,11 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../../app/cha
 import { fetchBalances, fetchPrices } from "../../app/data/classic"
 import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
 import { useCw20Balances } from "../../app/data/cw20"
-import { useCw20Whitelist } from "../../app/data/terraAssets"
+import { useResolvedCw20Whitelist } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
+import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
 import { connectClassicSigningClient } from "../../app/wallet/signingClient"
-import { useWallet } from "../../app/wallet/WalletProvider"
+import { useWallet } from "../../app/wallet/WalletContext"
 
 type AssetType = "native" | "cw20"
 type DexId = string
@@ -83,38 +84,8 @@ type WalletWindow = Window & {
 
 const asNativeId = (denom: string) => `native:${denom}`
 const asCw20Id = (contract: string) => `cw20:${contract}`
-const ASSET_URL = "https://assets.terra.dev"
-
-const buildNativeIconCandidates = (denom: string, symbol: string) => {
-  const iconDenom = denom === "uluna" ? "LUNC" : symbol
-  const upper = iconDenom.toUpperCase()
-  const lower = iconDenom.toLowerCase()
-  const legacyClassic = upper.endsWith("TC") ? upper.slice(0, -1) : undefined
-  const ustAlias = upper === "USTC" ? "UST" : undefined
-  return [
-    `${ASSET_URL}/icon/60/${iconDenom}.png`,
-    `${ASSET_URL}/icon/svg/${iconDenom}.svg`,
-    `${ASSET_URL}/icon/60/${upper}.png`,
-    `${ASSET_URL}/icon/svg/${upper}.svg`,
-    `${ASSET_URL}/icon/60/${lower}.png`,
-    ...(legacyClassic
-      ? [
-          `${ASSET_URL}/icon/60/${legacyClassic}.png`,
-          `${ASSET_URL}/icon/svg/${legacyClassic}.svg`,
-          `${ASSET_URL}/icon/60/${legacyClassic.toLowerCase()}.png`
-        ]
-      : []),
-    ...(ustAlias
-      ? [
-          `${ASSET_URL}/icon/60/${ustAlias}.png`,
-          `${ASSET_URL}/icon/svg/${ustAlias}.svg`,
-          "/system/ustc.png"
-        ]
-      : []),
-    ...(upper === "LUNC" ? ["/system/lunc.svg"] : []),
-    "/system/cw20.svg"
-  ].filter(Boolean)
-}
+const buildNativeIconCandidates = (denom: string, symbol: string) =>
+  buildClassicNativeIconCandidates({ denom, symbol })
 
 const NATIVE_ASSETS: readonly SwapAsset[] = [
   {
@@ -514,6 +485,15 @@ const getOfflineSigner = async (): Promise<OfflineSigner | undefined> => {
   return undefined
 }
 
+const getAmountDensity = (value?: string) => {
+  const text = String(value ?? "").trim()
+  if (!text || text === "--") return "default" as const
+  const digits = text.replace(/\D/g, "").length
+  if (text.length >= 16 || digits >= 13) return "tiny" as const
+  if (text.length >= 12 || digits >= 10) return "compact" as const
+  return "default" as const
+}
+
 const AssetIcon = ({
   symbol,
   candidates,
@@ -580,8 +560,8 @@ const SwapPanel = ({
   } = useWallet()
   const accountAddress = account?.address
 
-  const [fromAssetId, setFromAssetId] = useState<string>(defaultFromAssetId)
-  const [toAssetId, setToAssetId] = useState<string>(defaultToAssetId)
+  const [fromAssetId, setFromAssetId] = useState<string>(DEFAULT_FROM_ASSET_ID)
+  const [toAssetId, setToAssetId] = useState<string>(DEFAULT_TO_ASSET_ID)
   const [amountIn, setAmountIn] = useState("")
   const [slippageBps, setSlippageBps] = useState<bigint>(DEFAULT_SLIPPAGE_BPS)
   const [quotes, setQuotes] = useState<DexQuote[]>([])
@@ -596,8 +576,7 @@ const SwapPanel = ({
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [pickerTarget, setPickerTarget] = useState<"from" | "to" | null>(null)
   const [pickerQuery, setPickerQuery] = useState("")
-
-  const { data: cw20Whitelist = {} } = useCw20Whitelist()
+  const appliedDefaultPairRef = useRef<string | null>(null)
 
   const { data: dexPairs = {} } = useQuery({
     queryKey: ["swap-dex-pairs", "classic"],
@@ -635,22 +614,24 @@ const SwapPanel = ({
     return set
   }, [dexPairs])
 
+  const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(
+    Array.from(tradableCw20Set)
+  )
+
   const assets = useMemo<SwapAsset[]>(() => {
     const cw20Rows = Object.entries(cw20Whitelist)
       .map(([contract, token]) => {
         const decimals = Number(token.decimals ?? 6)
-        return {
-          id: asCw20Id(contract),
-          type: "cw20" as const,
-          symbol: token.symbol || token.name || contract.slice(0, 6).toUpperCase(),
-          name: token.name || token.symbol || contract,
-          decimals: Number.isFinite(decimals) ? decimals : 6,
-          contract,
-          iconCandidates: [token.icon, "/system/cw20.svg"].filter(
-            (item): item is string => Boolean(item)
-          )
-        } satisfies SwapAsset
-      })
+      return {
+        id: asCw20Id(contract),
+        type: "cw20" as const,
+        symbol: token.symbol || token.name || contract.slice(0, 6).toUpperCase(),
+        name: token.name || token.symbol || contract,
+        decimals: Number.isFinite(decimals) ? decimals : 6,
+        contract,
+        iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
+      } satisfies SwapAsset
+    })
       .sort((a, b) => {
         const aTradable = !tradableCw20Set.size || tradableCw20Set.has(a.contract ?? "")
         const bTradable = !tradableCw20Set.size || tradableCw20Set.has(b.contract ?? "")
@@ -676,6 +657,27 @@ const SwapPanel = ({
     }
   }, [assets, fromAssetId, toAssetId])
 
+  useEffect(() => {
+    if (!assets.length) return
+
+    const defaultPairKey = `${defaultFromAssetId}:${defaultToAssetId}`
+    if (appliedDefaultPairRef.current === defaultPairKey) return
+
+    const hasDefaultFrom = assets.some((asset) => asset.id === defaultFromAssetId)
+    const hasDefaultTo = assets.some(
+      (asset) => asset.id === defaultToAssetId && asset.id !== defaultFromAssetId
+    )
+
+    if (!hasDefaultFrom || !hasDefaultTo) return
+
+    appliedDefaultPairRef.current = defaultPairKey
+    setFromAssetId(defaultFromAssetId)
+    setToAssetId(defaultToAssetId)
+    setQuotes([])
+    setSelectedDexId(undefined)
+    setQuoteError(undefined)
+  }, [assets, defaultFromAssetId, defaultToAssetId])
+
   const fromAsset = useMemo(
     () => assets.find((asset) => asset.id === fromAssetId) ?? assets[0] ?? NATIVE_ASSETS[0],
     [assets, fromAssetId]
@@ -686,6 +688,52 @@ const SwapPanel = ({
     if (candidate) return candidate
     return assets.find((asset) => asset.id !== fromAsset.id) ?? NATIVE_ASSETS[1]
   }, [assets, toAssetId, fromAsset.id])
+
+  const quoteFromAsset = useMemo(
+    () =>
+      ({
+        id: fromAsset.id,
+        type: fromAsset.type,
+        symbol: fromAsset.symbol,
+        name: fromAsset.name,
+        decimals: fromAsset.decimals,
+        denom: fromAsset.denom,
+        contract: fromAsset.contract,
+        iconCandidates: []
+      }) satisfies SwapAsset,
+    [
+      fromAsset.contract,
+      fromAsset.decimals,
+      fromAsset.denom,
+      fromAsset.id,
+      fromAsset.name,
+      fromAsset.symbol,
+      fromAsset.type
+    ]
+  )
+
+  const quoteToAsset = useMemo(
+    () =>
+      ({
+        id: toAsset.id,
+        type: toAsset.type,
+        symbol: toAsset.symbol,
+        name: toAsset.name,
+        decimals: toAsset.decimals,
+        denom: toAsset.denom,
+        contract: toAsset.contract,
+        iconCandidates: []
+      }) satisfies SwapAsset,
+    [
+      toAsset.contract,
+      toAsset.decimals,
+      toAsset.denom,
+      toAsset.id,
+      toAsset.name,
+      toAsset.symbol,
+      toAsset.type
+    ]
+  )
 
   const amountInMicro = useMemo(
     () => toMicroAmount(amountIn, fromAsset.decimals),
@@ -709,10 +757,10 @@ const SwapPanel = ({
   })
 
   const { data: prices } = useQuery({
-    queryKey: ["swap-prices"],
+    queryKey: ["prices"],
     queryFn: fetchPrices,
-    staleTime: 30_000,
-    refetchInterval: 60_000
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000
   })
 
   const assetBalanceMap = useMemo(() => {
@@ -766,6 +814,29 @@ const SwapPanel = ({
     return quotes.find((item) => item.id === selectedDexId) ?? bestQuote
   }, [bestQuote, quotes, selectedDexId])
 
+  const selectedQuoteId = selectedQuote?.id ?? ""
+  const selectedQuotePair = selectedQuote?.pair ?? ""
+  const selectedQuoteMode = selectedQuote?.mode ?? "terraswap"
+
+  const feeQuote = useMemo(
+    () =>
+      selectedQuotePair
+        ? {
+            pair: selectedQuotePair,
+            mode: selectedQuoteMode
+          }
+        : undefined,
+    [selectedQuoteMode, selectedQuotePair]
+  )
+
+  const selectedQuoteSignature = selectedQuoteId
+    ? `${selectedQuoteId}:${selectedQuotePair}:${selectedQuoteMode}`
+    : ""
+
+  const hasAmountInput = amountInMicro > 0n
+  const hasQuotePreview = hasAmountInput && Boolean(selectedQuote)
+  const previewPending = hasAmountInput && quoteLoading && !selectedQuote
+
   const toAmountUsdText = useMemo(
     () =>
       formatAssetUsdText({
@@ -777,11 +848,36 @@ const SwapPanel = ({
     [toAsset, selectedQuote?.returnAmount, luncUsd, ustcUsd]
   )
 
+  const toAmountDisplay = useMemo(
+    () =>
+      selectedQuote
+        ? formatTokenAmount(selectedQuote.returnAmount.toString(), toAsset.decimals, 6)
+        : "--",
+    [selectedQuote, toAsset.decimals]
+  )
+
+  const quotePlaceholderText = useMemo(() => {
+    if (!hasAmountInput) return "Enter amount to preview rate, fee, and route details."
+    if (previewPending) return "Fetching quotes across Classic DEX routes..."
+    return "Route details will appear here once a quote is available."
+  }, [hasAmountInput, previewPending])
+
+  const amountInDensity = useMemo(() => getAmountDensity(amountIn), [amountIn])
+  const toAmountDensity = useMemo(() => getAmountDensity(toAmountDisplay), [toAmountDisplay])
+
   const minReceiveMicro = useMemo(() => {
     if (!selectedQuote) return 0n
     const basis = 10_000n - slippageBps
     return (selectedQuote.returnAmount * basis) / 10_000n
   }, [selectedQuote, slippageBps])
+
+  const toFooterText = useMemo(() => {
+    if (hasQuotePreview) {
+      return `${formatTokenAmount(minReceiveMicro.toString(), toAsset.decimals, 6)} ${toAsset.symbol}`
+    }
+    if (previewPending) return "Fetching routes..."
+    return "Enter amount to preview"
+  }, [hasQuotePreview, minReceiveMicro, previewPending, toAsset.decimals, toAsset.symbol])
 
   const maxSpread = useMemo(() => bpsToMaxSpread(slippageBps), [slippageBps])
 
@@ -882,7 +978,7 @@ const SwapPanel = ({
     let cancelled = false
 
     if (swapAmountMicro <= 0n) {
-      setQuotes([])
+      setQuotes((current) => (current.length ? [] : current))
       setQuoteError(undefined)
       setQuoteLoading(false)
       return undefined
@@ -893,7 +989,9 @@ const SwapPanel = ({
       setQuoteError(undefined)
       try {
         const settled = await Promise.allSettled(
-          DEXES.map((dex) => simulateSwapQuote(dex, fromAsset, toAsset, swapAmountMicro))
+          DEXES.map((dex) =>
+            simulateSwapQuote(dex, quoteFromAsset, quoteToAsset, swapAmountMicro)
+          )
         )
         const nextQuotes = settled
           .filter((item): item is PromiseFulfilledResult<DexQuote> => item.status === "fulfilled")
@@ -931,25 +1029,25 @@ const SwapPanel = ({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [fromAsset, swapAmountMicro, toAsset])
+  }, [quoteFromAsset, quoteToAsset, swapAmountMicro])
 
   useEffect(() => {
     let cancelled = false
 
-    if (!selectedQuote || swapAmountMicro <= 0n) {
-      setFeeDisplay("--")
+    if (!feeQuote || swapAmountMicro <= 0n) {
+      setFeeDisplay((current) => (current === "--" ? current : "--"))
       setFeeLoading(false)
       return undefined
     }
 
     const fallbackFee = `${formatTokenAmount(
-      estimateFallbackFeeMicro(fromAsset, platformFeeMicro > 0n).toString(),
+      estimateFallbackFeeMicro(quoteFromAsset, platformFeeMicro > 0n).toString(),
       6,
       6
     )} LUNC`
 
     if (!accountAddress) {
-      setFeeDisplay(fallbackFee)
+      setFeeDisplay((current) => (current === fallbackFee ? current : fallbackFee))
       setFeeLoading(false)
       return undefined
     }
@@ -962,14 +1060,14 @@ const SwapPanel = ({
         const signer = await getOfflineSigner()
         if (!signer) throw new Error("Wallet signer not available")
         const client = await connectClassicSigningClient(signer)
-        const feeMsg = buildPlatformFeeMessage(accountAddress, fromAsset, platformFeeMicro)
+        const feeMsg = buildPlatformFeeMessage(accountAddress, quoteFromAsset, platformFeeMicro)
         const msg = buildSwapMessage(
           accountAddress,
-          selectedQuote.pair,
-          fromAsset,
+          feeQuote?.pair ?? "",
+          quoteFromAsset,
           swapAmountMicro,
           maxSpread,
-          selectedQuote.mode ?? "terraswap"
+          feeQuote?.mode ?? "terraswap"
         )
         const gasUsed = await client.simulate(
           accountAddress,
@@ -993,10 +1091,11 @@ const SwapPanel = ({
     }
   }, [
     accountAddress,
-    fromAsset,
+    feeQuote,
     maxSpread,
     platformFeeMicro,
-    selectedQuote,
+    quoteFromAsset,
+    selectedQuoteSignature,
     swapAmountMicro
   ])
 
@@ -1149,7 +1248,16 @@ const SwapPanel = ({
                     <span className={styles.assetPickerCaret}>▾</span>
                   </button>
                   <input
-                    className={styles.amountInput}
+                    className={[
+                      styles.amountInput,
+                      amountInDensity === "compact"
+                        ? styles.amountInputCompact
+                        : amountInDensity === "tiny"
+                          ? styles.amountInputTiny
+                          : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     inputMode="decimal"
                     value={amountIn}
                     onChange={(event) => setAmountIn(sanitizeAmount(event.target.value))}
@@ -1182,7 +1290,11 @@ const SwapPanel = ({
               <div className={styles.fieldCard}>
                 <div className={styles.fieldHeader}>
                   <span>To</span>
-                  <span className={styles.routeLabel}>Best: {bestQuote?.label ?? "--"}</span>
+                  {hasQuotePreview || previewPending ? (
+                    <span className={styles.routeLabel}>
+                      {previewPending ? "Fetching routes..." : `Best: ${bestQuote?.label ?? "--"}`}
+                    </span>
+                  ) : null}
                 </div>
                 <div className={styles.fieldBody}>
                   <button
@@ -1200,141 +1312,147 @@ const SwapPanel = ({
                     </span>
                     <span className={styles.assetPickerCaret}>▾</span>
                   </button>
-                  <div className={styles.readonlyAmount}>
-                    {selectedQuote
-                      ? formatTokenAmount(
-                          selectedQuote.returnAmount.toString(),
-                          toAsset.decimals,
-                          6
-                        )
-                      : "--"}
+                  <div
+                    className={[
+                      styles.readonlyAmount,
+                      toAmountDensity === "compact"
+                        ? styles.readonlyAmountCompact
+                        : toAmountDensity === "tiny"
+                          ? styles.readonlyAmountTiny
+                          : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {toAmountDisplay}
                   </div>
                 </div>
                 <div className={styles.fieldFooter}>
                   <span>
-                    Minimum receive:{" "}
-                    {selectedQuote
-                      ? `${formatTokenAmount(minReceiveMicro.toString(), toAsset.decimals, 6)} ${
-                          toAsset.symbol
-                        }`
-                      : "--"}
+                    Minimum receive: {toFooterText}
                   </span>
-                  <span className={styles.usdHint}>{toAmountUsdText}</span>
+                  {hasQuotePreview ? (
+                    <span className={styles.usdHint}>{toAmountUsdText}</span>
+                  ) : null}
                 </div>
               </div>
             </div>
 
-            <section className={styles.quoteAccordion}>
-              <button
-                type="button"
-                className={styles.quoteAccordionHeader}
-                onClick={() => setAdvancedOpen((current) => !current)}
-                aria-expanded={advancedOpen}
-              >
-                <span className={styles.quoteAccordionMain}>{rateDisplay}</span>
-                <span className={styles.quoteAccordionMeta}>
-                  {bestQuote?.label ?? "--"} · Impact {priceImpactDisplay}
-                </span>
-                <span className={styles.quoteAccordionMeta}>
-                  Fee {feeLoading ? "Estimating..." : feeDisplay}
-                </span>
-                <span className={styles.quoteAccordionToggle}>
-                  {advancedOpen ? "Hide details ▴" : "Show details ▾"}
-                </span>
-              </button>
+            {hasQuotePreview ? (
+              <section className={styles.quoteAccordion}>
+                <button
+                  type="button"
+                  className={styles.quoteAccordionHeader}
+                  onClick={() => setAdvancedOpen((current) => !current)}
+                  aria-expanded={advancedOpen}
+                >
+                  <span className={styles.quoteAccordionMain}>{rateDisplay}</span>
+                  <span className={styles.quoteAccordionMeta}>
+                    {bestQuote?.label ?? "--"} · Impact {priceImpactDisplay}
+                  </span>
+                  <span className={styles.quoteAccordionMeta}>
+                    Fee {feeLoading ? "Estimating..." : feeDisplay}
+                  </span>
+                  <span className={styles.quoteAccordionToggle}>
+                    {advancedOpen ? "Hide details ▴" : "Show details ▾"}
+                  </span>
+                </button>
 
-              {advancedOpen ? (
-                <div className={styles.quoteAccordionBody}>
-                  <div className={styles.detailsGrid}>
-                    <div>
-                      <label>Rate</label>
-                      <strong>{rateDisplay}</strong>
+                {advancedOpen ? (
+                  <div className={styles.quoteAccordionBody}>
+                    <div className={styles.detailsGrid}>
+                      <div>
+                        <label>Rate</label>
+                        <strong>{rateDisplay}</strong>
+                      </div>
+                      <div>
+                        <label>Best route</label>
+                        <strong>{bestQuote?.label ?? "--"}</strong>
+                      </div>
+                      <div>
+                        <label>Price impact</label>
+                        <strong>{priceImpactDisplay}</strong>
+                      </div>
+                      <div>
+                        <label>Slippage</label>
+                        <strong>{(Number(slippageBps) / 100).toFixed(2)}%</strong>
+                      </div>
+                      <div>
+                        <label>Estimated fee</label>
+                        <strong>{feeLoading ? "Estimating..." : feeDisplay}</strong>
+                      </div>
+                      <div>
+                        <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
+                        <strong>
+                          {`${formatTokenAmount(
+                            platformFeeMicro.toString(),
+                            fromAsset.decimals,
+                            6
+                          )} ${fromAsset.symbol}`}
+                        </strong>
+                      </div>
+                      <div>
+                        <label>Route path</label>
+                        <strong>
+                          {fromAsset.symbol} → {toAsset.symbol}
+                        </strong>
+                      </div>
                     </div>
-                    <div>
-                      <label>Best route</label>
-                      <strong>{bestQuote?.label ?? "--"}</strong>
-                    </div>
-                    <div>
-                      <label>Price impact</label>
-                      <strong>{priceImpactDisplay}</strong>
-                    </div>
-                    <div>
-                      <label>Slippage</label>
-                      <strong>{(Number(slippageBps) / 100).toFixed(2)}%</strong>
-                    </div>
-                    <div>
-                      <label>Estimated fee</label>
-                      <strong>{feeLoading ? "Estimating..." : feeDisplay}</strong>
-                    </div>
-                    <div>
-                      <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
-                      <strong>
-                        {amountInMicro > 0n
-                          ? `${formatTokenAmount(
-                              platformFeeMicro.toString(),
-                              fromAsset.decimals,
-                              6
-                            )} ${fromAsset.symbol}`
-                          : "--"}
-                      </strong>
-                    </div>
-                    <div>
-                      <label>Route path</label>
-                      <strong>
-                        {fromAsset.symbol} → {toAsset.symbol}
-                      </strong>
+
+                    <div className={styles.routesCard}>
+                      <div className={styles.routesHeader}>
+                        <h3>Liquidity routes</h3>
+                        <span>{quoteLoading ? "Updating..." : "Best price auto-detected"}</span>
+                      </div>
+                      <div className={styles.routeList}>
+                        {routeRows.map((quote, index) => {
+                          const selected = selectedQuote?.id === quote.id
+                          return (
+                            <button
+                              key={quote.id}
+                              type="button"
+                              className={`${styles.routeItem} ${selected ? styles.routeItemActive : ""}`}
+                              onClick={() => setSelectedDexId(quote.id)}
+                            >
+                              <div className={styles.routeName}>
+                                {quote.label}
+                                {index === 0 ? <span className={styles.bestTag}>Best price</span> : null}
+                              </div>
+                              <div className={styles.routeValue}>
+                                {formatTokenAmount(quote.returnAmount.toString(), toAsset.decimals, 6)}{" "}
+                                {toAsset.symbol}
+                              </div>
+                              <div className={styles.routeMeta}>
+                                {quote.lossBps > 0
+                                  ? `-${(quote.lossBps / 100).toFixed(2)}% vs best`
+                                  : "Best"}
+                                {" · "}
+                                Fee:{" "}
+                                {formatTokenAmount(
+                                  quote.commissionAmount.toString(),
+                                  toAsset.decimals,
+                                  6
+                                )}{" "}
+                                {toAsset.symbol}
+                              </div>
+                            </button>
+                          )
+                        })}
+                        {!routeRows.length && !quoteLoading ? (
+                          <div className={styles.routeEmpty}>
+                            Enter amount and choose assets to fetch routes.
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-
-                  <div className={styles.routesCard}>
-                    <div className={styles.routesHeader}>
-                      <h3>Liquidity routes</h3>
-                      <span>{quoteLoading ? "Updating..." : "Best price auto-detected"}</span>
-                    </div>
-                    <div className={styles.routeList}>
-                      {routeRows.map((quote, index) => {
-                        const selected = selectedQuote?.id === quote.id
-                        return (
-                          <button
-                            key={quote.id}
-                            type="button"
-                            className={`${styles.routeItem} ${selected ? styles.routeItemActive : ""}`}
-                            onClick={() => setSelectedDexId(quote.id)}
-                          >
-                            <div className={styles.routeName}>
-                              {quote.label}
-                              {index === 0 ? <span className={styles.bestTag}>Best price</span> : null}
-                            </div>
-                            <div className={styles.routeValue}>
-                              {formatTokenAmount(quote.returnAmount.toString(), toAsset.decimals, 6)}{" "}
-                              {toAsset.symbol}
-                            </div>
-                            <div className={styles.routeMeta}>
-                              {quote.lossBps > 0
-                                ? `-${(quote.lossBps / 100).toFixed(2)}% vs best`
-                                : "Best"}
-                              {" · "}
-                              Fee:{" "}
-                              {formatTokenAmount(
-                                quote.commissionAmount.toString(),
-                                toAsset.decimals,
-                                6
-                              )}{" "}
-                              {toAsset.symbol}
-                            </div>
-                          </button>
-                        )
-                      })}
-                      {!routeRows.length && !quoteLoading ? (
-                        <div className={styles.routeEmpty}>
-                          Enter amount and choose assets to fetch routes.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </section>
+                ) : null}
+              </section>
+            ) : (
+              <section className={styles.quotePlaceholder}>
+                <span>{quotePlaceholderText}</span>
+              </section>
+            )}
 
             {insufficientBalance ? (
               <p className={styles.error}>Insufficient {fromAsset.symbol} balance.</p>

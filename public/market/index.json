@@ -1004,7 +1004,17 @@
           "id": "native:uusd",
           "amount": "4052571386921"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6|uusd": 100,
+          "uusd|terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6": 88.755888
+        },
+        "7d": {
+          "terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6|uusd": 13076.402499,
+          "uusd|terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6": 11645.313128999998
+        }
+      }
     },
     {
       "pair": "terra144p2hh09v4y9ytj7x3r97jl5etrrg9lrgyf8yn",
@@ -2244,7 +2254,13 @@
           "id": "cw20:terra1rdqy74e080e96qhk5gntnr882awm4pfc7t6dn4",
           "amount": "2595937970112"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra1kqf8ua7al5tdnkz95ue4zkuv4gcu52pt63ya54|terra1rdqy74e080e96qhk5gntnr882awm4pfc7t6dn4": 1129.741251,
+          "terra1rdqy74e080e96qhk5gntnr882awm4pfc7t6dn4|terra1kqf8ua7al5tdnkz95ue4zkuv4gcu52pt63ya54": 424.468788
+        }
+      }
     },
     {
       "pair": "terra194vxep9tppptk9qzpuhyjyws2m7qs0x4p00a8e",
@@ -2444,7 +2460,13 @@
           "id": "native:uusd",
           "amount": "636207681233"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n|uusd": 3940.826834,
+          "uusd|terra12hgwnpupflfpuual532wgrxu2gjp0tcagzgx4n": 43365.454591999995
+        }
+      }
     },
     {
       "pair": "terra19yfms6e3ahcczw0s3j98z67krm0vhrweh7dzrq",
@@ -4984,7 +5006,13 @@
           "id": "native:uusd",
           "amount": "2103696245561"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra1xj49zyqrwpv5k928jwfpfy2ha668nwdgkwlrg3|uusd": 19042.651928,
+          "uusd|terra1xj49zyqrwpv5k928jwfpfy2ha668nwdgkwlrg3": 213213.306354
+        }
+      }
     },
     {
       "pair": "terra1lanv5hu69wrnr3m2m37g2wzkg9uu4e27tfh5ye",
@@ -5304,7 +5332,17 @@
           "id": "native:uluna",
           "amount": "622986879049573"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uusd|uluna": 15275336.400958998,
+          "uluna|uusd": 125892.00038800001
+        },
+        "7d": {
+          "uusd|uluna": 100771193.95964402,
+          "uluna|uusd": 834315.226942
+        }
+      }
     },
     {
       "pair": "terra1m95udvvdame93kl6j2mk8d03kc982wqgr75jsr",
@@ -5544,7 +5582,13 @@
           "id": "native:uusd",
           "amount": "297079574810"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra1mddcdx0ujx89f38gu7zspk2r2ffdl5enyz2u03|uusd": 2,
+          "uusd|terra1mddcdx0ujx89f38gu7zspk2r2ffdl5enyz2u03": 32.78895548
+        }
+      }
     },
     {
       "pair": "terra1myl709y74vrdcyuxy6g9wv5l2sgah4e9lstnwe",
@@ -9404,7 +9448,13 @@
           "id": "cw20:terra15juucad3k2npsj53crl6qhra9f65s9jkas9nzpqypj38en4ht32qczde4a",
           "amount": "44840556750070941"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra15juucad3k2npsj53crl6qhra9f65s9jkas9nzpqypj38en4ht32qczde4a": 7094944245.761162,
+          "terra15juucad3k2npsj53crl6qhra9f65s9jkas9nzpqypj38en4ht32qczde4a|uluna": 8950196.521922
+        }
+      }
     },
     {
       "pair": "terra12prndqcl2t4garpp7694xy245al6n9vrpanl9eh9fug3e5jy730smzuaq3",
@@ -9804,7 +9854,13 @@
           "id": "cw20:terra1vxhnzlr44ajzq84xra07gtvyv5saxmsyz6cd5cewqm479znvsepqzdkk05",
           "amount": "49269764917948"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra1vxhnzlr44ajzq84xra07gtvyv5saxmsyz6cd5cewqm479znvsepqzdkk05": 78101.288606,
+          "terra1vxhnzlr44ajzq84xra07gtvyv5saxmsyz6cd5cewqm479znvsepqzdkk05|uluna": 101760.44994
+        }
+      }
     },
     {
       "pair": "terra13dtjuqfza22zzlk9hkwjv79ut9q9n5xups067n8lpx2s2gh5qdzq7ajd2w",
@@ -9924,7 +9980,17 @@
           "id": "native:uluna",
           "amount": "87920276025395"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra1wx48f5g06l9qxw8k4gn3200lmseu85vkgangwyn9xdu66mtfsfxq60hkdt|uluna": 20206.832326,
+          "uluna|terra1wx48f5g06l9qxw8k4gn3200lmseu85vkgangwyn9xdu66mtfsfxq60hkdt": 2130.214914
+        },
+        "7d": {
+          "terra1wx48f5g06l9qxw8k4gn3200lmseu85vkgangwyn9xdu66mtfsfxq60hkdt|uluna": 579217.436302,
+          "uluna|terra1wx48f5g06l9qxw8k4gn3200lmseu85vkgangwyn9xdu66mtfsfxq60hkdt": 60442.322545999996
+        }
+      }
     },
     {
       "pair": "terra13mvklnkxclutk4ek7z5rjgk9w88njjvuy2nqg6zw5xjexxjkuauqc605ug",
@@ -10064,7 +10130,21 @@
           "id": "native:uluna",
           "amount": "400656044860550"
         }
-      ]
+      ],
+      "volumes": {
+        "1h": {
+          "terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2|uluna": 1655886.034382,
+          "uluna|terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2": 24351744.6845
+        },
+        "24h": {
+          "terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2|uluna": 31845154.242069,
+          "uluna|terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2": 457142313.01249796
+        },
+        "7d": {
+          "terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2|uluna": 106706633.34603,
+          "uluna|terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2": 1540546112.147186
+        }
+      }
     },
     {
       "pair": "terra13yh4ym0sclu08gm493vaptckqw6d6ytd7et2pgmmxrywm76674nqnl68rq",
@@ -11964,7 +12044,17 @@
           "id": "native:ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D",
           "amount": "1143196267"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D": 0.040695,
+          "ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D|uluna": 980
+        },
+        "7d": {
+          "uluna|ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D": 11.127269,
+          "ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D|uluna": 265452.89995600004
+        }
+      }
     },
     {
       "pair": "terra17tn3q0sqd43z3y7czxcahur00fergc3lavpyr7nxd856fm6s4p5qkxw9g0",
@@ -12244,7 +12334,17 @@
           "id": "cw20:terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp",
           "amount": "3561177135974"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 61678.649741,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2": 37548800.902748
+        },
+        "7d": {
+          "terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 418832.74649700004,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2": 239200422.73295403
+        }
+      }
     },
     {
       "pair": "terra18pmu9k44juv7hnkwt0x2ppz2tmnt22lqepgry6pjdyf2hmhg082shq9s4l",
@@ -14224,7 +14324,13 @@
           "id": "cw20:terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp",
           "amount": "737783940597"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra1pcwd6q9ed5prxhq9q2l4nlwhv9uux4gfkzaxywg0ewqcvuhfcwgq8hn0vv|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 645.578943,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|terra1pcwd6q9ed5prxhq9q2l4nlwhv9uux4gfkzaxywg0ewqcvuhfcwgq8hn0vv": 483.040935
+        }
+      }
     },
     {
       "pair": "terra1edq2zmzwwavenn7taqheey5acc4cxc3rqvvqcavrgrc6ejuakklq83cepa",
@@ -15684,7 +15790,13 @@
           "id": "cw20:terra14rfnhc2aru7jp304lht3yf903necsnrt4cxd464cftsfcksw0rtsgundnt",
           "amount": "2628696075763"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra14rfnhc2aru7jp304lht3yf903necsnrt4cxd464cftsfcksw0rtsgundnt": 21752.133381,
+          "terra14rfnhc2aru7jp304lht3yf903necsnrt4cxd464cftsfcksw0rtsgundnt|uluna": 298787.44805
+        }
+      }
     },
     {
       "pair": "terra1ht0mzpzmu75qxqat37x0svs8ac9wmpce97k5r59x4juh8l7e5yrsshylzv",
@@ -16604,7 +16716,17 @@
           "id": "native:uusd",
           "amount": "302897192610"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|uusd": 123.136803,
+          "uusd|uluna": 15059.368117
+        },
+        "7d": {
+          "uluna|uusd": 10147.372908,
+          "uusd|uluna": 1206179.39565
+        }
+      }
     },
     {
       "pair": "terra1l2vjuslm34zp45cgfngkr6tsxl6fn5acnzmruhq5tppvk5audxssl7ed44",
@@ -17924,7 +18046,17 @@
           "id": "cw20:terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp",
           "amount": "1970047306488"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uusd|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 24495.861804,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|uusd": 8344.247426
+        },
+        "7d": {
+          "uusd|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 211980.56396799997,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|uusd": 69352.487597
+        }
+      }
     },
     {
       "pair": "terra1p73gqaa3lnlqgcpxg06dvusnvff6wfmjs7hfzgzqg73ahdf8qsvsvp5tq4",
@@ -19104,7 +19236,21 @@
           "id": "cw20:terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp",
           "amount": "8431898838665"
         }
-      ]
+      ],
+      "volumes": {
+        "1h": {
+          "uluna|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 1361.756331,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|uluna": 57452.861911
+        },
+        "24h": {
+          "uluna|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 368667.4676760001,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|uluna": 15284204.062077997
+        },
+        "7d": {
+          "uluna|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 2750443.913942,
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|uluna": 106815671.95783004
+        }
+      }
     },
     {
       "pair": "terra1rm57fxle0cnun3455rk8qz4r02prz57wyajjw4u2r6nytpaays3s365njs",
@@ -19744,7 +19890,17 @@
           "id": "cw20:terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00",
           "amount": "3868949184662"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00": 2620.418321,
+          "terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00|uluna": 14700
+        },
+        "7d": {
+          "uluna|terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00": 134601.858937,
+          "terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00|uluna": 762994.16535
+        }
+      }
     },
     {
       "pair": "terra1swvvupmrhdm9g5m2992gyzx23lq8w7ce3ltcs32hgsr6rmdlaxcq5dtumt",
@@ -20404,7 +20560,21 @@
           "id": "cw20:terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej",
           "amount": "589981155859272351"
         }
-      ]
+      ],
+      "volumes": {
+        "1h": {
+          "uluna|terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej": 631752796.0122889,
+          "terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej|uluna": 45953.927543000005
+        },
+        "24h": {
+          "uluna|terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej": 17919753378.061104,
+          "terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej|uluna": 1290116.5089980003
+        },
+        "7d": {
+          "uluna|terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej": 81827891859.84361,
+          "terra12j3xuxx52cg045qk37ee4k4u4fsgvyuf8d89dh7c9mr706jvxdascahqej|uluna": 5869305.924646999
+        }
+      }
     },
     {
       "pair": "terra1u6ek9rfjf7vv6qxrndja0076dxynt7v87zxwwj989s8qgxrphmvqg0m4h3",
@@ -21004,7 +21174,13 @@
           "id": "cw20:terra1le9l8gpwl2f48xluphnwkqrnhwxqt27xhducfzqvncmsh9swavlqjpy7c9",
           "amount": "587438922"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra1le9l8gpwl2f48xluphnwkqrnhwxqt27xhducfzqvncmsh9swavlqjpy7c9": 0.28606,
+          "terra1le9l8gpwl2f48xluphnwkqrnhwxqt27xhducfzqvncmsh9swavlqjpy7c9|uluna": 21584.692
+        }
+      }
     },
     {
       "pair": "terra1vt6h74yjjvmyqchsdz35grycs5yxmqj6u6h4srlwycntawc7d7xsldeqvf",
@@ -21604,7 +21780,17 @@
           "id": "cw20:terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt",
           "amount": "5582356826260590933"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt": 213782839228.42053,
+          "terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt|uluna": 4031227.946563
+        },
+        "7d": {
+          "uluna|terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt": 739734197589.7184,
+          "terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt|uluna": 13525876.534610001
+        }
+      }
     },
     {
       "pair": "terra1x6027sw6punk7stmy4lptaeknannn367390dmgf0u9m7pnrdc4nq2h2ln9",
@@ -22744,7 +22930,13 @@
           "id": "cw20:terra1pcwd6q9ed5prxhq9q2l4nlwhv9uux4gfkzaxywg0ewqcvuhfcwgq8hn0vv",
           "amount": "349836220659"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "ibc/0471F1C4E7AFD3F07702BEF6DC365268D64570F7C1FDC98EA6098DD6DE59817B|terra1pcwd6q9ed5prxhq9q2l4nlwhv9uux4gfkzaxywg0ewqcvuhfcwgq8hn0vv": 5704.126501,
+          "terra1pcwd6q9ed5prxhq9q2l4nlwhv9uux4gfkzaxywg0ewqcvuhfcwgq8hn0vv|ibc/0471F1C4E7AFD3F07702BEF6DC365268D64570F7C1FDC98EA6098DD6DE59817B": 366.341807
+        }
+      }
     },
     {
       "pair": "terra1zycsed0fmgefx38yjz8rj4u9sjkw7pnsne5ucp6pxtddsrl3sxusjded7n",
@@ -22784,7 +22976,17 @@
           "id": "native:ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5",
           "amount": "2645623995"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 118.93092399999999,
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 67548.20949800001
+        },
+        "7d": {
+          "terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 850.313472,
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp": 511319.6995210001
+        }
+      }
     },
     {
       "pair": "terra10txu4rkdavraaj2jg67080z2jmn8t7f84slf2ul0sfvkf4hr3a6s00ew29",
@@ -22824,7 +23026,17 @@
           "id": "cw20:terra1xuwhm227h520fx0zse5enze42as3n0sm2xlyctjwnh08m0kvt83ss0rmzw",
           "amount": "217784484366311"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra1xuwhm227h520fx0zse5enze42as3n0sm2xlyctjwnh08m0kvt83ss0rmzw": 70029.682636,
+          "terra1xuwhm227h520fx0zse5enze42as3n0sm2xlyctjwnh08m0kvt83ss0rmzw|uluna": 12000
+        },
+        "7d": {
+          "uluna|terra1xuwhm227h520fx0zse5enze42as3n0sm2xlyctjwnh08m0kvt83ss0rmzw": 70029.682636,
+          "terra1xuwhm227h520fx0zse5enze42as3n0sm2xlyctjwnh08m0kvt83ss0rmzw|uluna": 12000
+        }
+      }
     },
     {
       "pair": "terra15jhy94cz3dd6sr6ugpyruljmltkj2p87y470k46g5pqgknwxugksgakv6f",
@@ -22864,7 +23076,13 @@
           "id": "cw20:terra1d06z7c94qu5vuhnk0r3m6dyn75y259uqjjk8mf2kxx4gxmfvnavsnx2uc0",
           "amount": "196418081957558"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra1d06z7c94qu5vuhnk0r3m6dyn75y259uqjjk8mf2kxx4gxmfvnavsnx2uc0": 11299975.144709,
+          "terra1d06z7c94qu5vuhnk0r3m6dyn75y259uqjjk8mf2kxx4gxmfvnavsnx2uc0|uluna": 2268797.780588
+        }
+      }
     },
     {
       "pair": "terra16p0fhpm7a09t3t5xnj7ukfeats77tc25032rl6l00n4w2f7wz9xsyve64x",
@@ -22884,7 +23102,17 @@
           "id": "cw20:terra1y4plh8lxjy8ywf28wwuxjac0qmk20fuvg98kev2ey78gg82xafuq0nuqyy",
           "amount": "93907196115457"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra1y4plh8lxjy8ywf28wwuxjac0qmk20fuvg98kev2ey78gg82xafuq0nuqyy": 600000.006993,
+          "terra1y4plh8lxjy8ywf28wwuxjac0qmk20fuvg98kev2ey78gg82xafuq0nuqyy|uluna": 603927.602834
+        },
+        "7d": {
+          "uluna|terra1y4plh8lxjy8ywf28wwuxjac0qmk20fuvg98kev2ey78gg82xafuq0nuqyy": 3289152.892226,
+          "terra1y4plh8lxjy8ywf28wwuxjac0qmk20fuvg98kev2ey78gg82xafuq0nuqyy|uluna": 3302315.187128
+        }
+      }
     },
     {
       "pair": "terra170zyvj4tchlt5whqelg4873ejljsgnkntpfh9aqe0g8dpdukle5qhefgrt",
@@ -22904,7 +23132,13 @@
           "id": "cw20:terra1j9tjp5terr8n209ng8ys68rfrs8x76lrycet5rsc55yultyh9gfqeaa4wq",
           "amount": "183029579614999"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra1j9tjp5terr8n209ng8ys68rfrs8x76lrycet5rsc55yultyh9gfqeaa4wq": 28432.313814,
+          "terra1j9tjp5terr8n209ng8ys68rfrs8x76lrycet5rsc55yultyh9gfqeaa4wq|uluna": 7555.676425
+        }
+      }
     },
     {
       "pair": "terra17lveswhf4gk4l43k33zlz8j3r7kgdsp0tsmj5zunnuchsq547rmqqdr4j7",
@@ -22984,7 +23218,17 @@
           "id": "cw20:terra1lhu9sn8g402zg8gz8wm2rrpwdseukxdgcfum92j9meucy9rz8frq95y6h2",
           "amount": "756133658"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|terra1lhu9sn8g402zg8gz8wm2rrpwdseukxdgcfum92j9meucy9rz8frq95y6h2": 60.99514799999999,
+          "terra1lhu9sn8g402zg8gz8wm2rrpwdseukxdgcfum92j9meucy9rz8frq95y6h2|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 63.057274
+        },
+        "7d": {
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|terra1lhu9sn8g402zg8gz8wm2rrpwdseukxdgcfum92j9meucy9rz8frq95y6h2": 127.15711999999999,
+          "terra1lhu9sn8g402zg8gz8wm2rrpwdseukxdgcfum92j9meucy9rz8frq95y6h2|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 131.432498
+        }
+      }
     },
     {
       "pair": "terra197g6z3w2vmqhz48gujd6nfnnxm6rn2q5rqkdphkfuj5uxc5ra9lsgx8vng",
@@ -23004,7 +23248,17 @@
           "id": "cw20:terra1lv5ew0e3tzw9wd5gal0ugq7yrfu9tltnpd8q5pry7j6juqeg933s3amat4",
           "amount": "130583"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|terra1lv5ew0e3tzw9wd5gal0ugq7yrfu9tltnpd8q5pry7j6juqeg933s3amat4": 0.003248,
+          "terra1lv5ew0e3tzw9wd5gal0ugq7yrfu9tltnpd8q5pry7j6juqeg933s3amat4|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 17.195635
+        },
+        "7d": {
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|terra1lv5ew0e3tzw9wd5gal0ugq7yrfu9tltnpd8q5pry7j6juqeg933s3amat4": 0.003278,
+          "terra1lv5ew0e3tzw9wd5gal0ugq7yrfu9tltnpd8q5pry7j6juqeg933s3amat4|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 17.355196
+        }
+      }
     },
     {
       "pair": "terra19uv9qnp0l50z7h22a00rwrzfl7t6em675uasyp3tuyryvhvcy6yscgyhex",
@@ -23044,7 +23298,17 @@
           "id": "native:ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5",
           "amount": "18972363592"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 336.005946,
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|uluna": 8069257.9522319995
+        },
+        "7d": {
+          "uluna|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 1575.9133549999997,
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|uluna": 37883831.691168
+        }
+      }
     },
     {
       "pair": "terra1a9ky9vzcfj4ffs7dxjus96ylx30m8szmzk2mt7szxpda9c962k6scz25tu",
@@ -23084,7 +23348,13 @@
           "id": "cw20:terra1c8465efwtu0vvyldde50meshzsdk7uhxmgyrhl5gmcsp7qaxk42qjmk5uu",
           "amount": "343212628720356"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra1c8465efwtu0vvyldde50meshzsdk7uhxmgyrhl5gmcsp7qaxk42qjmk5uu": 82000000,
+          "terra1c8465efwtu0vvyldde50meshzsdk7uhxmgyrhl5gmcsp7qaxk42qjmk5uu|uluna": 7444161.234911
+        }
+      }
     },
     {
       "pair": "terra1cm5vek3vjmr28hfugvy37yu3jk32f5rm2m3w00dexgx4xvqq05as5avpxx",
@@ -23144,7 +23414,17 @@
           "id": "native:uusd",
           "amount": "1126644127222"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|uusd": 12014.672909,
+          "uusd|uluna": 1467031.309576
+        },
+        "7d": {
+          "uluna|uusd": 71191.50291000001,
+          "uusd|uluna": 8588377.194663
+        }
+      }
     },
     {
       "pair": "terra1dxrmf0m2ssnc472rpjttcwdn6n2pawsq2xl87tmlguq4h8sgdjlsuh06tt",
@@ -23244,7 +23524,17 @@
           "id": "cw20:terra14mw4gzskqrvnkn5x4u4ukwkggl9ucncg8v8xz3ckuc2fylt4ev7sjlpcg0",
           "amount": "237863828931236"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra14mw4gzskqrvnkn5x4u4ukwkggl9ucncg8v8xz3ckuc2fylt4ev7sjlpcg0": 11000000,
+          "terra14mw4gzskqrvnkn5x4u4ukwkggl9ucncg8v8xz3ckuc2fylt4ev7sjlpcg0|uluna": 2278479.904754
+        },
+        "7d": {
+          "uluna|terra14mw4gzskqrvnkn5x4u4ukwkggl9ucncg8v8xz3ckuc2fylt4ev7sjlpcg0": 37723670.585168004,
+          "terra14mw4gzskqrvnkn5x4u4ukwkggl9ucncg8v8xz3ckuc2fylt4ev7sjlpcg0|uluna": 7896337.8132730005
+        }
+      }
     },
     {
       "pair": "terra1k4nq73ujdhjspsumsa3emhzh287dc8q8ekej9w8zh944qnl2q6lqtx4q0z",
@@ -23264,7 +23554,13 @@
           "id": "native:uluna",
           "amount": "53995513606314"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms|uluna": 89662.87169900001,
+          "uluna|terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms": 2261.65
+        }
+      }
     },
     {
       "pair": "terra1k7tye8ezprfy2786gaynstfuqqw8erxetvqyee4hw4thfl0wnzjsuuzg38",
@@ -23284,7 +23580,17 @@
           "id": "native:uluna",
           "amount": "30461303200606"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "ibc/911B721F15A40ABB29636CBF8AE630076DDF62841ACE7E6D879405CA8870CEA2|uluna": 700000,
+          "uluna|ibc/911B721F15A40ABB29636CBF8AE630076DDF62841ACE7E6D879405CA8870CEA2": 0.040763999999999995
+        },
+        "7d": {
+          "ibc/911B721F15A40ABB29636CBF8AE630076DDF62841ACE7E6D879405CA8870CEA2|uluna": 1200000,
+          "uluna|ibc/911B721F15A40ABB29636CBF8AE630076DDF62841ACE7E6D879405CA8870CEA2": 0.071047
+        }
+      }
     },
     {
       "pair": "terra1lvcdvntl6xqlk0zrnpqmhs8lazlevmd9ss6t9gzuqnl362q329nq9yffmj",
@@ -23304,7 +23610,17 @@
           "id": "cw20:terra1ldxkxrtpd85wyfstenjzt8vgyv8vdjgd3t0nwu38sqh4wx6h2wksh9ule8",
           "amount": "134589493262675"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra1ldxkxrtpd85wyfstenjzt8vgyv8vdjgd3t0nwu38sqh4wx6h2wksh9ule8": 10642099.863033,
+          "terra1ldxkxrtpd85wyfstenjzt8vgyv8vdjgd3t0nwu38sqh4wx6h2wksh9ule8|uluna": 3837845.722772999
+        },
+        "7d": {
+          "uluna|terra1ldxkxrtpd85wyfstenjzt8vgyv8vdjgd3t0nwu38sqh4wx6h2wksh9ule8": 111333911.25497498,
+          "terra1ldxkxrtpd85wyfstenjzt8vgyv8vdjgd3t0nwu38sqh4wx6h2wksh9ule8|uluna": 61079908.725081004
+        }
+      }
     },
     {
       "pair": "terra1mreya3nd8mrvy7gggqeq6nmhn6a0lajxf5ksee0cqfjpslvrhllqazkt0s",
@@ -23364,7 +23680,17 @@
           "id": "cw20:terra1jfm4mxtc8afqpnp556j97gsyhydel87cvm0lxvgv6l7f4kghdq7sq98xjk",
           "amount": "80015866829628"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|terra1jfm4mxtc8afqpnp556j97gsyhydel87cvm0lxvgv6l7f4kghdq7sq98xjk": 87049.075549,
+          "terra1jfm4mxtc8afqpnp556j97gsyhydel87cvm0lxvgv6l7f4kghdq7sq98xjk|uluna": 43819.19644
+        },
+        "7d": {
+          "uluna|terra1jfm4mxtc8afqpnp556j97gsyhydel87cvm0lxvgv6l7f4kghdq7sq98xjk": 8385192.836304999,
+          "terra1jfm4mxtc8afqpnp556j97gsyhydel87cvm0lxvgv6l7f4kghdq7sq98xjk|uluna": 4004804.59807
+        }
+      }
     },
     {
       "pair": "terra1rc6fy8qysa3m7vwr2wf9wgr6dzs9sc7zhr67e0ukj5vg5h0mehxsmw7jjf",
@@ -23404,7 +23730,21 @@
           "id": "native:uluna",
           "amount": "114779204960831"
         }
-      ]
+      ],
+      "volumes": {
+        "1h": {
+          "terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd|uluna": 1830.120379,
+          "uluna|terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd": 5.653755
+        },
+        "24h": {
+          "terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd|uluna": 672493.442654,
+          "uluna|terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd": 2067.916723
+        },
+        "7d": {
+          "terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd|uluna": 12137131.779506998,
+          "uluna|terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd": 37367.67729699999
+        }
+      }
     },
     {
       "pair": "terra1tkqu5dwl4ffp5dxl8yh7f6cqtd69n2a4ulyyv5s49yvs0fj0qmxsx7f8lg",
@@ -23424,7 +23764,13 @@
           "id": "cw20:terra1peu2e6efadlrvdq70nkkkqx36nzn5ccgtjg5wwd3xry3yzd276dqnep594",
           "amount": "207698664901050"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uluna|terra1peu2e6efadlrvdq70nkkkqx36nzn5ccgtjg5wwd3xry3yzd276dqnep594": 271618.544999,
+          "terra1peu2e6efadlrvdq70nkkkqx36nzn5ccgtjg5wwd3xry3yzd276dqnep594|uluna": 50486.640684
+        }
+      }
     },
     {
       "pair": "terra1uzzt7dzs7khczsm5cxl8mzgtqsan23cduz0fku4qssqsqpw33j3q89acns",
@@ -27684,7 +28030,17 @@
           "id": "native:ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5",
           "amount": "18994430190"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uluna|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 184.5529,
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|uluna": 4419791.32154
+        },
+        "7d": {
+          "uluna|ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5": 1463.987657,
+          "ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5|uluna": 35215875.15563801
+        }
+      }
     },
     {
       "pair": "terra19jdzym52e7dxpdkaxj7n4vf6vs6d2v54ckjd36eqtzgqgy8frfgsy0memh",
@@ -30704,7 +31060,17 @@
           "id": "native:uluna",
           "amount": "20772621388421"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a|uluna": 341585.433716,
+          "uluna|terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a": 2206.40038
+        },
+        "7d": {
+          "terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a|uluna": 802290.675881,
+          "uluna|terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a": 5172.371018999999
+        }
+      }
     },
     {
       "pair": "terra1h58jpl006zedsuv20rk9vvwl30p275aw4mar89",
@@ -32144,7 +32510,21 @@
           "id": "native:uluna",
           "amount": "631978963481958"
         }
-      ]
+      ],
+      "volumes": {
+        "1h": {
+          "uusd|uluna": 580276.038462,
+          "uluna|uusd": 4703.115814
+        },
+        "24h": {
+          "uusd|uluna": 23037911.596024,
+          "uluna|uusd": 187830.47916199997
+        },
+        "7d": {
+          "uusd|uluna": 140555479.373759,
+          "uluna|uusd": 1163211.144588
+        }
+      }
     },
     {
       "pair": "terra1l87t45xgd4txpvfpn35vgpcggyfaywqzen34za",
@@ -34544,7 +34924,21 @@
           "id": "native:uluna",
           "amount": "27815363794760"
         }
-      ]
+      ],
+      "volumes": {
+        "1h": {
+          "terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00|uluna": 16840.958145,
+          "uluna|terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00": 3000
+        },
+        "24h": {
+          "terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00|uluna": 87419.262715,
+          "uluna|terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00": 15530.079579000001
+        },
+        "7d": {
+          "terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00|uluna": 1337653.690676,
+          "uluna|terra1g6fm3yu79gv0rc8067n2nnfpf0vks6n0wpzaf4u7w48tdrmj98zsy7uu00": 237237.34743699996
+        }
+      }
     },
     {
       "pair": "terra1rgd4nqucl8g0985u338838jlzfnyq8kdvz8jex",
@@ -36324,7 +36718,13 @@
           "id": "native:ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D",
           "amount": "954286754"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uusd|ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D": 13.370401000000001,
+          "ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D|uusd": 2674.2468799999997
+        }
+      }
     },
     {
       "pair": "terra1vjn47wdahfwxe0qm68e6k2c9uhcy4mltjdjup7",
@@ -41104,7 +41504,17 @@
           "id": "cw20:terra1dk3g53js3034x4v5c3vavhj2738une880yu6kx",
           "amount": "75245350540"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uusd|terra1dk3g53js3034x4v5c3vavhj2738une880yu6kx": 607.6169819999999,
+          "terra1dk3g53js3034x4v5c3vavhj2738une880yu6kx|uusd": 1485.3000710000001
+        },
+        "7d": {
+          "uusd|terra1dk3g53js3034x4v5c3vavhj2738une880yu6kx": 2190.482969,
+          "terra1dk3g53js3034x4v5c3vavhj2738une880yu6kx|uusd": 5274.434671999999
+        }
+      }
     },
     {
       "pair": "terra14gsl8tl6pwe4xmtuc4c78w356n66klmh8xn26w",
@@ -45584,7 +45994,13 @@
           "id": "cw20:terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6",
           "amount": "354241436450"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "uusd|terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6": 1065.758191,
+          "terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6|uusd": 1210.652333
+        }
+      }
     },
     {
       "pair": "terra1aqd6qu6t505rx2tgcunslwtz7parvl2cy2ccn3",
@@ -45784,7 +46200,17 @@
           "id": "native:uusd",
           "amount": "834820994345"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra1dzhzukyezv0etz22ud940z7adyv7xgcjkahuun|uusd": 179.737726,
+          "uusd|terra1dzhzukyezv0etz22ud940z7adyv7xgcjkahuun": 0.000813
+        },
+        "7d": {
+          "terra1dzhzukyezv0etz22ud940z7adyv7xgcjkahuun|uusd": 572.8715010000001,
+          "uusd|terra1dzhzukyezv0etz22ud940z7adyv7xgcjkahuun": 0.002594
+        }
+      }
     },
     {
       "pair": "terra1c0g493amwrzx47zxa0qcvrks7wyhmqkpsf8u2y",
@@ -49124,7 +49550,13 @@
           "id": "native:uusd",
           "amount": "304500066831"
         }
-      ]
+      ],
+      "volumes": {
+        "7d": {
+          "terra14z56l0fp2lsf86zy3hty2z47ezkhnthtr9yq76|uusd": 92.142567,
+          "uusd|terra14z56l0fp2lsf86zy3hty2z47ezkhnthtr9yq76": 2401.733102
+        }
+      }
     },
     {
       "pair": "terra1gmke355upsxhn09qdj9mvgdah24dhv4r0la4k8",
@@ -57224,7 +57656,17 @@
           "id": "native:uusd",
           "amount": "232359376716"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "terra1s5eczhe0h0jutf46re52x5z4r03c8hupacxmdr|uusd": 19.650522,
+          "uusd|terra1s5eczhe0h0jutf46re52x5z4r03c8hupacxmdr": 450
+        },
+        "7d": {
+          "terra1s5eczhe0h0jutf46re52x5z4r03c8hupacxmdr|uusd": 19.650522,
+          "uusd|terra1s5eczhe0h0jutf46re52x5z4r03c8hupacxmdr": 450
+        }
+      }
     },
     {
       "pair": "terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6",
@@ -57244,7 +57686,17 @@
           "id": "native:uluna",
           "amount": "31645739867561"
         }
-      ]
+      ],
+      "volumes": {
+        "24h": {
+          "uusd|uluna": 168274.96960100002,
+          "uluna|uusd": 1383.7317639999999
+        },
+        "7d": {
+          "uusd|uluna": 2661836.7875100006,
+          "uluna|uusd": 22173.099372
+        }
+      }
     },
     {
       "pair": "terra1tnt6qdre3htcd6wwf2asj40ch4fys5x5wzz35v",

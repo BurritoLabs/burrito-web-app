@@ -1,17 +1,26 @@
+.marketShell {
+  display: grid;
+  gap: 12px;
+  container: market / inline-size;
+}
+
 .toolbar {
   padding: 14px;
   display: grid;
   gap: 10px;
+  position: relative;
+  z-index: 8;
+  overflow: visible;
 }
 
 .toolbarMain {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 250px;
   gap: 10px;
+  align-items: start;
 }
 
-.searchInput,
-.sortSelect {
+.searchInput {
   width: 100%;
   height: 40px;
   border-radius: 10px;
@@ -23,29 +32,187 @@
   font-size: 13px;
 }
 
-.searchInput {
-  padding: 0 14px;
-}
-
 .searchInput::placeholder {
   color: rgba(234, 245, 235, 0.45);
 }
 
-.sortSelect {
-  appearance: none;
-  padding: 0 34px 0 12px;
-  background-image:
-    linear-gradient(45deg, transparent 50%, rgba(234, 245, 235, 0.72) 50%),
-    linear-gradient(135deg, rgba(234, 245, 235, 0.72) 50%, transparent 50%);
-  background-position:
-    calc(100% - 14px) calc(50% - 2px),
-    calc(100% - 9px) calc(50% - 2px);
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
+.searchInput {
+  padding: 0 14px;
 }
 
-.sortSelect option {
-  color: #0e1a12;
+.sortControls {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.directionButton {
+  width: 100%;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 10px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(16, 26, 20, 0.9);
+  color: rgba(245, 249, 255, 0.96);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: var(--bold);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.directionButton:hover {
+  border-color: rgba(82, 196, 26, 0.3);
+  background:
+    linear-gradient(180deg, rgba(82, 196, 26, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(18, 29, 22, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.directionGlyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.directionBars {
+  display: grid;
+  gap: 2px;
+}
+
+.directionBar {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(234, 245, 235, 0.82);
+}
+
+.directionBarLong {
+  width: 12px;
+}
+
+.directionBarMedium {
+  width: 9px;
+}
+
+.directionBarShort {
+  width: 6px;
+}
+
+.directionArrow {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid rgba(234, 245, 235, 0.76);
+  border-bottom: 2px solid rgba(234, 245, 235, 0.76);
+  transform: rotate(45deg);
+  margin-top: -1px;
+}
+
+.directionArrowAsc {
+  transform: rotate(225deg);
+  margin-top: 2px;
+}
+
+.sortWrap {
+  position: relative;
+  z-index: 4;
+}
+
+.sortButton {
+  width: 100%;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(16, 26, 20, 0.9);
+  color: rgba(245, 249, 255, 0.96);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: var(--bold);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sortButton:hover,
+.sortButtonOpen {
+  border-color: rgba(82, 196, 26, 0.3);
+  background:
+    linear-gradient(180deg, rgba(82, 196, 26, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(18, 29, 22, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.sortButtonValue {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.sortButtonChevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(234, 245, 235, 0.76);
+  border-bottom: 2px solid rgba(234, 245, 235, 0.76);
+  transform: translateY(-1px) rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.sortButtonChevronOpen {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.sortMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 10px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 24, 20, 0.98);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px) saturate(130%);
+}
+
+.sortOption {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 10px;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(234, 245, 235, 0.8);
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.sortOption:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.sortOptionActive {
+  background: rgba(82, 196, 26, 0.14);
+  color: rgba(153, 239, 102, 0.98);
 }
 
 .toolbarFooter {
@@ -102,6 +269,8 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .poolCardLink {
@@ -360,6 +529,10 @@
     grid-template-columns: 1fr;
   }
 
+  .sortControls {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
   .toolbarFooter {
     flex-direction: column;
     align-items: flex-start;
@@ -371,25 +544,44 @@
 }
 
 @media (max-width: 560px) {
-  .toolbar,
-  .poolCard {
+  .toolbar {
     padding: 12px;
   }
+}
 
-  .pairTitle {
-    font-size: 20px;
+@container market (max-width: 1220px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
 
-  .price {
-    font-size: 20px;
+@container market (max-width: 920px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .content {
+@container market (max-width: 760px) {
+  .toolbarMain {
     grid-template-columns: 1fr;
-    align-items: start;
   }
 
-  .rightMetrics {
-    justify-items: start;
+  .sortControls {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .toolbarFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container market (max-width: 620px) {
+  .toolbar {
+    padding: 12px;
   }
 }

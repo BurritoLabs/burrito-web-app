@@ -1,0 +1,60 @@
+.button {
+  position: fixed;
+  right: calc(16px + var(--wallet-offset));
+  bottom: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  border: none;
+  background: #52c41a;
+  color: #0c1411;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 340;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    right 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    background 0.25s ease;
+}
+
+.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.button:hover {
+  background: #49ad17;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 991.98px) {
+  .button {
+    right: 16px;
+    bottom: 18px;
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .button {
+    right: 14px;
+    bottom: 14px;
+  }
+}

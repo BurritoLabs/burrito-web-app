@@ -20,8 +20,8 @@ export type ProposalItem = {
   contentType?: string
   description?: string
   summary?: string
-  content?: any
-  metadataContent?: any
+  content?: unknown
+  metadataContent?: unknown
   metadata?: string
   deposit: string
   submitTime?: string
@@ -132,6 +132,118 @@ export type ContractHistoryEntry = {
   msg?: unknown
 }
 
+type ProposalMetadata = Record<string, unknown>
+
+type GovWeightedVoteOption = {
+  option?: string
+  weight?: string
+}
+
+type GovVoteTxMessage = {
+  "@type"?: string
+  type?: string
+  proposal_id?: string | number
+  voter?: string
+  option?: string
+  weight?: string
+  options?: GovWeightedVoteOption[]
+}
+
+type GovProposalContent = ProposalMetadata & {
+  title?: string
+  description?: string
+  summary?: string
+  "@type"?: string
+  type?: string
+  content?: unknown
+}
+
+type GovProposal = {
+  id?: string | number
+  proposal_id?: string | number
+  status?: string
+  proposal_status?: string
+  title?: string
+  summary?: string
+  description?: string
+  metadata?: string
+  __metadata?: ProposalMetadata
+  content?: GovProposalContent
+  messages?: GovVoteTxMessage[]
+  total_deposit?: CoinBalance[] | CoinBalance
+  submit_time?: string
+  voting_start_time?: string
+  voting_end_time?: string
+  deposit_end_time?: string
+  final_tally_result?: {
+    yes?: string
+    yes_count?: string
+    no?: string
+    no_count?: string
+    abstain?: string
+    abstain_count?: string
+    no_with_veto?: string
+    no_with_veto_count?: string
+  }
+}
+
+type GovVoteRecord = {
+  voter?: string
+  voter_address?: string
+  option?: string
+  weight?: string
+  options?: GovWeightedVoteOption[]
+}
+
+type GovDepositRecord = {
+  depositor?: string
+  amount?: CoinBalance[]
+}
+
+type GovParamsRecord = {
+  voting_period?: string
+  min_deposit?: CoinBalance[]
+  max_deposit_period?: string
+  quorum?: string
+  threshold?: string
+  veto_threshold?: string
+}
+
+type GovTallyRecord = {
+  yes?: string
+  yes_count?: string
+  no?: string
+  no_count?: string
+  abstain?: string
+  abstain_count?: string
+  no_with_veto?: string
+  no_with_veto_count?: string
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+const getRecordString = (
+  value: Record<string, unknown> | undefined,
+  key: string
+) => {
+  const field = value?.[key]
+  return typeof field === "string" ? field : undefined
+}
+
+type GovParamsResponse = {
+  voting_params?: GovParamsRecord
+  deposit_params?: GovParamsRecord
+  tally_params?: GovParamsRecord
+  params?: GovParamsRecord
+}
+
+type StakingPoolResponse = {
+  bonded_tokens?: { amount?: string } | string
+}
+
+type TxRecord = NonNullable<TxItem["tx"]>
+
 export type PriceMap = {
   lunc?: {
     usd: number
@@ -146,6 +258,18 @@ export type PriceMap = {
     usd_24h_change?: number
     usd_7d_change?: number
     usd_market_cap?: number
+  }
+}
+
+type CoinPaprikaTicker = {
+  quotes?: {
+    USD?: {
+      price?: number
+      market_cap?: number
+      percent_change_1h?: number
+      percent_change_24h?: number
+      percent_change_7d?: number
+    }
   }
 }
 
@@ -167,8 +291,25 @@ const fetchJson = async <T>(url: string): Promise<T> => {
   return response.json() as Promise<T>
 }
 
+const postJson = async <T>(url: string, body: unknown): Promise<T> => {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  })
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`)
+  }
+  return response.json() as Promise<T>
+}
+
 const PRICE_CACHE_KEY = "burritoPriceCache"
 const FX_CACHE_KEY = "burritoFxCache"
+const PRICE_CACHE_TTL_MS = 5 * 60 * 1000
+const COINPAPRIKA_LUNC_URL = "https://api.coinpaprika.com/v1/tickers/luna-terra"
+const COINPAPRIKA_USTC_URL = "https://api.coinpaprika.com/v1/tickers/ust-terrausd"
 
 export const getCachedPrices = () => {
   if (typeof window === "undefined") return undefined
@@ -252,6 +393,68 @@ export const fetchSpendableBalances = async (address: string) => {
   )
   const data = await fetchJson<{ balances?: CoinBalance[] }>(url)
   return data.balances ?? []
+}
+
+export const fetchTreasuryTaxRate = async () => {
+  const url = buildUrl(CLASSIC_CHAIN.lcd, "/terra/treasury/v1beta1/tax_rate")
+  const data = await fetchJson<{ tax_rate?: string }>(url)
+  const parsed = Number(data.tax_rate ?? "0")
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+export const fetchBurnTaxRate = async () => {
+  const url = buildUrl(CLASSIC_CHAIN.lcd, "/terra/tax/v1beta1/burn_tax_rate")
+  const data = await fetchJson<{ tax_rate?: string }>(url)
+  const parsed = Number(data.tax_rate ?? "0")
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+export const fetchTaxableTransfer = async (
+  fromAddress: string,
+  toAddress: string
+) => {
+  const url = buildUrl(
+    CLASSIC_CHAIN.lcd,
+    `/terra/taxexemption/v1/taxable/${fromAddress}/${toAddress}`
+  )
+  const data = await fetchJson<{ taxable?: boolean }>(url)
+  return data.taxable === true
+}
+
+export const fetchComputedBankSendTax = async ({
+  fromAddress,
+  toAddress,
+  denom,
+  amount
+}: {
+  fromAddress: string
+  toAddress: string
+  denom: string
+  amount: string
+}) => {
+  const url = buildUrl(CLASSIC_CHAIN.lcd, "/terra/tx/v1beta1/compute_tax")
+  const data = await postJson<{ tax_amount?: CoinBalance[] }>(url, {
+    tx: {
+      body: {
+        messages: [
+          {
+            "@type": "/cosmos.bank.v1beta1.MsgSend",
+            from_address: fromAddress,
+            to_address: toAddress,
+            amount: [
+              {
+                denom,
+                amount
+              }
+            ]
+          }
+        ]
+      }
+    }
+  })
+
+  const match = data.tax_amount?.find((coin) => coin.denom === denom)
+  return match?.amount ?? "0"
 }
 
 export type DelegationResponse = {
@@ -344,25 +547,14 @@ export const fetchValidatorCommission = async (validatorAddress: string) => {
 }
 
 export const fetchValidators = async () => {
-  const items: ValidatorItem[] = []
-  let nextKey: string | undefined
-  let guard = 0
-
-  do {
-    const params: Record<string, string> = { "pagination.limit": "200" }
-    if (nextKey) params["pagination.key"] = nextKey
-    const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/validators", params)
-    const data = await fetchJson<{
-      validators?: ValidatorItem[]
-      pagination?: { next_key?: string | null }
-    }>(url)
-    items.push(...(data.validators ?? []))
-    const newKey = data.pagination?.next_key ?? undefined
-    nextKey = newKey && newKey !== nextKey ? newKey : undefined
-    guard += 1
-  } while (nextKey && guard < 50)
-
-  return items
+  const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/validators", {
+    status: "BOND_STATUS_BONDED",
+    "pagination.limit": "200"
+  })
+  const data = await fetchJson<{
+    validators?: ValidatorItem[]
+  }>(url)
+  return data.validators ?? []
 }
 
 export const fetchValidator = async (operatorAddress: string) => {
@@ -378,26 +570,28 @@ export const fetchValidator = async (operatorAddress: string) => {
   }
 }
 
-const parseProposalTitle = (proposal: any) => {
-  const parsedMetadata = proposal?.__metadata ?? tryParseMetadata(proposal?.metadata)
-  if (proposal?.title) return proposal.title as string
-  if (proposal?.content?.title) return proposal.content.title as string
-  if (proposal?.summary) return proposal.summary as string
-  if (parsedMetadata?.title) return parsedMetadata.title as string
-  if (proposal?.metadata) return String(proposal.metadata)
+const parseProposalTitle = (proposal: GovProposal) => {
+  const parsedMetadata = proposal.__metadata ?? tryParseMetadata(proposal.metadata)
+  if (proposal.title) return proposal.title
+  if (proposal.content?.title) return proposal.content.title
+  if (proposal.summary) return proposal.summary
+  const metadataTitle = getRecordString(parsedMetadata, "title")
+  if (metadataTitle) return metadataTitle
+  if (proposal.metadata) return String(proposal.metadata)
   return "Proposal"
 }
 
-const normalizeProposal = (proposal: any): ProposalItem => {
-  const id = String(proposal?.id ?? proposal?.proposal_id ?? "--")
-  const status = String(proposal?.status ?? proposal?.proposal_status ?? "--")
+const normalizeProposal = (proposal: GovProposal): ProposalItem => {
+  const id = String(proposal.id ?? proposal.proposal_id ?? "--")
+  const status = String(proposal.status ?? proposal.proposal_status ?? "--")
   const title = parseProposalTitle(proposal)
+  const totalDeposit = proposal.total_deposit
   const deposit =
-    proposal?.total_deposit?.[0]?.amount ??
-    proposal?.total_deposit?.amount ??
-    "0"
+    (Array.isArray(totalDeposit)
+      ? totalDeposit[0]?.amount
+      : totalDeposit?.amount) ?? "0"
 
-  const tally = proposal?.final_tally_result
+  const tally = proposal.final_tally_result
   const finalTally = tally
     ? {
         yes: tally.yes ?? tally.yes_count ?? "0",
@@ -407,61 +601,63 @@ const normalizeProposal = (proposal: any): ProposalItem => {
       }
     : undefined
 
-  const parsedMetadata = proposal?.__metadata ?? tryParseMetadata(proposal?.metadata)
+  const parsedMetadata = proposal.__metadata ?? tryParseMetadata(proposal.metadata)
+  const metadataDetails =
+    getRecordString(parsedMetadata, "details") ??
+    getRecordString(parsedMetadata, "description")
+  const metadataSummary = getRecordString(parsedMetadata, "summary")
 
   const description =
-    proposal?.content?.description ??
-    proposal?.description ??
-    parsedMetadata?.details ??
-    parsedMetadata?.description ??
-    parsedMetadata?.summary ??
-    proposal?.summary ??
-    proposal?.content?.summary
+    proposal.content?.description ??
+    proposal.description ??
+    metadataDetails ??
+    metadataSummary ??
+    proposal.summary ??
+    proposal.content?.summary
 
   const summary =
-    proposal?.summary ??
-    proposal?.content?.summary ??
-    parsedMetadata?.summary ??
-    parsedMetadata?.details ??
-    parsedMetadata?.description
+    proposal.summary ??
+    proposal.content?.summary ??
+    metadataSummary ??
+    metadataDetails
 
   return {
     id,
     status,
     title,
     contentType:
-      proposal?.content?.["@type"] ??
-      proposal?.content?.type ??
-      proposal?.messages?.[0]?.["@type"] ??
-      proposal?.messages?.[0]?.type ??
+      proposal.content?.["@type"] ??
+      proposal.content?.type ??
+      proposal.messages?.[0]?.["@type"] ??
+      proposal.messages?.[0]?.type ??
       undefined,
     description,
     summary,
-    content: proposal?.content ?? proposal?.content?.content ?? proposal?.messages?.[0],
+    content: proposal.content?.content ?? proposal.content ?? proposal.messages?.[0],
     metadataContent: parsedMetadata,
-    metadata: proposal?.metadata,
+    metadata: proposal.metadata,
     deposit,
-    submitTime: proposal?.submit_time ?? proposal?.submit_time?.toString(),
-    votingStartTime:
-      proposal?.voting_start_time ?? proposal?.voting_start_time?.toString(),
-    votingEndTime:
-      proposal?.voting_end_time ?? proposal?.voting_end_time?.toString(),
-    depositEndTime:
-      proposal?.deposit_end_time ?? proposal?.deposit_end_time?.toString(),
+    submitTime: proposal.submit_time,
+    votingStartTime: proposal.voting_start_time,
+    votingEndTime: proposal.voting_end_time,
+    depositEndTime: proposal.deposit_end_time,
     finalTally
   }
 }
 
-const tryParseMetadata = (metadata?: string) => {
+const tryParseMetadata = (metadata?: string): ProposalMetadata | undefined => {
   if (!metadata) return undefined
   try {
-    return JSON.parse(metadata)
+    const parsed = JSON.parse(metadata) as unknown
+    return isRecord(parsed) ? parsed : undefined
   } catch {
     return undefined
   }
 }
 
-const resolveMetadata = async (metadata?: string) => {
+const resolveMetadata = async (
+  metadata?: string
+): Promise<ProposalMetadata | undefined> => {
   if (!metadata) return undefined
   const parsed = tryParseMetadata(metadata)
   if (parsed) return parsed
@@ -489,7 +685,10 @@ const resolveMetadata = async (metadata?: string) => {
     try {
       const response = await fetch(url)
       if (!response.ok) continue
-      return await response.json()
+      const remote = (await response.json()) as unknown
+      if (isRecord(remote)) {
+        return remote
+      }
     } catch {
       continue
     }
@@ -504,8 +703,11 @@ const GOV_STATUSES = {
   rejected: "PROPOSAL_STATUS_REJECTED"
 } as const
 
-const fetchGovPaged = async (path: string, params: Record<string, string>) => {
-  const items: any[] = []
+const fetchGovPaged = async (
+  path: string,
+  params: Record<string, string>
+): Promise<GovProposal[]> => {
+  const items: GovProposal[] = []
   let nextKey: string | undefined
   let guard = 0
 
@@ -516,7 +718,7 @@ const fetchGovPaged = async (path: string, params: Record<string, string>) => {
     }
     const url = buildUrl(CLASSIC_CHAIN.lcd, path, pageParams)
     const data = await fetchJson<{
-      proposals?: any[]
+      proposals?: GovProposal[]
       pagination?: { next_key?: string | null }
     }>(url)
     items.push(...(data.proposals ?? []))
@@ -562,7 +764,7 @@ const fetchProposalVotesFromTxs = async (
     if (!raw) return { option: undefined as string | undefined, weight: undefined as string | undefined }
     if (raw.includes("option:")) {
       const optionMatch = raw.match(/option:([A-Z0-9_]+)/)
-      const weightMatch = raw.match(/weight:\"([0-9.]+)\"/)
+      const weightMatch = raw.match(/weight:"([0-9.]+)"/)
       return {
         option: optionMatch?.[1],
         weight: weightMatch?.[1]
@@ -579,7 +781,7 @@ const fetchProposalVotesFromTxs = async (
       "pagination.count_total": "true"
     })
     const data = await fetchJson<{
-      txs?: Array<{ body?: { messages?: any[] } }>
+      txs?: Array<{ body?: { messages?: GovVoteTxMessage[] } }>
       tx_responses?: Array<{
         height?: string
         txhash?: string
@@ -728,7 +930,7 @@ const parseDurationSeconds = (value?: string | number) => {
   return raw
 }
 
-const normalizeTally = (tally: any): GovTally => ({
+const normalizeTally = (tally?: GovTallyRecord): GovTally => ({
   yes: tally?.yes ?? tally?.yes_count ?? "0",
   no: tally?.no ?? tally?.no_count ?? "0",
   abstain: tally?.abstain ?? tally?.abstain_count ?? "0",
@@ -737,21 +939,21 @@ const normalizeTally = (tally: any): GovTally => ({
 
 export const fetchProposalById = async (id: string) => {
   try {
-    const data = await fetchJson<{ proposal?: any }>(
+    const data = await fetchJson<{ proposal?: GovProposal }>(
       buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1/proposals/${id}`)
     )
-    const proposal = data?.proposal ?? {}
-    const resolved = await resolveMetadata(proposal?.metadata)
+    const proposal: GovProposal = data.proposal ?? {}
+    const resolved = await resolveMetadata(proposal.metadata)
     if (resolved) {
       proposal.__metadata = resolved
     }
     return normalizeProposal(proposal)
   } catch {
-    const data = await fetchJson<{ proposal?: any }>(
+    const data = await fetchJson<{ proposal?: GovProposal }>(
       buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1beta1/proposals/${id}`)
     )
-    const proposal = data?.proposal ?? {}
-    const resolved = await resolveMetadata(proposal?.metadata)
+    const proposal: GovProposal = data.proposal ?? {}
+    const resolved = await resolveMetadata(proposal.metadata)
     if (resolved) {
       proposal.__metadata = resolved
     }
@@ -761,20 +963,24 @@ export const fetchProposalById = async (id: string) => {
 
 export const fetchProposalTally = async (id: string): Promise<GovTally> => {
   try {
-    const data = await fetchJson<{ tally?: any }>(
+    const data = await fetchJson<{ tally?: GovTallyRecord }>(
       buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1/proposals/${id}/tally`)
     )
     return normalizeTally(data?.tally)
   } catch {
-    const data = await fetchJson<{ tally?: any }>(
+    const data = await fetchJson<{ tally?: GovTallyRecord }>(
       buildUrl(CLASSIC_CHAIN.lcd, `/cosmos/gov/v1beta1/proposals/${id}/tally`)
     )
     return normalizeTally(data?.tally)
   }
 }
 
-const fetchGovPagedList = async (path: string, params: Record<string, string>) => {
-  const items: any[] = []
+const fetchGovPagedList = async <T extends GovVoteRecord | GovDepositRecord>(
+  path: string,
+  params: Record<string, string>,
+  key: "votes" | "deposits"
+): Promise<T[]> => {
+  const items: T[] = []
   let nextKey: string | undefined
   let guard = 0
 
@@ -785,11 +991,12 @@ const fetchGovPagedList = async (path: string, params: Record<string, string>) =
     }
     const url = buildUrl(CLASSIC_CHAIN.lcd, path, pageParams)
     const data = await fetchJson<{
-      votes?: any[]
-      deposits?: any[]
+      votes?: GovVoteRecord[]
+      deposits?: GovDepositRecord[]
       pagination?: { next_key?: string | null }
     }>(url)
-    items.push(...(data.votes ?? data.deposits ?? []))
+    const pageItems = (key === "votes" ? data.votes : data.deposits) ?? []
+    items.push(...(pageItems as T[]))
     const newKey = data.pagination?.next_key ?? undefined
     nextKey = newKey && newKey !== nextKey ? newKey : undefined
     guard += 1
@@ -802,16 +1009,18 @@ export const fetchProposalVotes = async (
   id: string,
   status?: string
 ): Promise<ProposalVote[]> => {
-  let votes: any[] = []
+  let votes: GovVoteRecord[] = []
   try {
-    votes = await fetchGovPagedList(
+    votes = await fetchGovPagedList<GovVoteRecord>(
       `/cosmos/gov/v1/proposals/${id}/votes`,
-      { "pagination.limit": "200" }
+      { "pagination.limit": "200" },
+      "votes"
     )
   } catch {
-    votes = await fetchGovPagedList(
+    votes = await fetchGovPagedList<GovVoteRecord>(
       `/cosmos/gov/v1beta1/proposals/${id}/votes`,
-      { "pagination.limit": "200" }
+      { "pagination.limit": "200" },
+      "votes"
     )
   }
   const normalized = votes.map((vote) => {
@@ -948,16 +1157,18 @@ export const fetchProposalVoteTxHashes = async (
 export const fetchProposalDeposits = async (
   id: string
 ): Promise<ProposalDeposit[]> => {
-  let deposits: any[] = []
+  let deposits: GovDepositRecord[] = []
   try {
-    deposits = await fetchGovPagedList(
+    deposits = await fetchGovPagedList<GovDepositRecord>(
       `/cosmos/gov/v1/proposals/${id}/deposits`,
-      { "pagination.limit": "200" }
+      { "pagination.limit": "200" },
+      "deposits"
     )
   } catch {
-    deposits = await fetchGovPagedList(
+    deposits = await fetchGovPagedList<GovDepositRecord>(
       `/cosmos/gov/v1beta1/proposals/${id}/deposits`,
-      { "pagination.limit": "200" }
+      { "pagination.limit": "200" },
+      "deposits"
     )
   }
   return deposits.map((deposit) => ({
@@ -968,7 +1179,7 @@ export const fetchProposalDeposits = async (
 
 export const fetchVotingParams = async (): Promise<GovVotingParams> => {
   try {
-    const data = await fetchJson<{ voting_params?: any; params?: any }>(
+    const data = await fetchJson<GovParamsResponse>(
       buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/params/voting")
     )
     const seconds = parseDurationSeconds(
@@ -976,7 +1187,7 @@ export const fetchVotingParams = async (): Promise<GovVotingParams> => {
     )
     return { votingPeriodSeconds: seconds }
   } catch {
-    const data = await fetchJson<{ voting_params?: any }>(
+    const data = await fetchJson<{ voting_params?: GovParamsRecord }>(
       buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1beta1/params/voting")
     )
     const seconds = parseDurationSeconds(data?.voting_params?.voting_period)
@@ -986,7 +1197,7 @@ export const fetchVotingParams = async (): Promise<GovVotingParams> => {
 
 export const fetchDepositParams = async (): Promise<GovDepositParams> => {
   try {
-    const data = await fetchJson<{ deposit_params?: any; params?: any }>(
+    const data = await fetchJson<GovParamsResponse>(
       buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/params/deposit")
     )
     return {
@@ -998,7 +1209,7 @@ export const fetchDepositParams = async (): Promise<GovDepositParams> => {
       )
     }
   } catch {
-    const data = await fetchJson<{ deposit_params?: any }>(
+    const data = await fetchJson<{ deposit_params?: GovParamsRecord }>(
       buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1beta1/params/deposit")
     )
     return {
@@ -1012,7 +1223,7 @@ export const fetchDepositParams = async (): Promise<GovDepositParams> => {
 
 export const fetchTallyParams = async (): Promise<GovTallyParams> => {
   try {
-    const data = await fetchJson<{ tally_params?: any; params?: any }>(
+    const data = await fetchJson<GovParamsResponse>(
       buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1/params/tallying")
     )
     return {
@@ -1027,7 +1238,7 @@ export const fetchTallyParams = async (): Promise<GovTallyParams> => {
       )
     }
   } catch {
-    const data = await fetchJson<{ tally_params?: any }>(
+    const data = await fetchJson<{ tally_params?: GovParamsRecord }>(
       buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/gov/v1beta1/params/tallying")
     )
     return {
@@ -1039,16 +1250,15 @@ export const fetchTallyParams = async (): Promise<GovTallyParams> => {
 }
 
 export const fetchStakingPool = async (): Promise<StakingPool> => {
-  const data = await fetchJson<{ pool?: StakingPool }>(
+  const data = await fetchJson<{ pool?: StakingPoolResponse }>(
     buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/pool")
   )
-  const pool = data?.pool ?? {}
-  const bonded = (pool as any)?.bonded_tokens
+  const bonded = data.pool?.bonded_tokens
   if (typeof bonded === "string") {
     return { bonded_tokens: { amount: bonded } }
   }
   if (bonded && typeof bonded === "object" && "amount" in bonded) {
-    return { bonded_tokens: { amount: (bonded as any).amount ?? "0" } }
+    return { bonded_tokens: { amount: bonded.amount ?? "0" } }
   }
   return {}
 }
@@ -1070,7 +1280,7 @@ export const fetchTxs = async (address: string, limit = 75) => {
       })
       try {
         return await fetchJson<{
-          txs?: Array<{ body?: { messages?: any[]; memo?: string }; auth_info?: any }>
+          txs?: TxRecord[]
           tx_responses?: Array<{
             txhash?: string
             timestamp?: string
@@ -1118,8 +1328,8 @@ export const fetchTxs = async (address: string, limit = 75) => {
         const itemHasMsgs = Boolean(item.tx?.body?.messages?.length)
         const existingHasEvents = Boolean(existing.events?.length)
         const itemHasEvents = Boolean(item.events?.length)
-        const existingHasLogs = Boolean((existing as any).logs?.length)
-        const itemHasLogs = Boolean((item as any).logs?.length)
+        const existingHasLogs = Boolean(existing.logs?.length)
+        const itemHasLogs = Boolean(item.logs?.length)
         if (
           (itemHasMsgs && !existingHasMsgs) ||
           (itemHasEvents && !existingHasEvents) ||
@@ -1195,23 +1405,40 @@ export const queryContractSmart = async <T = unknown>(
 
   const response = await fetch(url)
   const text = await response.text()
-  let parsed: any
+  let parsed: unknown
   try {
     parsed = text ? JSON.parse(text) : undefined
   } catch {
     parsed = undefined
   }
+  const parsedRecord = isRecord(parsed) ? parsed : undefined
   if (!response.ok) {
     const message =
-      parsed?.message ??
-      parsed?.error ??
-      parsed?.details ??
+      getRecordString(parsedRecord, "message") ??
+      getRecordString(parsedRecord, "error") ??
+      getRecordString(parsedRecord, "details") ??
       text ??
       `Request failed: ${response.status}`
     throw new Error(message)
   }
 
-  return (parsed?.data ?? parsed) as T
+  return ((parsedRecord?.data as T | undefined) ?? (parsed as T)) as T
+}
+
+const buildCoinPaprikaPriceEntry = (
+  ticker: CoinPaprikaTicker | undefined,
+  fallback?: PriceMap["lunc"]
+) => {
+  const usd = ticker?.quotes?.USD
+  const price = usd?.price
+  if (!Number.isFinite(price) || price === undefined) return fallback
+  return {
+    usd: price,
+    usd_1h_change: usd?.percent_change_1h,
+    usd_24h_change: usd?.percent_change_24h,
+    usd_7d_change: usd?.percent_change_7d,
+    usd_market_cap: usd?.market_cap ?? fallback?.usd_market_cap
+  }
 }
 
 export const fetchPrices = async (): Promise<PriceMap> => {
@@ -1220,6 +1447,29 @@ export const fetchPrices = async (): Promise<PriceMap> => {
   const marketsUrl = `${base}/coins/markets?vs_currency=usd&ids=terra-luna,terraclassicusd,terrausd&price_change_percentage=1h,24h,7d&sparkline=false`
   const simpleUrl = `${base}/simple/price?ids=terra-luna,terraclassicusd,terrausd&vs_currencies=usd&include_24hr_change=true`
   const cached = getCachedPrices()
+  if (cached?.data && Date.now() - cached.ts < PRICE_CACHE_TTL_MS) {
+    return cached.data
+  }
+
+  try {
+    const [luncTicker, ustcTicker] = await Promise.all([
+      fetchJson<CoinPaprikaTicker>(COINPAPRIKA_LUNC_URL),
+      fetchJson<CoinPaprikaTicker>(COINPAPRIKA_USTC_URL)
+    ])
+
+    const result: PriceMap = {
+      lunc: buildCoinPaprikaPriceEntry(luncTicker, cached?.data?.lunc),
+      ustc: buildCoinPaprikaPriceEntry(ustcTicker, cached?.data?.ustc)
+    }
+
+    if (result.lunc || result.ustc) {
+      setCachedPrices(result)
+      return result
+    }
+  } catch {
+    // Fall through to CoinGecko and cache fallback below.
+  }
+
   try {
     const marketRows = await fetchJson<
       Array<{

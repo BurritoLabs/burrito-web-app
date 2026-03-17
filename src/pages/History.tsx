@@ -2,13 +2,13 @@ import { useMemo, type ReactNode } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./History.module.css"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import { fetchTxs, fetchValidators, fetchContractInfo } from "../app/data/classic"
 import type { CoinBalance, TxItem, ValidatorItem } from "../app/data/classic"
 import {
   useCw20Contracts,
-  useCw20Whitelist,
-  useIbcWhitelist
+  useResolvedCw20Whitelist,
+  useResolvedIbcWhitelist
 } from "../app/data/terraAssets"
 import {
   formatTokenAmount,
@@ -21,6 +21,50 @@ import {
   createLogMatcherForActions,
   getTxCanonicalMsgs
 } from "@terra-money/log-finder-ruleset"
+
+type LogFinderTransaction = Parameters<typeof getTxCanonicalMsgs>[0]
+type LogFinderTxLog = NonNullable<LogFinderTransaction["logs"]>[number]
+type LogFinderTxEvent = LogFinderTxLog["events"][number]
+type LogFinderTxAttribute = LogFinderTxEvent["attributes"][number]
+
+type HistoryMessage = {
+  "@type"?: string
+  type?: string
+  from_address?: string
+  to_address?: string
+  delegator_address?: string
+  validator_address?: string
+  validator_dst_address?: string
+  sender?: string
+  recipient?: string
+  receiver?: string
+  contract?: string
+  contract_address?: string
+  amount?: CoinBalance | CoinBalance[]
+  token?: CoinBalance
+  option?: string
+  options?: Array<{ option?: string }>
+  voter?: string
+  inputs?: Array<{ address?: string; coins?: CoinBalance[] }>
+  outputs?: Array<{ address?: string; coins?: CoinBalance[] }>
+}
+
+type RawTxLog = {
+  msg_index?: number
+  msgIndex?: number
+  log?: string
+  events?: RawTxEvent[]
+}
+
+type RawTxEvent = {
+  type?: string
+  attributes?: RawTxAttribute[]
+}
+
+type RawTxAttribute = {
+  key?: string
+  value?: string
+}
 
 const formatMsgType = (value: string) => {
   const raw = String(value)
@@ -79,7 +123,10 @@ const decodeEventValue = (value?: string) => {
   return value
 }
 
-const normalizeTxLogs = (logs?: Array<any>, rawLog?: string) => {
+const normalizeTxLogs = (
+  logs?: RawTxLog[],
+  rawLog?: string
+): LogFinderTransaction["logs"] => {
   const raw =
     logs ??
     (() => {
@@ -93,17 +140,25 @@ const normalizeTxLogs = (logs?: Array<any>, rawLog?: string) => {
     })()
 
   if (!raw) return undefined
-  return raw.map((log: any) => ({
+  return raw.map((log): LogFinderTxLog => ({
     msg_index: log?.msg_index ?? log?.msgIndex ?? 0,
     log: log?.log ?? "",
-    events: (log?.events ?? []).map((event: any) => ({
+    events: (log?.events ?? []).map((event: RawTxEvent): LogFinderTxEvent => ({
       type: event?.type ?? "",
-      attributes: (event?.attributes ?? []).map((attr: any) => ({
+      attributes: (event?.attributes ?? []).map((attr: RawTxAttribute): LogFinderTxAttribute => ({
         key: decodeEventValue(attr?.key),
         value: decodeEventValue(attr?.value)
       }))
     }))
   }))
+}
+
+const getRawMessages = (tx: TxItem): HistoryMessage[] => {
+  const bodyMessages = tx.tx?.body?.messages
+  if (Array.isArray(bodyMessages)) return bodyMessages
+  const legacyMessages = tx.tx?.value?.msg
+  if (Array.isArray(legacyMessages)) return legacyMessages
+  return []
 }
 
 const buildCanonicalMessages = (
@@ -112,21 +167,30 @@ const buildCanonicalMessages = (
   renderLine: (line: string) => ReactNode
 ): TxMessage[] => {
   if (!logMatcher || !tx.tx || !tx.txhash || !tx.timestamp) return []
-  const logs = normalizeTxLogs((tx as any).logs, tx.raw_log)
+  const rawMessages = getRawMessages(tx)
+  const logs = normalizeTxLogs(tx.logs, tx.raw_log)
   if (!logs?.length) return []
 
-  const txInfo = {
+  const txInfo: LogFinderTransaction = {
     height: Number(tx.height ?? 0),
     txhash: tx.txhash,
     raw_log: tx.raw_log ?? "",
     logs,
     gas_wanted: 0,
     gas_used: 0,
-    tx: tx.tx as any,
+    tx: {
+      body: {
+        messages: rawMessages,
+        memo: tx.tx?.body?.memo
+      },
+      auth_info: {
+        fee: tx.tx?.auth_info?.fee ?? {}
+      }
+    },
     timestamp: tx.timestamp ?? ""
   }
 
-  const matched = getTxCanonicalMsgs(txInfo as any, logMatcher)
+  const matched = getTxCanonicalMsgs(txInfo, logMatcher)
   if (!matched?.length) return []
   const flattened = matched
     .map((group) => group.map((item) => item.transformed).filter(Boolean))
@@ -311,7 +375,7 @@ const renderAddressOrText = (address?: string, label?: string) => {
 }
 
 const buildMessage = (
-  msg: any,
+  msg: HistoryMessage,
   resolveName?: (address?: string) => string | undefined
 ): TxMessage => {
   const rawType = msg?.["@type"] ?? msg?.type ?? "Transaction"
@@ -464,7 +528,7 @@ const getTxMessages = (
   accountAddress?: string,
   includeEventTransfers = true
 ): TxMessage[] => {
-  const rawMessages = tx.tx?.body?.messages ?? tx.tx?.value?.msg ?? []
+  const rawMessages = getRawMessages(tx)
 
   const sendActions: Array<{
     sender?: string
@@ -509,7 +573,7 @@ const getTxMessages = (
 
   const otherMessages: TxMessage[] = []
   if (Array.isArray(rawMessages)) {
-    rawMessages.forEach((msg: any) => {
+    rawMessages.forEach((msg) => {
       const type = String(msg?.["@type"] ?? msg?.type ?? "")
       if (type.includes("MsgSend")) {
         const amounts = Array.isArray(msg?.amount)
@@ -631,9 +695,53 @@ const History = () => {
     enabled: Boolean(account?.address)
   })
 
-  const { data: cw20Whitelist = {} } = useCw20Whitelist()
+  const relevantCw20Contracts = useMemo(() => {
+    const addresses = new Set<string>()
+    txs.forEach((tx) => {
+      const messages = getRawMessages(tx)
+      messages.forEach((message) => {
+        const candidate =
+          message?.contract ??
+          message?.contract_address ??
+          (message?.sender && message?.contract ? message.contract : undefined)
+        if (typeof candidate === "string" && candidate.startsWith("terra1")) {
+          addresses.add(candidate.toLowerCase())
+        }
+      })
+
+      const events = tx.events ?? []
+      events.forEach((event) => {
+        event.attributes?.forEach((attr) => {
+          const value = decodeEventValue(attr?.value)
+          if (value?.startsWith("terra1")) {
+            addresses.add(value.toLowerCase())
+          }
+        })
+      })
+    })
+    return Array.from(addresses)
+  }, [txs])
+
+  const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(relevantCw20Contracts)
   const { data: cw20Contracts = {} } = useCw20Contracts()
-  const { data: ibcWhitelist = {} } = useIbcWhitelist()
+  const ibcDenoms = useMemo(() => {
+    const denoms = new Set<string>()
+    txs.forEach((tx) => {
+      const messages = getRawMessages(tx)
+      messages.forEach((message) => {
+        const amounts = Array.isArray(message?.amount)
+          ? message.amount
+          : message?.amount
+            ? [message.amount]
+            : []
+        amounts.forEach((coin) => {
+          if (coin?.denom?.startsWith("ibc/")) denoms.add(coin.denom)
+        })
+      })
+    })
+    return Array.from(denoms)
+  }, [txs])
+  const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
 
   const { data: validators = [] } = useQuery<ValidatorItem[]>({
     queryKey: ["validators"],
@@ -668,8 +776,8 @@ const History = () => {
     queryFn: async () => {
       const addresses = new Set<string>()
       txs.forEach((tx) => {
-        const messages = tx.tx?.body?.messages ?? []
-        messages.forEach((message: any) => {
+        const messages = getRawMessages(tx)
+        messages.forEach((message) => {
           const candidate =
             message?.contract ??
             message?.contract_address ??
@@ -751,44 +859,50 @@ const History = () => {
     return map
   }, [cw20Whitelist, ibcWhitelist])
 
-  const resolveName = (address?: string) => {
-    if (!address) return undefined
-    if (account?.address && address === account.address) return "My wallet"
-    const validatorName = validatorNameMap.get(address)
-    if (validatorName) return validatorName
-    try {
-      const { data } = fromBech32(address)
-      const operatorAddr = toBech32(`${CLASSIC_CHAIN.bech32Prefix}valoper`, data)
-      const operatorName = validatorNameMap.get(operatorAddr)
-      if (operatorName) return operatorName
-    } catch {
-      // ignore
-    }
-    const contractName = contractNameMap.get(address)
-    if (contractName) return contractName
-    const contractLabel = contractLabels[address]
-    if (contractLabel && contractLabel !== address) return contractLabel
-    return undefined
-  }
+  const resolveName = useMemo(
+    () => (address?: string) => {
+      if (!address) return undefined
+      if (account?.address && address === account.address) return "My wallet"
+      const validatorName = validatorNameMap.get(address)
+      if (validatorName) return validatorName
+      try {
+        const { data } = fromBech32(address)
+        const operatorAddr = toBech32(`${CLASSIC_CHAIN.bech32Prefix}valoper`, data)
+        const operatorName = validatorNameMap.get(operatorAddr)
+        if (operatorName) return operatorName
+      } catch {
+        // ignore
+      }
+      const contractName = contractNameMap.get(address)
+      if (contractName) return contractName
+      const contractLabel = contractLabels[address]
+      if (contractLabel && contractLabel !== address) return contractLabel
+      return undefined
+    },
+    [account, validatorNameMap, contractNameMap, contractLabels]
+  )
 
-  const resolveToken = (denom: string) => {
-    const meta = tokenLookupMap.get(denom)
-    if (meta) return meta
-    if (isAddressToken(denom)) {
-      const name = contractNameMap.get(denom)
-      if (name) return { symbol: name, decimals: 6 }
-      return { symbol: truncateHash(denom, 6, 4), decimals: 6 }
-    }
-    return undefined
-  }
+  const resolveToken = useMemo(
+    () => (denom: string) => {
+      const meta = tokenLookupMap.get(denom)
+      if (meta) return meta
+      if (isAddressToken(denom)) {
+        const name = contractNameMap.get(denom)
+        if (name) return { symbol: name, decimals: 6 }
+        return { symbol: truncateHash(denom, 6, 4), decimals: 6 }
+      }
+      return undefined
+    },
+    [tokenLookupMap, contractNameMap]
+  )
 
   const items = useMemo(
     () =>
       txs.map((tx) => {
         const isSuccess = !tx.code
-        const rawMessages = tx.tx?.body?.messages ?? tx.tx?.value?.msg ?? []
+        const rawMessages = getRawMessages(tx)
         const hasStakingAction = Array.isArray(rawMessages)
-          ? rawMessages.some((msg: any) => {
+          ? rawMessages.some((msg) => {
               const type = String(msg?.["@type"] ?? msg?.type ?? "")
               return (
                 type.includes("MsgDelegate") ||
@@ -815,7 +929,7 @@ const History = () => {
           signMode: getSignMode(tx)
         }
       }),
-    [txs, resolveName, logMatcher, account?.address]
+    [txs, resolveName, resolveToken, logMatcher, account?.address]
   )
 
   return (

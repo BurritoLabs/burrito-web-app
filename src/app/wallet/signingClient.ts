@@ -5,9 +5,12 @@ import {
   defaultRegistryTypes
 } from "@cosmjs/stargate"
 import {
+  MsgClearAdmin,
   MsgExecuteContract,
   MsgInstantiateContract,
-  MsgStoreCode
+  MsgMigrateContract,
+  MsgStoreCode,
+  MsgUpdateAdmin
 } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 
@@ -26,6 +29,18 @@ const getClassicRegistry = () => {
   registry.register(
     "/cosmwasm.wasm.v1.MsgStoreCode",
     MsgStoreCode as unknown as RegistryType
+  )
+  registry.register(
+    "/cosmwasm.wasm.v1.MsgMigrateContract",
+    MsgMigrateContract as unknown as RegistryType
+  )
+  registry.register(
+    "/cosmwasm.wasm.v1.MsgUpdateAdmin",
+    MsgUpdateAdmin as unknown as RegistryType
+  )
+  registry.register(
+    "/cosmwasm.wasm.v1.MsgClearAdmin",
+    MsgClearAdmin as unknown as RegistryType
   )
   return registry
 }

@@ -52,7 +52,7 @@ export const formatNumberNoRoundByNonZeroFractionDigits = (
 
   const sign = value < 0 ? "-" : ""
   const plain = numberToPlainString(Math.abs(value))
-  let [intPart, fracPart = ""] = plain.split(".")
+  const [intPart, fracPart = ""] = plain.split(".")
   const withGrouping = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
 
   if (!fracPart) return `${sign}${withGrouping}`

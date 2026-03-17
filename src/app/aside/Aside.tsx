@@ -1,46 +1,44 @@
 import styles from "./Aside.module.css"
 import BlockStatus from "./BlockStatus"
 
-const SetupIcon = () => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-    <path
-      d="M13 2L3 14h7l-1 8 11-14h-7z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
 const DocsIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
     <path
-      d="M6 4h9l3 3v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"
+      d="M6.25 4.75h8.1l3.4 3.39v10.11a1.5 1.5 0 0 1-1.5 1.5H6.25a1.5 1.5 0 0 1-1.5-1.5v-12a1.5 1.5 0 0 1 1.5-1.5Z"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.55"
       strokeLinejoin="round"
     />
     <path
-      d="M15 4v4h4"
+      d="M14.35 4.75v3.9h3.9"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.55"
       strokeLinejoin="round"
+    />
+    <path
+      d="M8 10h6.5M8 13h7.75M8 16h5.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.55"
+      strokeLinecap="round"
     />
   </svg>
 )
 
 const Aside = () => {
   const links = [
-    { label: "Setup", href: "#", icon: <SetupIcon /> },
-    { label: "Documentation", href: "#", icon: <DocsIcon /> }
+    {
+      label: "Documentation",
+      href: "https://terra-classic.io/docs",
+      icon: <DocsIcon />
+    }
   ]
 
   const community = [
-    { label: "Discord", href: "#", icon: "/community/Discord.svg" },
-    { label: "Telegram", href: "#", icon: "/community/Telegram.svg" },
+    { label: "Discord", icon: "/community/Discord.svg" },
+    { label: "Telegram", icon: "/community/Telegram.svg" },
     { label: "X", href: "https://x.com/burrito__money", icon: "/community/Twitter.svg" },
     { label: "GitHub", href: "https://github.com/BurritoLabs", icon: "/community/Github.svg" }
   ]
@@ -64,18 +62,29 @@ const Aside = () => {
         </div>
 
         <div className={styles.community}>
-          {community.map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              target="_blank"
-              rel="noreferrer"
-              className={styles.communityIcon}
-              aria-label={item.label}
-            >
-              <img src={item.icon} alt="" />
-            </a>
-          ))}
+          {community.map((item) =>
+            item.href ? (
+              <a
+                key={item.label}
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className={styles.communityIcon}
+                aria-label={item.label}
+              >
+                <img src={item.icon} alt="" />
+              </a>
+            ) : (
+              <span
+                key={item.label}
+                className={`${styles.communityIcon} ${styles.communityIconDisabled}`}
+                aria-label={`${item.label} unavailable`}
+                aria-disabled="true"
+              >
+                <img src={item.icon} alt="" />
+              </span>
+            )
+          )}
         </div>
 
         <div className={styles.blockStatusWrap}>

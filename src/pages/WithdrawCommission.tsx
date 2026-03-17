@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgWithdrawValidatorCommission } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./WithdrawCommission.module.css"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import {
   CLASSIC_CHAIN,
   CLASSIC_DENOMS,
@@ -16,37 +17,40 @@ import {
   type CoinBalance
 } from "../app/data/classic"
 import { formatTokenAmount } from "../app/utils/format"
+import { buildClassicNativeIconCandidates, buildIbcAssetIconCandidates } from "../app/utils/assetIcons"
 import { convertBech32Prefix } from "../app/utils/bech32"
+
+type InjectedWallet = {
+  enable?: (chainId: string) => Promise<void>
+  experimentalSuggestChain?: (config: unknown) => Promise<void>
+}
+
+type WalletWindow = Window & {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+  getOfflineSigner?: (chainId: string) => OfflineSigner
+  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
+}
 
 const FEE_DENOM_OPTIONS = [
   CLASSIC_DENOMS.lunc.coinMinimalDenom,
   CLASSIC_DENOMS.ustc.coinMinimalDenom
 ] as const
-const ASSET_URL = "https://assets.terra.dev"
-
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    keplr?: any
-    station?: any
-    galaxyStation?: any
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
-  }
-  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+  const walletWindow = window as WalletWindow
+  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
 }
 
 const getOfflineSigner = async () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
+  const walletWindow = window as WalletWindow
+  if (walletWindow.getOfflineSignerAuto) {
+    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (anyWindow.getOfflineSignerAuto) {
-    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (anyWindow.getOfflineSigner) {
-    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  if (walletWindow.getOfflineSigner) {
+    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
@@ -99,38 +103,18 @@ const parseCoinAmount = (amount?: string) => {
 
 const buildIconCandidates = (denom: string) => {
   if (denom.startsWith("ibc/")) {
-    return ["/system/ibc.svg"]
+    return buildIbcAssetIconCandidates([], "/system/ibc.svg")
   }
 
   const classicSymbol = formatDenom(denom, true)
-  const isClassicStable = classicSymbol.endsWith("TC")
-  const iconDenom = denom === "uluna" ? "LUNC" : formatDenom(denom, false)
-  const upper = iconDenom.toUpperCase()
-  const lower = iconDenom.toLowerCase()
-
-  return [
-    `${ASSET_URL}/icon/60/${iconDenom}.png`,
-    `${ASSET_URL}/icon/svg/${iconDenom}.svg`,
-    `${ASSET_URL}/icon/60/${upper}.png`,
-    `${ASSET_URL}/icon/svg/${upper}.svg`,
-    `${ASSET_URL}/icon/60/${lower}.png`,
-    ...(iconDenom === "LUNA"
-      ? [`${ASSET_URL}/icon/svg/Luna.svg`, `${ASSET_URL}/icon/60/Luna.png`]
-      : []),
-    ...(isClassicStable
-      ? [
-          `${ASSET_URL}/icon/svg/USTC.svg`,
-          `${ASSET_URL}/icon/60/USTC.png`,
-          `${ASSET_URL}/icon/60/ustc.png`
-        ]
-      : []),
-    ...(upper === "LUNC" ? ["/system/lunc.svg"] : []),
-    ...(upper === "USTC" ? ["/system/ustc.png"] : []),
-    "/system/cw20.svg"
-  ]
+  return buildClassicNativeIconCandidates({
+    denom,
+    symbol: classicSymbol,
+    fallback: "/system/cw20.svg"
+  })
 }
 
-const TokenIcon = ({
+const TokenIconInner = ({
   symbol,
   candidates
 }: {
@@ -138,12 +122,6 @@ const TokenIcon = ({
   candidates: string[]
 }) => {
   const [index, setIndex] = useState(0)
-  const candidateKey = candidates.join("|")
-
-  useEffect(() => {
-    setIndex(0)
-  }, [symbol, candidateKey])
-
   const src = candidates[index]
   const hasImage = Boolean(src)
 
@@ -169,6 +147,14 @@ const TokenIcon = ({
   )
 }
 
+const TokenIcon = ({
+  symbol,
+  candidates
+}: {
+  symbol: string
+  candidates: string[]
+}) => <TokenIconInner key={`${symbol}:${candidates.join("|")}`} symbol={symbol} candidates={candidates} />
+
 const WithdrawCommission = () => {
   const { account, startTx, finishTx, failTx } = useWallet()
   const [feeDenom, setFeeDenom] = useState<(typeof FEE_DENOM_OPTIONS)[number]>(
@@ -182,13 +168,12 @@ const WithdrawCommission = () => {
   const [submitError, setSubmitError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
 
-  const valoperAddress = useMemo(() => {
-    if (!account?.address) return null
-    return convertBech32Prefix(
-      account.address,
-      `${CLASSIC_CHAIN.bech32Prefix}valoper`
-    )
-  }, [account?.address])
+  const valoperAddress = account?.address
+    ? convertBech32Prefix(
+        account.address,
+        `${CLASSIC_CHAIN.bech32Prefix}valoper`
+      )
+    : null
 
   const { data: validator } = useQuery({
     queryKey: ["validator", valoperAddress],
@@ -232,65 +217,66 @@ const WithdrawCommission = () => {
 
   useEffect(() => {
     let cancelled = false
-    let timer: number | undefined
+    const timer =
+      !account?.address || !valoperAddress || !validator
+        ? undefined
+        : window.setTimeout(async () => {
+            setFeeLoading(true)
+            setFeeError(undefined)
+            try {
+              const wallet = getWalletInstance()
+              if (!wallet) throw new Error("Wallet extension not available")
+              if (wallet.experimentalSuggestChain) {
+                await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
+              }
+              if (wallet.enable) {
+                await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
+              }
+              const signer = await getOfflineSigner()
+              if (!signer) throw new Error("Wallet signer not available")
+              const msg = {
+                typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
+                value: MsgWithdrawValidatorCommission.fromPartial({
+                  validatorAddress: valoperAddress
+                })
+              }
+              const gasPrice = GasPrice.fromString(`28.325${feeDenom}`)
+              const client = await SigningStargateClient.connectWithSigner(
+                CLASSIC_CHAIN.rpc,
+                signer,
+                { gasPrice }
+              )
+              const gasUsed = await client.simulate(account.address, [msg], "")
+              const gasPriceAmount = Number(gasPrice.amount.toString())
+              const feeMicro = Math.ceil(gasUsed * gasPriceAmount).toString()
+              const feeDisplay = formatTokenAmount(
+                feeMicro,
+                CLASSIC_DENOMS.lunc.coinDecimals,
+                6
+              )
+              if (!cancelled) {
+                setFee(feeDisplay === "--" ? "--" : feeDisplay)
+              }
+            } catch (error) {
+              if (!cancelled) {
+                setFee("--")
+                setFeeError(
+                  error instanceof Error ? error.message : "Fee estimation failed"
+                )
+              }
+            } finally {
+              if (!cancelled) setFeeLoading(false)
+            }
+          }, 350)
     if (!account?.address || !valoperAddress || !validator) {
       setFee("--")
       setFeeError(undefined)
       return undefined
     }
 
-    timer = window.setTimeout(async () => {
-      setFeeLoading(true)
-      setFeeError(undefined)
-      try {
-        const wallet = getWalletInstance()
-        if (!wallet) throw new Error("Wallet extension not available")
-        if (wallet.experimentalSuggestChain) {
-          await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-        }
-        if (wallet.enable) {
-          await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-        }
-        const signer = await getOfflineSigner()
-        if (!signer) throw new Error("Wallet signer not available")
-        const msg = {
-          typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
-          value: MsgWithdrawValidatorCommission.fromPartial({
-            validatorAddress: valoperAddress
-          })
-        }
-        const gasPrice = GasPrice.fromString(`28.325${feeDenom}`)
-        const client = await SigningStargateClient.connectWithSigner(
-          CLASSIC_CHAIN.rpc,
-          signer,
-          { gasPrice }
-        )
-        const gasUsed = await client.simulate(account.address, [msg], "")
-        const gasPriceAmount = Number(gasPrice.amount.toString())
-        const feeMicro = Math.ceil(gasUsed * gasPriceAmount).toString()
-        const feeDisplay = formatTokenAmount(
-          feeMicro,
-          CLASSIC_DENOMS.lunc.coinDecimals,
-          6
-        )
-        if (!cancelled) {
-          setFee(feeDisplay === "--" ? "--" : feeDisplay)
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setFee("--")
-          setFeeError(
-            error instanceof Error ? error.message : "Fee estimation failed"
-          )
-        }
-      } finally {
-        if (!cancelled) setFeeLoading(false)
-      }
-    }, 350)
-
     return () => {
       cancelled = true
-      if (timer) window.clearTimeout(timer)
+      if (timer !== undefined) window.clearTimeout(timer)
     }
   }, [account?.address, valoperAddress, validator, feeDenom])
 
@@ -333,7 +319,7 @@ const WithdrawCommission = () => {
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }
-      finishTx((result as any).transactionHash ?? (result as any).txhash)
+      finishTx(result.transactionHash)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Broadcast failed"

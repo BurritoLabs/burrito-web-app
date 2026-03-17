@@ -1,11 +1,15 @@
 import { useMemo, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toUtf8 } from "@cosmjs/encoding"
 import type { OfflineSigner } from "@cosmjs/proto-signing"
 import {
+  MsgClearAdmin,
+  MsgExecuteContract,
   MsgInstantiateContract,
-  MsgStoreCode
+  MsgMigrateContract,
+  MsgStoreCode,
+  MsgUpdateAdmin
 } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import PageShell from "./PageShell"
 import styles from "./Contract.module.css"
@@ -17,7 +21,7 @@ import {
 import { CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
 import { truncateHash } from "../app/utils/format"
 import { connectClassicSigningClient } from "../app/wallet/signingClient"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 
 type IconProps = {
   className?: string
@@ -32,6 +36,8 @@ const CLOSE_ICON = (
 
 const DEFAULT_QUERY = '{\n  "token_info": {}\n}'
 const DEFAULT_INSTANTIATE_MSG = '{\n  "count": 0\n}'
+const DEFAULT_EXECUTE_MSG = "{\n  \n}"
+const DEFAULT_MIGRATE_MSG = "{\n  \n}"
 
 type InjectedWallet = {
   enable?: (chainId: string) => Promise<void>
@@ -68,6 +74,14 @@ const toMicroAmount = (value: string) => {
   const num = Number(value)
   if (!Number.isFinite(num) || num <= 0) return "0"
   return Math.floor(num * 1_000_000).toString()
+}
+
+const parseJsonRecord = (value: string, label: string) => {
+  const parsed = JSON.parse(value) as unknown
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${label} must be a JSON object.`)
+  }
+  return parsed as Record<string, unknown>
 }
 
 const extractEventAttr = (
@@ -140,11 +154,14 @@ const FinderAddressLink = ({
 
 const Contract = () => {
   const { account, startTx, finishTx, failTx } = useWallet()
+  const queryClient = useQueryClient()
   const [address, setAddress] = useState("")
   const [queryOpen, setQueryOpen] = useState(false)
   const [queryInput, setQueryInput] = useState(DEFAULT_QUERY)
   const [queryLocalError, setQueryLocalError] = useState<string>()
-  const [txModal, setTxModal] = useState<"upload" | "instantiate" | null>(null)
+  const [txModal, setTxModal] = useState<
+    "upload" | "instantiate" | "execute" | "migrate" | "admin" | null
+  >(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadSubmitting, setUploadSubmitting] = useState(false)
   const [uploadError, setUploadError] = useState<string>()
@@ -162,6 +179,25 @@ const Contract = () => {
   const [instantiateError, setInstantiateError] = useState<string>()
   const [instantiateHash, setInstantiateHash] = useState("")
   const [instantiateAddress, setInstantiateAddress] = useState("")
+  const [executeMsg, setExecuteMsg] = useState(DEFAULT_EXECUTE_MSG)
+  const [executeFunds, setExecuteFunds] = useState("")
+  const [executeFundsDenom, setExecuteFundsDenom] = useState<string>(
+    CLASSIC_DENOMS.lunc.coinMinimalDenom
+  )
+  const [executeSubmitting, setExecuteSubmitting] = useState(false)
+  const [executeError, setExecuteError] = useState<string>()
+  const [executeHash, setExecuteHash] = useState("")
+  const [migrateCodeId, setMigrateCodeId] = useState("")
+  const [migrateMsg, setMigrateMsg] = useState(DEFAULT_MIGRATE_MSG)
+  const [migrateSubmitting, setMigrateSubmitting] = useState(false)
+  const [migrateError, setMigrateError] = useState<string>()
+  const [migrateHash, setMigrateHash] = useState("")
+  const [nextAdmin, setNextAdmin] = useState("")
+  const [clearAdmin, setClearAdmin] = useState(false)
+  const [adminSubmitting, setAdminSubmitting] = useState(false)
+  const [adminError, setAdminError] = useState<string>()
+  const [adminHash, setAdminHash] = useState("")
+  const [adminResultText, setAdminResultText] = useState("")
   const hasAddress = address.trim().length > 0
   const trimmedAddress = address.trim()
   const isValidAddress = useMemo(
@@ -254,6 +290,41 @@ const Contract = () => {
     setInstantiateFundsDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
     setInstantiateAdmin(account?.address ?? "")
     setTxModal("instantiate")
+  }
+
+  const openExecute = () => {
+    setExecuteError(undefined)
+    setExecuteHash("")
+    setExecuteMsg(DEFAULT_EXECUTE_MSG)
+    setExecuteFunds("")
+    setExecuteFundsDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+    setTxModal("execute")
+  }
+
+  const openMigrate = () => {
+    setMigrateError(undefined)
+    setMigrateHash("")
+    setMigrateCodeId(contract?.code_id ?? "")
+    setMigrateMsg(DEFAULT_MIGRATE_MSG)
+    setTxModal("migrate")
+  }
+
+  const openAdmin = () => {
+    setAdminError(undefined)
+    setAdminHash("")
+    setAdminResultText("")
+    setNextAdmin(contract?.admin ?? "")
+    setClearAdmin(false)
+    setTxModal("admin")
+  }
+
+  const invalidateContract = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["contract", trimmedAddress]
+    })
+    await queryClient.invalidateQueries({
+      queryKey: ["contract-init-msg", trimmedAddress]
+    })
   }
 
   const connectClient = async () => {
@@ -397,13 +468,211 @@ const Contract = () => {
     }
   }
 
+  const handleExecuteSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!account?.address) {
+      setExecuteError("Please connect a wallet first.")
+      return
+    }
+    if (!contract?.address) {
+      setExecuteError("Load a contract first.")
+      return
+    }
+
+    let parsedMsg: Record<string, unknown>
+    try {
+      parsedMsg = parseJsonRecord(executeMsg, "Execute message")
+    } catch (error) {
+      setExecuteError(
+        error instanceof Error ? error.message : "Execute message is invalid."
+      )
+      return
+    }
+
+    const fundAmount = toMicroAmount(executeFunds)
+
+    try {
+      setExecuteSubmitting(true)
+      setExecuteError(undefined)
+      setExecuteHash("")
+      startTx("Execute contract")
+      const client = await connectClient()
+      const msg = {
+        typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+        value: MsgExecuteContract.fromPartial({
+          sender: account.address,
+          contract: contract.address,
+          msg: toUtf8(JSON.stringify(parsedMsg)),
+          funds:
+            fundAmount === "0"
+              ? []
+              : [
+                  {
+                    denom: executeFundsDenom,
+                    amount: fundAmount
+                  }
+                ]
+        })
+      }
+      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Execute failed")
+      }
+      setExecuteHash(result.transactionHash)
+      finishTx(result.transactionHash)
+      await invalidateContract()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Execute failed"
+      setExecuteError(message)
+      failTx(message)
+    } finally {
+      setExecuteSubmitting(false)
+    }
+  }
+
+  const handleMigrateSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!account?.address) {
+      setMigrateError("Please connect a wallet first.")
+      return
+    }
+    if (!contract?.address) {
+      setMigrateError("Load a contract first.")
+      return
+    }
+    if (!canAdmin) {
+      setMigrateError("Only the current admin can migrate this contract.")
+      return
+    }
+    if (!migrateCodeId.trim()) {
+      setMigrateError("Code ID is required.")
+      return
+    }
+
+    let codeId: bigint
+    try {
+      codeId = BigInt(migrateCodeId.trim())
+      if (codeId <= 0n) throw new Error("invalid")
+    } catch {
+      setMigrateError("Code ID must be a positive integer.")
+      return
+    }
+
+    let parsedMsg: Record<string, unknown>
+    try {
+      parsedMsg = parseJsonRecord(migrateMsg, "Migrate message")
+    } catch (error) {
+      setMigrateError(
+        error instanceof Error ? error.message : "Migrate message is invalid."
+      )
+      return
+    }
+
+    try {
+      setMigrateSubmitting(true)
+      setMigrateError(undefined)
+      setMigrateHash("")
+      startTx("Migrate contract")
+      const client = await connectClient()
+      const msg = {
+        typeUrl: "/cosmwasm.wasm.v1.MsgMigrateContract",
+        value: MsgMigrateContract.fromPartial({
+          sender: account.address,
+          contract: contract.address,
+          codeId,
+          msg: toUtf8(JSON.stringify(parsedMsg))
+        })
+      }
+      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Migrate failed")
+      }
+      setMigrateHash(result.transactionHash)
+      finishTx(result.transactionHash)
+      await invalidateContract()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Migrate failed"
+      setMigrateError(message)
+      failTx(message)
+    } finally {
+      setMigrateSubmitting(false)
+    }
+  }
+
+  const handleAdminSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!account?.address) {
+      setAdminError("Please connect a wallet first.")
+      return
+    }
+    if (!contract?.address) {
+      setAdminError("Load a contract first.")
+      return
+    }
+    if (!canAdmin) {
+      setAdminError("Only the current admin can update this contract admin.")
+      return
+    }
+
+    const next = nextAdmin.trim()
+    if (!clearAdmin && !/^terra1[0-9a-z]{38}$/.test(next)) {
+      setAdminError("Enter a valid Terra Classic address.")
+      return
+    }
+
+    try {
+      setAdminSubmitting(true)
+      setAdminError(undefined)
+      setAdminHash("")
+      setAdminResultText("")
+      startTx(clearAdmin ? "Clear contract admin" : "Update contract admin")
+      const client = await connectClient()
+      const msg = clearAdmin
+        ? {
+            typeUrl: "/cosmwasm.wasm.v1.MsgClearAdmin",
+            value: MsgClearAdmin.fromPartial({
+              sender: account.address,
+              contract: contract.address
+            })
+          }
+        : {
+            typeUrl: "/cosmwasm.wasm.v1.MsgUpdateAdmin",
+            value: MsgUpdateAdmin.fromPartial({
+              sender: account.address,
+              contract: contract.address,
+              newAdmin: next
+            })
+          }
+
+      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Update admin failed")
+      }
+      setAdminHash(result.transactionHash)
+      setAdminResultText(
+        clearAdmin ? "Admin removed from contract." : `New admin: ${next}`
+      )
+      finishTx(result.transactionHash)
+      await invalidateContract()
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Update admin failed"
+      setAdminError(message)
+      failTx(message)
+    } finally {
+      setAdminSubmitting(false)
+    }
+  }
+
   const handleSubmitQuery = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     let parsed: Record<string, unknown>
     try {
-      parsed = JSON.parse(queryInput) as Record<string, unknown>
-    } catch {
-      setQueryLocalError("Invalid JSON")
+      parsed = parseJsonRecord(queryInput, "Query input")
+    } catch (error) {
+      setQueryLocalError(
+        error instanceof Error ? error.message : "Query input is invalid."
+      )
       return
     }
     setQueryLocalError(undefined)
@@ -487,8 +756,9 @@ const Contract = () => {
                   <button
                     className="uiButton uiButtonOutline"
                     type="button"
-                    disabled
-                    title="Coming soon"
+                    onClick={openExecute}
+                    disabled={!account?.address}
+                    title={!account?.address ? "Connect wallet first" : undefined}
                   >
                     Execute
                   </button>
@@ -497,6 +767,7 @@ const Contract = () => {
                     type="button"
                     disabled={!canAdmin}
                     title={!canAdmin ? "Admin only" : undefined}
+                    onClick={openMigrate}
                   >
                     Migrate
                   </button>
@@ -505,6 +776,7 @@ const Contract = () => {
                     type="button"
                     disabled={!canAdmin}
                     title={!canAdmin ? "Admin only" : undefined}
+                    onClick={openAdmin}
                   >
                     Update Admin
                   </button>
@@ -631,7 +903,13 @@ const Contract = () => {
                   <div className={styles.queryTitle}>
                     {txModal === "upload"
                       ? "Upload contract"
-                      : "Instantiate contract"}
+                      : txModal === "instantiate"
+                      ? "Instantiate contract"
+                      : txModal === "execute"
+                      ? "Execute contract"
+                      : txModal === "migrate"
+                      ? "Migrate contract"
+                      : "Update admin"}
                   </div>
                   <button
                     className={styles.queryClose}
@@ -696,7 +974,7 @@ const Contract = () => {
                       </button>
                     </div>
                   </form>
-                ) : (
+                ) : txModal === "instantiate" ? (
                   <form
                     className={styles.txForm}
                     onSubmit={handleInstantiateSubmit}
@@ -832,6 +1110,243 @@ const Contract = () => {
                         disabled={instantiateSubmitting}
                       >
                         {instantiateSubmitting ? "Broadcasting..." : "Instantiate"}
+                      </button>
+                    </div>
+                  </form>
+                ) : txModal === "execute" ? (
+                  <form className={styles.txForm} onSubmit={handleExecuteSubmit}>
+                    <div className={styles.txHint}>
+                      Send an execute message to{" "}
+                      <strong>{truncateHash(contract?.address ?? trimmedAddress)}</strong>.
+                    </div>
+
+                    <label className={styles.txLabel} htmlFor="contract-execute-msg">
+                      Execute message (JSON)
+                    </label>
+                    <textarea
+                      id="contract-execute-msg"
+                      className={styles.txTextarea}
+                      value={executeMsg}
+                      onChange={(event) => setExecuteMsg(event.target.value)}
+                      spellCheck={false}
+                    />
+
+                    <div className={styles.txFundsRow}>
+                      <div className={styles.txFundsItem}>
+                        <label
+                          className={styles.txLabel}
+                          htmlFor="contract-execute-funds-amount"
+                        >
+                          Funds (optional)
+                        </label>
+                        <input
+                          id="contract-execute-funds-amount"
+                          className={styles.txInput}
+                          value={executeFunds}
+                          onChange={(event) => setExecuteFunds(event.target.value)}
+                          placeholder="0.0"
+                        />
+                      </div>
+                      <div className={styles.txFundsItem}>
+                        <label
+                          className={styles.txLabel}
+                          htmlFor="contract-execute-funds-denom"
+                        >
+                          Denom
+                        </label>
+                        <select
+                          id="contract-execute-funds-denom"
+                          className={styles.txInput}
+                          value={executeFundsDenom}
+                          onChange={(event) =>
+                            setExecuteFundsDenom(event.target.value)
+                          }
+                        >
+                          <option value={CLASSIC_DENOMS.lunc.coinMinimalDenom}>
+                            LUNC
+                          </option>
+                          <option value={CLASSIC_DENOMS.ustc.coinMinimalDenom}>
+                            USTC
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {executeError ? (
+                      <div className={styles.queryError}>{executeError}</div>
+                    ) : null}
+                    {executeHash ? (
+                      <div className={styles.txResult}>
+                        <div>
+                          Tx:{" "}
+                          <a
+                            href={`https://finder.burrito.money/classic/tx/${executeHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {truncateHash(executeHash)}
+                          </a>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className={styles.queryActions}>
+                      <button
+                        className="uiButton uiButtonOutline"
+                        type="button"
+                        onClick={() => setTxModal(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="uiButton uiButtonPrimary"
+                        type="submit"
+                        disabled={executeSubmitting}
+                      >
+                        {executeSubmitting ? "Broadcasting..." : "Execute"}
+                      </button>
+                    </div>
+                  </form>
+                ) : txModal === "migrate" ? (
+                  <form className={styles.txForm} onSubmit={handleMigrateSubmit}>
+                    <div className={styles.txHint}>
+                      Migrate this contract to a new code ID. Only the current admin
+                      can perform this action.
+                    </div>
+
+                    <label className={styles.txLabel} htmlFor="contract-migrate-code-id">
+                      New code ID
+                    </label>
+                    <input
+                      id="contract-migrate-code-id"
+                      className={styles.txInput}
+                      value={migrateCodeId}
+                      onChange={(event) => setMigrateCodeId(event.target.value)}
+                      placeholder="e.g. 1234"
+                    />
+
+                    <label className={styles.txLabel} htmlFor="contract-migrate-msg">
+                      Migrate message (JSON)
+                    </label>
+                    <textarea
+                      id="contract-migrate-msg"
+                      className={styles.txTextarea}
+                      value={migrateMsg}
+                      onChange={(event) => setMigrateMsg(event.target.value)}
+                      spellCheck={false}
+                    />
+
+                    {migrateError ? (
+                      <div className={styles.queryError}>{migrateError}</div>
+                    ) : null}
+                    {migrateHash ? (
+                      <div className={styles.txResult}>
+                        <div>
+                          Tx:{" "}
+                          <a
+                            href={`https://finder.burrito.money/classic/tx/${migrateHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {truncateHash(migrateHash)}
+                          </a>
+                        </div>
+                        <div>Contract migrated successfully.</div>
+                      </div>
+                    ) : null}
+
+                    <div className={styles.queryActions}>
+                      <button
+                        className="uiButton uiButtonOutline"
+                        type="button"
+                        onClick={() => setTxModal(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="uiButton uiButtonPrimary"
+                        type="submit"
+                        disabled={migrateSubmitting}
+                      >
+                        {migrateSubmitting ? "Broadcasting..." : "Migrate"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form className={styles.txForm} onSubmit={handleAdminSubmit}>
+                    <div className={styles.txHint}>
+                      Update or clear the admin for{" "}
+                      <strong>{truncateHash(contract?.address ?? trimmedAddress)}</strong>.
+                    </div>
+
+                    <label className={styles.txLabel} htmlFor="contract-current-admin">
+                      Current admin
+                    </label>
+                    <input
+                      id="contract-current-admin"
+                      className={styles.txInput}
+                      value={contract?.admin ?? ""}
+                      readOnly
+                    />
+
+                    <label className={styles.txLabel} htmlFor="contract-next-admin">
+                      New admin
+                    </label>
+                    <input
+                      id="contract-next-admin"
+                      className={styles.txInput}
+                      value={nextAdmin}
+                      onChange={(event) => setNextAdmin(event.target.value)}
+                      placeholder="terra1..."
+                      disabled={clearAdmin}
+                    />
+
+                    <label className={styles.txToggle}>
+                      <input
+                        type="checkbox"
+                        checked={clearAdmin}
+                        onChange={(event) => setClearAdmin(event.target.checked)}
+                      />
+                      <span>Remove admin instead of setting a new one</span>
+                    </label>
+
+                    {adminError ? (
+                      <div className={styles.queryError}>{adminError}</div>
+                    ) : null}
+                    {adminHash ? (
+                      <div className={styles.txResult}>
+                        <div>
+                          Tx:{" "}
+                          <a
+                            href={`https://finder.burrito.money/classic/tx/${adminHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {truncateHash(adminHash)}
+                          </a>
+                        </div>
+                        {adminResultText ? <div>{adminResultText}</div> : null}
+                      </div>
+                    ) : null}
+
+                    <div className={styles.queryActions}>
+                      <button
+                        className="uiButton uiButtonOutline"
+                        type="button"
+                        onClick={() => setTxModal(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="uiButton uiButtonPrimary"
+                        type="submit"
+                        disabled={adminSubmitting}
+                      >
+                        {adminSubmitting
+                          ? "Broadcasting..."
+                          : clearAdmin
+                          ? "Clear admin"
+                          : "Update admin"}
                       </button>
                     </div>
                   </form>

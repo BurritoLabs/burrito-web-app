@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
+import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgWithdrawDelegatorReward } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./WithdrawRewards.module.css"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import {
   fetchRewardsByValidator,
   fetchValidators,
@@ -13,30 +14,38 @@ import {
 import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
 import { formatTokenAmount } from "../app/utils/format"
 import { useResolvedIbcWhitelist } from "../app/data/terraAssets"
+import {
+  buildClassicNativeIconCandidates,
+  buildIbcAssetIconCandidates
+} from "../app/utils/assetIcons"
+
+type InjectedWallet = {
+  enable?: (chainId: string) => Promise<void>
+  experimentalSuggestChain?: (config: unknown) => Promise<void>
+}
+
+type WalletWindow = Window & {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+  getOfflineSigner?: (chainId: string) => OfflineSigner
+  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
+}
 
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    keplr?: any
-    station?: any
-    galaxyStation?: any
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
-  }
-  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+  const walletWindow = window as WalletWindow
+  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
 }
 
 const getOfflineSigner = async () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
+  const walletWindow = window as WalletWindow
+  if (walletWindow.getOfflineSignerAuto) {
+    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (anyWindow.getOfflineSignerAuto) {
-    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (anyWindow.getOfflineSigner) {
-    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  if (walletWindow.getOfflineSigner) {
+    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
@@ -114,7 +123,6 @@ const formatRewardSymbol = (
   return getSymbol(denom, ibcSymbol)
 }
 
-const ASSET_URL = "https://assets.terra.dev"
 const buildIconCandidates = (denom: string, icon?: string) => {
   const formatDenom = (value: string) => {
     if (!value) return value
@@ -125,15 +133,14 @@ const buildIconCandidates = (denom: string, icon?: string) => {
     }
     return value
   }
-  const iconDenom = denom === "uluna" ? "LUNC" : formatDenom(denom)
-  return [
-    icon,
-    `${ASSET_URL}/icon/60/${iconDenom}.png`,
-    `${ASSET_URL}/icon/svg/${iconDenom}.svg`,
-    `${ASSET_URL}/icon/60/${String(iconDenom).toUpperCase()}.png`,
-    `${ASSET_URL}/icon/svg/${String(iconDenom).toUpperCase()}.svg`,
-    `${ASSET_URL}/icon/60/${String(iconDenom).toLowerCase()}.png`
-  ].filter(Boolean) as string[]
+  if (denom.startsWith("ibc/")) {
+    return buildIbcAssetIconCandidates([icon], "/system/ibc.svg")
+  }
+  return buildClassicNativeIconCandidates({
+    denom,
+    symbol: denom === "uluna" ? "LUNC" : formatDenom(denom),
+    primaryIcon: icon
+  })
 }
 
 const TokenIcon = ({
@@ -264,14 +271,13 @@ const WithdrawRewards = () => {
 
   useEffect(() => {
     let cancelled = false
-    let timer: number | undefined
     if (!accountAddress || !selected.length) {
       setFee("--")
       setFeeError(undefined)
       return undefined
     }
 
-    timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(async () => {
       setFeeLoading(true)
       setFeeError(undefined)
       try {
@@ -323,7 +329,7 @@ const WithdrawRewards = () => {
 
     return () => {
       cancelled = true
-      if (timer) window.clearTimeout(timer)
+      window.clearTimeout(timer)
     }
   }, [accountAddress, selected, feeDenom])
 
@@ -375,11 +381,11 @@ const WithdrawRewards = () => {
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }
-      finishTx((result as any).transactionHash ?? (result as any).txhash)
-      setSubmitting(false)
+      finishTx(result.transactionHash)
     } catch (err) {
       failTx(err instanceof Error ? err.message : "Submit failed")
       setSubmitError(err instanceof Error ? err.message : "Submit failed")
+    } finally {
       setSubmitting(false)
     }
   }

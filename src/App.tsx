@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react"
-import { useNav } from "./app/routes"
+import { useLocation } from "react-router-dom"
+import { useAppRoutes } from "./app/routes"
 import Layout, {
   Content,
   Header,
@@ -8,13 +9,15 @@ import Layout, {
 } from "./app/layout/Layout"
 import TopBar from "./app/header/TopBar"
 import Nav from "./app/nav/Nav"
-import WalletPanel from "./app/wallet/WalletPanel"
+import DeferredWalletPanel from "./app/wallet/DeferredWalletPanel"
 import Aside from "./app/aside/Aside"
 import LoadingBar from "./app/feedback/LoadingBar"
 import TxStatusModal from "./app/feedback/TxStatusModal"
+import ScrollTopButton from "./app/layout/ScrollTopButton"
 
 function App() {
-  const { element: routes } = useNav()
+  const routes = useAppRoutes()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const toggleMenu = useCallback(() => setMenuOpen((open) => !open), [])
@@ -34,8 +37,14 @@ function App() {
         <MainContainer>
           <LoadingBar />
           <TxStatusModal />
-          <div className="pageArea">{routes}</div>
-          <WalletPanel />
+          <ScrollTopButton />
+          <div
+            key={`${location.pathname}${location.search}${location.hash}`}
+            className="pageArea"
+          >
+            {routes}
+          </div>
+          <DeferredWalletPanel />
         </MainContainer>
       </Content>
     </Layout>

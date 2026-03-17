@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from "react-router-dom"
 import BrandLogo from "../../components/brand/BrandLogo"
-import { useNav } from "../routes"
+import { navMenu } from "../routes"
 import styles from "./Nav.module.css"
 import { useEffect } from "react"
 
@@ -10,7 +10,6 @@ type NavProps = {
 }
 
 const Nav = ({ isOpen, onClose }: NavProps) => {
-  const { menu } = useNav()
   const { pathname } = useLocation()
   const handleNavigate = () => {
     if (onClose) onClose()
@@ -45,7 +44,7 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
       </div>
 
       <div className={styles.links}>
-        {menu.map(({ path, title, icon }) => (
+        {navMenu.map(({ path, title, icon }) => (
           <NavLink
             key={path}
             to={path}

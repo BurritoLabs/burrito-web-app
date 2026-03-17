@@ -280,7 +280,13 @@ const Dashboard = () => {
         deltaRaw: undefined
       }
     ]
-  }, [currentSnapshot, prices?.lunc?.usd, prices?.ustc?.usd])
+  }, [
+    currentSnapshot,
+    prices?.lunc?.usd,
+    prices?.lunc?.usd_24h_change,
+    prices?.ustc?.usd,
+    prices?.ustc?.usd_24h_change
+  ])
 
   return (
     <PageShell title="Dashboard">

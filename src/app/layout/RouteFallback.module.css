@@ -1,0 +1,170 @@
+.shell {
+  min-height: calc(100vh - var(--header-height));
+  padding: 24px var(--main-padding);
+  display: flex;
+  justify-content: center;
+}
+
+.panel {
+  width: min(100%, 1120px);
+  display: grid;
+  gap: 18px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(234, 245, 235, 0.66);
+  font-size: var(--font-size-small);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(82, 196, 26, 0.9);
+  box-shadow: 0 0 12px rgba(82, 196, 26, 0.45);
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.title,
+.chip,
+.lineWide,
+.line,
+.lineShort,
+.block,
+.blockTall {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.title::after,
+.chip::after,
+.lineWide::after,
+.line::after,
+.lineShort::after,
+.block::after,
+.blockTall::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.title {
+  width: min(340px, 42vw);
+  height: 40px;
+}
+
+.chip {
+  width: 96px;
+  height: 34px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+  gap: 18px;
+}
+
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background: rgba(12, 20, 17, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
+    0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.lineWide {
+  width: 56%;
+  height: 14px;
+}
+
+.line {
+  width: 84%;
+  height: 12px;
+}
+
+.lineShort {
+  width: 44%;
+  height: 12px;
+}
+
+.block {
+  height: 120px;
+  border-radius: 18px;
+}
+
+.blockTall {
+  height: 340px;
+  border-radius: 20px;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 991.98px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .shell {
+    padding: 18px var(--main-padding);
+  }
+
+  .hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .title {
+    width: min(260px, 72vw);
+    height: 34px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .blockTall {
+    height: 260px;
+  }
+}

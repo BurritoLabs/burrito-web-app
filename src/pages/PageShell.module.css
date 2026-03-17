@@ -53,6 +53,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .backButton {
@@ -116,7 +117,7 @@
 
 @media (max-width: 600px) {
   .page {
-    padding: 28px 0;
+    padding: 28px var(--main-padding);
   }
 
   .banner {
@@ -132,7 +133,17 @@
   }
 
   .header {
-    padding: 0 var(--main-padding);
+    margin-right: 0;
+    padding: 0;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .extra {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 }
 

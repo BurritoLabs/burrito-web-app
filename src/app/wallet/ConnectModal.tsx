@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import styles from "./ConnectModal.module.css"
-import { useWallet } from "./WalletProvider"
+import { useWallet } from "./WalletContext"
 
 type ConnectModalProps = {
   open: boolean
@@ -17,11 +17,9 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
   const isConnecting = status === "connecting"
   const [copied, setCopied] = useState(false)
 
-  const walletLabel = useMemo(() => {
-    if (account?.name?.trim()) return account.name.trim()
-    const match = connectors.find((item) => item.id === connectorId)
-    return match?.label ?? "Wallet"
-  }, [account?.name, connectorId, connectors])
+  const walletLabel = account?.name?.trim()
+    ? account.name.trim()
+    : connectors.find((item) => item.id === connectorId)?.label ?? "Wallet"
   const walletBadge =
     connectorId === "keplr" ? "K" : connectorId === "galaxy" ? "G" : "W"
   const finderUrl = account

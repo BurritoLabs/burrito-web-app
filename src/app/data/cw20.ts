@@ -28,13 +28,30 @@ const saveCache = (key: string, data: Record<string, string>) => {
   window.localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
 }
 
+const buildWhitelistSignature = (whitelist: Record<string, Cw20Token>) => {
+  const keys = Object.keys(whitelist)
+    .map((key) => key.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+
+  let hash = 0
+  for (const key of keys) {
+    for (let index = 0; index < key.length; index += 1) {
+      hash = (hash * 33 + key.charCodeAt(index)) >>> 0
+    }
+  }
+
+  return `${keys.length}:${hash.toString(16)}`
+}
+
 export const fetchCw20Balances = async (
   address: string,
   whitelist: Record<string, Cw20Token>
 ) => {
   if (!address) return []
 
-  const cacheKey = `cw20balance:${address}:classic`
+  const whitelistSignature = buildWhitelistSignature(whitelist)
+  const cacheKey = `cw20balance:${address}:classic:${whitelistSignature}`
   const invalidKey = "cw20invalid:classic"
   const cached = loadCache(cacheKey)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
@@ -82,8 +99,9 @@ export const fetchCw20Balances = async (
         }
         const data = (await res.json()) as { data?: { balance?: string } }
         results[contract] = data?.data?.balance ?? "0"
-      } catch (error: any) {
-        const message = String(error?.message ?? "")
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : String(error ?? "")
         if (message.includes("no such contract")) {
           invalidContracts[contract] = true
         }
@@ -108,8 +126,10 @@ export const useCw20Balances = (
   address: string | undefined,
   whitelist?: Record<string, Cw20Token>
 ) => {
+  const whitelistSignature = buildWhitelistSignature(whitelist ?? {})
+
   return useQuery({
-    queryKey: ["cw20-balances", address],
+    queryKey: ["cw20-balances", address, whitelistSignature],
     queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}),
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
     staleTime: 60_000

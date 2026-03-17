@@ -1,8 +1,7 @@
 import { createPortal } from "react-dom"
 import { useEffect, useState } from "react"
-import QRCode from "qrcode"
 import styles from "./WalletAddressesModal.module.css"
-import { useWallet } from "./WalletProvider"
+import { useWallet } from "./WalletContext"
 
 type WalletAddressesModalProps = {
   open: boolean
@@ -32,6 +31,7 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
       }
 
       try {
+        const { default: QRCode } = await import("qrcode")
         const dataUrl = await QRCode.toDataURL(address, {
           width: 280,
           margin: 0,

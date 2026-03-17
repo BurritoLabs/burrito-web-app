@@ -1,0 +1,155 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 10, 8, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.modal {
+  width: min(360px, 100%);
+  background: var(--card-bg);
+  border: var(--border-width) solid var(--card-border);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 14px;
+}
+
+.optionList {
+  display: grid;
+  gap: 10px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.closeButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  position: relative;
+  color: rgba(234, 245, 235, 0.8);
+}
+
+.closeButton span {
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+.closeButton span:first-child {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.closeButton span:last-child {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.optionCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    radial-gradient(circle at top right, rgba(240, 185, 11, 0.1), transparent 38%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.optionTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.optionLogo {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  flex: 0 0 auto;
+}
+
+.optionLogo img {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.optionTitle {
+  font-size: var(--font-size-title);
+  font-weight: var(--bold);
+  color: #ffffff;
+}
+
+.optionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optionVenueTag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(240, 185, 11, 0.14);
+  color: #f0b90b;
+  font-size: 10px;
+  font-weight: var(--bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.optionMeta {
+  margin-top: 2px;
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.58);
+}
+
+.primaryLink {
+  min-height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0b90b;
+  color: #0c1411;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+@media (max-width: 480px) {
+  .modal {
+    padding: 18px;
+  }
+}

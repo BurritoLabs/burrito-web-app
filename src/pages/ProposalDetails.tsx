@@ -4,11 +4,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode
 } from "react"
 import { createPortal } from "react-dom"
 import { useLocation, useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
@@ -37,7 +39,7 @@ import {
   CLASSIC_DENOMS,
   KEPLR_CHAIN_CONFIG
 } from "../app/chain"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import type {
   GovTally,
   GovTallyParams,
@@ -50,30 +52,50 @@ import type {
 
 const GAS_PRICE_MICRO = 28.325
 const VOTE_GAS_LIMIT = 220000
+const KEYBASE_PROXY_URL = import.meta.env.DEV
+  ? "/keybase"
+  : "https://keybase.burrito.money"
+
+type InjectedWallet = {
+  enable?: (chainId: string) => Promise<void>
+  experimentalSuggestChain?: (config: unknown) => Promise<void>
+}
+
+type WalletWindow = Window & {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+  getOfflineSigner?: (chainId: string) => OfflineSigner
+  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
+}
+
+type SummaryMap = Record<string, unknown>
+type SummaryCoin = { denom: string; amount: string | number | bigint }
+
+const isSummaryMap = (value: unknown): value is SummaryMap =>
+  typeof value === "object" && value !== null
+
+const isSummaryCoin = (value: unknown): value is SummaryCoin =>
+  isSummaryMap(value) &&
+  typeof value.denom === "string" &&
+  (typeof value.amount === "string" ||
+    typeof value.amount === "number" ||
+    typeof value.amount === "bigint")
 
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    keplr?: any
-    station?: any
-    galaxyStation?: any
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
-  }
-  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+  const walletWindow = window as WalletWindow
+  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
 }
 
 const getOfflineSigner = async () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
+  const walletWindow = window as WalletWindow
+  if (walletWindow.getOfflineSignerAuto) {
+    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (anyWindow.getOfflineSignerAuto) {
-    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (anyWindow.getOfflineSigner) {
-    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  if (walletWindow.getOfflineSigner) {
+    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
@@ -205,7 +227,7 @@ const ProposalDetails = () => {
     const items: Array<{ label: string; value: ReactNode }> = []
     const seen = new Set<string>()
 
-    const pushEntries = (source?: Record<string, any>) => {
+    const pushEntries = (source?: SummaryMap) => {
       if (!source) return
       Object.entries(source)
         .filter(([key]) => !ignored.has(key))
@@ -219,8 +241,12 @@ const ProposalDetails = () => {
         })
     }
 
-    pushEntries(proposal.metadataContent)
-    pushEntries(proposal.content as Record<string, any>)
+    pushEntries(
+      isSummaryMap(proposal.metadataContent)
+        ? proposal.metadataContent
+        : undefined
+    )
+    pushEntries(isSummaryMap(proposal.content) ? proposal.content : undefined)
     return items
   }, [proposal])
 
@@ -400,7 +426,7 @@ const ProposalDetails = () => {
         pending.map(async (identity) => {
           try {
             const response = await fetch(
-              `https://keybase.burrito.money/?identity=${identity}`
+              `${KEYBASE_PROXY_URL}/?identity=${identity}`
             )
             const data = await response.json()
             return [identity, data?.picture ?? ""] as const
@@ -492,9 +518,14 @@ const ProposalDetails = () => {
     })
   }, [description])
 
-  const metadata = proposal?.metadataContent as Record<string, any> | undefined
+  const metadata = isSummaryMap(proposal?.metadataContent)
+    ? proposal.metadataContent
+    : undefined
   const authors = metadata?.authors
-  const forumUrl = metadata?.proposal_forum_url
+  const forumUrl =
+    typeof metadata?.proposal_forum_url === "string"
+      ? metadata.proposal_forum_url
+      : undefined
   const voteContext = metadata?.vote_option_context
   const forumLabel = (() => {
     if (!forumUrl || typeof forumUrl !== "string") return ""
@@ -1223,11 +1254,16 @@ const VoteFlag = ({ label, left }: { label: string; left: number }) => {
   const computed =
     (left / 100) * width < maxTranslate ? `-${(left / 100) * width}px` : "-50%"
 
+  const flagStyle = {
+    "--flag-left": `${left}%`,
+    "--x-pos": computed
+  } as CSSProperties
+
   return (
     <div
       ref={ref}
       className={styles.progressFlag}
-      style={{ ["--flag-left" as any]: `${left}%`, ["--x-pos" as any]: computed }}
+      style={flagStyle}
     >
       <span className={styles.progressFlagLabel}>{label}</span>
       <span className={styles.progressFlagLine} />
@@ -1284,10 +1320,11 @@ const capitalize = (value: string) =>
 const renderSummaryValue = (key: string, value: unknown) => {
   if (Array.isArray(value)) {
     if (!value.length) return "--"
-    const first = value[0] as any
-    if (first && typeof first === "object" && "denom" in first && "amount" in first) {
+    const first = value[0]
+    if (isSummaryCoin(first)) {
       return value
-        .map((coin: any) =>
+        .filter(isSummaryCoin)
+        .map((coin) =>
           `${formatTokenAmount(coin.amount, 6, 2)} ${formatDenom(coin.denom)}`
         )
         .join(", ")

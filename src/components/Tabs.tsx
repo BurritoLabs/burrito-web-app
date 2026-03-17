@@ -30,7 +30,7 @@ const Tabs = ({
   const active = tabs.find((tab) => tab.key === currentKey) ?? tabs[0]
 
   const visibleTabs = tabs.filter((tab) => !tab.hidden)
-  const tabRefs = visibleTabs.map(() => useRef<HTMLButtonElement | null>(null))
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   const setKey = (key: string) => {
     if (activeKey === undefined) {
@@ -49,7 +49,7 @@ const Tabs = ({
       event.key === "ArrowRight"
         ? (index + 1) % visibleTabs.length
         : (index - 1 + visibleTabs.length) % visibleTabs.length
-    tabRefs[nextIndex]?.current?.focus()
+    tabRefs.current[nextIndex]?.focus()
     setKey(visibleTabs[nextIndex]?.key)
   }
 
@@ -64,7 +64,9 @@ const Tabs = ({
               tab.key === currentKey ? styles.active : ""
             }`}
             onClick={() => setKey(tab.key)}
-            ref={tabRefs[index]}
+            ref={(node) => {
+              tabRefs.current[index] = node
+            }}
             onKeyDown={(event) => handleKeyDown(event, index)}
           >
             <span className={styles.title}>{tab.label}</span>

@@ -1,18 +1,5 @@
+import { Suspense, lazy, type ComponentType } from "react"
 import { useRoutes } from "react-router-dom"
-import Dashboard from "../pages/Dashboard"
-import Wallet from "../pages/Wallet"
-import Market from "../pages/Market"
-import MarketPairDetails from "../pages/MarketPairDetails"
-import Swap from "../pages/Swap"
-import History from "../pages/History"
-import Stake from "../pages/Stake"
-import WithdrawRewards from "../pages/WithdrawRewards"
-import WithdrawCommission from "../pages/WithdrawCommission"
-import Governance from "../pages/Governance"
-import ProposalDetails from "../pages/ProposalDetails"
-import ProposalNew from "../pages/ProposalNew"
-import Contract from "../pages/Contract"
-import NotFound from "../pages/NotFound"
 import {
   ContractIcon,
   GovIcon,
@@ -22,66 +9,88 @@ import {
   SwapIcon,
   WalletIcon
 } from "./icons"
+import RouteFallback from "./layout/RouteFallback"
 
 const ICON_SIZE = { width: 18, height: 18 }
 
-export const useNav = () => {
-  const menu = [
-    {
-      path: "/wallet",
-      element: <Wallet />,
-      title: "Wallet",
-      icon: <WalletIcon {...ICON_SIZE} />
-    },
-    {
-      path: "/swap",
-      element: <Swap />,
-      title: "Swap",
-      icon: <SwapIcon {...ICON_SIZE} />
-    },
-    {
-      path: "/market",
-      element: <Market />,
-      title: "Market",
-      icon: <MarketIcon {...ICON_SIZE} />
-    },
-    {
-      path: "/history",
-      element: <History />,
-      title: "History",
-      icon: <HistoryIcon {...ICON_SIZE} />
-    },
-    {
-      path: "/stake",
-      element: <Stake />,
-      title: "Stake",
-      icon: <StakeIcon {...ICON_SIZE} />
-    },
-    {
-      path: "/gov",
-      element: <Governance />,
-      title: "Governance",
-      icon: <GovIcon {...ICON_SIZE} />
-    },
-    {
-      path: "/contract",
-      element: <Contract />,
-      title: "Contract",
-      icon: <ContractIcon {...ICON_SIZE} />
-    }
-  ]
+const Dashboard = lazy(() => import("../pages/Dashboard"))
+const Wallet = lazy(() => import("../pages/Wallet"))
+const Market = lazy(() => import("../pages/Market"))
+const MarketPairDetails = lazy(() => import("../pages/MarketPairDetails"))
+const Swap = lazy(() => import("../pages/Swap"))
+const History = lazy(() => import("../pages/History"))
+const Stake = lazy(() => import("../pages/Stake"))
+const WithdrawRewards = lazy(() => import("../pages/WithdrawRewards"))
+const WithdrawCommission = lazy(() => import("../pages/WithdrawCommission"))
+const Governance = lazy(() => import("../pages/Governance"))
+const ProposalDetails = lazy(() => import("../pages/ProposalDetails"))
+const ProposalNew = lazy(() => import("../pages/ProposalNew"))
+const Contract = lazy(() => import("../pages/Contract"))
+const NotFound = lazy(() => import("../pages/NotFound"))
 
-  const routes = [
-    { path: "/", element: <Dashboard /> },
-    { path: "/market/pair/:dexId/:pair", element: <MarketPairDetails /> },
-    { path: "/market/pair/:pairId", element: <MarketPairDetails /> },
-    { path: "/proposal/new", element: <ProposalNew /> },
-    { path: "/proposal/:id", element: <ProposalDetails /> },
-    { path: "/rewards", element: <WithdrawRewards /> },
-    { path: "/commission", element: <WithdrawCommission /> },
-    ...menu,
-    { path: "*", element: <NotFound /> }
-  ]
+const renderPage = (Component: ComponentType) => (
+  <Suspense fallback={<RouteFallback />}>
+    <Component />
+  </Suspense>
+)
 
-  return { menu, element: useRoutes(routes) }
-}
+export const navMenu = [
+  {
+    path: "/wallet",
+    title: "Wallet",
+    icon: <WalletIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/swap",
+    title: "Swap",
+    icon: <SwapIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/market",
+    title: "Market",
+    icon: <MarketIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/history",
+    title: "History",
+    icon: <HistoryIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/stake",
+    title: "Stake",
+    icon: <StakeIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/gov",
+    title: "Governance",
+    icon: <GovIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/contract",
+    title: "Contract",
+    icon: <ContractIcon {...ICON_SIZE} />
+  }
+] as const
+
+const appRoutes = [
+  { path: "/", element: renderPage(Dashboard) },
+  {
+    path: "/market/pair/:dexId/:pair",
+    element: renderPage(MarketPairDetails)
+  },
+  { path: "/market/pair/:pairId", element: renderPage(MarketPairDetails) },
+  { path: "/proposal/new", element: renderPage(ProposalNew) },
+  { path: "/proposal/:id", element: renderPage(ProposalDetails) },
+  { path: "/rewards", element: renderPage(WithdrawRewards) },
+  { path: "/commission", element: renderPage(WithdrawCommission) },
+  { path: "/wallet", element: renderPage(Wallet) },
+  { path: "/swap", element: renderPage(Swap) },
+  { path: "/market", element: renderPage(Market) },
+  { path: "/history", element: renderPage(History) },
+  { path: "/stake", element: renderPage(Stake) },
+  { path: "/gov", element: renderPage(Governance) },
+  { path: "/contract", element: renderPage(Contract) },
+  { path: "*", element: renderPage(NotFound) }
+]
+
+export const useAppRoutes = () => useRoutes(appRoutes)

@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, type SyntheticEvent } from "react
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Stake.module.css"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import { Link } from "react-router-dom"
 import {
   fetchDelegations,
@@ -22,11 +22,23 @@ import {
 import { CLASSIC_DENOMS } from "../app/chain"
 import StakeManageModal from "./StakeManageModal"
 
-const KEYBASE_PROXY_URL = "https://keybase.burrito.money"
+const KEYBASE_PROXY_URL = import.meta.env.DEV
+  ? "/keybase"
+  : "https://keybase.burrito.money"
 const KEYBASE_FETCH_CONCURRENCY = 10
 const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
 const KEYBASE_CACHE_STORAGE_KEY = "burrito:keybase-pictures:v1"
 const KEYBASE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14
+const DONUT_COLORS = [
+  "#7893F5",
+  "#7C1AE5",
+  "#FF7940",
+  "#FF9F40",
+  "#ACACAC",
+  "#52C41A",
+  "#36CFC9",
+  "#FAAD14"
+]
 
 const normalizeIdentity = (value?: string) => value?.trim() || ""
 
@@ -284,17 +296,6 @@ const Stake = () => {
   const totalDelegated = useMemo(() => {
     return validatorDelegations.reduce((sum, item) => sum + item.amount, 0n)
   }, [validatorDelegations])
-
-  const DONUT_COLORS = [
-    "#7893F5",
-    "#7C1AE5",
-    "#FF7940",
-    "#FF9F40",
-    "#ACACAC",
-    "#52C41A",
-    "#36CFC9",
-    "#FAAD14"
-  ]
 
   const delegatedAmount = useMemo(() => {
     const amounts = delegations
@@ -625,8 +626,8 @@ const Stake = () => {
                 ["Rewards", rewardsDisplay],
                 ["Rewards", rewardsUstcDisplay],
                 ["Unstaking", unbondingDisplay]
-              ].map(([label, value]) => (
-                <div key={label} className="listRow">
+              ].map(([label, value], index) => (
+                <div key={`${label}-${index}`} className="listRow">
                   <strong>{label}</strong>
                   <span>{value}</span>
                 </div>

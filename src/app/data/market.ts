@@ -40,11 +40,14 @@ export type MarketDexPair = {
   assets: [string, string]
 }
 
+export type MarketVolumeSummary = Partial<Record<"1h" | "24h" | "7d", Record<string, number>>>
+
 export type MarketPoolSnapshot = {
   pair: string
   dexId: string
   dexLabel: string
   type: string
+  volumes?: MarketVolumeSummary
   poolAssets: [
     { id: string; amount: string },
     { id: string; amount: string }
@@ -660,9 +663,35 @@ type MarketIndexPayload = {
     dexId?: string
     dexLabel?: string
     type?: string
+    volumes?: Partial<Record<"1h" | "24h" | "7d", Record<string, number>>>
     assets?: string[]
     poolAssets?: Array<{ id?: string; amount?: string }>
   }>
+}
+
+const parseMarketVolumeSummary = (
+  raw: Partial<Record<"1h" | "24h" | "7d", Record<string, number>>> | undefined
+): MarketVolumeSummary | undefined => {
+  if (!raw) return undefined
+
+  const parsed: MarketVolumeSummary = {}
+  ;(["1h", "24h", "7d"] as const).forEach((timeframe) => {
+    const entry = raw[timeframe]
+    if (!entry || typeof entry !== "object") return
+
+    const normalized = Object.entries(entry).reduce<Record<string, number>>((acc, [key, value]) => {
+      const amount = Number(value)
+      if (!key || !Number.isFinite(amount) || amount < 0) return acc
+      acc[key] = amount
+      return acc
+    }, {})
+
+    if (Object.keys(normalized).length) {
+      parsed[timeframe] = normalized
+    }
+  })
+
+  return Object.keys(parsed).length ? parsed : undefined
 }
 
 const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
@@ -685,6 +714,7 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
     const dexId = (entry.dexId ?? "unknown").toLowerCase()
     const dexLabel = entry.dexLabel ?? pickDexLabel(dexId)
     const type = entry.type ?? "xyk"
+    const volumes = parseMarketVolumeSummary(entry.volumes)
     const fallbackAssets =
       Array.isArray(entry.assets) && entry.assets.length >= 2
         ? [entry.assets[0], entry.assets[1]]
@@ -702,6 +732,7 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
       dexId,
       dexLabel,
       type,
+      volumes,
       poolAssets: [
         { id: leftId, amount: leftAmount },
         { id: rightId, amount: rightAmount }

@@ -1,52 +1,20 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState
 } from "react"
 import type { ReactNode } from "react"
 import { KEPLR_CHAIN_CONFIG } from "../chain"
-
-type WalletStatus = "disconnected" | "connecting" | "connected" | "error"
-type WalletConnectorId = "keplr" | "galaxy"
-type TxStatus = "idle" | "pending" | "success" | "error"
-
-type TxState = {
-  status: TxStatus
-  hash?: string
-  label?: string
-  error?: string
-  startedAt?: number
-}
-
-type WalletAccount = {
-  address: string
-  name?: string
-}
-
-type WalletConnector = {
-  id: WalletConnectorId
-  label: string
-  type: "extension" | "mobile"
-  available: boolean
-}
-
-type WalletContextValue = {
-  status: WalletStatus
-  connectorId?: WalletConnectorId
-  account?: WalletAccount
-  error?: string
-  connectors: WalletConnector[]
-  connect: (id: WalletConnectorId) => Promise<void>
-  disconnect: () => Promise<void>
-  txState: TxState
-  startTx: (label?: string) => void
-  finishTx: (hash?: string) => void
-  failTx: (error?: string) => void
-  clearTx: () => void
-}
+import {
+  WalletContext,
+  type TxState,
+  type WalletAccount,
+  type WalletConnector,
+  type WalletConnectorId,
+  type WalletContextValue,
+  type WalletStatus
+} from "./WalletContext"
 
 type InjectedWallet = {
   enable: (chainId: string) => Promise<void>
@@ -59,8 +27,6 @@ type InjectedWallets = {
   station?: InjectedWallet
   galaxyStation?: InjectedWallet
 }
-
-const WalletContext = createContext<WalletContextValue | undefined>(undefined)
 const STORAGE_KEY = "burritoWalletConnector"
 
 const getInjectedWallets = (): InjectedWallets => {
@@ -237,12 +203,4 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   )
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
-}
-
-export const useWallet = () => {
-  const context = useContext(WalletContext)
-  if (!context) {
-    throw new Error("useWallet must be used within WalletProvider")
-  }
-  return context
 }

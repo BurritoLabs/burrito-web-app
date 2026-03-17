@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom"
 import { useMemo } from "react"
 import styles from "./TxStatusModal.module.css"
-import { useWallet } from "../wallet/WalletProvider"
+import { useWallet } from "../wallet/WalletContext"
 
 const formatHash = (hash: string) =>
   `${hash.slice(0, 10)}...${hash.slice(-8)}`

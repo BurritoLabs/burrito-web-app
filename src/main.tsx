@@ -6,11 +6,23 @@ import "./index.css"
 import App from "./App"
 import { WalletProvider } from "./app/wallet/WalletProvider"
 
+const shouldRetryQuery = (failureCount: number, error: unknown) => {
+  if (failureCount >= 1) return false
+  if (!(error instanceof Error)) return true
+  if (/\b(400|401|402|403|404|409|422|429)\b/.test(error.message)) {
+    return false
+  }
+  if (/too many requests/i.test(error.message)) {
+    return false
+  }
+  return true
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1
+      retry: shouldRetryQuery
     }
   }
 })

@@ -7,6 +7,11 @@ import {
 } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
+import type {
+  EncodeObject,
+  GeneratedType,
+  OfflineSigner
+} from "@cosmjs/proto-signing"
 import { Registry } from "@cosmjs/proto-signing"
 import { toUtf8 } from "@cosmjs/encoding"
 import { MsgSubmitProposal } from "cosmjs-types/cosmos/gov/v1beta1/tx"
@@ -19,7 +24,7 @@ import {
 import { ExecuteContractProposal } from "cosmjs-types/cosmwasm/wasm/v1/proposal_legacy"
 import PageShell from "./PageShell"
 import styles from "./ProposalNew.module.css"
-import { useWallet } from "../app/wallet/WalletProvider"
+import { useWallet } from "../app/wallet/WalletContext"
 import {
   CLASSIC_CHAIN,
   CLASSIC_DENOMS,
@@ -70,29 +75,35 @@ const toMicroAmount = (value: string) => {
   return Math.floor(num * 1_000_000).toString()
 }
 
+type InjectedWallet = {
+  enable?: (chainId: string) => Promise<void>
+  experimentalSuggestChain?: (config: unknown) => Promise<void>
+}
+
+type WalletWindow = Window & {
+  keplr?: InjectedWallet
+  station?: InjectedWallet
+  galaxyStation?: InjectedWallet
+  getOfflineSigner?: (chainId: string) => OfflineSigner
+  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
+}
+
+const isTerraAddress = (value: string) => /^terra1[0-9a-z]{38}$/.test(value)
+
 const getWalletInstance = () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    keplr?: any
-    station?: any
-    galaxyStation?: any
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
-  }
-  return anyWindow.keplr ?? anyWindow.station ?? anyWindow.galaxyStation
+  const walletWindow = window as WalletWindow
+  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
 }
 
 const getOfflineSigner = async () => {
   if (typeof window === "undefined") return undefined
-  const anyWindow = window as Window & {
-    getOfflineSigner?: any
-    getOfflineSignerAuto?: any
+  const walletWindow = window as WalletWindow
+  if (walletWindow.getOfflineSignerAuto) {
+    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (anyWindow.getOfflineSignerAuto) {
-    return await anyWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (anyWindow.getOfflineSigner) {
-    return anyWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+  if (walletWindow.getOfflineSigner) {
+    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
@@ -184,23 +195,29 @@ const ProposalNew = () => {
   const getDenomLabel = (denom: string) =>
     denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ? "LUNC" : "USTC"
 
-  const validateAddress = (value: string) =>
-    /^terra1[0-9a-z]{38}$/.test(value)
-
   const getRegistry = () => {
     const registry = new Registry()
-    registry.register("/cosmos.gov.v1beta1.MsgSubmitProposal", MsgSubmitProposal as any)
-    registry.register(TextProposal.typeUrl, TextProposal as any)
+    registry.register(
+      "/cosmos.gov.v1beta1.MsgSubmitProposal",
+      MsgSubmitProposal as GeneratedType
+    )
+    registry.register(TextProposal.typeUrl, TextProposal as GeneratedType)
     registry.register(
       CommunityPoolSpendProposal.typeUrl,
-      CommunityPoolSpendProposal as any
+      CommunityPoolSpendProposal as GeneratedType
     )
-    registry.register(ParameterChangeProposal.typeUrl, ParameterChangeProposal as any)
-    registry.register(ExecuteContractProposal.typeUrl, ExecuteContractProposal as any)
+    registry.register(
+      ParameterChangeProposal.typeUrl,
+      ParameterChangeProposal as GeneratedType
+    )
+    registry.register(
+      ExecuteContractProposal.typeUrl,
+      ExecuteContractProposal as GeneratedType
+    )
     return registry
   }
 
-  const buildContent = () => {
+  const buildContent = (): EncodeObject => {
     if (proposalType === "SPEND") {
       const value = CommunityPoolSpendProposal.fromPartial({
         title,
@@ -225,7 +242,7 @@ const ProposalNew = () => {
       return { typeUrl: ParameterChangeProposal.typeUrl, value }
     }
     if (proposalType === "EXECUTE") {
-      const msgJson = JSON.parse(executeMsg)
+      const msgJson = JSON.parse(executeMsg) as Record<string, unknown>
       const parsedFunds = funds
         .filter((item) => Number(item.amount))
         .map((item) => ({
@@ -262,8 +279,8 @@ const ProposalNew = () => {
 
     return {
       typeUrl: "/cosmos.gov.v1beta1.MsgSubmitProposal",
-        value: MsgSubmitProposal.fromPartial({
-          content: registry.encodeAsAny(content as any),
+      value: MsgSubmitProposal.fromPartial({
+        content: registry.encodeAsAny(content),
         initialDeposit,
         proposer: account?.address ?? ""
       })
@@ -274,7 +291,7 @@ const ProposalNew = () => {
     if (!account?.address) return false
     if (!title.trim() || !description.trim()) return false
     if (proposalType === "SPEND") {
-      return validateAddress(spendRecipient) && Number(spendAmount) > 0
+      return isTerraAddress(spendRecipient) && Number(spendAmount) > 0
     }
     if (proposalType === "PARAMS") {
       return changes.every(
@@ -282,7 +299,7 @@ const ProposalNew = () => {
       )
     }
     if (proposalType === "EXECUTE") {
-      if (!validateAddress(runAs) || !validateAddress(contractAddress)) return false
+      if (!isTerraAddress(runAs) || !isTerraAddress(contractAddress)) return false
       try {
         JSON.parse(executeMsg)
       } catch {
@@ -300,8 +317,7 @@ const ProposalNew = () => {
     changes,
     runAs,
     contractAddress,
-    executeMsg,
-    validateAddress
+    executeMsg
   ])
 
   useEffect(() => {
@@ -421,7 +437,7 @@ const ProposalNew = () => {
       return
     }
     if (proposalType === "SPEND") {
-      if (!validateAddress(spendRecipient)) {
+      if (!isTerraAddress(spendRecipient)) {
         setError("Recipient address is invalid.")
         return
       }
@@ -440,7 +456,7 @@ const ProposalNew = () => {
       }
     }
     if (proposalType === "EXECUTE") {
-      if (!validateAddress(runAs) || !validateAddress(contractAddress)) {
+      if (!isTerraAddress(runAs) || !isTerraAddress(contractAddress)) {
         setError("Run as / contract address is invalid.")
         return
       }
