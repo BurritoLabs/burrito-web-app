@@ -7,6 +7,12 @@ import type {
   WalletConnectorId
 } from "./WalletContext"
 
+type WalletAdapterRuntime = {
+  getConnector?: (id: WalletConnectorId) => WalletConnector | undefined
+  connect?: (id: WalletConnectorId) => Promise<WalletAccount | undefined>
+  getOfflineSigner?: (id: WalletConnectorId) => Promise<OfflineSigner | undefined>
+}
+
 type InjectedKey = {
   bech32Address: string
   name?: string
@@ -91,6 +97,12 @@ const ADAPTERS: readonly WalletAdapter[] = [
       walletWindow.luncdashWallet
   }
 ] as const
+
+let walletAdapterRuntime: WalletAdapterRuntime | undefined
+
+export const registerWalletAdapterRuntime = (runtime?: WalletAdapterRuntime) => {
+  walletAdapterRuntime = runtime
+}
 
 const getWalletWindow = () => {
   if (typeof window === "undefined") return undefined
@@ -178,15 +190,25 @@ const resolveAccount = async (
 
 export const getWalletConnectors = (): WalletConnector[] => {
   const walletWindow = getWalletWindow()
-  return ADAPTERS.map((adapter) => ({
-    id: adapter.id,
-    label: adapter.label,
-    type: adapter.type,
-    available: Boolean(walletWindow && adapter.getProvider(walletWindow))
-  }))
+  return ADAPTERS.map((adapter) => {
+    const runtimeConnector = walletAdapterRuntime?.getConnector?.(adapter.id)
+    if (runtimeConnector) {
+      return runtimeConnector
+    }
+    return {
+      id: adapter.id,
+      label: adapter.label,
+      type: adapter.type,
+      available: Boolean(walletWindow && adapter.getProvider(walletWindow))
+    }
+  })
 }
 
 export const isWalletConnectorAvailable = (id: WalletConnectorId) => {
+  const runtimeConnector = walletAdapterRuntime?.getConnector?.(id)
+  if (runtimeConnector) {
+    return runtimeConnector.available
+  }
   const walletWindow = getWalletWindow()
   if (!walletWindow) return false
   const adapter = getRequiredAdapter(id)
@@ -200,12 +222,20 @@ export const getWalletConnectorBadge = (id?: WalletConnectorId) =>
   id ? getAdapter(id)?.badge ?? "W" : "W"
 
 export const connectWalletConnector = async (id: WalletConnectorId) => {
+  const runtimeAccount = await walletAdapterRuntime?.connect?.(id)
+  if (runtimeAccount) {
+    return runtimeAccount
+  }
   const { adapter, provider, walletWindow } = getRequiredProvider(id)
   await enableProvider(provider)
   return resolveAccount(adapter, provider, walletWindow)
 }
 
 export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
+  const runtimeSigner = await walletAdapterRuntime?.getOfflineSigner?.(id)
+  if (runtimeSigner) {
+    return runtimeSigner
+  }
   const { adapter, provider, walletWindow } = getRequiredProvider(id)
   await enableProvider(provider)
   const signer = await getOfflineSignerFromProvider(adapter, provider, walletWindow)

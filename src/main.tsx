@@ -2,9 +2,16 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { ChainProvider } from "@cosmos-kit/react"
 import "./index.css"
 import App from "./App"
 import { WalletProvider } from "./app/wallet/WalletProvider"
+import {
+  COSMOS_KIT_ASSET_LISTS,
+  COSMOS_KIT_CHAINS,
+  COSMOS_KIT_WALLETS,
+  getWalletConnectOptions
+} from "./app/wallet/cosmosKit"
 
 const shouldRetryQuery = (failureCount: number, error: unknown) => {
   if (failureCount >= 1) return false
@@ -30,11 +37,19 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </WalletProvider>
+      <ChainProvider
+        chains={COSMOS_KIT_CHAINS}
+        assetLists={COSMOS_KIT_ASSET_LISTS}
+        wallets={COSMOS_KIT_WALLETS}
+        walletConnectOptions={getWalletConnectOptions()}
+        throwErrors={false}
+      >
+        <WalletProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </WalletProvider>
+      </ChainProvider>
     </QueryClientProvider>
   </StrictMode>
 )
