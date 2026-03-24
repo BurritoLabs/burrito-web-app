@@ -16,15 +16,25 @@ import {
 } from "./WalletContext"
 import {
   connectWalletConnector,
-  getWalletConnectors,
-  isWalletConnectorAvailable
+  getWalletConnectors
 } from "./walletAdapters"
 const STORAGE_KEY = "burritoWalletConnector"
+const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = [
+  "keplr",
+  "leap",
+  "galaxy",
+  "trust",
+  "luncdash"
+]
+
+const isKnownConnectorId = (
+  value: string | null
+): value is WalletConnectorId => KNOWN_CONNECTOR_IDS.includes(value as WalletConnectorId)
 
 const getStoredConnectorId = () => {
   if (typeof window === "undefined") return undefined
-  const stored = window.localStorage.getItem(STORAGE_KEY) as WalletConnectorId | null
-  if (!stored || !isWalletConnectorAvailable(stored)) {
+  const stored = window.localStorage.getItem(STORAGE_KEY)
+  if (!isKnownConnectorId(stored)) {
     return undefined
   }
   return stored
@@ -39,6 +49,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [account, setAccount] = useState<WalletAccount>()
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
+  const [connectors, setConnectors] = useState<WalletConnector[]>(() =>
+    getWalletConnectors()
+  )
   const [pendingAutoConnectId] = useState<WalletConnectorId | undefined>(
     () => getStoredConnectorId()
   )
@@ -46,8 +59,20 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     () => !pendingAutoConnectId
   )
 
-  const connectors = useMemo<WalletConnector[]>(() => {
-    return getWalletConnectors()
+  const refreshConnectors = useCallback(() => {
+    setConnectors((current) => {
+      const next = getWalletConnectors()
+      const unchanged =
+        current.length === next.length &&
+        current.every(
+          (item, index) =>
+            item.id === next[index]?.id &&
+            item.available === next[index]?.available &&
+            item.type === next[index]?.type &&
+            item.label === next[index]?.label
+        )
+      return unchanged ? current : next
+    })
   }, [])
 
   const connect = useCallback(
@@ -116,7 +141,43 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [txState.status])
 
   useEffect(() => {
-    if (autoConnectAttempted || !pendingAutoConnectId) return
+    const retryDelays = [250, 900, 1800, 3200]
+    const timers = [0, ...retryDelays].map((delay) =>
+      window.setTimeout(refreshConnectors, delay)
+    )
+    const handleFocus = () => {
+      refreshConnectors()
+    }
+    window.addEventListener("focus", handleFocus)
+    window.addEventListener("pageshow", handleFocus)
+    document.addEventListener("visibilitychange", handleFocus)
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+      window.removeEventListener("focus", handleFocus)
+      window.removeEventListener("pageshow", handleFocus)
+      document.removeEventListener("visibilitychange", handleFocus)
+    }
+  }, [refreshConnectors])
+
+  const pendingAutoConnectAvailable = useMemo(
+    () =>
+      Boolean(
+        pendingAutoConnectId &&
+          connectors.some(
+            (connector) =>
+              connector.id === pendingAutoConnectId && connector.available
+          )
+      ),
+    [connectors, pendingAutoConnectId]
+  )
+
+  useEffect(() => {
+    if (
+      autoConnectAttempted ||
+      !pendingAutoConnectId ||
+      !pendingAutoConnectAvailable
+    )
+      return
     let cancelled = false
     const timer = window.setTimeout(() => {
       void connect(pendingAutoConnectId).finally(() => {
@@ -129,7 +190,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [autoConnectAttempted, connect, pendingAutoConnectId])
+  }, [
+    autoConnectAttempted,
+    connect,
+    pendingAutoConnectAvailable,
+    pendingAutoConnectId
+  ])
 
   const value = useMemo<WalletContextValue>(
     () => ({
