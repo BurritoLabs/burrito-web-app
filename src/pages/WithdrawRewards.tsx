@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
-import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgWithdrawDelegatorReward } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
 import PageShell from "./PageShell"
@@ -11,44 +10,14 @@ import {
   fetchValidators,
   type RewardsByValidator
 } from "../app/data/classic"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
+import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
 import { formatTokenAmount } from "../app/utils/format"
 import { useResolvedIbcWhitelist } from "../app/data/terraAssets"
 import {
   buildClassicNativeIconCandidates,
   buildIbcAssetIconCandidates
 } from "../app/utils/assetIcons"
-
-type InjectedWallet = {
-  enable?: (chainId: string) => Promise<void>
-  experimentalSuggestChain?: (config: unknown) => Promise<void>
-}
-
-type WalletWindow = Window & {
-  keplr?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-  getOfflineSigner?: (chainId: string) => OfflineSigner
-  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
-}
-
-const getWalletInstance = () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
-}
-
-const getOfflineSigner = async () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  if (walletWindow.getOfflineSignerAuto) {
-    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  return undefined
-}
+import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
 
 const sumRewards = (rewards: RewardsByValidator[], selected: string[]) => {
   const totals = new Map<string, bigint>()
@@ -173,7 +142,7 @@ const TokenIcon = ({
 }
 
 const WithdrawRewards = () => {
-  const { account, startTx, finishTx, failTx } = useWallet()
+  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const accountAddress = account?.address
   const { data: rewardData } = useQuery({
     queryKey: ["rewardsByValidator", accountAddress],
@@ -281,16 +250,8 @@ const WithdrawRewards = () => {
       setFeeLoading(true)
       setFeeError(undefined)
       try {
-        const wallet = getWalletInstance()
-        if (!wallet) throw new Error("Wallet extension not available")
-        if (wallet.experimentalSuggestChain) {
-          await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-        }
-        if (wallet.enable) {
-          await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-        }
-        const signer = await getOfflineSigner()
-        if (!signer) throw new Error("Wallet signer not available")
+        if (!connectorId) throw new Error("Wallet not connected")
+        const signer = await getOfflineSignerForConnector(connectorId)
         const msgs = selected.map((validator) => ({
           typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
           value: MsgWithdrawDelegatorReward.fromPartial({
@@ -331,7 +292,7 @@ const WithdrawRewards = () => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [accountAddress, selected, feeDenom])
+  }, [accountAddress, connectorId, selected, feeDenom])
 
   const toggleAll = (value: boolean) => {
     setSelected(value ? rewards.map((item) => item.validator_address) : [])
@@ -355,16 +316,8 @@ const WithdrawRewards = () => {
     try {
       setSubmitting(true)
       startTx("Withdraw rewards")
-      const wallet = getWalletInstance()
-      if (!wallet) throw new Error("Wallet extension not available")
-      if (wallet.experimentalSuggestChain) {
-        await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-      }
-      if (wallet.enable) {
-        await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-      }
-      const signer = await getOfflineSigner()
-      if (!signer) throw new Error("Wallet signer not available")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signer = await getOfflineSignerForConnector(connectorId)
       const client = await SigningStargateClient.connectWithSigner(
         CLASSIC_CHAIN.rpc,
         signer,

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import {
   MsgDelegate,
@@ -8,25 +7,9 @@ import {
 } from "cosmjs-types/cosmos/staking/v1beta1/tx"
 import { useWallet } from "../app/wallet/WalletContext"
 import styles from "./StakeManageModal.module.css"
-import {
-  CLASSIC_CHAIN,
-  CLASSIC_DENOMS,
-  KEPLR_CHAIN_CONFIG
-} from "../app/chain"
+import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
+import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
 import { formatTokenAmount } from "../app/utils/format"
-
-type InjectedWallet = {
-  enable?: (chainId: string) => Promise<void>
-  experimentalSuggestChain?: (config: unknown) => Promise<void>
-}
-
-type WalletWindow = Window & {
-  keplr?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-  getOfflineSigner?: (chainId: string) => OfflineSigner
-  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
-}
 
 type DelegationItem = {
   validator: string
@@ -64,24 +47,6 @@ const estimateFallbackFeeMicro = (
   return BigInt(Math.ceil(gas * GAS_PRICE_MICRO_LUNC))
 }
 
-const getWalletInstance = () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
-}
-
-const getOfflineSigner = async () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  if (walletWindow.getOfflineSignerAuto) {
-    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  return undefined
-}
-
 const StakeManageModal = ({
   open,
   onClose,
@@ -89,7 +54,7 @@ const StakeManageModal = ({
   active,
   available
 }: StakeManageModalProps) => {
-  const { account, startTx, finishTx, failTx } = useWallet()
+  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const accountAddress = account?.address
   const [tab, setTab] = useState<"Delegate" | "Redelegate" | "Undelegate">(
     "Delegate"
@@ -207,16 +172,8 @@ const StakeManageModal = ({
         setFeeMicro(fallbackFeeMicro)
       }
       try {
-        const wallet = getWalletInstance()
-        if (!wallet) throw new Error("Wallet extension not available")
-        if (wallet.experimentalSuggestChain) {
-          await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-        }
-        if (wallet.enable) {
-          await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-        }
-        const signer = await getOfflineSigner()
-        if (!signer) throw new Error("Wallet signer not available")
+        if (!connectorId) throw new Error("Wallet not connected")
+        const signer = await getOfflineSignerForConnector(connectorId)
 
         const msg =
           tab === "Redelegate"
@@ -294,6 +251,7 @@ const StakeManageModal = ({
     accountAddress,
     activeValidator?.validator,
     amount,
+    connectorId,
     open,
     source,
     tab
@@ -330,16 +288,8 @@ const StakeManageModal = ({
       setSubmitting(true)
       setSubmitError(undefined)
       startTx(`${tab} stake`)
-      const wallet = getWalletInstance()
-      if (!wallet) throw new Error("Wallet extension not available")
-      if (wallet.experimentalSuggestChain) {
-        await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-      }
-      if (wallet.enable) {
-        await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-      }
-      const signer = await getOfflineSigner()
-      if (!signer) throw new Error("Wallet signer not available")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signer = await getOfflineSignerForConnector(connectorId)
 
       const msg =
         tab === "Redelegate"

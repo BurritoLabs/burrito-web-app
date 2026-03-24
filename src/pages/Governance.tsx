@@ -6,14 +6,17 @@ import PageShell from "./PageShell"
 import Tabs from "../components/Tabs"
 import styles from "./Governance.module.css"
 import {
+  fetchDepositParams,
   fetchProposals,
   fetchProposalTally,
   fetchStakingPool,
-  fetchTallyParams
+  fetchTallyParams,
+  fetchVotingParams
 } from "../app/data/classic"
-import type { ProposalItem } from "../app/data/classic"
+import type { GovDepositParams, GovVotingParams, ProposalItem } from "../app/data/classic"
 import {
-  formatTimestamp
+  formatTimestamp,
+  formatTokenAmount
 } from "../app/utils/format"
 
 const Governance = () => {
@@ -34,6 +37,18 @@ const Governance = () => {
   const { data: tallyParams } = useQuery({
     queryKey: ["govTallyParams"],
     queryFn: fetchTallyParams,
+    staleTime: 10 * 60 * 1000
+  })
+
+  const { data: depositParams } = useQuery<GovDepositParams>({
+    queryKey: ["govDepositParams"],
+    queryFn: fetchDepositParams,
+    staleTime: 10 * 60 * 1000
+  })
+
+  const { data: votingParams } = useQuery<GovVotingParams>({
+    queryKey: ["govVotingParams"],
+    queryFn: fetchVotingParams,
     staleTime: 10 * 60 * 1000
   })
 
@@ -101,6 +116,25 @@ const Governance = () => {
       return 0n
     }
   }
+
+  const formatDurationLabel = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "--"
+    const days = seconds / 86_400
+    if (Number.isInteger(days) && days >= 1) {
+      return `${days} day${days === 1 ? "" : "s"}`
+    }
+    const hours = seconds / 3_600
+    if (Number.isInteger(hours) && hours >= 1) {
+      return `${hours} hour${hours === 1 ? "" : "s"}`
+    }
+    const minutes = Math.max(1, Math.round(seconds / 60))
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`
+  }
+
+  const minDepositMicro = useMemo(() => {
+    const item = depositParams?.minDeposit?.find((coin) => coin.denom === "uluna")
+    return toBigInt(item?.amount)
+  }, [depositParams?.minDeposit])
 
   const chainFilters = (
     <div className={styles.panelHeader}>
@@ -185,85 +219,146 @@ const Governance = () => {
     const thresholdX = threshold * determinantThreshold
     const votedBarWidth = Math.min(100, votedRatio * 100)
     const markerLeft = Math.min(100, thresholdX * votedRatio * 100)
+    const isDepositCard = statusLabel === "Deposit"
+    const currentDepositBig = toBigInt(proposal.deposit)
+    const depositProgressRatio =
+      minDepositMicro <= 0n
+        ? 0
+        : Math.min(
+            1,
+            Number((currentDepositBig * 10000n) / minDepositMicro) / 10000
+          )
+    const depositProgressPercent = `${(depositProgressRatio * 100).toFixed(2)}%`
+    const remainingDepositBig =
+      minDepositMicro > currentDepositBig ? minDepositMicro - currentDepositBig : 0n
+    const detailState = { from: `${location.pathname}${location.search}` }
+    const depositActionState = {
+      from: `${location.pathname}${location.search}`,
+      openDeposit: true
+    }
     return (
-      <Link
-        key={proposal.id}
-        className={styles.proposalLink}
-        to={`/proposal/${proposal.id}`}
-        state={{ from: `${location.pathname}${location.search}` }}
-      >
-        <div className={`card ${styles.proposalCard}`}>
-        <div className={styles.proposalMetaRow}>
-          <div className={styles.proposalMetaLeft}>
-            <span className={styles.proposalMetaText}>
-              #{proposal.id} | {formatProposalType(proposal.contentType)}
+      <div className={`card ${styles.proposalCard}`}>
+        <Link
+          key={proposal.id}
+          className={styles.proposalLink}
+          to={`/proposal/${proposal.id}`}
+          state={detailState}
+        >
+          <div className={styles.proposalMetaRow}>
+            <div className={styles.proposalMetaLeft}>
+              <span className={styles.proposalMetaText}>
+                #{proposal.id} | {formatProposalType(proposal.contentType)}
+              </span>
+            </div>
+            <span className={`${styles.statusPill} ${statusClass}`}>
+              {statusLabel}
             </span>
           </div>
-          <span className={`${styles.statusPill} ${statusClass}`}>
-            {statusLabel}
-          </span>
-        </div>
 
-        <div className={styles.proposalTitle}>{proposal.title}</div>
-        <div className={styles.proposalTime}>
-          {proposal.submitTime
-            ? `Submitted ${formatTimestamp(proposal.submitTime)}`
-            : "Status update --"}
-        </div>
-
-        <div className={styles.progressBlock}>
-          <div className={styles.progressLabel}>
-            Voted / Bonded
-            <span className={styles.progressValue}>{votedPercent}</span>
+          <div className={styles.proposalTitle}>{proposal.title}</div>
+          <div className={styles.proposalTime}>
+            {proposal.submitTime
+              ? `Submitted ${formatTimestamp(proposal.submitTime)}`
+              : "Status update --"}
           </div>
-            <div className={styles.progressTrack}>
-              <div
-                className={styles.votedBar}
-                style={{ width: `${votedBarWidth}%` }}
-              >
+
+          {isDepositCard ? (
+            <div className={styles.progressBlock}>
+              <div className={styles.progressLabel}>
+                Deposited / Minimum
+                <span className={styles.progressValue}>{depositProgressPercent}</span>
+              </div>
+              <div className={styles.progressTrack}>
                 <div
-                  className={`${styles.progressSegment} ${styles.segmentYes}`}
-                  style={{ width: `${byVoted.yes * 100}%` }}
-                />
-                <div
-                  className={`${styles.progressSegment} ${styles.segmentNo}`}
-                  style={{ width: `${byVoted.no * 100}%` }}
-                />
-                <div
-                  className={`${styles.progressSegment} ${styles.segmentVeto}`}
-                  style={{ width: `${byVoted.veto * 100}%` }}
-                />
-                <div
-                  className={`${styles.progressSegment} ${styles.segmentAbstain}`}
-                  style={{ width: `${byVoted.abstain * 100}%` }}
+                  className={styles.depositBar}
+                  style={{ width: `${depositProgressRatio * 100}%` }}
                 />
               </div>
-              {Number.isFinite(markerLeft) && markerLeft > 0 ? (
-                <span
-                  className={styles.progressMarker}
-                  style={{ left: `${markerLeft}%` }}
-                />
-              ) : null}
+              <div className={styles.depositMeta}>
+                <span>
+                  {formatTokenAmount(currentDepositBig.toString(), 6, 2)} /{" "}
+                  {formatTokenAmount(minDepositMicro.toString(), 6, 2)} LUNC
+                </span>
+                <span>
+                  {remainingDepositBig > 0n
+                    ? `${formatTokenAmount(
+                        remainingDepositBig.toString(),
+                        6,
+                        2
+                      )} LUNC remaining`
+                    : "Minimum reached"}
+                </span>
+              </div>
             </div>
-        </div>
+          ) : (
+            <div className={styles.progressBlock}>
+              <div className={styles.progressLabel}>
+                Voted / Bonded
+                <span className={styles.progressValue}>{votedPercent}</span>
+              </div>
+              <div className={styles.progressTrack}>
+                <div
+                  className={styles.votedBar}
+                  style={{ width: `${votedBarWidth}%` }}
+                >
+                  <div
+                    className={`${styles.progressSegment} ${styles.segmentYes}`}
+                    style={{ width: `${byVoted.yes * 100}%` }}
+                  />
+                  <div
+                    className={`${styles.progressSegment} ${styles.segmentNo}`}
+                    style={{ width: `${byVoted.no * 100}%` }}
+                  />
+                  <div
+                    className={`${styles.progressSegment} ${styles.segmentVeto}`}
+                    style={{ width: `${byVoted.veto * 100}%` }}
+                  />
+                  <div
+                    className={`${styles.progressSegment} ${styles.segmentAbstain}`}
+                    style={{ width: `${byVoted.abstain * 100}%` }}
+                  />
+                </div>
+                {Number.isFinite(markerLeft) && markerLeft > 0 ? (
+                  <span
+                    className={styles.progressMarker}
+                    style={{ left: `${markerLeft}%` }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          )}
+        </Link>
 
         <div className={styles.proposalFooter}>
           <span>
-            {proposal.votingEndTime
+            {isDepositCard
+              ? proposal.depositEndTime
+                ? `Ends ${formatTimestamp(proposal.depositEndTime)}`
+                : "--"
+              : proposal.votingEndTime
               ? `Ends ${formatTimestamp(proposal.votingEndTime)}`
               : "--"}
           </span>
           {actionLabel ? (
-            <button
-              className={`uiButton uiButtonOutline ${styles.proposalAction}`}
-              type="button"
-            >
-              {actionLabel}
-            </button>
+            isDepositCard ? (
+              <Link
+                className={`uiButton uiButtonOutline ${styles.proposalAction}`}
+                to={`/proposal/${proposal.id}`}
+                state={depositActionState}
+              >
+                {actionLabel}
+              </Link>
+            ) : (
+              <button
+                className={`uiButton uiButtonOutline ${styles.proposalAction}`}
+                type="button"
+              >
+                {actionLabel}
+              </button>
+            )
           ) : null}
         </div>
-        </div>
-      </Link>
+      </div>
     )
   }
 
@@ -295,15 +390,27 @@ const Governance = () => {
     <div className={`card ${styles.rulesCard}`}>
       <div className={styles.rulesItem}>
         <div className={styles.rulesLabel}>Minimum deposit</div>
-        <div className={styles.rulesValue}>5,000,000 LUNC</div>
+        <div className={styles.rulesValue}>
+          {minDepositMicro > 0n
+            ? `${formatTokenAmount(minDepositMicro.toString(), 6, 0)} LUNC`
+            : "--"}
+        </div>
       </div>
       <div className={styles.rulesItem}>
         <div className={styles.rulesLabel}>Maximum deposit period</div>
-        <div className={styles.rulesValue}>7 days</div>
+        <div className={styles.rulesValue}>
+          {depositParams?.maxDepositPeriodSeconds
+            ? formatDurationLabel(depositParams.maxDepositPeriodSeconds)
+            : "--"}
+        </div>
       </div>
       <div className={styles.rulesItem}>
         <div className={styles.rulesLabel}>Voting period</div>
-        <div className={styles.rulesValue}>7 days</div>
+        <div className={styles.rulesValue}>
+          {votingParams?.votingPeriodSeconds
+            ? formatDurationLabel(votingParams.votingPeriodSeconds)
+            : "--"}
+        </div>
       </div>
     </div>
   )

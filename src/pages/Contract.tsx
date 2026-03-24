@@ -2,7 +2,6 @@ import { useMemo, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toUtf8 } from "@cosmjs/encoding"
-import type { OfflineSigner } from "@cosmjs/proto-signing"
 import {
   MsgClearAdmin,
   MsgExecuteContract,
@@ -18,10 +17,10 @@ import {
   fetchContractInitMsg,
   queryContractSmart
 } from "../app/data/classic"
-import { CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
+import { CLASSIC_DENOMS } from "../app/chain"
 import { truncateHash } from "../app/utils/format"
-import { connectClassicSigningClient } from "../app/wallet/signingClient"
 import { useWallet } from "../app/wallet/WalletContext"
+import { connectClassicSigningClientForConnector } from "../app/wallet/walletAdapters"
 
 type IconProps = {
   className?: string
@@ -38,37 +37,6 @@ const DEFAULT_QUERY = '{\n  "token_info": {}\n}'
 const DEFAULT_INSTANTIATE_MSG = '{\n  "count": 0\n}'
 const DEFAULT_EXECUTE_MSG = "{\n  \n}"
 const DEFAULT_MIGRATE_MSG = "{\n  \n}"
-
-type InjectedWallet = {
-  enable?: (chainId: string) => Promise<void>
-  experimentalSuggestChain?: (config: unknown) => Promise<void>
-}
-
-type WalletWindow = Window & {
-  keplr?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-  getOfflineSigner?: (chainId: string) => OfflineSigner
-  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
-}
-
-const getWalletInstance = () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
-}
-
-const getOfflineSigner = async () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  if (walletWindow.getOfflineSignerAuto) {
-    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  return undefined
-}
 
 const toMicroAmount = (value: string) => {
   const num = Number(value)
@@ -153,7 +121,7 @@ const FinderAddressLink = ({
 )
 
 const Contract = () => {
-  const { account, startTx, finishTx, failTx } = useWallet()
+  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const queryClient = useQueryClient()
   const [address, setAddress] = useState("")
   const [queryOpen, setQueryOpen] = useState(false)
@@ -328,17 +296,8 @@ const Contract = () => {
   }
 
   const connectClient = async () => {
-    const wallet = getWalletInstance()
-    if (!wallet) throw new Error("Wallet extension not available")
-    if (wallet.experimentalSuggestChain) {
-      await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-    }
-    if (wallet.enable) {
-      await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-    }
-    const signer = await getOfflineSigner()
-    if (!signer) throw new Error("Wallet signer not available")
-    return connectClassicSigningClient(signer)
+    if (!connectorId) throw new Error("Wallet not connected")
+    return connectClassicSigningClientForConnector(connectorId)
   }
 
   const handleUploadSubmit = async (event: FormEvent<HTMLFormElement>) => {

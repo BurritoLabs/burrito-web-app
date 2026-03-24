@@ -236,6 +236,163 @@
   gap: 40px;
 }
 
+.depositBody {
+  display: grid;
+  gap: 18px;
+}
+
+.depositSummary {
+  display: grid;
+  gap: 16px;
+}
+
+.depositSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.depositMetric {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.depositMetricLabel {
+  font-size: var(--font-size-xxs);
+  color: rgba(234, 245, 235, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.depositMetricValue {
+  font-size: var(--font-size-small);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.depositProgressBlock {
+  display: grid;
+  gap: 10px;
+}
+
+.depositProgressHeader,
+.depositProgressMeta,
+.depositModalRow,
+.depositFieldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.depositProgressLabel,
+.depositFieldLabel {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.72);
+}
+
+.depositProgressValue {
+  font-size: var(--font-size-small);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.depositProgressTrack {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.depositProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(246, 195, 67, 0.72), rgba(246, 195, 67, 1));
+}
+
+.depositProgressMeta {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.62);
+}
+
+.depositModalSummary {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.depositModalRow {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.72);
+}
+
+.depositModalRow strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.depositField {
+  display: grid;
+  gap: 10px;
+}
+
+.depositMaxButton {
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.depositAmountWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.depositAmountInput {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.depositAmountInput::placeholder {
+  color: rgba(234, 245, 235, 0.28);
+}
+
+.depositAmountDenom {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.7);
+  font-weight: 600;
+}
+
+.depositFieldHint,
+.depositModalHint {
+  font-size: var(--font-size-small);
+  color: rgba(234, 245, 235, 0.62);
+}
+
 
 .emptyState {
   font-size: var(--font-size-small);
@@ -830,6 +987,10 @@
     grid-template-columns: 1fr;
   }
 
+  .depositSummaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .voteGrid {
     grid-template-columns: 1fr;
   }
@@ -846,5 +1007,21 @@
 
   .voteOptionList {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .depositSummaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .depositProgressMeta,
+  .depositFieldHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .depositAmountInput {
+    font-size: 24px;
   }
 }

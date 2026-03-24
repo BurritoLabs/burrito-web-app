@@ -7,6 +7,7 @@ import ConnectModal from "../wallet/ConnectModal"
 import WalletAddressesModal from "../wallet/WalletAddressesModal"
 import { WalletIcon } from "../icons"
 import { useWallet } from "../wallet/WalletContext"
+import { getWalletConnectorLabel } from "../wallet/walletAdapters"
 import { CLASSIC_CHAIN } from "../chain"
 import { fetchValidator } from "../data/classic"
 import { convertBech32Prefix } from "../utils/bech32"
@@ -33,13 +34,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
       }
     | null
   >(null)
-  const walletName =
-    account?.name?.trim() ||
-    (connectorId === "keplr"
-      ? "Keplr"
-      : connectorId === "galaxy"
-      ? "Galaxy Station"
-      : "")
+  const walletName = account?.name?.trim() || getWalletConnectorLabel(connectorId)
   const connectLabel = account
     ? walletName ||
       `${account.address.slice(0, 6)}...${account.address.slice(-4)}`

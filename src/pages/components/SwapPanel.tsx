@@ -2,19 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
-import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
 import styles from "../Swap.module.css"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../../app/chain"
+import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import { fetchBalances, fetchPrices } from "../../app/data/classic"
 import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
 import { useCw20Balances } from "../../app/data/cw20"
 import { useResolvedCw20Whitelist } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
-import { connectClassicSigningClient } from "../../app/wallet/signingClient"
 import { useWallet } from "../../app/wallet/WalletContext"
+import { connectClassicSigningClientForConnector } from "../../app/wallet/walletAdapters"
 
 type AssetType = "native" | "cw20"
 type DexId = string
@@ -67,19 +66,6 @@ type HexxagonDexPair = {
   dex?: string
   type?: string
   assets?: string[]
-}
-
-type InjectedWallet = {
-  enable: (chainId: string) => Promise<void>
-  experimentalSuggestChain?: (config: unknown) => Promise<void>
-}
-
-type WalletWindow = Window & {
-  keplr?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-  getOfflineSigner?: (chainId: string) => OfflineSigner
-  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
 }
 
 const asNativeId = (denom: string) => `native:${denom}`
@@ -467,24 +453,6 @@ const estimateFallbackFeeMicro = (offerAsset: SwapAsset, includePlatformFee: boo
   return BigInt(Math.ceil((swapGas + feeGas) * GAS_PRICE_MICRO_LUNC))
 }
 
-const getWalletInstance = () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
-}
-
-const getOfflineSigner = async (): Promise<OfflineSigner | undefined> => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  if (walletWindow.getOfflineSignerAuto) {
-    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  return undefined
-}
-
 const getAmountDensity = (value?: string) => {
   const text = String(value ?? "").trim()
   if (!text || text === "--") return "default" as const
@@ -552,6 +520,7 @@ const SwapPanel = ({
 }: SwapPanelProps) => {
   const {
     account,
+    connectorId,
     connectors,
     connect,
     startTx,
@@ -1055,11 +1024,8 @@ const SwapPanel = ({
     const timer = window.setTimeout(async () => {
       setFeeLoading(true)
       try {
-        const wallet = getWalletInstance()
-        if (!wallet) throw new Error("Wallet extension not available")
-        const signer = await getOfflineSigner()
-        if (!signer) throw new Error("Wallet signer not available")
-        const client = await connectClassicSigningClient(signer)
+        if (!connectorId) throw new Error("Wallet not connected")
+        const client = await connectClassicSigningClientForConnector(connectorId)
         const feeMsg = buildPlatformFeeMessage(accountAddress, quoteFromAsset, platformFeeMicro)
         const msg = buildSwapMessage(
           accountAddress,
@@ -1091,6 +1057,7 @@ const SwapPanel = ({
     }
   }, [
     accountAddress,
+    connectorId,
     feeQuote,
     maxSpread,
     platformFeeMicro,
@@ -1158,11 +1125,8 @@ const SwapPanel = ({
     setSubmitLoading(true)
     try {
       startTx("Swap")
-      const wallet = getWalletInstance()
-      if (!wallet) throw new Error("Wallet extension not available")
-      const signer = await getOfflineSigner()
-      if (!signer) throw new Error("Wallet signer not available")
-      const client = await connectClassicSigningClient(signer)
+      if (!connectorId) throw new Error("Wallet not connected")
+      const client = await connectClassicSigningClientForConnector(connectorId)
 
       const feeMsg = buildPlatformFeeMessage(accountAddress, fromAsset, platformFeeMicro)
       const msg = buildSwapMessage(

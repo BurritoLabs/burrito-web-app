@@ -2,6 +2,10 @@ import { createPortal } from "react-dom"
 import { useState } from "react"
 import styles from "./ConnectModal.module.css"
 import { useWallet } from "./WalletContext"
+import {
+  getWalletConnectorBadge,
+  getWalletConnectorLabel
+} from "./walletAdapters"
 
 type ConnectModalProps = {
   open: boolean
@@ -19,9 +23,8 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
 
   const walletLabel = account?.name?.trim()
     ? account.name.trim()
-    : connectors.find((item) => item.id === connectorId)?.label ?? "Wallet"
-  const walletBadge =
-    connectorId === "keplr" ? "K" : connectorId === "galaxy" ? "G" : "W"
+    : getWalletConnectorLabel(connectorId)
+  const walletBadge = getWalletConnectorBadge(connectorId)
   const finderUrl = account
     ? `https://finder.burrito.money/classic/address/${account.address}`
     : ""

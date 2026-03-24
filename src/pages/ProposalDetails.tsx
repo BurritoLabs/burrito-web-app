@@ -10,13 +10,14 @@ import {
 import { createPortal } from "react-dom"
 import { useLocation, useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
-import { MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
+import { MsgDeposit, MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./ProposalDetails.module.css"
 import {
+  fetchBalances,
+  fetchDepositParams,
   fetchProposalById,
   fetchProposalDeposits,
   fetchProposalTally,
@@ -30,17 +31,17 @@ import {
 } from "../app/data/classic"
 import {
   formatTimestamp,
+  toUnitAmount,
   formatTokenAmount,
   truncateHash
 } from "../app/utils/format"
 import { convertBech32Prefix } from "../app/utils/bech32"
-import {
-  CLASSIC_CHAIN,
-  CLASSIC_DENOMS,
-  KEPLR_CHAIN_CONFIG
-} from "../app/chain"
+import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
 import { useWallet } from "../app/wallet/WalletContext"
+import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
 import type {
+  CoinBalance,
+  GovDepositParams,
   GovTally,
   GovTallyParams,
   ProposalDeposit,
@@ -52,22 +53,10 @@ import type {
 
 const GAS_PRICE_MICRO = 28.325
 const VOTE_GAS_LIMIT = 220000
+const DEPOSIT_GAS_LIMIT = 220000
 const KEYBASE_PROXY_URL = import.meta.env.DEV
   ? "/keybase"
   : "https://keybase.burrito.money"
-
-type InjectedWallet = {
-  enable?: (chainId: string) => Promise<void>
-  experimentalSuggestChain?: (config: unknown) => Promise<void>
-}
-
-type WalletWindow = Window & {
-  keplr?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-  getOfflineSigner?: (chainId: string) => OfflineSigner
-  getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
-}
 
 type SummaryMap = Record<string, unknown>
 type SummaryCoin = { denom: string; amount: string | number | bigint }
@@ -82,29 +71,28 @@ const isSummaryCoin = (value: unknown): value is SummaryCoin =>
     typeof value.amount === "number" ||
     typeof value.amount === "bigint")
 
-const getWalletInstance = () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  return walletWindow.keplr ?? walletWindow.station ?? walletWindow.galaxyStation
-}
-
-const getOfflineSigner = async () => {
-  if (typeof window === "undefined") return undefined
-  const walletWindow = window as WalletWindow
-  if (walletWindow.getOfflineSignerAuto) {
-    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
-  }
-  return undefined
-}
-
 const parseSequenceMismatchExpected = (message: string) => {
   const matched = message.match(/expected\s+(\d+)\s*,\s*got\s+\d+/i)
   if (!matched) return undefined
   const value = Number(matched[1])
   return Number.isFinite(value) ? value : undefined
+}
+
+const toSafeBigInt = (value?: string | number | bigint) => {
+  try {
+    if (value === undefined || value === null || value === "") return 0n
+    if (typeof value === "bigint") return value
+    if (typeof value === "number") return BigInt(Math.trunc(value))
+    return BigInt(value)
+  } catch {
+    return 0n
+  }
+}
+
+const toMicroAmount = (value: string) => {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return "0"
+  return Math.floor(num * 1_000_000).toString()
 }
 
 type VoteChoice = "YES" | "NO" | "NO_WITH_VETO" | "ABSTAIN"
@@ -121,11 +109,15 @@ const ProposalDetails = () => {
   const proposalId = params.id ?? ""
   const location = useLocation()
   const queryClient = useQueryClient()
-  const { account, startTx, finishTx, failTx } = useWallet()
+  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const [voteModalOpen, setVoteModalOpen] = useState(false)
   const [voteChoice, setVoteChoice] = useState<VoteChoice>("YES")
   const [voteSubmitting, setVoteSubmitting] = useState(false)
   const [voteError, setVoteError] = useState<string>()
+  const [depositModalOpen, setDepositModalOpen] = useState(false)
+  const [depositAmount, setDepositAmount] = useState("")
+  const [depositSubmitting, setDepositSubmitting] = useState(false)
+  const [depositError, setDepositError] = useState<string>()
 
   const { data: proposal } = useQuery<ProposalItem>({
     queryKey: ["proposal", proposalId],
@@ -158,6 +150,18 @@ const ProposalDetails = () => {
     enabled: Boolean(proposalId),
     refetchInterval: 30_000,
     refetchIntervalInBackground: true
+  })
+
+  const { data: depositParams } = useQuery<GovDepositParams>({
+    queryKey: ["govDepositParams"],
+    queryFn: fetchDepositParams,
+    staleTime: 10 * 60 * 1000
+  })
+
+  const { data: balances = [] } = useQuery<CoinBalance[]>({
+    queryKey: ["balances", account?.address],
+    queryFn: () => fetchBalances(account?.address ?? ""),
+    enabled: Boolean(account?.address)
   })
 
   const { data: validators = [] } = useQuery<ValidatorItem[]>({
@@ -538,6 +542,148 @@ const ProposalDetails = () => {
     }
   })()
 
+  const luncBalance = useMemo(() => {
+    const item = balances.find(
+      (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+    )
+    return item?.amount ?? "0"
+  }, [balances])
+
+  const minDepositCoins = useMemo(
+    () => depositParams?.minDeposit ?? [],
+    [depositParams?.minDeposit]
+  )
+
+  const depositTotals = useMemo(() => {
+    const totals = new Map<string, bigint>()
+    deposits.forEach((deposit) => {
+      deposit.amount.forEach((coin) => {
+        const current = totals.get(coin.denom) ?? 0n
+        totals.set(coin.denom, current + toSafeBigInt(coin.amount))
+      })
+    })
+
+    const proposalDepositMicro = toSafeBigInt(proposal?.deposit)
+    if (proposalDepositMicro > 0n) {
+      const current = totals.get(CLASSIC_DENOMS.lunc.coinMinimalDenom) ?? 0n
+      if (proposalDepositMicro > current) {
+        totals.set(CLASSIC_DENOMS.lunc.coinMinimalDenom, proposalDepositMicro)
+      }
+    }
+    return totals
+  }, [deposits, proposal?.deposit])
+
+  const primaryDepositDenom =
+    minDepositCoins[0]?.denom ?? CLASSIC_DENOMS.lunc.coinMinimalDenom
+
+  const currentDepositMicro =
+    depositTotals.get(primaryDepositDenom) ??
+    (primaryDepositDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+      ? toSafeBigInt(proposal?.deposit)
+      : 0n)
+
+  const minDepositMicro =
+    toSafeBigInt(
+      minDepositCoins.find((coin) => coin.denom === primaryDepositDenom)?.amount
+    ) || toSafeBigInt(minDepositCoins[0]?.amount)
+
+  const remainingDepositMicro =
+    minDepositMicro > currentDepositMicro
+      ? minDepositMicro - currentDepositMicro
+      : 0n
+
+  const depositProgressPercent =
+    minDepositMicro <= 0n
+      ? 0
+      : Math.min(
+          100,
+          Number((currentDepositMicro * 10000n) / minDepositMicro) / 100
+        )
+
+  const currentDepositCoins = useMemo(() => {
+    if (depositTotals.size) {
+      return Array.from(depositTotals.entries()).map(([denom, amount]) => ({
+        denom,
+        amount: amount.toString()
+      }))
+    }
+    const proposalDepositMicro = toSafeBigInt(proposal?.deposit)
+    if (proposalDepositMicro <= 0n) return []
+    return [
+      {
+        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+        amount: proposalDepositMicro.toString()
+      }
+    ]
+  }, [depositTotals, proposal?.deposit])
+
+  const minDepositLabel = useMemo(
+    () =>
+      minDepositCoins.length
+        ? formatCoinList(minDepositCoins)
+        : `-- ${formatDenom(primaryDepositDenom)}`,
+    [minDepositCoins, primaryDepositDenom]
+  )
+
+  const currentDepositLabel = useMemo(
+    () =>
+      currentDepositCoins.length
+        ? formatCoinList(currentDepositCoins)
+        : `0 ${formatDenom(primaryDepositDenom)}`,
+    [currentDepositCoins, primaryDepositDenom]
+  )
+
+  const remainingDepositLabel = useMemo(
+    () =>
+      remainingDepositMicro > 0n
+        ? `${formatTokenAmount(
+            remainingDepositMicro.toString(),
+            6,
+            2
+          )} ${formatDenom(primaryDepositDenom)}`
+        : `0 ${formatDenom(primaryDepositDenom)}`,
+    [primaryDepositDenom, remainingDepositMicro]
+  )
+
+  const luncBalanceLabel = useMemo(
+    () =>
+      `${formatTokenAmount(
+        luncBalance,
+        6,
+        2
+      )} ${CLASSIC_DENOMS.lunc.coinDenom}`,
+    [luncBalance]
+  )
+
+  const depositStats = useMemo(() => {
+    const progress = depositProgressPercent.toFixed(2)
+    const maxPeriodSeconds = depositParams?.maxDepositPeriodSeconds ?? 0
+    return {
+      current: currentDepositLabel,
+      minimum: minDepositLabel,
+      remaining: remainingDepositLabel,
+      progressLabel: `${progress}% funded`,
+      maxPeriod:
+        maxPeriodSeconds > 0 ? formatDurationLabel(maxPeriodSeconds) : "--"
+    }
+  }, [
+    currentDepositLabel,
+    depositParams?.maxDepositPeriodSeconds,
+    depositProgressPercent,
+    minDepositLabel,
+    remainingDepositLabel
+  ])
+
+  const depositAmountMicro = useMemo(
+    () => toSafeBigInt(toMicroAmount(depositAmount)),
+    [depositAmount]
+  )
+
+  const depositAmountValue = useMemo(
+    () => toUnitAmount(depositAmountMicro.toString(), 6),
+    [depositAmountMicro]
+  )
+
   const tallyStats = useMemo(() => {
     const safeRatio = (num: bigint, den: bigint) => {
       try {
@@ -647,8 +793,23 @@ const ProposalDetails = () => {
   ]
 
   const isVotingPeriod = statusLabel === "Voting"
+  const isDepositPeriod = statusLabel === "Deposit"
   const canVote = isVotingPeriod && Boolean(account?.address)
-  const actionLabel = isVotingPeriod ? (canVote ? "Vote" : "Connect wallet") : null
+  const canDeposit = isDepositPeriod && Boolean(account?.address)
+  const actionLabel = isVotingPeriod
+    ? canVote
+      ? "Vote"
+      : "Connect wallet"
+    : isDepositPeriod
+    ? canDeposit
+      ? "Deposit"
+      : "Connect wallet"
+    : null
+  const actionDisabled = isVotingPeriod
+    ? !canVote
+    : isDepositPeriod
+    ? !canDeposit
+    : true
 
   const backTo =
     (location.state as { from?: string } | undefined)?.from ?? "/gov"
@@ -664,15 +825,7 @@ const ProposalDetails = () => {
       setVoteSubmitting(true)
       setVoteError(undefined)
       startTx("Vote proposal")
-
-      const wallet = getWalletInstance()
-      if (!wallet) throw new Error("Wallet extension not available")
-      if (wallet.experimentalSuggestChain) {
-        await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-      }
-      if (wallet.enable) {
-        await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-      }
+      if (!connectorId) throw new Error("Wallet not connected")
       let proposalIdValue: bigint
       try {
         proposalIdValue = BigInt(proposalId)
@@ -709,8 +862,7 @@ const ProposalDetails = () => {
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const signer = await getOfflineSigner()
-          if (!signer) throw new Error("Wallet signer not available")
+          const signer = await getOfflineSignerForConnector(connectorId)
 
           const client = await SigningStargateClient.connectWithSigner(
             CLASSIC_CHAIN.rpc,
@@ -775,10 +927,163 @@ const ProposalDetails = () => {
     }
   }
 
+  const depositValidationMessage = useMemo(() => {
+    if (!account?.address) return "Please connect a wallet first."
+    if (depositAmountMicro <= 0n) return "Enter an amount greater than zero."
+    if (depositAmountMicro > toSafeBigInt(luncBalance)) {
+      return "Insufficient LUNC balance."
+    }
+    return undefined
+  }, [account?.address, depositAmountMicro, luncBalance])
+
+  const submitDeposit = async () => {
+    if (!proposalId) return
+    if (!account?.address) {
+      setDepositError("Please connect a wallet first.")
+      return
+    }
+    if (depositAmountMicro <= 0n) {
+      setDepositError("Enter an amount greater than zero.")
+      return
+    }
+    if (depositAmountMicro > toSafeBigInt(luncBalance)) {
+      setDepositError("Insufficient LUNC balance.")
+      return
+    }
+
+    try {
+      setDepositSubmitting(true)
+      setDepositError(undefined)
+      startTx("Deposit proposal")
+      if (!connectorId) throw new Error("Wallet not connected")
+
+      let proposalIdValue: bigint
+      try {
+        proposalIdValue = BigInt(proposalId)
+      } catch {
+        throw new Error("Invalid proposal id")
+      }
+
+      const msg = {
+        typeUrl: "/cosmos.gov.v1beta1.MsgDeposit",
+        value: MsgDeposit.fromPartial({
+          proposalId: proposalIdValue,
+          depositor: account.address,
+          amount: [
+            {
+              denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+              amount: depositAmountMicro.toString()
+            }
+          ]
+        })
+      }
+
+      const feeAmount = Math.max(
+        1,
+        Math.ceil(DEPOSIT_GAS_LIMIT * GAS_PRICE_MICRO)
+      ).toString()
+      const fee = {
+        amount: [
+          {
+            amount: feeAmount,
+            denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+          }
+        ],
+        gas: String(DEPOSIT_GAS_LIMIT)
+      }
+
+      let sequenceHint: number | undefined
+      let result:
+        | Awaited<ReturnType<SigningStargateClient["broadcastTxSync"]>>
+        | undefined
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const signer = await getOfflineSignerForConnector(connectorId)
+          const client = await SigningStargateClient.connectWithSigner(
+            CLASSIC_CHAIN.rpc,
+            signer,
+            {
+              gasPrice: GasPrice.fromString(
+                `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
+              )
+            }
+          )
+          const signerState = await client.getSequence(account.address)
+          const sequenceToUse = sequenceHint ?? signerState.sequence
+
+          const signed = await client.sign(
+            account.address,
+            [msg],
+            fee,
+            "",
+            {
+              accountNumber: signerState.accountNumber,
+              sequence: Number(sequenceToUse),
+              chainId: CLASSIC_CHAIN.chainId
+            }
+          )
+          const txBytes = TxRaw.encode(signed).finish()
+          const txHash = await client.broadcastTxSync(txBytes)
+          if (!txHash) {
+            throw new Error("Deposit transaction failed")
+          }
+          result = txHash
+          break
+        } catch (innerErr) {
+          const message =
+            innerErr instanceof Error ? innerErr.message : String(innerErr)
+          const expectedSequence = parseSequenceMismatchExpected(message)
+          if (expectedSequence !== undefined && attempt < 2) {
+            sequenceHint = expectedSequence
+            await new Promise((resolve) => setTimeout(resolve, 220))
+            continue
+          }
+          throw innerErr
+        }
+      }
+
+      if (!result) {
+        throw new Error("Deposit transaction failed")
+      }
+
+      finishTx(result)
+      setDepositModalOpen(false)
+      setDepositAmount("")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["proposal", proposalId] }),
+        queryClient.invalidateQueries({
+          queryKey: ["proposalDeposits", proposalId]
+        }),
+        queryClient.invalidateQueries({ queryKey: ["proposals"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["balances", account.address]
+        })
+      ])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Deposit failed"
+      failTx(message)
+      setDepositError(message)
+    } finally {
+      setDepositSubmitting(false)
+    }
+  }
+
   useEffect(() => {
     if (!voteModalOpen) return
     setVoteError(undefined)
   }, [voteModalOpen])
+
+  useEffect(() => {
+    if (!depositModalOpen) return
+    setDepositError(undefined)
+  }, [depositModalOpen])
+
+  useEffect(() => {
+    const state = location.state as { openDeposit?: boolean } | undefined
+    if (!state?.openDeposit || !isDepositPeriod) return
+    setDepositModalOpen(true)
+  }, [isDepositPeriod, location.state])
 
   return (
     <PageShell
@@ -790,8 +1095,16 @@ const ProposalDetails = () => {
           <button
             className="uiButton uiButtonPrimary"
             type="button"
-            onClick={() => setVoteModalOpen(true)}
-            disabled={!canVote}
+            onClick={() => {
+              if (isVotingPeriod) {
+                setVoteModalOpen(true)
+                return
+              }
+              if (isDepositPeriod) {
+                setDepositModalOpen(true)
+              }
+            }}
+            disabled={actionDisabled}
           >
             {actionLabel}
           </button>
@@ -886,22 +1199,80 @@ const ProposalDetails = () => {
       {statusLabel === "Deposit" ? (
         <div className={`card ${styles.sectionCard}`}>
           <div className={styles.sectionHeader}>Deposits</div>
-          <div className={styles.sectionBody}>
+          <div className={`${styles.sectionBody} ${styles.depositBody}`}>
+            <div className={styles.depositSummary}>
+              <div className={styles.depositSummaryGrid}>
+                <div className={styles.depositMetric}>
+                  <div className={styles.depositMetricLabel}>Current deposited</div>
+                  <div className={styles.depositMetricValue}>
+                    {depositStats.current}
+                  </div>
+                </div>
+                <div className={styles.depositMetric}>
+                  <div className={styles.depositMetricLabel}>Minimum required</div>
+                  <div className={styles.depositMetricValue}>
+                    {depositStats.minimum}
+                  </div>
+                </div>
+                <div className={styles.depositMetric}>
+                  <div className={styles.depositMetricLabel}>Remaining</div>
+                  <div className={styles.depositMetricValue}>
+                    {depositStats.remaining}
+                  </div>
+                </div>
+                <div className={styles.depositMetric}>
+                  <div className={styles.depositMetricLabel}>Deposit period</div>
+                  <div className={styles.depositMetricValue}>
+                    {proposal?.depositEndTime
+                      ? `Ends ${formatTimestamp(proposal.depositEndTime)}`
+                      : depositStats.maxPeriod}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.depositProgressBlock}>
+                <div className={styles.depositProgressHeader}>
+                  <span className={styles.depositProgressLabel}>
+                    Deposit progress
+                  </span>
+                  <span className={styles.depositProgressValue}>
+                    {depositStats.progressLabel}
+                  </span>
+                </div>
+                <div className={styles.depositProgressTrack}>
+                  <div
+                    className={styles.depositProgressFill}
+                    style={{ width: `${depositProgressPercent}%` }}
+                  />
+                </div>
+                <div className={styles.depositProgressMeta}>
+                  {account?.address ? (
+                    <span>Your balance: {luncBalanceLabel}</span>
+                  ) : (
+                    <span>Connect a wallet to contribute to this proposal.</span>
+                  )}
+                  {canDeposit ? (
+                    <button
+                      type="button"
+                      className="uiButton uiButtonPrimary"
+                      onClick={() => setDepositModalOpen(true)}
+                    >
+                      Deposit
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
             {deposits.length ? (
               <div className={styles.list}>
-                {deposits.map((deposit) => (
-                  <div key={deposit.depositor} className={styles.listRow}>
+                {deposits.map((deposit, index) => (
+                  <div
+                    key={`${deposit.depositor}-${index}`}
+                    className={styles.listRow}
+                  >
                     <div className={styles.listName}>{deposit.depositor}</div>
-                    <div className={styles.listValue}>
-                      {deposit.amount
-                        .map(
-                          (coin) =>
-                            `${formatTokenAmount(coin.amount, 6, 2)} ${formatDenom(
-                              coin.denom
-                            )}`
-                        )
-                        .join(", ")}
-                    </div>
+                    <div className={styles.listValue}>{formatCoinList(deposit.amount)}</div>
                   </div>
                 ))}
               </div>
@@ -1153,6 +1524,144 @@ const ProposalDetails = () => {
         </div>
       </div>
 
+      {depositModalOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className={styles.voteModalBackdrop}
+              role="dialog"
+              aria-modal="true"
+              onClick={() => {
+                if (depositSubmitting) return
+                setDepositModalOpen(false)
+              }}
+            >
+              <div
+                className={styles.voteModal}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={styles.voteModalHeader}>
+                  <div className={styles.voteModalTitle}>Deposit to proposal</div>
+                  <button
+                    type="button"
+                    className={styles.voteModalClose}
+                    onClick={() => {
+                      if (depositSubmitting) return
+                      setDepositModalOpen(false)
+                    }}
+                    aria-label="Close deposit modal"
+                  >
+                    <span />
+                    <span />
+                  </button>
+                </div>
+
+                <div className={styles.voteModalBody}>
+                  <div className={styles.depositModalSummary}>
+                    <div className={styles.depositModalRow}>
+                      <span>Current deposited</span>
+                      <strong>{depositStats.current}</strong>
+                    </div>
+                    <div className={styles.depositModalRow}>
+                      <span>Minimum required</span>
+                      <strong>{depositStats.minimum}</strong>
+                    </div>
+                    <div className={styles.depositModalRow}>
+                      <span>Remaining</span>
+                      <strong>{depositStats.remaining}</strong>
+                    </div>
+                    <div className={styles.depositModalRow}>
+                      <span>Your balance</span>
+                      <strong>{luncBalanceLabel}</strong>
+                    </div>
+                  </div>
+
+                  <div className={styles.depositField}>
+                    <div className={styles.depositFieldHeader}>
+                      <label
+                        htmlFor="proposal-deposit-amount"
+                        className={styles.depositFieldLabel}
+                      >
+                        Deposit amount
+                      </label>
+                      <button
+                        type="button"
+                        className={styles.depositMaxButton}
+                        onClick={() =>
+                          setDepositAmount(formatAmountInput(luncBalance))
+                        }
+                        disabled={depositSubmitting}
+                      >
+                        Max
+                      </button>
+                    </div>
+                    <div className={styles.depositAmountWrap}>
+                      <input
+                        id="proposal-deposit-amount"
+                        className={styles.depositAmountInput}
+                        inputMode="decimal"
+                        type="text"
+                        value={depositAmount}
+                        onChange={(event) =>
+                          setDepositAmount(sanitizeDecimalInput(event.target.value))
+                        }
+                        placeholder="0.0"
+                        disabled={depositSubmitting}
+                      />
+                      <span className={styles.depositAmountDenom}>LUNC</span>
+                    </div>
+                    <div className={styles.depositFieldHint}>
+                      Deposit end:{" "}
+                      {proposal?.depositEndTime
+                        ? formatTimestamp(proposal.depositEndTime)
+                        : "--"}
+                    </div>
+                  </div>
+
+                  {depositError ? (
+                    <div className={styles.voteModalError}>{depositError}</div>
+                  ) : depositValidationMessage ? (
+                    <div className={styles.depositModalHint}>
+                      {depositValidationMessage}
+                    </div>
+                  ) : (
+                    <div className={styles.depositModalHint}>
+                      You will deposit{" "}
+                      {depositAmountValue > 0
+                        ? `${formatTokenAmount(
+                            depositAmountMicro.toString(),
+                            6,
+                            6
+                          )} LUNC`
+                        : "--"}
+                      .
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.voteModalActions}>
+                  <button
+                    type="button"
+                    className="uiButton uiButtonOutline"
+                    onClick={() => setDepositModalOpen(false)}
+                    disabled={depositSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="uiButton uiButtonPrimary"
+                    onClick={submitDeposit}
+                    disabled={depositSubmitting || Boolean(depositValidationMessage)}
+                  >
+                    {depositSubmitting ? "Submitting..." : "Deposit"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+
       {voteModalOpen && typeof document !== "undefined"
         ? createPortal(
             <div
@@ -1283,6 +1792,40 @@ const formatDenom = (denom: string) => {
     return f.slice(0, 2).toUpperCase() + "T"
   }
   return denom.toUpperCase()
+}
+
+const formatCoinList = (coins: CoinBalance[]) => {
+  if (!coins.length) return "--"
+  return coins
+    .map(
+      (coin) =>
+        `${formatTokenAmount(coin.amount, 6, 2)} ${formatDenom(coin.denom)}`
+    )
+    .join(", ")
+}
+
+const formatDurationLabel = (seconds: number) => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "--"
+  const days = seconds / 86_400
+  if (Number.isInteger(days) && days >= 1) return `${days} day${days === 1 ? "" : "s"}`
+  const hours = seconds / 3_600
+  if (Number.isInteger(hours) && hours >= 1)
+    return `${hours} hour${hours === 1 ? "" : "s"}`
+  const minutes = Math.max(1, Math.round(seconds / 60))
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`
+}
+
+const sanitizeDecimalInput = (value: string) => {
+  const cleaned = value.replace(/[^\d.]/g, "")
+  const [whole = "", ...fractionParts] = cleaned.split(".")
+  const fraction = fractionParts.join("").slice(0, 6)
+  return fractionParts.length ? `${whole}.${fraction}` : whole
+}
+
+const formatAmountInput = (microAmount: string) => {
+  const value = toUnitAmount(microAmount, 6)
+  if (!Number.isFinite(value) || value <= 0) return ""
+  return value.toFixed(6).replace(/\.?0+$/, "")
 }
 
 const formatVoteOption = (value: string) => {

@@ -5,33 +5,29 @@ import {
   useState
 } from "react"
 import type { ReactNode } from "react"
-import { KEPLR_CHAIN_CONFIG } from "../chain"
 import {
   WalletContext,
-  type TxState,
   type WalletAccount,
+  type TxState,
   type WalletConnector,
   type WalletConnectorId,
   type WalletContextValue,
   type WalletStatus
 } from "./WalletContext"
-
-type InjectedWallet = {
-  enable: (chainId: string) => Promise<void>
-  getKey: (chainId: string) => Promise<{ bech32Address: string; name?: string }>
-  experimentalSuggestChain?: (config: unknown) => Promise<void>
-}
-
-type InjectedWallets = {
-  keplr?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-}
+import {
+  connectWalletConnector,
+  getWalletConnectors,
+  isWalletConnectorAvailable
+} from "./walletAdapters"
 const STORAGE_KEY = "burritoWalletConnector"
 
-const getInjectedWallets = (): InjectedWallets => {
-  if (typeof window === "undefined") return {}
-  return window as Window & InjectedWallets
+const getStoredConnectorId = () => {
+  if (typeof window === "undefined") return undefined
+  const stored = window.localStorage.getItem(STORAGE_KEY) as WalletConnectorId | null
+  if (!stored || !isWalletConnectorAvailable(stored)) {
+    return undefined
+  }
+  return stored
 }
 
 const formatWalletError = (error: unknown) =>
@@ -43,54 +39,25 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [account, setAccount] = useState<WalletAccount>()
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
-  const [autoConnectAttempted, setAutoConnectAttempted] = useState(false)
+  const [pendingAutoConnectId] = useState<WalletConnectorId | undefined>(
+    () => getStoredConnectorId()
+  )
+  const [autoConnectAttempted, setAutoConnectAttempted] = useState(
+    () => !pendingAutoConnectId
+  )
 
   const connectors = useMemo<WalletConnector[]>(() => {
-    const injected = getInjectedWallets()
-    const base: WalletConnector[] = [
-      {
-        id: "keplr",
-        label: "Keplr",
-        type: "extension",
-        available: Boolean(injected.keplr)
-      },
-      {
-        id: "galaxy",
-        label: "Galaxy Station",
-        type: "extension",
-        available: Boolean(injected.station ?? injected.galaxyStation)
-      }
-    ]
-    return base
+    return getWalletConnectors()
   }, [])
-
-  const connectInjected = useCallback(
-    async (wallet: InjectedWallet, id: WalletConnectorId) => {
-      if (wallet.experimentalSuggestChain) {
-        await wallet.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
-      }
-      await wallet.enable(KEPLR_CHAIN_CONFIG.chainId)
-      const key = await wallet.getKey(KEPLR_CHAIN_CONFIG.chainId)
-      setAccount({ address: key.bech32Address, name: key.name })
-      setConnectorId(id)
-    },
-    []
-  )
 
   const connect = useCallback(
     async (id: WalletConnectorId) => {
       setStatus("connecting")
       setError(undefined)
       try {
-        const injected = getInjectedWallets()
-        if (id === "keplr") {
-          if (!injected.keplr) throw new Error("Keplr not installed")
-          await connectInjected(injected.keplr, id)
-        } else if (id === "galaxy") {
-          const wallet = injected.station ?? injected.galaxyStation
-          if (!wallet) throw new Error("Galaxy Station not installed")
-          await connectInjected(wallet, id)
-        }
+        const nextAccount = await connectWalletConnector(id)
+        setAccount(nextAccount)
+        setConnectorId(id)
         setStatus("connected")
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, id)
@@ -100,7 +67,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         setError(formatWalletError(err))
       }
     },
-    [connectInjected]
+    []
   )
 
   const disconnect = useCallback(async () => {
@@ -149,27 +116,20 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [txState.status])
 
   useEffect(() => {
-    if (autoConnectAttempted) return
-    if (typeof window === "undefined") {
-      setAutoConnectAttempted(true)
-      return
+    if (autoConnectAttempted || !pendingAutoConnectId) return
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void connect(pendingAutoConnectId).finally(() => {
+        if (!cancelled) {
+          setAutoConnectAttempted(true)
+        }
+      })
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
     }
-    const stored = window.localStorage.getItem(STORAGE_KEY) as WalletConnectorId | null
-    if (!stored) {
-      setAutoConnectAttempted(true)
-      return
-    }
-    const injected = getInjectedWallets()
-    const available =
-      stored === "keplr"
-        ? injected.keplr
-        : injected.station ?? injected.galaxyStation
-    if (!available) {
-      setAutoConnectAttempted(true)
-      return
-    }
-    void connect(stored).finally(() => setAutoConnectAttempted(true))
-  }, [autoConnectAttempted, connect])
+  }, [autoConnectAttempted, connect, pendingAutoConnectId])
 
   const value = useMemo<WalletContextValue>(
     () => ({

@@ -143,7 +143,7 @@
   height: 100%;
   align-content: start;
   flex: 1;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: 1fr auto;
   min-height: 220px;
   width: 100%;
 }
@@ -152,7 +152,9 @@
   text-decoration: none;
   color: inherit;
   height: 100%;
-  display: flex;
+  display: grid;
+  gap: 10px;
+  align-content: start;
 }
 
 .proposalLink:hover .proposalCard {
@@ -317,6 +319,21 @@
   overflow: hidden;
 }
 
+.depositBar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(246, 195, 67, 0.65), rgba(246, 195, 67, 1));
+}
+
+.depositMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--font-size-xxs);
+  color: rgba(234, 245, 235, 0.68);
+}
+
 .progressSegment {
   height: 100%;
   min-width: 0;
@@ -388,5 +405,12 @@
 @media (min-width: 992px) {
   .proposals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .depositMeta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
