@@ -76,9 +76,26 @@ const formatWalletError = (error: unknown) =>
 
 const detectMobileBrowser = () => {
   if (typeof window === "undefined") return false
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    window.navigator.userAgent
-  )
+
+  const userAgent = window.navigator.userAgent || ""
+  const userAgentData = (
+    window.navigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  ).userAgentData
+  const isMobileUserAgent =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|CriOS|FxiOS/i.test(
+      userAgent
+    ) || userAgentData?.mobile === true
+
+  if (isMobileUserAgent) {
+    return true
+  }
+
+  const maxTouchPoints = window.navigator.maxTouchPoints || 0
+  const minViewportEdge = Math.min(window.innerWidth, window.innerHeight)
+
+  // Some wallet app browsers expose a desktop-like UA string.
+  // Touch-first small viewports should still be treated as mobile.
+  return maxTouchPoints > 1 && minViewportEdge <= 1024
 }
 
 const isWalletReady = (wallet?: ChainWalletBase) =>
