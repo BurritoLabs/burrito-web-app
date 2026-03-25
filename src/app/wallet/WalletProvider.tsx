@@ -400,12 +400,6 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (autoConnectAttempted || !pendingAutoConnectId) return
-    if (supportsMobileWallets) {
-      const timer = window.setTimeout(() => {
-        setAutoConnectAttempted(true)
-      }, 0)
-      return () => window.clearTimeout(timer)
-    }
     if (!pendingAutoConnectAvailable) return
     let cancelled = false
     const timer = window.setTimeout(() => {
