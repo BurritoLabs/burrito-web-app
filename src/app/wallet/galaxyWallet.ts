@@ -9,7 +9,10 @@ import GalaxyStationMobileWallet from "@hexxagon/galaxy-station-mobile"
 import StationWallet from "@hexxagon/station-wallet"
 import { CLASSIC_CHAIN } from "../chain"
 import type { WalletAccount } from "./WalletContext"
-import { isLikelyMobileBrowser } from "./walletPlatform"
+import {
+  isLikelyMobileBrowser,
+  isTouchWalletCapableBrowser
+} from "./walletPlatform"
 
 type GalaxyConnectResponse = {
   addresses: Record<string, string>
@@ -38,6 +41,16 @@ const getMobileGalaxyWallet = () => {
   return mobileGalaxyWallet
 }
 
+const shouldUseMobileGalaxyWallet = () => {
+  if (typeof window === "undefined") return false
+
+  if (isLikelyMobileBrowser()) {
+    return true
+  }
+
+  return !window.galaxyStation && isTouchWalletCapableBrowser()
+}
+
 const decodePubkey = (value?: string) => {
   if (!value) return undefined
 
@@ -53,7 +66,7 @@ const decodePubkey = (value?: string) => {
 }
 
 const getGalaxyWallet = () =>
-  isLikelyMobileBrowser() ? getMobileGalaxyWallet() : getDesktopGalaxyWallet()
+  shouldUseMobileGalaxyWallet() ? getMobileGalaxyWallet() : getDesktopGalaxyWallet()
 
 const resolveGalaxyAddress = (
   response: GalaxyConnectResponse,
@@ -113,9 +126,9 @@ class GalaxyOfflineSigner implements OfflineDirectSigner {
 }
 
 export const getGalaxyConnector = () => {
-  const isMobile = isLikelyMobileBrowser()
-  const wallet = getGalaxyWallet()
-  const available = isMobile ? true : Boolean(wallet.isInstalled)
+  const isMobile = shouldUseMobileGalaxyWallet()
+  const desktopInstalled = Boolean(window.galaxyStation)
+  const available = desktopInstalled || isMobile
   const type: "mobile" | "extension" = isMobile ? "mobile" : "extension"
 
   return {
@@ -143,7 +156,7 @@ export const getGalaxyOfflineSigner = async () => {
   const wallet = getGalaxyWallet()
   await wallet.connect()
 
-  if (!isLikelyMobileBrowser()) {
+  if (!shouldUseMobileGalaxyWallet()) {
     const station = window.galaxyStation
     if (station) {
       return station.getOfflineSigner(CLASSIC_CHAIN.chainId)

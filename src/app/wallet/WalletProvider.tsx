@@ -23,7 +23,10 @@ import {
   disconnectWalletConnector,
   registerWalletAdapterRuntime
 } from "./walletAdapters"
-import { isLikelyMobileBrowser } from "./walletPlatform"
+import {
+  isLikelyMobileBrowser,
+  isTouchWalletCapableBrowser
+} from "./walletPlatform"
 
 const STORAGE_KEY = "burritoWalletConnector"
 const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = ["keplr", "galaxy"]
@@ -85,6 +88,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   )
 
   const isMobileBrowser = useMemo(() => isLikelyMobileBrowser(), [])
+  const supportsMobileWallets = useMemo(() => isTouchWalletCapableBrowser(), [])
   const currentCosmosWalletName = cosmosChain.walletRepo.current?.walletName
   const activeCosmosConnectorId = currentCosmosWalletName
     ? COSMOS_WALLET_NAME_TO_CONNECTOR_ID[currentCosmosWalletName]
@@ -132,16 +136,23 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         return connectedWallet
       }
 
-      if (isMobileBrowser) {
-        if (mobileWallet) {
-          return mobileWallet
-        }
+      if (isMobileBrowser && mobileWallet) {
+        return mobileWallet
+      }
+
+      if (isWalletReady(extensionWallet)) {
         return extensionWallet
       }
 
-      return isWalletReady(extensionWallet) ? extensionWallet : undefined
+      if (supportsMobileWallets && mobileWallet) {
+        if (mobileWallet) {
+          return mobileWallet
+        }
+      }
+
+      return extensionWallet ?? mobileWallet
     },
-    [getCosmosWalletCandidates, isMobileBrowser]
+    [getCosmosWalletCandidates, isMobileBrowser, supportsMobileWallets]
   )
 
   const getCosmosConnector = useCallback(
@@ -149,16 +160,18 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       const config = COSMOS_CONNECTOR_CONFIGS[id]
       const { extensionWallet, mobileWallet } = getCosmosWalletCandidates(id)
       const extensionAvailable = isWalletReady(extensionWallet)
-      const mobileAvailable = Boolean(mobileWallet)
+      const mobileAvailable = Boolean(mobileWallet) && supportsMobileWallets
+      const shouldUseMobileType =
+        mobileAvailable && (isMobileBrowser || !extensionAvailable)
 
       return {
         id,
         label: config.label,
-        type: isMobileBrowser ? "mobile" : "extension",
-        available: isMobileBrowser ? extensionAvailable || mobileAvailable : extensionAvailable
+        type: shouldUseMobileType ? "mobile" : "extension",
+        available: extensionAvailable || mobileAvailable
       }
     },
-    [getCosmosWalletCandidates, isMobileBrowser]
+    [getCosmosWalletCandidates, isMobileBrowser, supportsMobileWallets]
   )
 
   const connectCosmosConnector = useCallback(
@@ -168,12 +181,14 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} not available`)
       }
       await wallet.connect(true)
-      if (isMobileBrowser) {
+      const isMobileWallet =
+        wallet.walletName === COSMOS_CONNECTOR_CONFIGS[id].mobileWalletName
+      if (isMobileWallet) {
         return undefined
       }
       return buildWalletAccount(wallet)
     },
-    [getPreferredCosmosWallet, isMobileBrowser]
+    [getPreferredCosmosWallet]
   )
 
   const getCosmosOfflineSigner = useCallback(
@@ -385,7 +400,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (autoConnectAttempted || !pendingAutoConnectId) return
-    if (isMobileBrowser) {
+    if (supportsMobileWallets) {
       const timer = window.setTimeout(() => {
         setAutoConnectAttempted(true)
       }, 0)
@@ -407,9 +422,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [
     autoConnectAttempted,
     connect,
-    isMobileBrowser,
     pendingAutoConnectAvailable,
-    pendingAutoConnectId
+    pendingAutoConnectId,
+    supportsMobileWallets
   ])
 
   const value = useMemo<WalletContextValue>(
