@@ -52,6 +52,11 @@ const formatWalletError = (error: unknown) =>
 const isWalletReady = (wallet?: ChainWalletBase) =>
   Boolean(wallet && !wallet.isWalletNotExist)
 
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+
 const matchesWalletAlias = (wallet: ChainWalletBase, aliases: string[]) => {
   const normalizedAliases = aliases.map((alias) => alias.toLowerCase())
   const walletName = wallet.walletName?.toLowerCase?.() ?? ""
@@ -63,13 +68,30 @@ const matchesWalletAlias = (wallet: ChainWalletBase, aliases: string[]) => {
 }
 
 const buildWalletAccount = async (wallet: ChainWalletBase): Promise<WalletAccount> => {
-  const address = wallet.address
+  let address = wallet.address
+  let username = wallet.username
+
+  if (!address) {
+    await wallet.update({ connect: false })
+    address = wallet.address
+    username = wallet.username
+  }
+
+  if (!address) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await wait(250)
+      address = wallet.address
+      username = wallet.username
+      if (address) break
+    }
+  }
+
   if (!address) {
     throw new Error(`${wallet.walletPrettyName} account unavailable`)
   }
   return {
     address,
-    name: wallet.username || wallet.walletPrettyName
+    name: username || wallet.walletPrettyName
   }
 }
 
@@ -137,10 +159,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (isMobileBrowser) {
-        if (isWalletReady(extensionWallet)) {
-          return extensionWallet
+        if (mobileWallet) {
+          return mobileWallet
         }
-        return mobileWallet ?? extensionWallet
+        return extensionWallet
       }
 
       return isWalletReady(extensionWallet) ? extensionWallet : undefined
