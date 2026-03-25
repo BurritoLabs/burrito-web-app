@@ -26,6 +26,8 @@
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  overflow: hidden;
+  contain: paint;
 }
 
 .globalGlow::before {
@@ -233,6 +235,19 @@
 
   .menuOpen .header,
   .menuOpen .main {
+    display: none;
+  }
+
+  .globalGlow::before {
+    inset: -10vh -12vw;
+    background:
+      radial-gradient(720px 420px at 65% 22%, rgba(82, 196, 26, 0.14), transparent 62%),
+      radial-gradient(600px 360px at 48% 38%, rgba(82, 196, 26, 0.08), transparent 66%);
+    filter: blur(10px);
+    opacity: 0.72;
+  }
+
+  .glowPrimary {
     display: none;
   }
 }
