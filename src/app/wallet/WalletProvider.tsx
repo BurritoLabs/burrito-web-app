@@ -1,11 +1,6 @@
 import { useChain } from "@cosmos-kit/react"
 import type { ChainWalletBase } from "@cosmos-kit/core"
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState
-} from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import {
   COSMOS_CONNECTOR_CONFIGS,
@@ -52,11 +47,6 @@ const formatWalletError = (error: unknown) =>
 const isWalletReady = (wallet?: ChainWalletBase) =>
   Boolean(wallet && !wallet.isWalletNotExist)
 
-const wait = (ms: number) =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
-
 const matchesWalletAlias = (wallet: ChainWalletBase, aliases: string[]) => {
   const normalizedAliases = aliases.map((alias) => alias.toLowerCase())
   const walletName = wallet.walletName?.toLowerCase?.() ?? ""
@@ -67,31 +57,15 @@ const matchesWalletAlias = (wallet: ChainWalletBase, aliases: string[]) => {
   )
 }
 
-const buildWalletAccount = async (wallet: ChainWalletBase): Promise<WalletAccount> => {
-  let address = wallet.address
-  let username = wallet.username
-
+const buildWalletAccount = (wallet: ChainWalletBase): WalletAccount | undefined => {
+  const address = wallet.address
   if (!address) {
-    await wallet.update({ connect: false })
-    address = wallet.address
-    username = wallet.username
+    return undefined
   }
 
-  if (!address) {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      await wait(250)
-      address = wallet.address
-      username = wallet.username
-      if (address) break
-    }
-  }
-
-  if (!address) {
-    throw new Error(`${wallet.walletPrettyName} account unavailable`)
-  }
   return {
     address,
-    name: username || wallet.walletPrettyName
+    name: wallet.username || wallet.walletPrettyName
   }
 }
 
@@ -194,9 +168,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} not available`)
       }
       await wallet.connect(true)
+      if (isMobileBrowser) {
+        return undefined
+      }
       return buildWalletAccount(wallet)
     },
-    [getPreferredCosmosWallet]
+    [getPreferredCosmosWallet, isMobileBrowser]
   )
 
   const getCosmosOfflineSigner = useCallback(
@@ -232,16 +209,19 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const connect = useCallback(
     async (id: WalletConnectorId) => {
       setStatus("connecting")
+      setAccount(undefined)
       setError(undefined)
       try {
         const nextAccount = isCosmosConnectorId(id)
           ? await connectCosmosConnector(id)
           : await connectWalletConnector(id)
-        setAccount(nextAccount)
         setConnectorId(id)
-        setStatus("connected")
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, id)
+        }
+        if (nextAccount) {
+          setAccount(nextAccount)
+          setStatus("connected")
         }
       } catch (err) {
         setStatus("error")
