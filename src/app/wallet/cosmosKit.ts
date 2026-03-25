@@ -1,8 +1,6 @@
 import type { AssetList, Chain } from "@chain-registry/types"
 import type { MainWalletBase, WalletConnectOptions } from "@cosmos-kit/core"
 import { wallets as keplrWallets } from "@cosmos-kit/keplr"
-import { wallets as leapWallets } from "@cosmos-kit/leap"
-import { wallets as trustWallets } from "@cosmos-kit/trust"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import type { WalletConnectorId } from "./WalletContext"
 
@@ -117,19 +115,15 @@ export const COSMOS_KIT_ASSET_LIST: AssetList = {
   ]
 }
 
-export const COSMOS_KIT_WALLETS: MainWalletBase[] = [
-  ...keplrWallets,
-  ...leapWallets,
-  ...trustWallets
-]
+export const COSMOS_KIT_WALLETS: MainWalletBase[] = [...keplrWallets]
 
 export const COSMOS_KIT_CHAINS = [COSMOS_KIT_CHAIN]
 export const COSMOS_KIT_ASSET_LISTS = [COSMOS_KIT_ASSET_LIST]
 
 export const COSMOS_CONNECTOR_CONFIGS: Record<
-  "keplr" | "leap" | "trust",
+  "keplr",
   {
-    id: "keplr" | "leap" | "trust"
+    id: "keplr"
     label: string
     badge: string
     extensionWalletName: string
@@ -142,20 +136,6 @@ export const COSMOS_CONNECTOR_CONFIGS: Record<
     badge: "K",
     extensionWalletName: "keplr-extension",
     mobileWalletName: "keplr-mobile"
-  },
-  leap: {
-    id: "leap",
-    label: "Leap",
-    badge: "L",
-    extensionWalletName: "leap-extension",
-    mobileWalletName: "leap-cosmos-mobile"
-  },
-  trust: {
-    id: "trust",
-    label: "Trust Wallet",
-    badge: "T",
-    extensionWalletName: "trust-extension",
-    mobileWalletName: "trust-mobile"
   }
 }
 

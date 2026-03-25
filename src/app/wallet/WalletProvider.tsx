@@ -13,6 +13,7 @@ import {
   COSMOS_WALLET_NAME_TO_CONNECTOR_ID,
   isCosmosConnectorId
 } from "./cosmosKit"
+import { getGalaxyConnector } from "./galaxyWallet"
 import {
   WalletContext,
   type WalletAccount,
@@ -24,39 +25,13 @@ import {
 } from "./WalletContext"
 import {
   connectWalletConnector,
-  isWalletConnectorAvailable,
+  disconnectWalletConnector,
   registerWalletAdapterRuntime
 } from "./walletAdapters"
+import { isLikelyMobileBrowser } from "./walletPlatform"
 
 const STORAGE_KEY = "burritoWalletConnector"
-const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = [
-  "keplr",
-  "leap",
-  "galaxy",
-  "trust",
-  "luncdash"
-]
-const CONNECTOR_ORDER: WalletConnectorId[] = [
-  "keplr",
-  "leap",
-  "galaxy",
-  "trust",
-  "luncdash"
-]
-
-const LEGACY_CONNECTOR_META: Record<
-  "galaxy" | "luncdash",
-  Pick<WalletConnector, "label" | "type">
-> = {
-  galaxy: {
-    label: "Galaxy Station",
-    type: "extension"
-  },
-  luncdash: {
-    label: "LUNC Dash",
-    type: "extension"
-  }
-}
+const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = ["keplr", "galaxy"]
 
 const isKnownConnectorId = (
   value: string | null
@@ -74,32 +49,18 @@ const getStoredConnectorId = () => {
 const formatWalletError = (error: unknown) =>
   error instanceof Error ? error.message : "Wallet connection failed"
 
-const detectMobileBrowser = () => {
-  if (typeof window === "undefined") return false
-
-  const userAgent = window.navigator.userAgent || ""
-  const userAgentData = (
-    window.navigator as Navigator & { userAgentData?: { mobile?: boolean } }
-  ).userAgentData
-  const isMobileUserAgent =
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|CriOS|FxiOS/i.test(
-      userAgent
-    ) || userAgentData?.mobile === true
-
-  if (isMobileUserAgent) {
-    return true
-  }
-
-  const maxTouchPoints = window.navigator.maxTouchPoints || 0
-  const minViewportEdge = Math.min(window.innerWidth, window.innerHeight)
-
-  // Some wallet app browsers expose a desktop-like UA string.
-  // Touch-first small viewports should still be treated as mobile.
-  return maxTouchPoints > 1 && minViewportEdge <= 1024
-}
-
 const isWalletReady = (wallet?: ChainWalletBase) =>
   Boolean(wallet && !wallet.isWalletNotExist)
+
+const matchesWalletAlias = (wallet: ChainWalletBase, aliases: string[]) => {
+  const normalizedAliases = aliases.map((alias) => alias.toLowerCase())
+  const walletName = wallet.walletName?.toLowerCase?.() ?? ""
+  const walletPrettyName = wallet.walletPrettyName?.toLowerCase?.() ?? ""
+
+  return normalizedAliases.some(
+    (alias) => walletName === alias || walletPrettyName === alias
+  )
+}
 
 const buildWalletAccount = async (wallet: ChainWalletBase): Promise<WalletAccount> => {
   const address = wallet.address
@@ -127,7 +88,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     () => !pendingAutoConnectId
   )
 
-  const isMobileBrowser = useMemo(() => detectMobileBrowser(), [])
+  const isMobileBrowser = useMemo(() => isLikelyMobileBrowser(), [])
   const currentCosmosWalletName = cosmosChain.walletRepo.current?.walletName
   const activeCosmosConnectorId = currentCosmosWalletName
     ? COSMOS_WALLET_NAME_TO_CONNECTOR_ID[currentCosmosWalletName]
@@ -140,11 +101,21 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const getCosmosWalletCandidates = useCallback(
     (id: keyof typeof COSMOS_CONNECTOR_CONFIGS) => {
       const config = COSMOS_CONNECTOR_CONFIGS[id]
+      const wallets = cosmosChain.walletRepo.wallets
+      const extensionAliases = [config.extensionWalletName, config.label]
+      const mobileAliases = [
+        config.mobileWalletName,
+        `${config.label} Mobile`,
+        `${config.label} Wallet Mobile`
+      ]
+
       return {
-        extensionWallet: cosmosChain.walletRepo.getWallet(
-          config.extensionWalletName
-        ),
-        mobileWallet: cosmosChain.walletRepo.getWallet(config.mobileWalletName)
+        extensionWallet:
+          cosmosChain.walletRepo.getWallet(config.extensionWalletName) ??
+          wallets.find((wallet) => matchesWalletAlias(wallet, extensionAliases)),
+        mobileWallet:
+          cosmosChain.walletRepo.getWallet(config.mobileWalletName) ??
+          wallets.find((wallet) => matchesWalletAlias(wallet, mobileAliases))
       }
     },
     [cosmosChain.walletRepo]
@@ -182,15 +153,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       const config = COSMOS_CONNECTOR_CONFIGS[id]
       const { extensionWallet, mobileWallet } = getCosmosWalletCandidates(id)
       const extensionAvailable = isWalletReady(extensionWallet)
+      const mobileAvailable = Boolean(mobileWallet)
 
       return {
         id,
         label: config.label,
-        type:
-          isMobileBrowser && !extensionAvailable && mobileWallet ? "mobile" : "extension",
-        available: isMobileBrowser
-          ? Boolean(extensionAvailable || mobileWallet)
-          : extensionAvailable
+        type: isMobileBrowser ? "mobile" : "extension",
+        available: isMobileBrowser ? extensionAvailable || mobileAvailable : extensionAvailable
       }
     },
     [getCosmosWalletCandidates, isMobileBrowser]
@@ -230,21 +199,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     [getPreferredCosmosWallet]
   )
 
-  const connectors = useMemo(() => {
-    void connectorRefreshNonce
-    return CONNECTOR_ORDER.map((id) => {
-      if (isCosmosConnectorId(id)) {
-        return getCosmosConnector(id)
-      }
-      const legacyMeta = LEGACY_CONNECTOR_META[id]
-      return {
-        id,
-        label: legacyMeta.label,
-        type: legacyMeta.type,
-        available: isWalletConnectorAvailable(id)
-      }
-    })
-  }, [connectorRefreshNonce, getCosmosConnector])
+  const connectors = useMemo(
+    () => {
+      void connectorRefreshNonce
+      return [getCosmosConnector("keplr"), getGalaxyConnector()]
+    },
+    [connectorRefreshNonce, getCosmosConnector]
+  )
 
   const connect = useCallback(
     async (id: WalletConnectorId) => {
@@ -275,6 +236,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       cosmosChain.walletRepo.current
     ) {
       await cosmosChain.walletRepo.disconnect(undefined, true)
+    } else if (connectorId) {
+      await disconnectWalletConnector(connectorId)
     }
     setAccount(undefined)
     setConnectorId(undefined)
@@ -341,7 +304,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     registerWalletAdapterRuntime({
-      getConnector: (id) => (isCosmosConnectorId(id) ? getCosmosConnector(id) : undefined),
+      getConnector: (id) =>
+        isCosmosConnectorId(id) ? getCosmosConnector(id) : undefined,
       connect: async (id) =>
         isCosmosConnectorId(id) ? await connectCosmosConnector(id) : undefined,
       getOfflineSigner: async (id) =>
@@ -419,7 +383,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (autoConnectAttempted || !pendingAutoConnectId) return
-    if (isMobileBrowser && isCosmosConnectorId(pendingAutoConnectId)) {
+    if (isMobileBrowser) {
       const timer = window.setTimeout(() => {
         setAutoConnectAttempted(true)
       }, 0)

@@ -409,6 +409,12 @@
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
+.switchIcon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .switchButton:hover {
   border-color: rgba(82, 196, 26, 0.58);
   color: var(--green);

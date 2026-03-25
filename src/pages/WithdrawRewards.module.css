@@ -319,3 +319,117 @@
   font-size: 12px;
   color: #ff8c8c;
 }
+
+@media (max-width: 767.98px) {
+  .pageCard {
+    gap: 14px;
+  }
+
+  .validatorCard,
+  .feeCard {
+    padding: 12px;
+  }
+
+  .validatorHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+    display: grid;
+    gap: 8px;
+    align-items: center;
+    padding-bottom: 8px;
+  }
+
+  .validatorRow {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 0;
+  }
+
+  .validatorRow input {
+    margin-top: 2px;
+  }
+
+  .validatorItem {
+    display: grid;
+    gap: 4px;
+  }
+
+  .validatorName {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .validatorReward {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .summaryDivider {
+    margin: 4px 0 8px;
+  }
+
+  .summaryGrid {
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .summaryCard {
+    padding: 10px;
+  }
+
+  .feeRow {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .feeLeft {
+    flex-wrap: wrap;
+  }
+
+  .feeValue {
+    min-width: 0;
+    width: 100%;
+    text-align: left;
+  }
+}
+
+@media (max-width: 479.98px) {
+  .pageCard {
+    padding: 16px 14px;
+  }
+
+  .validatorHeader dt,
+  .validatorHeader dd,
+  .validatorName,
+  .validatorReward,
+  .empty,
+  .feeRow,
+  .feeError,
+  .submitError {
+    font-size: 11px;
+  }
+
+  .summaryCard {
+    --reward-icon-size: 20px;
+    --reward-icon-gap: 7px;
+  }
+
+  .summarySymbol {
+    font-size: 13px;
+  }
+
+  .summaryAmount {
+    font-size: 11px;
+  }
+
+  .feeCard {
+    margin-top: 12px;
+  }
+
+  .submit {
+    height: 40px;
+    border-radius: 999px;
+  }
+}

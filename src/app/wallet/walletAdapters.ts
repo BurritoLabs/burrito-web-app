@@ -1,6 +1,12 @@
 import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { KEPLR_CHAIN_CONFIG } from "../chain"
 import { connectClassicSigningClient } from "./signingClient"
+import {
+  connectGalaxyWallet,
+  disconnectGalaxyWallet,
+  getGalaxyConnector,
+  getGalaxyOfflineSigner
+} from "./galaxyWallet"
 import type {
   WalletAccount,
   WalletConnector,
@@ -10,6 +16,7 @@ import type {
 type WalletAdapterRuntime = {
   getConnector?: (id: WalletConnectorId) => WalletConnector | undefined
   connect?: (id: WalletConnectorId) => Promise<WalletAccount | undefined>
+  disconnect?: (id: WalletConnectorId) => Promise<void>
   getOfflineSigner?: (id: WalletConnectorId) => Promise<OfflineSigner | undefined>
 }
 
@@ -26,77 +33,33 @@ type InjectedWallet = {
   getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
 }
 
-type TrustWalletContainer = {
-  cosmos?: InjectedWallet
-}
-
 type WalletWindow = Window & {
   keplr?: InjectedWallet
-  leap?: InjectedWallet
-  station?: InjectedWallet
-  galaxyStation?: InjectedWallet
-  trustwallet?: TrustWalletContainer
-  trustWallet?: TrustWalletContainer
-  luncdash?: InjectedWallet
-  luncDash?: InjectedWallet
-  luncdashWallet?: InjectedWallet
-  luncDashWallet?: InjectedWallet
   getOfflineSigner?: (chainId: string) => OfflineSigner
   getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
 }
 
-type WalletAdapter = {
+type WalletAdapterMeta = {
   id: WalletConnectorId
   label: string
   badge: string
   type: WalletConnector["type"]
-  getProvider: (walletWindow: WalletWindow) => InjectedWallet | undefined
-  supportsRootSignerFallback?: boolean
 }
 
-const ADAPTERS: readonly WalletAdapter[] = [
-  {
+const CONNECTOR_META: Record<WalletConnectorId, WalletAdapterMeta> = {
+  keplr: {
     id: "keplr",
     label: "Keplr",
     badge: "K",
-    type: "extension",
-    getProvider: (walletWindow) => walletWindow.keplr,
-    supportsRootSignerFallback: true
+    type: "extension"
   },
-  {
-    id: "leap",
-    label: "Leap",
-    badge: "L",
-    type: "extension",
-    getProvider: (walletWindow) => walletWindow.leap
-  },
-  {
+  galaxy: {
     id: "galaxy",
     label: "Galaxy Station",
     badge: "G",
-    type: "extension",
-    getProvider: (walletWindow) => walletWindow.galaxyStation
-  },
-  {
-    id: "trust",
-    label: "Trust Wallet",
-    badge: "T",
-    type: "extension",
-    getProvider: (walletWindow) =>
-      walletWindow.trustwallet?.cosmos ?? walletWindow.trustWallet?.cosmos
-  },
-  {
-    id: "luncdash",
-    label: "LUNC Dash",
-    badge: "LD",
-    type: "extension",
-    getProvider: (walletWindow) =>
-      walletWindow.luncDash ??
-      walletWindow.luncdash ??
-      walletWindow.luncDashWallet ??
-      walletWindow.luncdashWallet
+    type: "extension"
   }
-] as const
+}
 
 let walletAdapterRuntime: WalletAdapterRuntime | undefined
 
@@ -109,34 +72,20 @@ const getWalletWindow = () => {
   return window as WalletWindow
 }
 
-const getAdapter = (id: WalletConnectorId) => ADAPTERS.find((adapter) => adapter.id === id)
+const getConnectorMeta = (id: WalletConnectorId) => CONNECTOR_META[id]
 
-const getRequiredAdapter = (id: WalletConnectorId) => {
-  const adapter = getAdapter(id)
-  if (!adapter) {
-    throw new Error("Unsupported wallet connector")
-  }
-  return adapter
-}
-
-const getRequiredProvider = (id: WalletConnectorId) => {
+const getRequiredKeplrProvider = () => {
   const walletWindow = getWalletWindow()
-  if (!walletWindow) {
-    throw new Error("Wallet not available")
-  }
-  const adapter = getRequiredAdapter(id)
-  const provider = adapter.getProvider(walletWindow)
-  if (!provider) {
-    throw new Error(`${adapter.label} not installed`)
+  if (!walletWindow?.keplr) {
+    throw new Error("Keplr not installed")
   }
   return {
-    adapter,
-    provider,
+    provider: walletWindow.keplr,
     walletWindow
   }
 }
 
-const enableProvider = async (provider: InjectedWallet) => {
+const enableKeplr = async (provider: InjectedWallet) => {
   if (provider.experimentalSuggestChain) {
     await provider.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
   }
@@ -145,8 +94,7 @@ const enableProvider = async (provider: InjectedWallet) => {
   }
 }
 
-const getOfflineSignerFromProvider = async (
-  adapter: WalletAdapter,
+const getOfflineSignerFromKeplr = async (
   provider: InjectedWallet,
   walletWindow: WalletWindow
 ) => {
@@ -156,20 +104,19 @@ const getOfflineSignerFromProvider = async (
   if (provider.getOfflineSigner) {
     return provider.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (adapter.supportsRootSignerFallback && walletWindow.getOfflineSignerAuto) {
+  if (walletWindow.getOfflineSignerAuto) {
     return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
   }
-  if (adapter.supportsRootSignerFallback && walletWindow.getOfflineSigner) {
+  if (walletWindow.getOfflineSigner) {
     return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
   }
   return undefined
 }
 
-const resolveAccount = async (
-  adapter: WalletAdapter,
-  provider: InjectedWallet,
-  walletWindow: WalletWindow
-): Promise<WalletAccount> => {
+const connectInjectedKeplr = async (): Promise<WalletAccount> => {
+  const { provider, walletWindow } = getRequiredKeplrProvider()
+  await enableKeplr(provider)
+
   if (provider.getKey) {
     const key = await provider.getKey(KEPLR_CHAIN_CONFIG.chainId)
     return {
@@ -177,11 +124,12 @@ const resolveAccount = async (
       name: key.name
     }
   }
-  const signer = await getOfflineSignerFromProvider(adapter, provider, walletWindow)
+
+  const signer = await getOfflineSignerFromKeplr(provider, walletWindow)
   const accounts = await signer?.getAccounts()
   const account = accounts?.[0]
   if (!account) {
-    throw new Error(`${adapter.label} account unavailable`)
+    throw new Error("Keplr account unavailable")
   }
   return {
     address: account.address
@@ -190,45 +138,46 @@ const resolveAccount = async (
 
 export const getWalletConnectors = (): WalletConnector[] => {
   const walletWindow = getWalletWindow()
-  return ADAPTERS.map((adapter) => {
-    const runtimeConnector = walletAdapterRuntime?.getConnector?.(adapter.id)
-    if (runtimeConnector) {
-      return runtimeConnector
-    }
-    return {
-      id: adapter.id,
-      label: adapter.label,
-      type: adapter.type,
-      available: Boolean(walletWindow && adapter.getProvider(walletWindow))
-    }
-  })
+  const keplrRuntimeConnector = walletAdapterRuntime?.getConnector?.("keplr")
+  const galaxyRuntimeConnector = walletAdapterRuntime?.getConnector?.("galaxy")
+
+  return [
+    keplrRuntimeConnector ?? {
+      ...getConnectorMeta("keplr"),
+      available: Boolean(walletWindow?.keplr)
+    },
+    galaxyRuntimeConnector ?? getGalaxyConnector()
+  ]
 }
 
-export const isWalletConnectorAvailable = (id: WalletConnectorId) => {
-  const runtimeConnector = walletAdapterRuntime?.getConnector?.(id)
-  if (runtimeConnector) {
-    return runtimeConnector.available
-  }
-  const walletWindow = getWalletWindow()
-  if (!walletWindow) return false
-  const adapter = getRequiredAdapter(id)
-  return Boolean(adapter.getProvider(walletWindow))
-}
+export const isWalletConnectorAvailable = (id: WalletConnectorId) =>
+  getWalletConnectors().some((connector) => connector.id === id && connector.available)
 
 export const getWalletConnectorLabel = (id?: WalletConnectorId) =>
-  id ? getAdapter(id)?.label ?? "Wallet" : "Wallet"
+  id ? getConnectorMeta(id).label : "Wallet"
 
 export const getWalletConnectorBadge = (id?: WalletConnectorId) =>
-  id ? getAdapter(id)?.badge ?? "W" : "W"
+  id ? getConnectorMeta(id).badge : "W"
 
 export const connectWalletConnector = async (id: WalletConnectorId) => {
   const runtimeAccount = await walletAdapterRuntime?.connect?.(id)
   if (runtimeAccount) {
     return runtimeAccount
   }
-  const { adapter, provider, walletWindow } = getRequiredProvider(id)
-  await enableProvider(provider)
-  return resolveAccount(adapter, provider, walletWindow)
+
+  if (id === "galaxy") {
+    return connectGalaxyWallet()
+  }
+
+  return connectInjectedKeplr()
+}
+
+export const disconnectWalletConnector = async (id: WalletConnectorId) => {
+  await walletAdapterRuntime?.disconnect?.(id)
+
+  if (id === "galaxy") {
+    await disconnectGalaxyWallet()
+  }
 }
 
 export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
@@ -236,11 +185,16 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
   if (runtimeSigner) {
     return runtimeSigner
   }
-  const { adapter, provider, walletWindow } = getRequiredProvider(id)
-  await enableProvider(provider)
-  const signer = await getOfflineSignerFromProvider(adapter, provider, walletWindow)
+
+  if (id === "galaxy") {
+    return getGalaxyOfflineSigner()
+  }
+
+  const { provider, walletWindow } = getRequiredKeplrProvider()
+  await enableKeplr(provider)
+  const signer = await getOfflineSignerFromKeplr(provider, walletWindow)
   if (!signer) {
-    throw new Error(`${adapter.label} signer not available`)
+    throw new Error("Keplr signer not available")
   }
   return signer
 }

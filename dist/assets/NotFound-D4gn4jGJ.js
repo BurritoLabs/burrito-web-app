@@ -1,0 +1,1 @@
+import{j as e}from"./react-vendor-D4AWz4-a.js";import{P as r}from"./PageShell-C5c_qwr_.js";const a=()=>e.jsx(r,{title:"404",children:e.jsx("div",{className:"card",children:e.jsx("div",{className:"cardText",children:"Not found"})})});export{a as default};

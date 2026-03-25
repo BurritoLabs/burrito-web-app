@@ -27,6 +27,8 @@
     "@cosmos-kit/trust": "^2.16.1",
     "@cosmos-kit/trust-mobile": "^2.15.1",
     "@cosmos-kit/walletconnect": "^2.15.1",
+    "@hexxagon/galaxy-station-mobile": "^1.0.23",
+    "@hexxagon/wallet-kit": "^1.0.23",
     "@interchain-ui/react": "^1.26.3",
     "@tanstack/react-query": "^5.90.20",
     "@terra-money/log-finder-ruleset": "^3.0.3",
@@ -50,6 +52,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vite-plugin-node-polyfills": "^0.25.0"
   }
 }

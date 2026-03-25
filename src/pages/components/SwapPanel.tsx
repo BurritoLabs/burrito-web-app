@@ -1246,8 +1246,44 @@ const SwapPanel = ({
                   className={styles.switchButton}
                   type="button"
                   onClick={handleSwapDirection}
+                  aria-label="Switch assets"
                 >
-                  ↕
+                  <svg
+                    className={styles.switchIcon}
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M9 5.5v11"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M6.75 7.75L9 5.5l2.25 2.25"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M15 18.5v-11"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M12.75 16.25L15 18.5l2.25-2.25"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
               </div>
 

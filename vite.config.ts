@@ -1,12 +1,23 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
+import { nodePolyfills } from "vite-plugin-node-polyfills"
 
 const hasPackage = (id: string, pkg: string) =>
   id.includes(`/node_modules/${pkg}/`) || id.includes(`\\node_modules\\${pkg}\\`)
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    nodePolyfills({
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true
+      },
+      protocolImports: true
+    })
+  ],
   build: {
     rollupOptions: {
       output: {
