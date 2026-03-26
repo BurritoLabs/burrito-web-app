@@ -227,6 +227,26 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       if (!wallet) {
         throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} signer not available`)
       }
+
+      const activeWallet = cosmosChain.walletRepo.current
+      const shouldUseChainSigner =
+        Boolean(activeWallet) &&
+        activeWallet?.walletName === wallet.walletName &&
+        cosmosChain.isWalletConnected
+
+      if (shouldUseChainSigner) {
+        if (!cosmosChain.address) {
+          await waitForWalletAddress(activeWallet!, 8, 150)
+        }
+
+        try {
+          return cosmosChain.getOfflineSigner()
+        } catch {
+          // Fall back to the underlying wallet instance when Cosmos Kit has not
+          // fully hydrated its signer yet.
+        }
+      }
+
       if (wallet.isWalletDisconnected) {
         await wallet.connect(false)
       }
@@ -245,7 +265,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
       return wallet.offlineSigner
     },
-    [getPreferredCosmosWallet]
+    [cosmosChain, getPreferredCosmosWallet]
   )
 
   const connectors = useMemo(
