@@ -292,6 +292,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         if (nextAccount) {
           setAccount(nextAccount)
           setStatus("connected")
+        } else {
+          // Mobile wallets often hand control to the native app first and only
+          // hydrate the address after the page regains focus. Don't keep the UI
+          // stuck in "connecting" while we wait for Cosmos Kit to reconcile.
+          setStatus("disconnected")
         }
       } catch (err) {
         setStatus("error")
