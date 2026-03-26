@@ -194,6 +194,17 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         wallet.walletName === COSMOS_CONNECTOR_CONFIGS[id].mobileWalletName
 
       if (isMobileWallet) {
+        try {
+          await wallet.disconnect(false, {
+            walletconnect: {
+              removeAllPairings: true
+            }
+          })
+        } catch {
+          // Best-effort cleanup. Keplr Mobile sometimes keeps a stale pairing
+          // that opens the app without surfacing a fresh connection request.
+        }
+
         const connectPromise = wallet.connect(true)
         const settled = await Promise.race([
           connectPromise.then(() => "resolved" as const),
