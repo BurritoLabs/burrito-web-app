@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import { MsgWithdrawDelegatorReward } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./WithdrawRewards.module.css"
@@ -10,14 +9,14 @@ import {
   fetchValidators,
   type RewardsByValidator
 } from "../app/data/classic"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
+import { CLASSIC_DENOMS } from "../app/chain"
 import { formatTokenAmount } from "../app/utils/format"
 import { useResolvedIbcWhitelist } from "../app/data/terraAssets"
 import {
   buildClassicNativeIconCandidates,
   buildIbcAssetIconCandidates
 } from "../app/utils/assetIcons"
-import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
+import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
 
 const sumRewards = (rewards: RewardsByValidator[], selected: string[]) => {
   const totals = new Map<string, bigint>()
@@ -248,10 +247,13 @@ const WithdrawRewards = () => {
 
     const timer = window.setTimeout(async () => {
       setFeeLoading(true)
-      setFeeError(undefined)
+        setFeeError(undefined)
       try {
         if (!connectorId) throw new Error("Wallet not connected")
-        const signer = await getOfflineSignerForConnector(connectorId)
+        const client = await connectClassicStargateClientForConnector(
+          connectorId,
+          feeDenom
+        )
         const msgs = selected.map((validator) => ({
           typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
           value: MsgWithdrawDelegatorReward.fromPartial({
@@ -259,15 +261,8 @@ const WithdrawRewards = () => {
             validatorAddress: validator
           })
         }))
-        const gasPrice = GasPrice.fromString(`28.325${feeDenom}`)
-        const client = await SigningStargateClient.connectWithSigner(
-          CLASSIC_CHAIN.rpc,
-          signer,
-          { gasPrice }
-        )
         const gasUsed = await client.simulate(accountAddress, msgs, "")
-        const gasPriceAmount = Number(gasPrice.amount.toString())
-        const feeMicro = Math.ceil(gasUsed * gasPriceAmount).toString()
+        const feeMicro = Math.ceil(gasUsed * 28.325).toString()
         const feeDisplay = formatTokenAmount(
           feeMicro,
           CLASSIC_DENOMS.lunc.coinDecimals,
@@ -317,11 +312,9 @@ const WithdrawRewards = () => {
       setSubmitting(true)
       startTx("Withdraw rewards")
       if (!connectorId) throw new Error("Wallet not connected")
-      const signer = await getOfflineSignerForConnector(connectorId)
-      const client = await SigningStargateClient.connectWithSigner(
-        CLASSIC_CHAIN.rpc,
-        signer,
-        { gasPrice: GasPrice.fromString(`28.325${feeDenom}`) }
+      const client = await connectClassicStargateClientForConnector(
+        connectorId,
+        feeDenom
       )
       const msgs = selected.map((validator) => ({
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",

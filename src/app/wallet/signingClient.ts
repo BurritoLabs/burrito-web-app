@@ -50,3 +50,11 @@ export const connectClassicSigningClient = async (signer: OfflineSigner) =>
     gasPrice: GasPrice.fromString(`28.325${CLASSIC_DENOMS.lunc.coinMinimalDenom}`),
     registry: getClassicRegistry()
   })
+
+export const connectClassicStargateClient = async (
+  signer: OfflineSigner,
+  feeDenom: string = CLASSIC_DENOMS.lunc.coinMinimalDenom
+) =>
+  SigningStargateClient.connectWithSigner(CLASSIC_CHAIN.rpc, signer, {
+    gasPrice: GasPrice.fromString(`28.325${feeDenom}`)
+  })

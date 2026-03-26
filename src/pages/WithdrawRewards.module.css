@@ -416,6 +416,18 @@
     padding: 16px 14px;
   }
 
+  .validatorCard {
+    padding: 11px 12px;
+  }
+
+  .validatorRow {
+    gap: 6px;
+  }
+
+  .validatorItem {
+    gap: 3px;
+  }
+
   .validatorHeader dt,
   .validatorHeader dd,
   .validatorName,
@@ -445,6 +457,16 @@
 
   .feeCard {
     margin-top: 12px;
+  }
+
+  .feeRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .feeLeft {
+    justify-content: space-between;
+    width: 100%;
   }
 
   .submit {

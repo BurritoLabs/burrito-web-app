@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
 import {
   MsgDelegate,
   MsgBeginRedelegate,
@@ -7,8 +6,8 @@ import {
 } from "cosmjs-types/cosmos/staking/v1beta1/tx"
 import { useWallet } from "../app/wallet/WalletContext"
 import styles from "./StakeManageModal.module.css"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
-import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
+import { CLASSIC_DENOMS } from "../app/chain"
+import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
 import { formatTokenAmount } from "../app/utils/format"
 
 type DelegationItem = {
@@ -173,7 +172,7 @@ const StakeManageModal = ({
       }
       try {
         if (!connectorId) throw new Error("Wallet not connected")
-        const signer = await getOfflineSignerForConnector(connectorId)
+        const client = await connectClassicStargateClientForConnector(connectorId)
 
         const msg =
           tab === "Redelegate"
@@ -213,17 +212,8 @@ const StakeManageModal = ({
                 })
               }
 
-        const gasPrice = GasPrice.fromString(
-          `28.325${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
-        )
-        const client = await SigningStargateClient.connectWithSigner(
-          CLASSIC_CHAIN.rpc,
-          signer,
-          { gasPrice }
-        )
         const gasUsed = await client.simulate(accountAddress, [msg], "")
-        const gasPriceAmount = Number(gasPrice.amount.toString())
-        const feeMicro = Math.ceil(gasUsed * gasPriceAmount).toString()
+        const feeMicro = Math.ceil(gasUsed * GAS_PRICE_MICRO_LUNC).toString()
         const feeDisplay = formatTokenAmount(
           feeMicro,
           CLASSIC_DENOMS.lunc.coinDecimals,
@@ -289,7 +279,7 @@ const StakeManageModal = ({
       setSubmitError(undefined)
       startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
-      const signer = await getOfflineSignerForConnector(connectorId)
+      const client = await connectClassicStargateClientForConnector(connectorId)
 
       const msg =
         tab === "Redelegate"
@@ -329,14 +319,6 @@ const StakeManageModal = ({
               })
             }
 
-      const gasPrice = GasPrice.fromString(
-        `28.325${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
-      )
-      const client = await SigningStargateClient.connectWithSigner(
-        CLASSIC_CHAIN.rpc,
-        signer,
-        { gasPrice }
-      )
       const amountCoin = {
         denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
         amount: microAmount

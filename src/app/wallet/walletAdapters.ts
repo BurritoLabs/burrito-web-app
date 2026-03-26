@@ -1,6 +1,10 @@
 import type { OfflineSigner } from "@cosmjs/proto-signing"
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { KEPLR_CHAIN_CONFIG } from "../chain"
-import { connectClassicSigningClient } from "./signingClient"
+import {
+  connectClassicSigningClient,
+  connectClassicStargateClient
+} from "./signingClient"
 import {
   connectGalaxyWallet,
   disconnectGalaxyWallet,
@@ -18,6 +22,71 @@ type WalletAdapterRuntime = {
   connect?: (id: WalletConnectorId) => Promise<WalletAccount | undefined>
   disconnect?: (id: WalletConnectorId) => Promise<void>
   getOfflineSigner?: (id: WalletConnectorId) => Promise<OfflineSigner | undefined>
+  getSigningStargateClient?: (
+    id: WalletConnectorId,
+    feeDenom?: string
+  ) => Promise<ClassicStargateClient | undefined>
+}
+
+type EncodeObjectLike = {
+  typeUrl: string
+  value: unknown
+}
+
+type StdFeeLike = {
+  amount: Array<{ amount: string; denom: string }>
+  gas: string
+}
+
+type BroadcastResultLike = {
+  code: number
+  rawLog?: string
+  transactionHash: string
+}
+
+type SignerDataLike = {
+  accountNumber: number
+  sequence: number
+  chainId: string
+}
+
+export type ClassicStargateClient = {
+  simulate: (
+    signerAddress: string,
+    messages: readonly EncodeObjectLike[],
+    memo: string
+  ) => Promise<number>
+  signAndBroadcast: (
+    signerAddress: string,
+    messages: readonly EncodeObjectLike[],
+    fee: "auto" | StdFeeLike,
+    memo?: string
+  ) => Promise<BroadcastResultLike>
+  getSequence: (
+    address: string
+  ) => Promise<{ accountNumber: number; sequence: number }>
+  sign: (
+    signerAddress: string,
+    messages: readonly EncodeObjectLike[],
+    fee: StdFeeLike,
+    memo: string,
+    signerData: SignerDataLike
+  ) => Promise<TxRaw>
+  broadcastTxSync: (tx: Uint8Array) => Promise<string>
+  delegateTokens: (
+    delegatorAddress: string,
+    validatorAddress: string,
+    amount: { denom: string; amount: string },
+    fee: "auto" | StdFeeLike,
+    memo?: string
+  ) => Promise<BroadcastResultLike>
+  undelegateTokens: (
+    delegatorAddress: string,
+    validatorAddress: string,
+    amount: { denom: string; amount: string },
+    fee: "auto" | StdFeeLike,
+    memo?: string
+  ) => Promise<BroadcastResultLike>
 }
 
 type InjectedKey = {
@@ -202,3 +271,20 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
 export const connectClassicSigningClientForConnector = async (
   id: WalletConnectorId
 ) => connectClassicSigningClient(await getOfflineSignerForConnector(id))
+
+export const connectClassicStargateClientForConnector = async (
+  id: WalletConnectorId,
+  feeDenom?: string
+) : Promise<ClassicStargateClient> => {
+  const runtimeClient = await walletAdapterRuntime?.getSigningStargateClient?.(
+    id,
+    feeDenom
+  )
+  if (runtimeClient) {
+    return runtimeClient
+  }
+  return connectClassicStargateClient(
+    await getOfflineSignerForConnector(id),
+    feeDenom
+  )
+}

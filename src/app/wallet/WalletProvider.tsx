@@ -21,6 +21,7 @@ import {
 import {
   connectWalletConnector,
   disconnectWalletConnector,
+  type ClassicStargateClient,
   registerWalletAdapterRuntime
 } from "./walletAdapters"
 import {
@@ -30,6 +31,7 @@ import {
 
 const STORAGE_KEY = "burritoWalletConnector"
 const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = ["keplr", "galaxy"]
+const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
 
 const isKnownConnectorId = (
   value: string | null
@@ -209,7 +211,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         const settled = await Promise.race([
           connectPromise.then(() => "resolved" as const),
           new Promise<"pending">((resolve) =>
-            window.setTimeout(() => resolve("pending"), 180)
+            window.setTimeout(
+              () => resolve("pending"),
+              MOBILE_CONNECT_HANDOFF_TIMEOUT_MS
+            )
           )
         ])
 
@@ -391,18 +396,61 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshConnectors])
 
   useEffect(() => {
+    const getSigningStargateClient = async (
+      id: keyof typeof COSMOS_CONNECTOR_CONFIGS
+    ): Promise<ClassicStargateClient | undefined> => {
+      const wallet =
+        getPreferredCosmosWallet(id, { preferConnected: true }) ??
+        getPreferredCosmosWallet(id)
+      if (!wallet) {
+        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} signer not available`)
+      }
+
+      const activeWallet = cosmosChain.walletRepo.current
+      if (
+        activeWallet?.walletName === wallet.walletName &&
+        cosmosChain.isWalletConnected
+      ) {
+        return (await activeWallet.getSigningStargateClient()) as ClassicStargateClient
+      }
+
+      if (wallet.isWalletDisconnected) {
+        await wallet.connect(false)
+      }
+      if (!wallet.address) {
+        await wallet.update({ connect: false })
+        await waitForWalletAddress(wallet)
+      }
+      if (!wallet.address) {
+        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
+      }
+
+      return (await wallet.getSigningStargateClient()) as ClassicStargateClient
+    }
+
     registerWalletAdapterRuntime({
       getConnector: (id) =>
         isCosmosConnectorId(id) ? getCosmosConnector(id) : undefined,
       connect: async (id) =>
         isCosmosConnectorId(id) ? await connectCosmosConnector(id) : undefined,
       getOfflineSigner: async (id) =>
-        isCosmosConnectorId(id) ? await getCosmosOfflineSigner(id) : undefined
+        isCosmosConnectorId(id) ? await getCosmosOfflineSigner(id) : undefined,
+      getSigningStargateClient: async (id) =>
+        isCosmosConnectorId(id)
+          ? await getSigningStargateClient(id)
+          : undefined
     })
     return () => {
       registerWalletAdapterRuntime(undefined)
     }
-  }, [connectCosmosConnector, getCosmosConnector, getCosmosOfflineSigner])
+  }, [
+    connectCosmosConnector,
+    cosmosChain.isWalletConnected,
+    cosmosChain.walletRepo,
+    getCosmosConnector,
+    getCosmosOfflineSigner,
+    getPreferredCosmosWallet
+  ])
 
   useEffect(() => {
     if (!activeCosmosConnectorId || !cosmosChain.isWalletConnected || !cosmosChain.address) {

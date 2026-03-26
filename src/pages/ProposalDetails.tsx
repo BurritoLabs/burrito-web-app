@@ -10,7 +10,7 @@ import {
 import { createPortal } from "react-dom"
 import { useLocation, useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { SigningStargateClient, GasPrice } from "@cosmjs/stargate"
+import { SigningStargateClient } from "@cosmjs/stargate"
 import { MsgDeposit, MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import PageShell from "./PageShell"
@@ -38,7 +38,7 @@ import {
 import { convertBech32Prefix } from "../app/utils/bech32"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
 import { useWallet } from "../app/wallet/WalletContext"
-import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
+import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
 import type {
   CoinBalance,
   GovDepositParams,
@@ -862,16 +862,8 @@ const ProposalDetails = () => {
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const signer = await getOfflineSignerForConnector(connectorId)
-
-          const client = await SigningStargateClient.connectWithSigner(
-            CLASSIC_CHAIN.rpc,
-            signer,
-            {
-              gasPrice: GasPrice.fromString(
-                `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
-              )
-            }
+          const client = await connectClassicStargateClientForConnector(
+            connectorId
           )
           const signerState = await client.getSequence(account.address)
           const sequenceToUse = sequenceHint ?? signerState.sequence
@@ -999,15 +991,8 @@ const ProposalDetails = () => {
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const signer = await getOfflineSignerForConnector(connectorId)
-          const client = await SigningStargateClient.connectWithSigner(
-            CLASSIC_CHAIN.rpc,
-            signer,
-            {
-              gasPrice: GasPrice.fromString(
-                `${GAS_PRICE_MICRO}${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
-              )
-            }
+          const client = await connectClassicStargateClientForConnector(
+            connectorId
           )
           const signerState = await client.getSequence(account.address)
           const sequenceToUse = sequenceHint ?? signerState.sequence
