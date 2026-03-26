@@ -72,6 +72,16 @@ const buildWalletAccount = (wallet: ChainWalletBase): WalletAccount | undefined 
   }
 }
 
+const waitForWalletAddress = async (wallet: ChainWalletBase, attempts = 10, delayMs = 200) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (wallet.address) {
+      return wallet.address
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+  }
+  return wallet.address
+}
+
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const cosmosChain = useChain(COSMOS_KIT_CHAIN_NAME)
   const [status, setStatus] = useState<WalletStatus>("disconnected")
@@ -180,12 +190,30 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       if (!wallet) {
         throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} not available`)
       }
-      await wallet.connect(true)
       const isMobileWallet =
         wallet.walletName === COSMOS_CONNECTOR_CONFIGS[id].mobileWalletName
+
       if (isMobileWallet) {
-        return undefined
+        const connectPromise = wallet.connect(true)
+        const settled = await Promise.race([
+          connectPromise.then(() => "resolved" as const),
+          new Promise<"pending">((resolve) =>
+            window.setTimeout(() => resolve("pending"), 180)
+          )
+        ])
+
+        if (settled === "pending") {
+          void connectPromise.catch(() => {
+            // The normal wallet state flow will surface follow-up errors.
+          })
+          return undefined
+        }
+
+        await waitForWalletAddress(wallet, 5, 150)
+        return buildWalletAccount(wallet)
       }
+
+      await wallet.connect(true)
       return buildWalletAccount(wallet)
     },
     [getPreferredCosmosWallet]
@@ -201,6 +229,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
       if (wallet.isWalletDisconnected) {
         await wallet.connect(false)
+      }
+      if (!wallet.address) {
+        await wallet.update({ connect: false })
+        await waitForWalletAddress(wallet)
+      }
+      if (!wallet.address) {
+        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
       }
       if (!wallet.offlineSigner) {
         await wallet.initOfflineSigner()
