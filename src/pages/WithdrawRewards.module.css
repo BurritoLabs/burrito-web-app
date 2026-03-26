@@ -14,6 +14,8 @@
   padding: 0;
   background: transparent;
   border: 0;
+  display: inline-flex;
+  align-items: center;
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   cursor: pointer;
@@ -325,6 +327,20 @@
     gap: 14px;
   }
 
+  .actions {
+    width: 100%;
+  }
+
+  .actionButton {
+    margin-left: 0;
+    width: 100%;
+    min-height: 36px;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid rgba(82, 196, 26, 0.18);
+    background: rgba(82, 196, 26, 0.08);
+  }
+
   .validatorCard,
   .feeCard {
     padding: 12px;
@@ -414,10 +430,13 @@
   .summaryCard {
     --reward-icon-size: 20px;
     --reward-icon-gap: 7px;
+    padding: 9px;
   }
 
   .summarySymbol {
     font-size: 13px;
+    white-space: normal;
+    line-height: 1.2;
   }
 
   .summaryAmount {
@@ -431,5 +450,9 @@
   .submit {
     height: 40px;
     border-radius: 999px;
+  }
+
+  .actionButton {
+    min-height: 38px;
   }
 }
