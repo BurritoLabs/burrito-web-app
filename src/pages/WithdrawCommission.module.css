@@ -1,13 +1,13 @@
 .pageCard {
   display: grid;
-  gap: 16px;
-  padding: var(--card-padding);
+  gap: 14px;
+  padding: 18px;
 }
 
 .emptyState {
   border: 1px dashed rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 8px;
+  padding: 14px 16px;
   font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.75);
 }
@@ -41,7 +41,7 @@
 
 .commissionList {
   border: 1px solid var(--card-border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--card-bg-muted);
   overflow: hidden;
 }
@@ -102,9 +102,9 @@
 
 .feeCard {
   border: 1px solid var(--card-border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--card-bg-muted);
-  padding: 12px 14px;
+  padding: 12px;
 }
 
 .feeRow {
@@ -233,8 +233,8 @@
 
 @media (max-width: 767.98px) {
   .pageCard {
-    gap: 12px;
-    padding: 14px 12px;
+    gap: 10px;
+    padding: 12px;
   }
 
   .commissionRow,

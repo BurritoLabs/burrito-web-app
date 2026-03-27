@@ -1,7 +1,7 @@
 .pageCard {
   display: grid;
-  gap: 16px;
-  padding: var(--card-padding);
+  gap: 14px;
+  padding: 18px;
 }
 
 .actions {
@@ -22,9 +22,10 @@
 }
 
 .validatorCard {
-  padding: 12px 14px;
+  padding: 12px;
   background: var(--card-bg-muted);
   border: 1px solid var(--card-border);
+  border-radius: 8px;
 }
 
 .validatorHeader {
@@ -191,10 +192,10 @@
 }
 
 .feeCard {
-  margin-top: 16px;
-  padding: 12px 16px;
+  padding: 12px;
   background: var(--card-bg-muted);
   border: 1px solid var(--card-border);
+  border-radius: 8px;
 }
 
 .feeRow {
@@ -324,8 +325,8 @@
 
 @media (max-width: 767.98px) {
   .pageCard {
-    gap: 12px;
-    padding: 14px 12px;
+    gap: 10px;
+    padding: 12px;
   }
 
   .actions {
@@ -344,7 +345,7 @@
 
   .validatorCard,
   .feeCard {
-    padding: 10px 12px;
+    padding: 11px 12px;
   }
 
   .validatorHeader {
@@ -454,10 +455,6 @@
 
   .summaryAmount {
     font-size: 11px;
-  }
-
-  .feeCard {
-    margin-top: 12px;
   }
 
   .feeRow {
