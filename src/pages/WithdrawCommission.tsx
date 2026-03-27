@@ -296,7 +296,8 @@ const WithdrawCommission = () => {
   const feeSymbol = toSymbol(feeDenom)
 
   return (
-    <PageShell title="Withdraw commission" small backTo="/stake" backLabel="">
+    <PageShell title="Withdraw commission" backTo="/stake" backLabel="">
+      <div className={styles.pageLayout}>
       <div className={`card ${styles.pageShellCard}`}>
         <div className={styles.pageCard}>
         {!account?.address ? (
@@ -390,6 +391,7 @@ const WithdrawCommission = () => {
           </>
         )}
         </div>
+      </div>
       </div>
     </PageShell>
   )

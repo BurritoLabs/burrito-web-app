@@ -1,4 +1,13 @@
+.pageLayout {
+  width: 100%;
+  max-width: 840px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
 .pageShellCard {
+  width: 100%;
+  min-width: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -27,6 +36,7 @@
 }
 
 .validatorCard {
+  min-width: 0;
   padding: 12px;
   background: var(--card-bg-muted);
   border: 1px solid var(--card-border);
@@ -117,6 +127,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-top: 14px;
+  min-width: 0;
 }
 
 .summaryCard {
@@ -197,6 +208,7 @@
 }
 
 .feeCard {
+  min-width: 0;
   padding: 12px;
   background: var(--card-bg-muted);
   border: 1px solid var(--card-border);

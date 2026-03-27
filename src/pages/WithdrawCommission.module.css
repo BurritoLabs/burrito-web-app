@@ -1,4 +1,13 @@
+.pageLayout {
+  width: 100%;
+  max-width: 840px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
 .pageShellCard {
+  width: 100%;
+  min-width: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -45,6 +54,7 @@
 }
 
 .commissionList {
+  min-width: 0;
   border: 1px solid var(--card-border);
   border-radius: 8px;
   background: var(--card-bg-muted);
@@ -106,6 +116,7 @@
 }
 
 .feeCard {
+  min-width: 0;
   border: 1px solid var(--card-border);
   border-radius: 8px;
   background: var(--card-bg-muted);
