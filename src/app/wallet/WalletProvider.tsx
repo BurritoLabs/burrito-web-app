@@ -21,7 +21,6 @@ import {
 import {
   connectWalletConnector,
   disconnectWalletConnector,
-  type ClassicStargateClient,
   registerWalletAdapterRuntime
 } from "./walletAdapters"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
@@ -380,48 +379,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshConnectors])
 
   useEffect(() => {
-    const getSigningStargateClient = async (
-      id: keyof typeof COSMOS_CONNECTOR_CONFIGS
-    ): Promise<ClassicStargateClient | undefined> => {
-      const wallet =
-        getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
-      if (!wallet) {
-        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} signer not available`)
-      }
-
-      const activeWallet = cosmosChain.walletRepo.current
-      if (
-        activeWallet?.walletName === wallet.walletName &&
-        cosmosChain.isWalletConnected
-      ) {
-        return (await activeWallet.getSigningStargateClient()) as ClassicStargateClient
-      }
-
-      if (wallet.isWalletDisconnected) {
-        await wallet.connect(false)
-      }
-      if (!wallet.address) {
-        await wallet.update({ connect: false })
-        await waitForWalletAddress(wallet)
-      }
-      if (!wallet.address) {
-        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
-      }
-
-      return (await wallet.getSigningStargateClient()) as ClassicStargateClient
-    }
-
     registerWalletAdapterRuntime({
       getConnector: (id) =>
         isCosmosConnectorId(id) ? getCosmosConnector(id) : undefined,
       connect: async (id) =>
         isCosmosConnectorId(id) ? await connectCosmosConnector(id) : undefined,
       getOfflineSigner: async (id) =>
-        isCosmosConnectorId(id) ? await getCosmosOfflineSigner(id) : undefined,
-      getSigningStargateClient: async (id) =>
-        isCosmosConnectorId(id)
-          ? await getSigningStargateClient(id)
-          : undefined
+        isCosmosConnectorId(id) ? await getCosmosOfflineSigner(id) : undefined
     })
     return () => {
       registerWalletAdapterRuntime(undefined)
@@ -431,8 +395,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     cosmosChain.isWalletConnected,
     cosmosChain.walletRepo,
     getCosmosConnector,
-    getCosmosOfflineSigner,
-    getCosmosWallet
+    getCosmosOfflineSigner
   ])
 
   useEffect(() => {
