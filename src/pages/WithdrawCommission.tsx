@@ -329,58 +329,62 @@ const WithdrawCommission = () => {
               )}
             </div>
 
-            <div className={styles.feeCard}>
-              <div className={styles.feeRow}>
-                <div className={styles.feeLeft}>
-                  <span className={styles.feeLabel}>Fee</span>
-                  <div className={styles.feeSelectWrap} ref={feeRef}>
-                    <button
-                      type="button"
-                      className={styles.feeSelectButton}
-                      onClick={() => setFeeOpen((open) => !open)}
-                      disabled={feeLoading}
-                    >
-                      <span>{feeSymbol}</span>
-                      <span className={styles.feeCaret} />
-                    </button>
-                    {feeOpen ? (
-                      <div className={styles.feeDropdown}>
-                        {FEE_DENOM_OPTIONS.map((denom) => (
-                          <button
-                            key={denom}
-                            type="button"
-                            className={`${styles.feeOption} ${
-                              denom === feeDenom ? styles.feeOptionActive : ""
-                            }`}
-                            onClick={() => {
-                              setFeeDenom(denom)
-                              setFeeOpen(false)
-                            }}
-                          >
-                            {toSymbol(denom)}
-                          </button>
-                        ))}
+            {commissionItems.length ? (
+              <>
+                <div className={styles.feeCard}>
+                  <div className={styles.feeRow}>
+                    <div className={styles.feeLeft}>
+                      <span className={styles.feeLabel}>Fee</span>
+                      <div className={styles.feeSelectWrap} ref={feeRef}>
+                        <button
+                          type="button"
+                          className={styles.feeSelectButton}
+                          onClick={() => setFeeOpen((open) => !open)}
+                          disabled={feeLoading}
+                        >
+                          <span>{feeSymbol}</span>
+                          <span className={styles.feeCaret} />
+                        </button>
+                        {feeOpen ? (
+                          <div className={styles.feeDropdown}>
+                            {FEE_DENOM_OPTIONS.map((denom) => (
+                              <button
+                                key={denom}
+                                type="button"
+                                className={`${styles.feeOption} ${
+                                  denom === feeDenom ? styles.feeOptionActive : ""
+                                }`}
+                                onClick={() => {
+                                  setFeeDenom(denom)
+                                  setFeeOpen(false)
+                                }}
+                              >
+                                {toSymbol(denom)}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
+                    </div>
+                    <div className={styles.feeValue}>
+                      {feeLoading ? "Estimating..." : `${fee} ${feeSymbol}`}
+                    </div>
                   </div>
+                  {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
                 </div>
-                <div className={styles.feeValue}>
-                  {feeLoading ? "Estimating..." : `${fee} ${feeSymbol}`}
-                </div>
-              </div>
-              {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
-            </div>
 
-            <button
-              type="button"
-              className={styles.submit}
-              disabled={submitting}
-              onClick={submit}
-            >
-              {submitting ? "Submitting..." : "Submit"}
-            </button>
-            {submitError ? (
-              <div className={styles.submitError}>{submitError}</div>
+                <button
+                  type="button"
+                  className={styles.submit}
+                  disabled={submitting}
+                  onClick={submit}
+                >
+                  {submitting ? "Submitting..." : "Submit"}
+                </button>
+                {submitError ? (
+                  <div className={styles.submitError}>{submitError}</div>
+                ) : null}
+              </>
             ) : null}
           </>
         )}

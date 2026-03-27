@@ -358,25 +358,27 @@ const WithdrawRewards = () => {
   return (
     <PageShell title="Withdraw rewards" backTo="/stake" backLabel="" small>
       <div className={`card ${styles.pageCard}`}>
-        <div className={styles.actions}>
-          {selected.length !== rewards.length ? (
-            <button
-              type="button"
-              className={styles.actionButton}
-              onClick={() => toggleAll(true)}
-            >
-              Select All
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={styles.actionButton}
-              onClick={() => toggleAll(false)}
-            >
-              Deselect All
-            </button>
-          )}
-        </div>
+        {rewards.length ? (
+          <div className={styles.actions}>
+            {selected.length !== rewards.length ? (
+              <button
+                type="button"
+                className={styles.actionButton}
+                onClick={() => toggleAll(true)}
+              >
+                Select All
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.actionButton}
+                onClick={() => toggleAll(false)}
+              >
+                Deselect All
+              </button>
+            )}
+          </div>
+        ) : null}
 
         <div className={`card ${styles.validatorCard}`}>
           <dl className={styles.validatorHeader}>
@@ -415,127 +417,137 @@ const WithdrawRewards = () => {
           </div>
         </div>
 
-        <div className={styles.summaryDivider} aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5.01 5a1 1 0 0 1-1.4 0l-5.01-5a1 1 0 1 1 1.42-1.42L11 15.59V5a1 1 0 0 1 1-1z"
-            />
-          </svg>
-        </div>
-
-        <div className={styles.summaryGrid}>
-          {totalsList.map(({ denom, amount }) => {
-            const ibcToken =
-              denom.startsWith("ibc/") ? ibcWhitelist?.[denom.slice(4)] : undefined
-            return (
-              <div key={denom} className={`card ${styles.summaryCard}`}>
-                <div className={styles.summaryHeader}>
-                  <TokenIcon
-                    symbol={getSymbol(
-                      denom,
-                      denom.startsWith("ibc/") ? ibcToken?.symbol : undefined
-                    )}
-                    candidates={buildIconCandidates(
-                      denom,
-                      denom.startsWith("ibc/")
-                        ? ibcToken?.icon ?? "/system/ibc.svg"
-                        : undefined
-                    )}
-                  />
-                  <span className={styles.summarySymbol}>
-                    {formatRewardSymbol(
-                      denom,
-                      denom.startsWith("ibc/") ? ibcToken?.symbol : undefined
-                    )}
-                  </span>
-                </div>
-                <div className={styles.summaryDividerLine} />
-                <div className={styles.summaryAmount}>
-                  {formatTokenAmount(
-                    amount.toString(),
-                    CLASSIC_DENOMS.lunc.coinDecimals,
-                    6
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className={`card ${styles.feeCard}`}>
-          <div className={styles.feeRow}>
-            <div className={styles.feeLeft} ref={feeRef}>
-              <span className={styles.feeLabel}>Fee</span>
-              <div className={styles.feeSelectWrap}>
-                <button
-                  type="button"
-                  className={styles.feeSelectButton}
-                  onClick={() => setFeeOpen((prev) => !prev)}
-                >
-                  {getSymbol(feeDenom)}
-                  <span className={styles.feeCaret} aria-hidden="true" />
-                </button>
-                {feeOpen ? (
-                  <div className={styles.feeDropdown}>
-                    <button
-                      type="button"
-                      className={`${styles.feeOption} ${
-                        feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
-                          ? styles.feeOptionActive
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setFeeDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
-                        setFeeOpen(false)
-                      }}
-                    >
-                      LUNC
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.feeOption} ${
-                        feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom
-                          ? styles.feeOptionActive
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setFeeDenom(CLASSIC_DENOMS.ustc.coinMinimalDenom)
-                        setFeeOpen(false)
-                      }}
-                    >
-                      USTC
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+        {totalsList.length ? (
+          <>
+            <div className={styles.summaryDivider} aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M12 4a1 1 0 0 1 1 1v10.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5.01 5a1 1 0 0 1-1.4 0l-5.01-5a1 1 0 1 1 1.42-1.42L11 15.59V5a1 1 0 0 1 1-1z"
+                />
+              </svg>
             </div>
-            <span className={styles.feeValue}>
-              {feeLoading
-                ? "Estimating..."
-                : fee === "--"
-                ? "--"
-                : `${fee} ${getSymbol(feeDenom)}`}
-            </span>
-          </div>
-          {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
-        </div>
 
-        {submitError ? (
-          <div className={styles.submitError}>{submitError}</div>
+            <div className={styles.summaryGrid}>
+              {totalsList.map(({ denom, amount }) => {
+                const ibcToken =
+                  denom.startsWith("ibc/")
+                    ? ibcWhitelist?.[denom.slice(4)]
+                    : undefined
+                return (
+                  <div key={denom} className={`card ${styles.summaryCard}`}>
+                    <div className={styles.summaryHeader}>
+                      <TokenIcon
+                        symbol={getSymbol(
+                          denom,
+                          denom.startsWith("ibc/") ? ibcToken?.symbol : undefined
+                        )}
+                        candidates={buildIconCandidates(
+                          denom,
+                          denom.startsWith("ibc/")
+                            ? ibcToken?.icon ?? "/system/ibc.svg"
+                            : undefined
+                        )}
+                      />
+                      <span className={styles.summarySymbol}>
+                        {formatRewardSymbol(
+                          denom,
+                          denom.startsWith("ibc/") ? ibcToken?.symbol : undefined
+                        )}
+                      </span>
+                    </div>
+                    <div className={styles.summaryDividerLine} />
+                    <div className={styles.summaryAmount}>
+                      {formatTokenAmount(
+                        amount.toString(),
+                        CLASSIC_DENOMS.lunc.coinDecimals,
+                        6
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
         ) : null}
-        <button
-          type="button"
-          className={`${styles.submit} ${
-            !accountAddress || !selected.length || submitting
-              ? styles.disabled
-              : ""
-          }`}
-          disabled={!accountAddress || !selected.length || submitting}
-          onClick={submit}
-        >
-          {submitting ? "Submitting..." : "Submit"}
-        </button>
+
+        {rewards.length ? (
+          <>
+            <div className={`card ${styles.feeCard}`}>
+              <div className={styles.feeRow}>
+                <div className={styles.feeLeft} ref={feeRef}>
+                  <span className={styles.feeLabel}>Fee</span>
+                  <div className={styles.feeSelectWrap}>
+                    <button
+                      type="button"
+                      className={styles.feeSelectButton}
+                      onClick={() => setFeeOpen((prev) => !prev)}
+                    >
+                      {getSymbol(feeDenom)}
+                      <span className={styles.feeCaret} aria-hidden="true" />
+                    </button>
+                    {feeOpen ? (
+                      <div className={styles.feeDropdown}>
+                        <button
+                          type="button"
+                          className={`${styles.feeOption} ${
+                            feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+                              ? styles.feeOptionActive
+                              : ""
+                          }`}
+                          onClick={() => {
+                            setFeeDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+                            setFeeOpen(false)
+                          }}
+                        >
+                          LUNC
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.feeOption} ${
+                            feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+                              ? styles.feeOptionActive
+                              : ""
+                          }`}
+                          onClick={() => {
+                            setFeeDenom(CLASSIC_DENOMS.ustc.coinMinimalDenom)
+                            setFeeOpen(false)
+                          }}
+                        >
+                          USTC
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <span className={styles.feeValue}>
+                  {feeLoading
+                    ? "Estimating..."
+                    : fee === "--"
+                    ? "--"
+                    : `${fee} ${getSymbol(feeDenom)}`}
+                </span>
+              </div>
+              {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
+            </div>
+
+            {submitError ? (
+              <div className={styles.submitError}>{submitError}</div>
+            ) : null}
+            <button
+              type="button"
+              className={`${styles.submit} ${
+                !accountAddress || !selected.length || submitting
+                  ? styles.disabled
+                  : ""
+              }`}
+              disabled={!accountAddress || !selected.length || submitting}
+              onClick={submit}
+            >
+              {submitting ? "Submitting..." : "Submit"}
+            </button>
+          </>
+        ) : null}
       </div>
     </PageShell>
   )

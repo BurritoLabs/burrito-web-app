@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react"
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error"
-export type WalletConnectorId = "keplr" | "galaxy"
+export type WalletConnectorId = "keplr" | "keplr-mobile" | "galaxy"
 export type TxStatus = "idle" | "pending" | "success" | "error"
 
 export type TxState = {

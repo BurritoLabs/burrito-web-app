@@ -121,21 +121,28 @@ export const COSMOS_KIT_CHAINS = [COSMOS_KIT_CHAIN]
 export const COSMOS_KIT_ASSET_LISTS = [COSMOS_KIT_ASSET_LIST]
 
 export const COSMOS_CONNECTOR_CONFIGS: Record<
-  "keplr",
+  "keplr" | "keplr-mobile",
   {
-    id: "keplr"
+    id: "keplr" | "keplr-mobile"
     label: string
     badge: string
-    extensionWalletName: string
-    mobileWalletName: string
+    walletName: string
+    type: "extension" | "mobile"
   }
 > = {
   keplr: {
     id: "keplr",
     label: "Keplr",
     badge: "K",
-    extensionWalletName: "keplr-extension",
-    mobileWalletName: "keplr-mobile"
+    walletName: "keplr-extension",
+    type: "extension"
+  },
+  "keplr-mobile": {
+    id: "keplr-mobile",
+    label: "Keplr Mobile",
+    badge: "K",
+    walletName: "keplr-mobile",
+    type: "mobile"
   }
 }
 
@@ -152,8 +159,7 @@ export const COSMOS_WALLET_NAME_TO_CONNECTOR_ID = Object.values(
   COSMOS_CONNECTOR_CONFIGS
 ).reduce<Record<string, keyof typeof COSMOS_CONNECTOR_CONFIGS>>(
   (result, config) => {
-    result[config.extensionWalletName] = config.id
-    result[config.mobileWalletName] = config.id
+    result[config.walletName] = config.id
     return result
   },
   {}

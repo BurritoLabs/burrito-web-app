@@ -122,6 +122,12 @@ const CONNECTOR_META: Record<WalletConnectorId, WalletAdapterMeta> = {
     badge: "K",
     type: "extension"
   },
+  "keplr-mobile": {
+    id: "keplr-mobile",
+    label: "Keplr Mobile",
+    badge: "K",
+    type: "mobile"
+  },
   galaxy: {
     id: "galaxy",
     label: "Galaxy Station",
@@ -214,6 +220,10 @@ export const getWalletConnectors = (): WalletConnector[] => {
     keplrRuntimeConnector ?? {
       ...getConnectorMeta("keplr"),
       available: Boolean(walletWindow?.keplr)
+    },
+    {
+      ...getConnectorMeta("keplr-mobile"),
+      available: false
     },
     galaxyRuntimeConnector ?? getGalaxyConnector()
   ]
