@@ -1,3 +1,8 @@
+.pageShellCard {
+  padding: 0;
+  overflow: hidden;
+}
+
 .pageCard {
   display: grid;
   gap: 14px;
@@ -324,6 +329,10 @@
 }
 
 @media (max-width: 767.98px) {
+  .pageShellCard {
+    border-radius: 8px;
+  }
+
   .pageCard {
     gap: 10px;
     padding: 12px;

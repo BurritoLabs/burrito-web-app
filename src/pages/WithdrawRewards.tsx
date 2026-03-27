@@ -357,7 +357,8 @@ const WithdrawRewards = () => {
 
   return (
     <PageShell title="Withdraw rewards" backTo="/stake" backLabel="" small>
-      <div className={`card ${styles.pageCard}`}>
+      <div className={`card ${styles.pageShellCard}`}>
+        <div className={styles.pageCard}>
         {rewards.length ? (
           <div className={styles.actions}>
             {selected.length !== rewards.length ? (
@@ -548,6 +549,7 @@ const WithdrawRewards = () => {
             </button>
           </>
         ) : null}
+        </div>
       </div>
     </PageShell>
   )

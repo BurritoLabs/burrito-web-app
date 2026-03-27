@@ -297,7 +297,8 @@ const WithdrawCommission = () => {
 
   return (
     <PageShell title="Withdraw commission" small backTo="/stake" backLabel="">
-      <div className={`card ${styles.pageCard}`}>
+      <div className={`card ${styles.pageShellCard}`}>
+        <div className={styles.pageCard}>
         {!account?.address ? (
           <div className={styles.emptyState}>Connect wallet to continue.</div>
         ) : !validator || !valoperAddress ? (
@@ -388,6 +389,7 @@ const WithdrawCommission = () => {
             ) : null}
           </>
         )}
+        </div>
       </div>
     </PageShell>
   )
