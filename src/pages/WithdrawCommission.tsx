@@ -20,6 +20,9 @@ const FEE_DENOM_OPTIONS = [
   CLASSIC_DENOMS.ustc.coinMinimalDenom
 ] as const
 
+const DEFAULT_FEE_GAS = 220_000
+const GAS_ADJUSTMENT = 1.2
+
 const toSymbol = (denom: string) => {
   if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
     return CLASSIC_DENOMS.lunc.coinDenom
@@ -128,6 +131,7 @@ const WithdrawCommission = () => {
   const [feeOpen, setFeeOpen] = useState(false)
   const feeRef = useRef<HTMLDivElement | null>(null)
   const [fee, setFee] = useState("--")
+  const [feeGas, setFeeGas] = useState(DEFAULT_FEE_GAS)
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeError, setFeeError] = useState<string>()
   const [submitError, setSubmitError] = useState<string>()
@@ -201,18 +205,24 @@ const WithdrawCommission = () => {
                 })
               }
               const gasUsed = await client.simulate(account.address, [msg], "")
-              const feeMicro = Math.ceil(gasUsed * 28.325).toString()
+              const gasWanted = Math.max(
+                DEFAULT_FEE_GAS,
+                Math.ceil(gasUsed * GAS_ADJUSTMENT)
+              )
+              const feeMicro = Math.ceil(gasWanted * 28.325).toString()
               const feeDisplay = formatTokenAmount(
                 feeMicro,
                 CLASSIC_DENOMS.lunc.coinDecimals,
                 6
               )
               if (!cancelled) {
+                setFeeGas(gasWanted)
                 setFee(feeDisplay === "--" ? "--" : feeDisplay)
               }
             } catch (error) {
               if (!cancelled) {
                 setFee("--")
+                setFeeGas(DEFAULT_FEE_GAS)
                 setFeeError(
                   error instanceof Error ? error.message : "Fee estimation failed"
                 )
@@ -223,6 +233,7 @@ const WithdrawCommission = () => {
           }, 350)
     if (!account?.address || !valoperAddress || !validator) {
       setFee("--")
+      setFeeGas(DEFAULT_FEE_GAS)
       setFeeError(undefined)
       return undefined
     }
@@ -258,7 +269,15 @@ const WithdrawCommission = () => {
           validatorAddress: valoperAddress
         })
       }
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const result = await client.signAndBroadcast(account.address, [msg], {
+        amount: [
+          {
+            amount: Math.ceil(feeGas * 28.325).toString(),
+            denom: feeDenom
+          }
+        ],
+        gas: String(feeGas)
+      })
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }

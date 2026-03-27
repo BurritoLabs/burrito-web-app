@@ -18,6 +18,9 @@ import {
 } from "../app/utils/assetIcons"
 import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
 
+const GAS_ADJUSTMENT = 1.2
+const DEFAULT_FEE_GAS = 180_000
+
 const sumRewards = (rewards: RewardsByValidator[], selected: string[]) => {
   const totals = new Map<string, bigint>()
   rewards.forEach((item) => {
@@ -220,6 +223,7 @@ const WithdrawRewards = () => {
   const [feeOpen, setFeeOpen] = useState(false)
   const feeRef = useRef<HTMLDivElement | null>(null)
   const [fee, setFee] = useState("--")
+  const [feeGas, setFeeGas] = useState(DEFAULT_FEE_GAS)
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeError, setFeeError] = useState<string>()
   const [submitError, setSubmitError] = useState<string>()
@@ -241,13 +245,14 @@ const WithdrawRewards = () => {
     let cancelled = false
     if (!accountAddress || !selected.length) {
       setFee("--")
+      setFeeGas(DEFAULT_FEE_GAS)
       setFeeError(undefined)
       return undefined
     }
 
     const timer = window.setTimeout(async () => {
       setFeeLoading(true)
-        setFeeError(undefined)
+      setFeeError(undefined)
       try {
         if (!connectorId) throw new Error("Wallet not connected")
         const client = await connectClassicStargateClientForConnector(
@@ -262,18 +267,24 @@ const WithdrawRewards = () => {
           })
         }))
         const gasUsed = await client.simulate(accountAddress, msgs, "")
-        const feeMicro = Math.ceil(gasUsed * 28.325).toString()
+        const gasWanted = Math.max(
+          DEFAULT_FEE_GAS + selected.length * 45_000,
+          Math.ceil(gasUsed * GAS_ADJUSTMENT)
+        )
+        const feeMicro = Math.ceil(gasWanted * 28.325).toString()
         const feeDisplay = formatTokenAmount(
           feeMicro,
           CLASSIC_DENOMS.lunc.coinDecimals,
           6
         )
         if (!cancelled) {
+          setFeeGas(gasWanted)
           setFee(feeDisplay === "--" ? "--" : feeDisplay)
         }
       } catch (err) {
         if (!cancelled) {
           setFee("--")
+          setFeeGas(DEFAULT_FEE_GAS + selected.length * 45_000)
           setFeeError(
             err instanceof Error ? err.message : "Fee estimation failed"
           )
@@ -323,7 +334,15 @@ const WithdrawRewards = () => {
           validatorAddress: validator
         })
       }))
-      const result = await client.signAndBroadcast(accountAddress, msgs, "auto")
+      const result = await client.signAndBroadcast(accountAddress, msgs, {
+        amount: [
+          {
+            amount: Math.ceil(feeGas * 28.325).toString(),
+            denom: feeDenom
+          }
+        ],
+        gas: String(feeGas)
+      })
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }

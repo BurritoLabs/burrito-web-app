@@ -33,6 +33,49 @@ const STORAGE_KEY = "burritoWalletConnector"
 const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = ["keplr", "galaxy"]
 const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
 
+const connectMobileWallet = async (wallet: ChainWalletBase) => {
+  const attemptConnect = async (resetPairings: boolean) => {
+    if (resetPairings) {
+      try {
+        await wallet.disconnect(false, {
+          walletconnect: {
+            removeAllPairings: true
+          }
+        })
+      } catch {
+        // Best-effort cleanup for stale WalletConnect sessions.
+      }
+    }
+
+    const connectPromise = wallet.connect(true)
+    const settled = await Promise.race([
+      connectPromise.then(() => "resolved" as const),
+      new Promise<"pending">((resolve) =>
+        window.setTimeout(
+          () => resolve("pending"),
+          MOBILE_CONNECT_HANDOFF_TIMEOUT_MS
+        )
+      )
+    ])
+
+    if (settled === "pending") {
+      void connectPromise.catch(() => {
+        // The normal wallet state flow will surface follow-up errors.
+      })
+      return undefined
+    }
+
+    await waitForWalletAddress(wallet, 5, 150)
+    return buildWalletAccount(wallet)
+  }
+
+  try {
+    return await attemptConnect(false)
+  } catch {
+    return attemptConnect(true)
+  }
+}
+
 const isKnownConnectorId = (
   value: string | null
 ): value is WalletConnectorId => KNOWN_CONNECTOR_IDS.includes(value as WalletConnectorId)
@@ -196,37 +239,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         wallet.walletName === COSMOS_CONNECTOR_CONFIGS[id].mobileWalletName
 
       if (isMobileWallet) {
-        try {
-          await wallet.disconnect(false, {
-            walletconnect: {
-              removeAllPairings: true
-            }
-          })
-        } catch {
-          // Best-effort cleanup. Keplr Mobile sometimes keeps a stale pairing
-          // that opens the app without surfacing a fresh connection request.
-        }
-
-        const connectPromise = wallet.connect(true)
-        const settled = await Promise.race([
-          connectPromise.then(() => "resolved" as const),
-          new Promise<"pending">((resolve) =>
-            window.setTimeout(
-              () => resolve("pending"),
-              MOBILE_CONNECT_HANDOFF_TIMEOUT_MS
-            )
-          )
-        ])
-
-        if (settled === "pending") {
-          void connectPromise.catch(() => {
-            // The normal wallet state flow will surface follow-up errors.
-          })
-          return undefined
-        }
-
-        await waitForWalletAddress(wallet, 5, 150)
-        return buildWalletAccount(wallet)
+        return connectMobileWallet(wallet)
       }
 
       await wallet.connect(true)

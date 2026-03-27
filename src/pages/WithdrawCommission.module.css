@@ -233,12 +233,13 @@
 
 @media (max-width: 767.98px) {
   .pageCard {
-    gap: 14px;
+    gap: 12px;
+    padding: 14px 12px;
   }
 
   .commissionRow,
   .feeCard {
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .commissionRow {
@@ -279,7 +280,7 @@
 
 @media (max-width: 479.98px) {
   .pageCard {
-    padding: 16px 14px;
+    padding: 12px;
   }
 
   .commissionList {
@@ -297,7 +298,7 @@
   }
 
   .moniker {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .valoper,

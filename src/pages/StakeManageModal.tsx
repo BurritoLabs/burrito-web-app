@@ -39,6 +39,8 @@ const FALLBACK_GAS_BY_TAB = {
   Undelegate: 500_000
 } as const
 
+const GAS_ADJUSTMENT = 1.2
+
 const estimateFallbackFeeMicro = (
   tab: "Delegate" | "Redelegate" | "Undelegate"
 ) => {
@@ -64,6 +66,7 @@ const StakeManageModal = ({
   const sourceRef = useRef<HTMLDivElement | null>(null)
   const [fee, setFee] = useState("--")
   const [feeMicro, setFeeMicro] = useState<bigint>(0n)
+  const [gasWanted, setGasWanted] = useState<number>(FALLBACK_GAS_BY_TAB.Delegate)
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeError, setFeeError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
@@ -167,6 +170,7 @@ const StakeManageModal = ({
         6
       )
       if (!cancelled) {
+        setGasWanted(FALLBACK_GAS_BY_TAB[tab])
         setFee(fallbackFee === "--" ? "--" : fallbackFee)
         setFeeMicro(fallbackFeeMicro)
       }
@@ -213,19 +217,25 @@ const StakeManageModal = ({
               }
 
         const gasUsed = await client.simulate(accountAddress, [msg], "")
-        const feeMicro = Math.ceil(gasUsed * GAS_PRICE_MICRO_LUNC).toString()
+        const nextGasWanted = Math.max(
+          FALLBACK_GAS_BY_TAB[tab],
+          Math.ceil(gasUsed * GAS_ADJUSTMENT)
+        )
+        const feeMicro = Math.ceil(nextGasWanted * GAS_PRICE_MICRO_LUNC).toString()
         const feeDisplay = formatTokenAmount(
           feeMicro,
           CLASSIC_DENOMS.lunc.coinDecimals,
           6
         )
         if (!cancelled) {
+          setGasWanted(nextGasWanted)
           setFee(feeDisplay === "--" ? "--" : feeDisplay)
           setFeeMicro(BigInt(feeMicro))
         }
       } catch {
         if (!cancelled) {
           // Keep fallback fee when simulation fails to avoid blank fee UI.
+          setGasWanted(FALLBACK_GAS_BY_TAB[tab])
           setFeeError(undefined)
         }
       } finally {
@@ -319,32 +329,15 @@ const StakeManageModal = ({
               })
             }
 
-      const amountCoin = {
-        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-        amount: microAmount
-      }
-      let result
-      if (tab === "Delegate") {
-        result = await client.delegateTokens(
-          accountAddress,
-          validator,
-          amountCoin,
-          "auto"
-        )
-      } else if (tab === "Undelegate") {
-        result = await client.undelegateTokens(
-          accountAddress,
-          validator,
-          amountCoin,
-          "auto"
-        )
-      } else {
-        result = await client.signAndBroadcast(
-          accountAddress,
-          [msg],
-          "auto"
-        )
-      }
+      const result = await client.signAndBroadcast(accountAddress, [msg], {
+        amount: [
+          {
+            amount: feeMicro.toString(),
+            denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+          }
+        ],
+        gas: String(gasWanted)
+      })
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }
