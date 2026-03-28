@@ -44,11 +44,15 @@ const getMobileGalaxyWallet = () => {
 const shouldUseMobileGalaxyWallet = () => {
   if (typeof window === "undefined") return false
 
+  if (window.galaxyStation) {
+    return false
+  }
+
   if (isLikelyMobileBrowser()) {
     return true
   }
 
-  return !window.galaxyStation && isTouchWalletCapableBrowser()
+  return isTouchWalletCapableBrowser()
 }
 
 const decodePubkey = (value?: string) => {

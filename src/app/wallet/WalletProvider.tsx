@@ -78,6 +78,9 @@ const connectMobileWallet = async (wallet: ChainWalletBase) => {
   }
 }
 
+const hasDesktopKeplrProvider = () =>
+  typeof window !== "undefined" && Boolean((window as Window & { keplr?: unknown }).keplr)
+
 const isKnownConnectorId = (
   value: string | null
 ): value is WalletConnectorId => KNOWN_CONNECTOR_IDS.includes(value as WalletConnectorId)
@@ -147,6 +150,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const supportsMobileWallets = useMemo(() => isTouchWalletCapableBrowser(), [])
   const currentCosmosWalletName = cosmosChain.walletRepo.current?.walletName
   const currentCosmosWallet = cosmosChain.walletRepo.current
+  const desktopKeplrAvailable = hasDesktopKeplrProvider()
+  const effectivePendingAutoConnectId =
+    pendingAutoConnectId === "keplr-mobile" && desktopKeplrAvailable
+      ? "keplr"
+      : pendingAutoConnectId
   const activeCosmosConnectorId = currentCosmosWalletName
     ? COSMOS_WALLET_NAME_TO_CONNECTOR_ID[currentCosmosWalletName]
     : undefined
@@ -187,7 +195,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       const wallet = getCosmosWallet(id)
       const available =
         config.type === "mobile"
-          ? Boolean(wallet) && supportsMobileWallets
+          ? Boolean(wallet) && supportsMobileWallets && !desktopKeplrAvailable
           : isWalletReady(wallet)
 
       return {
@@ -197,7 +205,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         available
       }
     },
-    [getCosmosWallet, supportsMobileWallets]
+    [desktopKeplrAvailable, getCosmosWallet, supportsMobileWallets]
   )
 
   const connectCosmosConnector = useCallback(
@@ -514,21 +522,22 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const pendingAutoConnectAvailable = useMemo(
     () =>
       Boolean(
-        pendingAutoConnectId &&
+        effectivePendingAutoConnectId &&
           connectors.some(
             (connector) =>
-              connector.id === pendingAutoConnectId && connector.available
+              connector.id === effectivePendingAutoConnectId &&
+              connector.available
           )
       ),
-    [connectors, pendingAutoConnectId]
+    [connectors, effectivePendingAutoConnectId]
   )
 
   useEffect(() => {
-    if (autoConnectAttempted || !pendingAutoConnectId) return
+    if (autoConnectAttempted || !effectivePendingAutoConnectId) return
     if (!pendingAutoConnectAvailable) return
     let cancelled = false
     const timer = window.setTimeout(() => {
-      void connect(pendingAutoConnectId).finally(() => {
+      void connect(effectivePendingAutoConnectId).finally(() => {
         if (!cancelled) {
           setAutoConnectAttempted(true)
         }
@@ -541,8 +550,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [
     autoConnectAttempted,
     connect,
+    effectivePendingAutoConnectId,
     pendingAutoConnectAvailable,
-    pendingAutoConnectId,
     supportsMobileWallets
   ])
 
