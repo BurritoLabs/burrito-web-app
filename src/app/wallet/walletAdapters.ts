@@ -22,6 +22,9 @@ type WalletAdapterRuntime = {
   connect?: (id: WalletConnectorId) => Promise<WalletAccount | undefined>
   disconnect?: (id: WalletConnectorId) => Promise<void>
   getOfflineSigner?: (id: WalletConnectorId) => Promise<OfflineSigner | undefined>
+  getAminoOfflineSigner?: (
+    id: WalletConnectorId
+  ) => Promise<OfflineSigner | undefined>
   getSigningStargateClient?: (
     id: WalletConnectorId,
     feeDenom?: string
@@ -278,6 +281,17 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
   return signer
 }
 
+export const getAminoOfflineSignerForConnector = async (
+  id: WalletConnectorId
+) => {
+  const runtimeSigner = await walletAdapterRuntime?.getAminoOfflineSigner?.(id)
+  if (runtimeSigner) {
+    return runtimeSigner
+  }
+
+  return undefined
+}
+
 export const connectClassicSigningClientForConnector = async (
   id: WalletConnectorId
 ) => connectClassicSigningClient(await getOfflineSignerForConnector(id))
@@ -293,6 +307,12 @@ export const connectClassicStargateClientForConnector = async (
   if (runtimeClient) {
     return runtimeClient
   }
+
+  const aminoSigner = await getAminoOfflineSignerForConnector(id)
+  if (aminoSigner) {
+    return connectClassicStargateClient(aminoSigner, feeDenom)
+  }
+
   return connectClassicStargateClient(
     await getOfflineSignerForConnector(id),
     feeDenom
