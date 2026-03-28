@@ -193,6 +193,14 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const getCosmosConnector = useCallback(
     (id: keyof typeof COSMOS_CONNECTOR_CONFIGS): WalletConnector => {
       const config = COSMOS_CONNECTOR_CONFIGS[id]
+      if (id === "keplr" && desktopKeplrAvailable) {
+        return {
+          id,
+          label: config.label,
+          type: config.type,
+          available: true
+        }
+      }
       const wallet = getCosmosWallet(id)
       const available =
         config.type === "mobile"
@@ -454,9 +462,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       setAccount(undefined)
       setError(undefined)
       try {
-        const nextAccount = isCosmosConnectorId(id)
-          ? await connectCosmosConnector(id)
-          : await connectWalletConnector(id)
+        const nextAccount =
+          id === "keplr" && desktopKeplrAvailable
+            ? await connectWalletConnector(id)
+            : isCosmosConnectorId(id)
+              ? await connectCosmosConnector(id)
+              : await connectWalletConnector(id)
         setConnectorId(id)
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, id)
@@ -475,12 +486,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         setError(formatWalletError(err))
       }
     },
-    [connectCosmosConnector]
+    [connectCosmosConnector, desktopKeplrAvailable]
   )
 
   const disconnect = useCallback(async () => {
     if (
       connectorId &&
+      !(connectorId === "keplr" && desktopKeplrAvailable) &&
       isCosmosConnectorId(connectorId) &&
       cosmosChain.walletRepo.current
     ) {
@@ -495,7 +507,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEY)
     }
-  }, [connectorId, cosmosChain.walletRepo])
+  }, [connectorId, cosmosChain.walletRepo, desktopKeplrAvailable])
 
   const startTx = useCallback((label?: string) => {
     setTxState({ status: "pending", label, startedAt: Date.now() })
@@ -556,17 +568,29 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       getConnector: (id) =>
         isCosmosConnectorId(id) ? getCosmosConnector(id) : undefined,
       connect: async (id) =>
-        isCosmosConnectorId(id) ? await connectCosmosConnector(id) : undefined,
+        id === "keplr" && desktopKeplrAvailable
+          ? undefined
+          : isCosmosConnectorId(id)
+            ? await connectCosmosConnector(id)
+            : undefined,
       getAminoOfflineSigner: async (id) =>
-        isCosmosConnectorId(id)
+        id === "keplr" && desktopKeplrAvailable
+          ? undefined
+          : isCosmosConnectorId(id)
           ? await getCosmosAminoOfflineSigner(id)
           : undefined,
       getSigningStargateClient: async (id) =>
-        isCosmosConnectorId(id)
+        id === "keplr" && desktopKeplrAvailable
+          ? undefined
+          : isCosmosConnectorId(id)
           ? await getCosmosSigningStargateClient(id)
           : undefined,
       getOfflineSigner: async (id) =>
-        isCosmosConnectorId(id) ? await getCosmosOfflineSigner(id) : undefined
+        id === "keplr" && desktopKeplrAvailable
+          ? undefined
+          : isCosmosConnectorId(id)
+            ? await getCosmosOfflineSigner(id)
+            : undefined
     })
     return () => {
       registerWalletAdapterRuntime(undefined)
@@ -578,11 +602,15 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     getCosmosAminoOfflineSigner,
     getCosmosConnector,
     getCosmosSigningStargateClient,
-    getCosmosOfflineSigner
+    getCosmosOfflineSigner,
+    desktopKeplrAvailable
   ])
 
   useEffect(() => {
     if (!activeCosmosConnectorId || !cosmosChain.isWalletConnected || !cosmosChain.address) {
+      return
+    }
+    if (connectorId === "keplr" && desktopKeplrAvailable) {
       return
     }
     const nextAccount = {
@@ -611,14 +639,17 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [
     activeCosmosConnectorId,
     autoConnectAttempted,
+    connectorId,
     cosmosChain.address,
     cosmosChain.isWalletConnected,
     cosmosChain.username,
-    cosmosChain.wallet?.prettyName
+    cosmosChain.wallet?.prettyName,
+    desktopKeplrAvailable
   ])
 
   useEffect(() => {
     if (!connectorId || !isCosmosConnectorId(connectorId)) return
+    if (connectorId === "keplr" && desktopKeplrAvailable) return
     if (status !== "connected") return
     if (cosmosChain.isWalletConnected) return
     if (activeCosmosConnectorId) return
@@ -631,6 +662,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     activeCosmosConnectorId,
     connectorId,
     cosmosChain.isWalletConnected,
+    desktopKeplrAvailable,
     status
   ])
 
