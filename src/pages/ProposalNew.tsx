@@ -231,7 +231,7 @@ const ProposalNew = () => {
     return { typeUrl: TextProposal.typeUrl, value }
   }
 
-  const buildMsg = (registry: Registry) => {
+  const buildMsg = (registry: Registry, proposer: string) => {
     const content = buildContent()
     const initialDeposit = Number(deposit)
       ? [
@@ -247,7 +247,7 @@ const ProposalNew = () => {
       value: MsgSubmitProposal.fromPartial({
         content: registry.encodeAsAny(content),
         initialDeposit,
-        proposer: account?.address ?? ""
+        proposer
       })
     }
   }
@@ -438,10 +438,15 @@ const ProposalNew = () => {
       startTx("Submit proposal")
       if (!connectorId) throw new Error("Wallet not connected")
       const signer = await getOfflineSignerForConnector(connectorId)
+      const signerAccount = (await signer.getAccounts())[0]
+      if (!signerAccount?.address) {
+        throw new Error("Wallet account unavailable")
+      }
+      const signerAddress = signerAccount.address
 
       const registry = getRegistry()
 
-      const msg = buildMsg(registry)
+      const msg = buildMsg(registry, signerAddress)
 
       const client = await SigningStargateClient.connectWithSigner(
         CLASSIC_CHAIN.rpc,
@@ -452,7 +457,7 @@ const ProposalNew = () => {
         }
       )
       const finalFee = feeEstimate
-      const result = await client.signAndBroadcast(account.address, [msg], {
+      const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [{ amount: finalFee.feeAmount, denom: feeDenom }],
         gas: String(finalFee.gasWanted)
       })

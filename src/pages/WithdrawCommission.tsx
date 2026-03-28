@@ -13,7 +13,10 @@ import {
 import { formatTokenAmount } from "../app/utils/format"
 import { buildClassicNativeIconCandidates, buildIbcAssetIconCandidates } from "../app/utils/assetIcons"
 import { convertBech32Prefix } from "../app/utils/bech32"
-import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
+import {
+  connectClassicStargateClientForConnector,
+  getSignerAddressForConnector
+} from "../app/wallet/walletAdapters"
 
 const FEE_DENOM_OPTIONS = [
   CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -194,6 +197,14 @@ const WithdrawCommission = () => {
             setFeeError(undefined)
             try {
               if (!connectorId) throw new Error("Wallet not connected")
+              const signerAddress = await getSignerAddressForConnector(connectorId)
+              const signerValoperAddress = convertBech32Prefix(
+                signerAddress,
+                `${CLASSIC_CHAIN.bech32Prefix}valoper`
+              )
+              if (!signerValoperAddress) {
+                throw new Error("Validator account not connected.")
+              }
               const client = await connectClassicStargateClientForConnector(
                 connectorId,
                 feeDenom
@@ -201,10 +212,10 @@ const WithdrawCommission = () => {
               const msg = {
                 typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
                 value: MsgWithdrawValidatorCommission.fromPartial({
-                  validatorAddress: valoperAddress
+                  validatorAddress: signerValoperAddress
                 })
               }
-              const gasUsed = await client.simulate(account.address, [msg], "")
+              const gasUsed = await client.simulate(signerAddress, [msg], "")
               const gasWanted = Math.max(
                 DEFAULT_FEE_GAS,
                 Math.ceil(gasUsed * GAS_ADJUSTMENT)
@@ -259,6 +270,14 @@ const WithdrawCommission = () => {
       setSubmitting(true)
       startTx("Withdraw commission")
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const signerValoperAddress = convertBech32Prefix(
+        signerAddress,
+        `${CLASSIC_CHAIN.bech32Prefix}valoper`
+      )
+      if (!signerValoperAddress) {
+        throw new Error("Validator account not connected.")
+      }
       const client = await connectClassicStargateClientForConnector(
         connectorId,
         feeDenom
@@ -266,10 +285,10 @@ const WithdrawCommission = () => {
       const msg = {
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
         value: MsgWithdrawValidatorCommission.fromPartial({
-          validatorAddress: valoperAddress
+          validatorAddress: signerValoperAddress
         })
       }
-      const result = await client.signAndBroadcast(account.address, [msg], {
+      const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [
           {
             amount: Math.ceil(feeGas * 28.325).toString(),

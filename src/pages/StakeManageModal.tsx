@@ -7,7 +7,10 @@ import {
 import { useWallet } from "../app/wallet/WalletContext"
 import styles from "./StakeManageModal.module.css"
 import { CLASSIC_DENOMS } from "../app/chain"
-import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
+import {
+  connectClassicStargateClientForConnector,
+  getSignerAddressForConnector
+} from "../app/wallet/walletAdapters"
 import { formatTokenAmount } from "../app/utils/format"
 
 type DelegationItem = {
@@ -176,6 +179,7 @@ const StakeManageModal = ({
       }
       try {
         if (!connectorId) throw new Error("Wallet not connected")
+        const signerAddress = await getSignerAddressForConnector(connectorId)
         const client = await connectClassicStargateClientForConnector(connectorId)
 
         const msg =
@@ -183,7 +187,7 @@ const StakeManageModal = ({
             ? {
                 typeUrl: "/cosmos.staking.v1beta1.MsgBeginRedelegate",
                 value: MsgBeginRedelegate.fromPartial({
-                  delegatorAddress: accountAddress,
+                  delegatorAddress: signerAddress,
                   validatorSrcAddress: sourceValidatorAddress,
                   validatorDstAddress: validator,
                   amount: {
@@ -196,7 +200,7 @@ const StakeManageModal = ({
             ? {
                 typeUrl: "/cosmos.staking.v1beta1.MsgUndelegate",
                 value: MsgUndelegate.fromPartial({
-                  delegatorAddress: accountAddress,
+                  delegatorAddress: signerAddress,
                   validatorAddress: validator,
                   amount: {
                     denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -207,7 +211,7 @@ const StakeManageModal = ({
             : {
                 typeUrl: "/cosmos.staking.v1beta1.MsgDelegate",
                 value: MsgDelegate.fromPartial({
-                  delegatorAddress: accountAddress,
+                  delegatorAddress: signerAddress,
                   validatorAddress: validator,
                   amount: {
                     denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -216,7 +220,7 @@ const StakeManageModal = ({
                 })
               }
 
-        const gasUsed = await client.simulate(accountAddress, [msg], "")
+        const gasUsed = await client.simulate(signerAddress, [msg], "")
         const nextGasWanted = Math.max(
           FALLBACK_GAS_BY_TAB[tab],
           Math.ceil(gasUsed * GAS_ADJUSTMENT)
@@ -289,6 +293,7 @@ const StakeManageModal = ({
       setSubmitError(undefined)
       startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicStargateClientForConnector(connectorId)
 
       const msg =
@@ -296,7 +301,7 @@ const StakeManageModal = ({
           ? {
               typeUrl: "/cosmos.staking.v1beta1.MsgBeginRedelegate",
               value: MsgBeginRedelegate.fromPartial({
-                delegatorAddress: accountAddress,
+                delegatorAddress: signerAddress,
                 validatorSrcAddress: source,
                 validatorDstAddress: validator,
                 amount: {
@@ -309,7 +314,7 @@ const StakeManageModal = ({
           ? {
               typeUrl: "/cosmos.staking.v1beta1.MsgUndelegate",
               value: MsgUndelegate.fromPartial({
-                delegatorAddress: accountAddress,
+                delegatorAddress: signerAddress,
                 validatorAddress: validator,
                 amount: {
                   denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -320,7 +325,7 @@ const StakeManageModal = ({
           : {
               typeUrl: "/cosmos.staking.v1beta1.MsgDelegate",
               value: MsgDelegate.fromPartial({
-                delegatorAddress: accountAddress,
+                delegatorAddress: signerAddress,
                 validatorAddress: validator,
                 amount: {
                   denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -329,7 +334,7 @@ const StakeManageModal = ({
               })
             }
 
-      const result = await client.signAndBroadcast(accountAddress, [msg], {
+      const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [
           {
             amount: feeMicro.toString(),

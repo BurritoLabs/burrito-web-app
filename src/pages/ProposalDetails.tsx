@@ -38,7 +38,10 @@ import {
 import { convertBech32Prefix } from "../app/utils/bech32"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
 import { useWallet } from "../app/wallet/WalletContext"
-import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
+import {
+  connectClassicStargateClientForConnector,
+  getSignerAddressForConnector
+} from "../app/wallet/walletAdapters"
 import type {
   CoinBalance,
   GovDepositParams,
@@ -826,6 +829,7 @@ const ProposalDetails = () => {
       setVoteError(undefined)
       startTx("Vote proposal")
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       let proposalIdValue: bigint
       try {
         proposalIdValue = BigInt(proposalId)
@@ -837,7 +841,7 @@ const ProposalDetails = () => {
         typeUrl: "/cosmos.gov.v1beta1.MsgVote",
         value: MsgVote.fromPartial({
           proposalId: proposalIdValue,
-          voter: account.address,
+          voter: signerAddress,
           option: VOTE_OPTION_VALUES[voteChoice]
         })
       }
@@ -865,11 +869,11 @@ const ProposalDetails = () => {
           const client = await connectClassicStargateClientForConnector(
             connectorId
           )
-          const signerState = await client.getSequence(account.address)
+          const signerState = await client.getSequence(signerAddress)
           const sequenceToUse = sequenceHint ?? signerState.sequence
 
           const signed = await client.sign(
-            account.address,
+            signerAddress,
             [msg],
             fee,
             "",
@@ -948,6 +952,7 @@ const ProposalDetails = () => {
       setDepositError(undefined)
       startTx("Deposit proposal")
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
 
       let proposalIdValue: bigint
       try {
@@ -960,7 +965,7 @@ const ProposalDetails = () => {
         typeUrl: "/cosmos.gov.v1beta1.MsgDeposit",
         value: MsgDeposit.fromPartial({
           proposalId: proposalIdValue,
-          depositor: account.address,
+          depositor: signerAddress,
           amount: [
             {
               denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -994,11 +999,11 @@ const ProposalDetails = () => {
           const client = await connectClassicStargateClientForConnector(
             connectorId
           )
-          const signerState = await client.getSequence(account.address)
+          const signerState = await client.getSequence(signerAddress)
           const sequenceToUse = sequenceHint ?? signerState.sequence
 
           const signed = await client.sign(
-            account.address,
+            signerAddress,
             [msg],
             fee,
             "",

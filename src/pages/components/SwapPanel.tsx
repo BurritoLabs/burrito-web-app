@@ -13,7 +13,10 @@ import { useResolvedCw20Whitelist } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
 import { useWallet } from "../../app/wallet/WalletContext"
-import { connectClassicSigningClientForConnector } from "../../app/wallet/walletAdapters"
+import {
+  connectClassicSigningClientForConnector,
+  getSignerAddressForConnector
+} from "../../app/wallet/walletAdapters"
 
 type AssetType = "native" | "cw20"
 type DexId = string
@@ -1025,10 +1028,11 @@ const SwapPanel = ({
       setFeeLoading(true)
       try {
         if (!connectorId) throw new Error("Wallet not connected")
+        const signerAddress = await getSignerAddressForConnector(connectorId)
         const client = await connectClassicSigningClientForConnector(connectorId)
-        const feeMsg = buildPlatformFeeMessage(accountAddress, quoteFromAsset, platformFeeMicro)
+        const feeMsg = buildPlatformFeeMessage(signerAddress, quoteFromAsset, platformFeeMicro)
         const msg = buildSwapMessage(
-          accountAddress,
+          signerAddress,
           feeQuote?.pair ?? "",
           quoteFromAsset,
           swapAmountMicro,
@@ -1036,7 +1040,7 @@ const SwapPanel = ({
           feeQuote?.mode ?? "terraswap"
         )
         const gasUsed = await client.simulate(
-          accountAddress,
+          signerAddress,
           feeMsg ? [feeMsg, msg] : [msg],
           ""
         )
@@ -1126,11 +1130,12 @@ const SwapPanel = ({
     try {
       startTx("Swap")
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
 
-      const feeMsg = buildPlatformFeeMessage(accountAddress, fromAsset, platformFeeMicro)
+      const feeMsg = buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
       const msg = buildSwapMessage(
-        accountAddress,
+        signerAddress,
         selectedQuote.pair,
         fromAsset,
         swapAmountMicro,
@@ -1138,7 +1143,7 @@ const SwapPanel = ({
         selectedQuote.mode ?? "terraswap"
       )
       const messages = feeMsg ? [feeMsg, msg] : [msg]
-      const result = await client.signAndBroadcast(accountAddress, messages, "auto", SWAP_MEMO)
+      const result = await client.signAndBroadcast(signerAddress, messages, "auto", SWAP_MEMO)
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Swap failed")
       }

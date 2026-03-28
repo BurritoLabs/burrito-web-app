@@ -16,7 +16,10 @@ import {
   buildClassicNativeIconCandidates,
   buildIbcAssetIconCandidates
 } from "../app/utils/assetIcons"
-import { connectClassicStargateClientForConnector } from "../app/wallet/walletAdapters"
+import {
+  connectClassicStargateClientForConnector,
+  getSignerAddressForConnector
+} from "../app/wallet/walletAdapters"
 
 const GAS_ADJUSTMENT = 1.2
 const DEFAULT_FEE_GAS = 180_000
@@ -255,6 +258,7 @@ const WithdrawRewards = () => {
       setFeeError(undefined)
       try {
         if (!connectorId) throw new Error("Wallet not connected")
+        const signerAddress = await getSignerAddressForConnector(connectorId)
         const client = await connectClassicStargateClientForConnector(
           connectorId,
           feeDenom
@@ -262,11 +266,11 @@ const WithdrawRewards = () => {
         const msgs = selected.map((validator) => ({
           typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
           value: MsgWithdrawDelegatorReward.fromPartial({
-            delegatorAddress: accountAddress,
+            delegatorAddress: signerAddress,
             validatorAddress: validator
           })
         }))
-        const gasUsed = await client.simulate(accountAddress, msgs, "")
+        const gasUsed = await client.simulate(signerAddress, msgs, "")
         const gasWanted = Math.max(
           DEFAULT_FEE_GAS + selected.length * 45_000,
           Math.ceil(gasUsed * GAS_ADJUSTMENT)
@@ -323,6 +327,7 @@ const WithdrawRewards = () => {
       setSubmitting(true)
       startTx("Withdraw rewards")
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicStargateClientForConnector(
         connectorId,
         feeDenom
@@ -330,11 +335,11 @@ const WithdrawRewards = () => {
       const msgs = selected.map((validator) => ({
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
         value: MsgWithdrawDelegatorReward.fromPartial({
-          delegatorAddress: accountAddress,
+          delegatorAddress: signerAddress,
           validatorAddress: validator
         })
       }))
-      const result = await client.signAndBroadcast(accountAddress, msgs, {
+      const result = await client.signAndBroadcast(signerAddress, msgs, {
         amount: [
           {
             amount: Math.ceil(feeGas * 28.325).toString(),

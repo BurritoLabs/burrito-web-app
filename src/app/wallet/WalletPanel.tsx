@@ -27,7 +27,10 @@ import {
   useWalletHiddenTokensPreference,
   useWalletHideLowBalancePreference
 } from "./useWalletVisibilityPreferences"
-import { connectClassicSigningClientForConnector } from "./walletAdapters"
+import {
+  connectClassicSigningClientForConnector,
+  getSignerAddressForConnector
+} from "./walletAdapters"
 import { useWalletAssets, type WalletAssetRow } from "./useWalletAssets"
 import {
   formatPercent,
@@ -953,13 +956,14 @@ const WalletPanel = () => {
     try {
       startTx(`Send ${sendAsset.symbol}`)
       if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const msg =
         sendAsset.kind === "cw20"
           ? {
               typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
               value: MsgExecuteContract.fromPartial({
-                sender: account.address,
+                sender: signerAddress,
                 contract: sendAsset.denom,
                 msg: toUtf8(
                   JSON.stringify({
@@ -975,7 +979,7 @@ const WalletPanel = () => {
           : {
               typeUrl: "/cosmos.bank.v1beta1.MsgSend",
               value: MsgSend.fromPartial({
-                fromAddress: account.address,
+                fromAddress: signerAddress,
                 toAddress: recipient,
                 amount: [
                   {
@@ -987,7 +991,7 @@ const WalletPanel = () => {
             }
 
       const result = await client.signAndBroadcast(
-        account.address,
+        signerAddress,
         [msg],
         "auto",
         sendMemo.trim()

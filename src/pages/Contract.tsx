@@ -20,7 +20,10 @@ import {
 import { CLASSIC_DENOMS } from "../app/chain"
 import { truncateHash } from "../app/utils/format"
 import { useWallet } from "../app/wallet/WalletContext"
-import { connectClassicSigningClientForConnector } from "../app/wallet/walletAdapters"
+import {
+  connectClassicSigningClientForConnector,
+  getSignerAddressForConnector
+} from "../app/wallet/walletAdapters"
 
 type IconProps = {
   className?: string
@@ -317,6 +320,8 @@ const Contract = () => {
       setUploadHash("")
       setUploadCodeId("")
       startTx("Upload contract")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const wasmByteCode = new Uint8Array(await uploadFile.arrayBuffer())
       if (!wasmByteCode.length) {
         throw new Error("WASM file is empty.")
@@ -325,11 +330,11 @@ const Contract = () => {
       const msg = {
         typeUrl: "/cosmwasm.wasm.v1.MsgStoreCode",
         value: MsgStoreCode.fromPartial({
-          sender: account.address,
+          sender: signerAddress,
           wasmByteCode
         })
       }
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const result = await client.signAndBroadcast(signerAddress, [msg], "auto")
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Upload failed")
       }
@@ -386,11 +391,13 @@ const Contract = () => {
       setInstantiateHash("")
       setInstantiateAddress("")
       startTx("Instantiate contract")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
       const msg = {
         typeUrl: "/cosmwasm.wasm.v1.MsgInstantiateContract",
         value: MsgInstantiateContract.fromPartial({
-          sender: account.address,
+          sender: signerAddress,
           admin: instantiateAdmin.trim(),
           codeId,
           label: instantiateLabel.trim(),
@@ -406,7 +413,7 @@ const Contract = () => {
                 ]
         })
       }
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const result = await client.signAndBroadcast(signerAddress, [msg], "auto")
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Instantiate failed")
       }
@@ -455,11 +462,13 @@ const Contract = () => {
       setExecuteError(undefined)
       setExecuteHash("")
       startTx("Execute contract")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
       const msg = {
         typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
         value: MsgExecuteContract.fromPartial({
-          sender: account.address,
+          sender: signerAddress,
           contract: contract.address,
           msg: toUtf8(JSON.stringify(parsedMsg)),
           funds:
@@ -473,7 +482,7 @@ const Contract = () => {
                 ]
         })
       }
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const result = await client.signAndBroadcast(signerAddress, [msg], "auto")
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Execute failed")
       }
@@ -532,17 +541,19 @@ const Contract = () => {
       setMigrateError(undefined)
       setMigrateHash("")
       startTx("Migrate contract")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
       const msg = {
         typeUrl: "/cosmwasm.wasm.v1.MsgMigrateContract",
         value: MsgMigrateContract.fromPartial({
-          sender: account.address,
+          sender: signerAddress,
           contract: contract.address,
           codeId,
           msg: toUtf8(JSON.stringify(parsedMsg))
         })
       }
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const result = await client.signAndBroadcast(signerAddress, [msg], "auto")
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Migrate failed")
       }
@@ -585,25 +596,27 @@ const Contract = () => {
       setAdminHash("")
       setAdminResultText("")
       startTx(clearAdmin ? "Clear contract admin" : "Update contract admin")
+      if (!connectorId) throw new Error("Wallet not connected")
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
       const msg = clearAdmin
         ? {
             typeUrl: "/cosmwasm.wasm.v1.MsgClearAdmin",
             value: MsgClearAdmin.fromPartial({
-              sender: account.address,
+              sender: signerAddress,
               contract: contract.address
             })
           }
         : {
             typeUrl: "/cosmwasm.wasm.v1.MsgUpdateAdmin",
             value: MsgUpdateAdmin.fromPartial({
-              sender: account.address,
+              sender: signerAddress,
               contract: contract.address,
               newAdmin: next
             })
           }
 
-      const result = await client.signAndBroadcast(account.address, [msg], "auto")
+      const result = await client.signAndBroadcast(signerAddress, [msg], "auto")
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Update admin failed")
       }

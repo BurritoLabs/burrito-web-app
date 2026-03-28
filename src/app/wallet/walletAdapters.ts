@@ -162,6 +162,11 @@ const getSignerAddress = async (signer: OfflineSigner) => {
   return account.address
 }
 
+export const getSignerAddressForConnector = async (id: WalletConnectorId) => {
+  const signer = await getOfflineSignerForConnector(id)
+  return getSignerAddress(signer)
+}
+
 const bindSignerAddress = <T extends ClassicStargateClient>(
   client: T,
   signerAddress: string
