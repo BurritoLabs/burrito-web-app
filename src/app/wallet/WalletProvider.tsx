@@ -326,6 +326,56 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     [cosmosChain.address, cosmosChain.isWalletConnected, currentCosmosWallet, getCosmosWallet]
   )
 
+  const getCosmosSigningStargateClient = useCallback(
+    async (id: keyof typeof COSMOS_CONNECTOR_CONFIGS) => {
+      if (COSMOS_CONNECTOR_CONFIGS[id].type === "mobile") {
+        return undefined
+      }
+
+      const wallet =
+        getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
+      if (!wallet) {
+        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} signer not available`)
+      }
+
+      const activeWallet = currentCosmosWallet
+      const shouldUseChainClient =
+        Boolean(activeWallet) &&
+        activeWallet?.walletName === wallet.walletName &&
+        cosmosChain.isWalletConnected
+
+      if (shouldUseChainClient) {
+        if (!cosmosChain.address) {
+          await waitForWalletAddress(activeWallet!, 8, 150)
+        }
+
+        try {
+          return await cosmosChain.getSigningStargateClient()
+        } catch {
+          // Fall back to the wallet instance when the chain hook client is not hydrated yet.
+        }
+      }
+
+      if (wallet.isWalletDisconnected) {
+        await wallet.connect(false)
+      }
+      if (!wallet.address) {
+        await wallet.update({ connect: false })
+        await waitForWalletAddress(wallet)
+      }
+      if (!wallet.address) {
+        throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
+      }
+
+      try {
+        return await wallet.getSigningStargateClient()
+      } catch {
+        return undefined
+      }
+    },
+    [cosmosChain, currentCosmosWallet, getCosmosWallet]
+  )
+
   const connectors = useMemo(
     () => {
       void connectorRefreshNonce
@@ -451,6 +501,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         isCosmosConnectorId(id)
           ? await getCosmosAminoOfflineSigner(id)
           : undefined,
+      getSigningStargateClient: async (id) =>
+        isCosmosConnectorId(id)
+          ? await getCosmosSigningStargateClient(id)
+          : undefined,
       getOfflineSigner: async (id) =>
         isCosmosConnectorId(id) ? await getCosmosOfflineSigner(id) : undefined
     })
@@ -463,6 +517,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     cosmosChain.walletRepo,
     getCosmosAminoOfflineSigner,
     getCosmosConnector,
+    getCosmosSigningStargateClient,
     getCosmosOfflineSigner
   ])
 
