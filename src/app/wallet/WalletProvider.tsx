@@ -21,6 +21,7 @@ import {
   type WalletStatus
 } from "./WalletContext"
 import {
+  type ClassicStargateClient,
   connectWalletConnector,
   disconnectWalletConnector,
   registerWalletAdapterRuntime
@@ -338,6 +339,56 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} signer not available`)
       }
 
+      const wrapStargateClient = (
+        client: ClassicStargateClient,
+        signerAddress: string,
+        signAndBroadcastImpl?: (
+          messages: Parameters<ClassicStargateClient["signAndBroadcast"]>[1],
+          fee: Parameters<ClassicStargateClient["signAndBroadcast"]>[2],
+          memo?: string
+        ) => ReturnType<ClassicStargateClient["signAndBroadcast"]>
+      ): ClassicStargateClient => ({
+        ...client,
+        simulate: (
+          _signerAddress: string,
+          messages: Parameters<ClassicStargateClient["simulate"]>[1],
+          memo: string
+        ) => client.simulate(signerAddress, messages, memo),
+        sign: (
+          _signerAddress: string,
+          messages: Parameters<ClassicStargateClient["sign"]>[1],
+          fee: Parameters<ClassicStargateClient["sign"]>[2],
+          memo: string,
+          signerData: Parameters<ClassicStargateClient["sign"]>[4]
+        ) => client.sign(signerAddress, messages, fee, memo, signerData),
+        signAndBroadcast: (
+          _signerAddress: string,
+          messages: Parameters<ClassicStargateClient["signAndBroadcast"]>[1],
+          fee: Parameters<ClassicStargateClient["signAndBroadcast"]>[2],
+          memo = ""
+        ) =>
+          signAndBroadcastImpl
+            ? signAndBroadcastImpl(messages, fee, memo)
+            : client.signAndBroadcast(signerAddress, messages, fee, memo),
+        getSequence: (address: string) => client.getSequence(address),
+        broadcastTxSync: (tx: Parameters<ClassicStargateClient["broadcastTxSync"]>[0]) =>
+          client.broadcastTxSync(tx),
+        delegateTokens: (
+          _delegatorAddress: string,
+          validatorAddress: Parameters<ClassicStargateClient["delegateTokens"]>[1],
+          amount: Parameters<ClassicStargateClient["delegateTokens"]>[2],
+          fee: Parameters<ClassicStargateClient["delegateTokens"]>[3],
+          memo?: Parameters<ClassicStargateClient["delegateTokens"]>[4]
+        ) => client.delegateTokens(signerAddress, validatorAddress, amount, fee, memo),
+        undelegateTokens: (
+          _delegatorAddress: string,
+          validatorAddress: Parameters<ClassicStargateClient["undelegateTokens"]>[1],
+          amount: Parameters<ClassicStargateClient["undelegateTokens"]>[2],
+          fee: Parameters<ClassicStargateClient["undelegateTokens"]>[3],
+          memo?: Parameters<ClassicStargateClient["undelegateTokens"]>[4]
+        ) => client.undelegateTokens(signerAddress, validatorAddress, amount, fee, memo)
+      })
+
       const activeWallet = currentCosmosWallet
       const shouldUseChainClient =
         Boolean(activeWallet) &&
@@ -350,7 +401,14 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-          return await cosmosChain.getSigningStargateClient()
+          const signerAddress = cosmosChain.address ?? wallet.address
+          if (!signerAddress) {
+            throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
+          }
+          const client = await cosmosChain.getSigningStargateClient()
+          return wrapStargateClient(client, signerAddress, (messages, fee, memo = "") =>
+            cosmosChain.signAndBroadcast([...messages], fee as never, memo, "stargate")
+          )
         } catch {
           // Fall back to the wallet instance when the chain hook client is not hydrated yet.
         }
@@ -368,7 +426,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        return await wallet.getSigningStargateClient()
+        const signerAddress = wallet.address
+        const client = await wallet.getSigningStargateClient()
+        return wrapStargateClient(client, signerAddress)
       } catch {
         return undefined
       }

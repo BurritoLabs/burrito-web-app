@@ -300,17 +300,17 @@ export const connectClassicStargateClientForConnector = async (
   id: WalletConnectorId,
   feeDenom?: string
 ) : Promise<ClassicStargateClient> => {
+  const aminoSigner = await getAminoOfflineSignerForConnector(id)
+  if (aminoSigner) {
+    return connectClassicStargateClient(aminoSigner, feeDenom)
+  }
+
   const runtimeClient = await walletAdapterRuntime?.getSigningStargateClient?.(
     id,
     feeDenom
   )
   if (runtimeClient) {
     return runtimeClient
-  }
-
-  const aminoSigner = await getAminoOfflineSignerForConnector(id)
-  if (aminoSigner) {
-    return connectClassicStargateClient(aminoSigner, feeDenom)
   }
 
   return connectClassicStargateClient(
