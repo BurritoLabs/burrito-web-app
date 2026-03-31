@@ -159,10 +159,6 @@ export const buildClassicNativeIconCandidates = ({
     return unique([sanitizeAssetIconUrl(primaryIcon), staticIcon, fallback])
   }
 
-  if (upperSymbol === "KRTC") {
-    return unique([sanitizeAssetIconUrl(primaryIcon), fallback])
-  }
-
   const iconDenom = denom === "uluna" ? "LUNC" : symbol
   const upper = iconDenom.toUpperCase()
   const lower = iconDenom.toLowerCase()
