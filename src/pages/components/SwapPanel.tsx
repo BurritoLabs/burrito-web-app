@@ -33,6 +33,14 @@ type SwapAsset = {
   iconCandidates: string[]
 }
 
+type SwapAssetOverride = {
+  id: string
+  symbol?: string
+  name?: string
+  decimals?: number
+  iconCandidates?: string[]
+}
+
 type DexConfig = {
   id: DexId
   label: string
@@ -107,6 +115,7 @@ type SwapPanelProps = {
   defaultFromAssetId?: string
   defaultToAssetId?: string
   embedded?: boolean
+  assetOverrides?: SwapAssetOverride[]
 }
 const DEFAULT_FROM_ASSET_ID = NATIVE_ASSETS[0].id
 const DEFAULT_TO_ASSET_ID = NATIVE_ASSETS[1].id
@@ -519,7 +528,8 @@ const AssetIconInner = ({
 const SwapPanel = ({
   defaultFromAssetId = DEFAULT_FROM_ASSET_ID,
   defaultToAssetId = DEFAULT_TO_ASSET_ID,
-  embedded = false
+  embedded = false,
+  assetOverrides = []
 }: SwapPanelProps) => {
   const {
     account,
@@ -590,20 +600,40 @@ const SwapPanel = ({
     Array.from(tradableCw20Set)
   )
 
+  const assetOverrideMap = useMemo(
+    () => new Map(assetOverrides.map((asset) => [asset.id, asset])),
+    [assetOverrides]
+  )
+
   const assets = useMemo<SwapAsset[]>(() => {
+    const applyOverride = (asset: SwapAsset): SwapAsset => {
+      const override = assetOverrideMap.get(asset.id)
+      if (!override) return asset
+      return {
+        ...asset,
+        symbol: override.symbol ?? asset.symbol,
+        name: override.name ?? asset.name,
+        decimals: override.decimals ?? asset.decimals,
+        iconCandidates:
+          override.iconCandidates && override.iconCandidates.length > 0
+            ? override.iconCandidates
+            : asset.iconCandidates
+      }
+    }
+
     const cw20Rows = Object.entries(cw20Whitelist)
       .map(([contract, token]) => {
         const decimals = Number(token.decimals ?? 6)
-      return {
-        id: asCw20Id(contract),
-        type: "cw20" as const,
-        symbol: token.symbol || token.name || contract.slice(0, 6).toUpperCase(),
-        name: token.name || token.symbol || contract,
-        decimals: Number.isFinite(decimals) ? decimals : 6,
-        contract,
-        iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
-      } satisfies SwapAsset
-    })
+        return applyOverride({
+          id: asCw20Id(contract),
+          type: "cw20" as const,
+          symbol: token.symbol || token.name || contract.slice(0, 6).toUpperCase(),
+          name: token.name || token.symbol || contract,
+          decimals: Number.isFinite(decimals) ? decimals : 6,
+          contract,
+          iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
+        } satisfies SwapAsset)
+      })
       .sort((a, b) => {
         const aTradable = !tradableCw20Set.size || tradableCw20Set.has(a.contract ?? "")
         const bTradable = !tradableCw20Set.size || tradableCw20Set.has(b.contract ?? "")
@@ -611,8 +641,8 @@ const SwapPanel = ({
         return a.symbol.localeCompare(b.symbol)
       })
 
-    return [...NATIVE_ASSETS, ...cw20Rows]
-  }, [cw20Whitelist, tradableCw20Set])
+    return [...NATIVE_ASSETS.map(applyOverride), ...cw20Rows]
+  }, [assetOverrideMap, cw20Whitelist, tradableCw20Set])
 
   const { data: cw20Balances = [] } = useCw20Balances(accountAddress, cw20Whitelist)
 

@@ -1253,6 +1253,22 @@ const MarketPairDetails = () => {
               embedded
               defaultFromAssetId={detail.left.id}
               defaultToAssetId={detail.right.id}
+              assetOverrides={[
+                {
+                  id: detail.left.id,
+                  symbol: detail.left.symbol,
+                  name: detail.left.name,
+                  decimals: detail.left.decimals,
+                  iconCandidates: detail.left.iconCandidates
+                },
+                {
+                  id: detail.right.id,
+                  symbol: detail.right.symbol,
+                  name: detail.right.name,
+                  decimals: detail.right.decimals,
+                  iconCandidates: detail.right.iconCandidates
+                }
+              ]}
             />
           </section>
         </aside>

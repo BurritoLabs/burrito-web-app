@@ -33,6 +33,12 @@ export type NativeToken = {
   decimals?: number
 }
 
+const LOCAL_CW20_TOKEN_OVERRIDES: Record<string, Partial<Cw20Token>> = {
+  terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt: {
+    icon: "/system/do-cookie.jpg"
+  }
+}
+
 type HexxagonCw20Token = {
   protocol?: string
   symbol?: string
@@ -293,15 +299,16 @@ const mergeCw20TokenMetadata = ({
     onChain?.symbol?.trim() ||
     fallback?.symbol ||
     contract
+  const localOverride = LOCAL_CW20_TOKEN_OVERRIDES[contract]
   return {
     token: contract,
     symbol,
     name,
-    protocol: fallback?.protocol,
-    icon: sanitizeAssetIconUrl(fallback?.icon),
+    protocol: localOverride?.protocol ?? fallback?.protocol,
+    icon: sanitizeAssetIconUrl(localOverride?.icon ?? fallback?.icon),
     decimals: Number.isFinite(onChain?.decimals)
       ? onChain?.decimals
-      : (fallback?.decimals ?? 6)
+      : (localOverride?.decimals ?? fallback?.decimals ?? 6)
   }
 }
 
@@ -599,17 +606,32 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
           address,
           {
             token: address,
-            symbol: token?.symbol ?? contract?.name?.trim() ?? fallbackSymbol,
+            symbol:
+              LOCAL_CW20_TOKEN_OVERRIDES[address]?.symbol ??
+              token?.symbol ??
+              contract?.name?.trim() ??
+              fallbackSymbol,
             name:
+              LOCAL_CW20_TOKEN_OVERRIDES[address]?.name?.trim() ||
               token?.name?.trim() ||
               contract?.name?.trim() ||
               token?.protocol?.trim() ||
               contract?.protocol?.trim() ||
               token?.symbol ||
               fallbackSymbol,
-            protocol: token?.protocol?.trim() || contract?.protocol?.trim() || undefined,
-            icon: token?.icon || contract?.icon,
-            decimals: token?.decimals ?? 6
+            protocol:
+              LOCAL_CW20_TOKEN_OVERRIDES[address]?.protocol?.trim() ||
+              token?.protocol?.trim() ||
+              contract?.protocol?.trim() ||
+              undefined,
+            icon:
+              LOCAL_CW20_TOKEN_OVERRIDES[address]?.icon ||
+              token?.icon ||
+              contract?.icon,
+            decimals:
+              LOCAL_CW20_TOKEN_OVERRIDES[address]?.decimals ??
+              token?.decimals ??
+              6
           } satisfies Cw20Token
         ]
       })
