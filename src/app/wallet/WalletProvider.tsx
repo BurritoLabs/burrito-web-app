@@ -133,6 +133,14 @@ const waitForWalletAddress = async (wallet: ChainWalletBase, attempts = 10, dela
   return wallet.address
 }
 
+const getOfflineSignerAddress = async (signer: OfflineSigner) => {
+  const account = (await signer.getAccounts())[0]
+  if (!account?.address) {
+    throw new Error("Wallet account unavailable")
+  }
+  return account.address
+}
+
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const cosmosChain = useChain(COSMOS_KIT_CHAIN_NAME)
   const [status, setStatus] = useState<WalletStatus>("disconnected")
@@ -237,6 +245,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   const getCosmosOfflineSigner = useCallback(
     async (id: keyof typeof COSMOS_CONNECTOR_CONFIGS) => {
+      const isMobileWallet = COSMOS_CONNECTOR_CONFIGS[id].type === "mobile"
       const wallet =
         getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
       if (!wallet) {
@@ -245,6 +254,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
       const activeWallet = cosmosChain.walletRepo.current
       const shouldUseChainSigner =
+        !isMobileWallet &&
         Boolean(activeWallet) &&
         activeWallet?.walletName === wallet.walletName &&
         cosmosChain.isWalletConnected
@@ -337,10 +347,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   const getCosmosSigningStargateClient = useCallback(
     async (id: keyof typeof COSMOS_CONNECTOR_CONFIGS) => {
-      if (COSMOS_CONNECTOR_CONFIGS[id].type === "mobile") {
-        return undefined
-      }
-
+      const isMobileWallet = COSMOS_CONNECTOR_CONFIGS[id].type === "mobile"
       const wallet =
         getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
       if (!wallet) {
@@ -399,6 +406,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
       const activeWallet = currentCosmosWallet
       const shouldUseChainClient =
+        !isMobileWallet &&
         Boolean(activeWallet) &&
         activeWallet?.walletName === wallet.walletName &&
         cosmosChain.isWalletConnected
@@ -409,10 +417,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-          const signerAddress = cosmosChain.address ?? wallet.address
-          if (!signerAddress) {
-            throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
-          }
+          const signerAddress = await getOfflineSignerAddress(
+            await getCosmosOfflineSigner(id)
+          )
           const client = await cosmosChain.getSigningStargateClient()
           return wrapStargateClient(client, signerAddress, (messages, fee, memo = "") =>
             cosmosChain.signAndBroadcast([...messages], fee as never, memo, "stargate")
@@ -434,14 +441,16 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        const signerAddress = wallet.address
+        const signerAddress = await getOfflineSignerAddress(
+          await getCosmosOfflineSigner(id)
+        )
         const client = await wallet.getSigningStargateClient()
         return wrapStargateClient(client, signerAddress)
       } catch {
         return undefined
       }
     },
-    [cosmosChain, currentCosmosWallet, getCosmosWallet]
+    [cosmosChain, currentCosmosWallet, getCosmosOfflineSigner, getCosmosWallet]
   )
 
   const connectors = useMemo(
