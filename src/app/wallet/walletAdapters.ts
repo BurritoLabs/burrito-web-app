@@ -421,19 +421,19 @@ export const connectClassicStargateClientForConnector = async (
     return bindSignerAddress(client, signerAddress)
   }
 
-  const aminoSigner = await getAminoOfflineSignerForConnector(id)
-  if (aminoSigner) {
-    const signerAddress = await getSignerAddress(aminoSigner)
-    const client = await connectClassicStargateClient(aminoSigner, feeDenom)
-    return bindSignerAddress(client, signerAddress)
-  }
-
   const runtimeClient = await walletAdapterRuntime?.getSigningStargateClient?.(
     id,
     feeDenom
   )
   if (runtimeClient) {
     return runtimeClient
+  }
+
+  const aminoSigner = await getAminoOfflineSignerForConnector(id)
+  if (aminoSigner) {
+    const signerAddress = await getSignerAddress(aminoSigner)
+    const client = await connectClassicStargateClient(aminoSigner, feeDenom)
+    return bindSignerAddress(client, signerAddress)
   }
 
   const signer = await getOfflineSignerForConnector(id)
