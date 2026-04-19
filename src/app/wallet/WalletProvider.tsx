@@ -441,11 +441,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        const signerAddress = await getOfflineSignerAddress(
-          await getCosmosOfflineSigner(id)
-        )
+        const signerAddress =
+          wallet.address ||
+          (await getOfflineSignerAddress(await getCosmosOfflineSigner(id)))
         const client = await wallet.getSigningStargateClient()
-        return wrapStargateClient(client, signerAddress)
+        return wrapStargateClient(client, signerAddress, (messages, fee, memo = "") =>
+          wallet.signAndBroadcast([...messages], fee as never, memo, "stargate")
+        )
       } catch {
         return undefined
       }
