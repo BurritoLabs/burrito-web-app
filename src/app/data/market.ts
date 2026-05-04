@@ -752,7 +752,8 @@ const fetchLocalMarketIndex = async () => {
   }
   if (localMarketIndexInFlight) return localMarketIndexInFlight
 
-  localMarketIndexInFlight = fetch(LOCAL_MARKET_INDEX_URL, { cache: "no-store" })
+  const cacheBuster = Math.floor(Date.now() / LOCAL_INDEX_CACHE_TTL)
+  localMarketIndexInFlight = fetch(`${LOCAL_MARKET_INDEX_URL}?v=${cacheBuster}`, { cache: "no-store" })
     .then(async (response) => {
       if (!response.ok) return null
       const payload = (await response.json()) as MarketIndexPayload
@@ -1014,6 +1015,9 @@ export const fetchMarketPool = async (pair: MarketDexPair) => {
   const pairDexMap = await getPairDexMap()
   return fetchPoolForPair(pair, pairDexMap)
 }
+
+export const fetchMarketPoolLive = async (pair: MarketDexPair) =>
+  fetchPoolForPair(pair, new Map())
 
 export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
   const local = await fetchLocalMarketIndex()

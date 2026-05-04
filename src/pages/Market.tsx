@@ -6,7 +6,9 @@ import styles from "./Market.module.css"
 import { CLASSIC_CHAIN } from "../app/chain"
 import {
   fetchMarketDexPairs,
-  fetchMarketPools
+  fetchMarketPoolLive,
+  fetchMarketPools,
+  type MarketPoolSnapshot
 } from "../app/data/market"
 import {
   useResolvedNativeWhitelist,
@@ -67,6 +69,7 @@ type MarketCard = {
 }
 
 const PAGE_SIZE = 40
+const LIVE_POOL_REFRESH_LIMIT = 80
 const SORT_METRIC_OPTIONS: Array<{ value: SortMetric; label: string }> = [
   { value: "change", label: "% Change" },
   { value: "volume", label: "Volume" },
@@ -518,10 +521,8 @@ const Market = () => {
     [prices]
   )
 
-  const cards = useMemo<MarketCard[]>(() => {
-    const mapped: MarketCard[] = []
-
-    pools.forEach((pool) => {
+  const buildMarketCard = useCallback(
+    (pool: MarketPoolSnapshot): MarketCard | null => {
       let left = resolveAsset(pool.poolAssets[0].id)
       let right = resolveAsset(pool.poolAssets[1].id)
       let leftAmount = toUnitAmount(pool.poolAssets[0].amount, left.decimals)
@@ -532,7 +533,7 @@ const Market = () => {
         ;[leftAmount, rightAmount] = [rightAmount, leftAmount]
       }
 
-      if (leftAmount <= 0 || rightAmount <= 0) return
+      if (leftAmount <= 0 || rightAmount <= 0) return null
 
       // Price display rule: always use the displayed left/right order.
       const priceBase = left
@@ -567,7 +568,7 @@ const Market = () => {
                 : undefined))
             : undefined
 
-      mapped.push({
+      return {
         id: `${pool.dexId}:${pool.pair}`,
         pairAddress: pool.pair,
         pairLabel: `${left.symbol}/${right.symbol}`,
@@ -585,18 +586,21 @@ const Market = () => {
         priceUsd,
         marketCapUsd,
         liquidityUsd
-      })
-    })
+      }
+    },
+    [
+      dashboardSnapshot,
+      getAssetUsdPrice,
+      prices?.lunc?.usd_market_cap,
+      prices?.ustc?.usd_market_cap,
+      resolveAsset
+    ]
+  )
 
-    return mapped
-  }, [
-    dashboardSnapshot,
-    getAssetUsdPrice,
-    pools,
-    prices?.lunc?.usd_market_cap,
-    prices?.ustc?.usd_market_cap,
-    resolveAsset
-  ])
+  const cards = useMemo<MarketCard[]>(
+    () => pools.map((pool) => buildMarketCard(pool)).filter((card): card is MarketCard => Boolean(card)),
+    [buildMarketCard, pools]
+  )
 
   const cw20SupplyContracts = useMemo(
     () =>
@@ -757,6 +761,45 @@ const Market = () => {
 
   const visible = filteredAndSorted.slice(0, visibleCount)
   const hasMore = filteredAndSorted.length > visible.length
+  const liveRefreshCards = visible.slice(0, LIVE_POOL_REFRESH_LIMIT)
+  const liveRefreshKey = liveRefreshCards
+    .map((card) => `${card.dexId}:${card.pairAddress}`)
+    .join("|")
+
+  const { data: liveVisiblePools = [] } = useQuery({
+    queryKey: ["market", "visible-pools-live", liveRefreshKey],
+    queryFn: async () => {
+      const rows = await Promise.all(
+        liveRefreshCards.map((card) =>
+          fetchMarketPoolLive({
+            pair: card.pairAddress,
+            dexId: card.dexId,
+            dexLabel: card.dexLabel,
+            type: "xyk",
+            assets: [card.left.key, card.right.key]
+          })
+        )
+      )
+      return rows.filter((row): row is MarketPoolSnapshot => Boolean(row))
+    },
+    enabled: liveRefreshCards.length > 0,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000
+  })
+
+  const liveCardById = useMemo(() => {
+    const map = new Map<string, MarketCard>()
+    liveVisiblePools.forEach((pool) => {
+      const card = buildMarketCard(pool)
+      if (card) map.set(card.id, card)
+    })
+    return map
+  }, [buildMarketCard, liveVisiblePools])
+
+  const displayVisible = useMemo(
+    () => visible.map((card) => liveCardById.get(card.id) ?? card),
+    [liveCardById, visible]
+  )
   const isLoading = isPairsLoading || isPoolsLoading
   const selectedSortMetric =
     SORT_METRIC_OPTIONS.find((option) => option.value === sortMetric) ?? SORT_METRIC_OPTIONS[0]
@@ -885,14 +928,14 @@ const Market = () => {
 
         {isLoading ? (
           <section className={`card ${styles.empty}`}>Loading market data...</section>
-        ) : visible.length === 0 ? (
+        ) : displayVisible.length === 0 ? (
           <section className={`card ${styles.empty}`}>
             No pool matched your search. Try another symbol or contract.
           </section>
         ) : (
           <>
             <section className={styles.grid}>
-              {visible.map((card, index) => {
+              {displayVisible.map((card, index) => {
                 const pairChange = getPairChange(card, timeframe)
                 const marketCapUsd = getCardMarketCapUsd(card)
                 const { dexName, dexVersion } = splitDexLabel(card.dexLabel)
