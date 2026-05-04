@@ -1272,14 +1272,9 @@ export const fetchTxs = async (address: string, limit = 75) => {
   ]
   const requests = await Promise.all(
     EVENTS.map(async (event) => {
-      const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
-        events: `${event}='${address}'`,
-        page: "1",
-        limit: String(limit),
-        "pagination.count_total": "false"
-      })
-      try {
-        return await fetchJson<{
+      const queryTxs = async (params: Record<string, string>) => {
+        const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", params)
+        return fetchJson<{
           txs?: TxRecord[]
           tx_responses?: Array<{
             txhash?: string
@@ -1301,8 +1296,28 @@ export const fetchTxs = async (address: string, limit = 75) => {
             }>
           }>
         }>(url)
+      }
+
+      const commonParams = {
+        page: "1",
+        limit: String(limit),
+        "pagination.count_total": "false"
+      }
+
+      try {
+        return await queryTxs({
+          ...commonParams,
+          query: `${event}='${address}'`
+        })
       } catch {
-        return undefined
+        try {
+          return await queryTxs({
+            ...commonParams,
+            events: `${event}='${address}'`
+          })
+        } catch {
+          return undefined
+        }
       }
     })
   )
