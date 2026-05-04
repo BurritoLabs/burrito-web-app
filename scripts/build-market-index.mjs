@@ -161,7 +161,6 @@ const mapWithConcurrency = async (items, limit, mapper) => {
     while (index < items.length) {
       const current = index;
       index += 1;
-      // eslint-disable-next-line no-await-in-loop
       const result = await mapper(items[current], current);
       if (result !== null && result !== undefined) results.push(result);
     }
@@ -184,7 +183,6 @@ const loadContractsByCodeId = async (codeId) => {
 
     let payload;
     try {
-      // eslint-disable-next-line no-await-in-loop
       payload = await fetchJson(url.toString());
     } catch {
       break;
@@ -216,7 +214,6 @@ const loadPairsFromTerraswapFactory = async (factory) => {
       : { pairs: { limit } };
     let data;
     try {
-      // eslint-disable-next-line no-await-in-loop
       data = await querySmart(factory, query);
     } catch {
       break;
@@ -354,17 +351,13 @@ const run = async () => {
   for (const dex of DEXES) {
     const pairEntries =
       dex.mode === "garuda"
-        ? // eslint-disable-next-line no-await-in-loop
-          await loadPairsFromGarudaFactory(dex.factory)
+        ? await loadPairsFromGarudaFactory(dex.factory)
         : dex.mode === "astroport"
-        ? // eslint-disable-next-line no-await-in-loop
-          await loadPairsFromAstroportFactory(dex)
-        : // eslint-disable-next-line no-await-in-loop
-          await loadPairsFromTerraswapFactory(dex.factory);
+        ? await loadPairsFromAstroportFactory(dex)
+        : await loadPairsFromTerraswapFactory(dex.factory);
 
     console.log(`${dex.label}: discovered ${pairEntries.length} pairs`);
 
-    // eslint-disable-next-line no-await-in-loop
     const snapshots = await mapWithConcurrency(pairEntries, 14, (pairEntry) =>
       resolvePoolSnapshot(pairEntry, dex)
     );

@@ -748,7 +748,7 @@ const fetchGovV1ByStatus = async (status: string) => {
 
 const fetchProposalVotesFromTxs = async (
   id: string,
-  events: string
+  txQuery: string
 ): Promise<ProposalVote[]> => {
   const votes = new Map<
     string,
@@ -774,13 +774,7 @@ const fetchProposalVotesFromTxs = async (
   }
 
   while ((page - 1) * limit < total && guard < maxPages) {
-    const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
-      events,
-      page: String(page),
-      limit: String(limit),
-      "pagination.count_total": "true"
-    })
-    const data = await fetchJson<{
+    type VoteTxsResponse = {
       txs?: Array<{ body?: { messages?: GovVoteTxMessage[] } }>
       tx_responses?: Array<{
         height?: string
@@ -791,7 +785,27 @@ const fetchProposalVotesFromTxs = async (
         }>
       }>
       total?: string
-    }>(url)
+    }
+    const queryPage = async (paramName: "query" | "events") => {
+      const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
+        [paramName]: txQuery,
+        page: String(page),
+        limit: String(limit),
+        "pagination.count_total": "true"
+      })
+      return fetchJson<VoteTxsResponse>(url)
+    }
+
+    let data: VoteTxsResponse | undefined
+    try {
+      data = await queryPage("query")
+    } catch {
+      try {
+        data = await queryPage("events")
+      } catch {
+        break
+      }
+    }
 
     const batch = data.txs ?? []
     const responses = data.tx_responses ?? []
@@ -1100,13 +1114,7 @@ export const fetchProposalVoteTxHashes = async (
   const maxPages = 200
 
   while ((page - 1) * limit < total && guard < maxPages && found.size < target.size) {
-    const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
-      events: `proposal_vote.proposal_id='${id}'`,
-      page: String(page),
-      limit: String(limit),
-      "pagination.count_total": "true"
-    })
-    const data = await fetchJson<{
+    type VoteTxHashResponse = {
       tx_responses?: Array<{
         height?: string
         txhash?: string
@@ -1116,7 +1124,28 @@ export const fetchProposalVoteTxHashes = async (
         }>
       }>
       total?: string
-    }>(url)
+    }
+    const txQuery = `proposal_vote.proposal_id='${id}'`
+    const queryPage = async (paramName: "query" | "events") => {
+      const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", {
+        [paramName]: txQuery,
+        page: String(page),
+        limit: String(limit),
+        "pagination.count_total": "true"
+      })
+      return fetchJson<VoteTxHashResponse>(url)
+    }
+
+    let data: VoteTxHashResponse | undefined
+    try {
+      data = await queryPage("query")
+    } catch {
+      try {
+        data = await queryPage("events")
+      } catch {
+        break
+      }
+    }
 
     const responses = data.tx_responses ?? []
     const parsedTotal = Number(data.total ?? NaN)

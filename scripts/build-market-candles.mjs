@@ -478,7 +478,6 @@ const mapWithConcurrency = async (items, limit, mapper) => {
       while (cursor < items.length) {
         const index = cursor;
         cursor += 1;
-        // eslint-disable-next-line no-await-in-loop
         const result = await mapper(items[index], index);
         if (result !== undefined && result !== null) {
           results.push(result);
@@ -564,7 +563,6 @@ const collectPairTicks = async ({ meta, oldestAllowed }) => {
   let matchedEvents = 0;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    // eslint-disable-next-line no-await-in-loop
     const txs = await fetchPairTxPage(meta.pair, page);
     if (!txs.length) break;
 
@@ -719,7 +717,6 @@ const run = async () => {
     }
 
     const outFile = path.join(OUT_DIR, `${meta.pair}.json`);
-    // eslint-disable-next-line no-await-in-loop
     await fs.writeFile(outFile, `${JSON.stringify(payload)}\n`, "utf8");
     filesWritten += 1;
   }
