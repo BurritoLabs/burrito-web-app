@@ -5,7 +5,7 @@ import { useWallet } from "./WalletContext"
 import {
   getWalletConnectorBadge,
   getWalletConnectorLabel
-} from "./walletAdapters"
+} from "./walletMeta"
 
 type ConnectModalProps = {
   open: boolean

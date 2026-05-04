@@ -16,6 +16,11 @@ import type {
   WalletConnector,
   WalletConnectorId
 } from "./WalletContext"
+import {
+  getWalletConnectorBadge,
+  getWalletConnectorLabel,
+  getWalletConnectorMeta
+} from "./walletMeta"
 
 type WalletAdapterRuntime = {
   getConnector?: (id: WalletConnectorId) => WalletConnector | undefined
@@ -120,34 +125,6 @@ type WalletWindow = Window & {
   getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
 }
 
-type WalletAdapterMeta = {
-  id: WalletConnectorId
-  label: string
-  badge: string
-  type: WalletConnector["type"]
-}
-
-const CONNECTOR_META: Record<WalletConnectorId, WalletAdapterMeta> = {
-  keplr: {
-    id: "keplr",
-    label: "Keplr",
-    badge: "K",
-    type: "extension"
-  },
-  "keplr-mobile": {
-    id: "keplr-mobile",
-    label: "Keplr Mobile",
-    badge: "K",
-    type: "mobile"
-  },
-  galaxy: {
-    id: "galaxy",
-    label: "Galaxy Station",
-    badge: "G",
-    type: "extension"
-  }
-}
-
 let walletAdapterRuntime: WalletAdapterRuntime | undefined
 
 export const registerWalletAdapterRuntime = (runtime?: WalletAdapterRuntime) => {
@@ -213,8 +190,6 @@ const getWalletWindow = () => {
   if (typeof window === "undefined") return undefined
   return window as WalletWindow
 }
-
-const getConnectorMeta = (id: WalletConnectorId) => CONNECTOR_META[id]
 
 const getRequiredKeplrProvider = () => {
   const walletWindow = getWalletWindow()
@@ -315,11 +290,11 @@ export const getWalletConnectors = (): WalletConnector[] => {
 
   return [
     keplrRuntimeConnector ?? {
-      ...getConnectorMeta("keplr"),
+      ...getWalletConnectorMeta("keplr"),
       available: Boolean(walletWindow?.keplr)
     },
     {
-      ...getConnectorMeta("keplr-mobile"),
+      ...getWalletConnectorMeta("keplr-mobile"),
       available: false
     },
     galaxyRuntimeConnector ?? getGalaxyConnector()
@@ -329,11 +304,7 @@ export const getWalletConnectors = (): WalletConnector[] => {
 export const isWalletConnectorAvailable = (id: WalletConnectorId) =>
   getWalletConnectors().some((connector) => connector.id === id && connector.available)
 
-export const getWalletConnectorLabel = (id?: WalletConnectorId) =>
-  id ? getConnectorMeta(id).label : "Wallet"
-
-export const getWalletConnectorBadge = (id?: WalletConnectorId) =>
-  id ? getConnectorMeta(id).badge : "W"
+export { getWalletConnectorBadge, getWalletConnectorLabel }
 
 export const connectWalletConnector = async (id: WalletConnectorId) => {
   const runtimeAccount = await walletAdapterRuntime?.connect?.(id)

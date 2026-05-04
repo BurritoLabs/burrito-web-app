@@ -27,13 +27,10 @@ import {
   registerWalletAdapterRuntime
 } from "./walletAdapters"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
-
-const STORAGE_KEY = "burritoWalletConnector"
-const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = [
-  "keplr",
-  "keplr-mobile",
-  "galaxy"
-]
+import {
+  WALLET_CONNECTOR_STORAGE_KEY,
+  getStoredWalletConnectorId
+} from "./walletMeta"
 const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
 
 const connectMobileWallet = async (wallet: ChainWalletBase) => {
@@ -81,19 +78,6 @@ const connectMobileWallet = async (wallet: ChainWalletBase) => {
 
 const hasDesktopKeplrProvider = () =>
   typeof window !== "undefined" && Boolean((window as Window & { keplr?: unknown }).keplr)
-
-const isKnownConnectorId = (
-  value: string | null
-): value is WalletConnectorId => KNOWN_CONNECTOR_IDS.includes(value as WalletConnectorId)
-
-const getStoredConnectorId = () => {
-  if (typeof window === "undefined") return undefined
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (!isKnownConnectorId(stored)) {
-    return undefined
-  }
-  return stored
-}
 
 const formatWalletError = (error: unknown) =>
   error instanceof Error ? error.message : "Wallet connection failed"
@@ -150,7 +134,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const [pendingAutoConnectId] = useState<WalletConnectorId | undefined>(
-    () => getStoredConnectorId()
+    () => getStoredWalletConnectorId()
   )
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(
     () => !pendingAutoConnectId
@@ -481,7 +465,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
               : await connectWalletConnector(id)
         setConnectorId(id)
         if (typeof window !== "undefined") {
-          window.localStorage.setItem(STORAGE_KEY, id)
+          window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, id)
         }
         if (nextAccount) {
           setAccount(nextAccount)
@@ -516,7 +500,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     setError(undefined)
     setStatus("disconnected")
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEY)
+      window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
     }
   }, [connectorId, cosmosChain.walletRepo, desktopKeplrAvailable])
 
@@ -640,7 +624,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       setStatus("connected")
       setError(undefined)
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, activeCosmosConnectorId)
+        window.localStorage.setItem(
+          WALLET_CONNECTOR_STORAGE_KEY,
+          activeCosmosConnectorId
+        )
       }
       if (!autoConnectAttempted) {
         setAutoConnectAttempted(true)
