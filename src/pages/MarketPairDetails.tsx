@@ -22,6 +22,7 @@ import {
   fetchPairCandles,
   fetchPairTrades,
   fetchMarketDexPairs,
+  fetchMarketPool,
   fetchMarketPools
 } from "../app/data/market"
 import {
@@ -101,6 +102,12 @@ const formatNativeSymbol = (denom: string) => {
     return f.toUpperCase()
   }
   return denom.toUpperCase()
+}
+
+const toPairFallbackAsset = (assetId: string) => {
+  if (assetId.startsWith("native:")) return assetId.slice("native:".length)
+  if (assetId.startsWith("cw20:")) return assetId.slice("cw20:".length)
+  return assetId
 }
 
 const buildNativeIconCandidates = (denom: string, symbol: string) =>
@@ -423,9 +430,38 @@ const MarketPairDetails = () => {
     return pools.find((pool) => `${pool.dexId}:${pool.pair}`.toLowerCase() === lowerPairId)
   }, [decodedPairId, pools])
 
+  const selectedPairForLivePool = useMemo(() => {
+    if (!selectedPool) return undefined
+    return {
+      pair: selectedPool.pair,
+      dexId: selectedPool.dexId,
+      dexLabel: selectedPool.dexLabel,
+      type: selectedPool.type,
+      assets: [
+        toPairFallbackAsset(selectedPool.poolAssets[0].id),
+        toPairFallbackAsset(selectedPool.poolAssets[1].id)
+      ] as [string, string]
+    }
+  }, [selectedPool])
+
+  const { data: liveSelectedPool } = useQuery({
+    queryKey: [
+      "market",
+      "pool-live",
+      selectedPairForLivePool?.dexId,
+      selectedPairForLivePool?.pair
+    ],
+    queryFn: () => fetchMarketPool(selectedPairForLivePool!),
+    enabled: Boolean(selectedPairForLivePool),
+    staleTime: 45_000,
+    refetchInterval: 90_000
+  })
+
+  const displayPool = liveSelectedPool ?? selectedPool
+
   const poolsForMetadata = useMemo(
-    () => (selectedPool ? [selectedPool] : []),
-    [selectedPool]
+    () => (displayPool ? [displayPool] : []),
+    [displayPool]
   )
 
   const cw20Contracts = useMemo(() => {
@@ -592,12 +628,12 @@ const MarketPairDetails = () => {
   }
 
   const detail = (() => {
-    if (!selectedPool) return undefined
+    if (!displayPool) return undefined
 
-    let left = resolveAsset(selectedPool.poolAssets[0].id)
-    let right = resolveAsset(selectedPool.poolAssets[1].id)
-    let leftAmount = toUnitAmount(selectedPool.poolAssets[0].amount, left.decimals)
-    let rightAmount = toUnitAmount(selectedPool.poolAssets[1].amount, right.decimals)
+    let left = resolveAsset(displayPool.poolAssets[0].id)
+    let right = resolveAsset(displayPool.poolAssets[1].id)
+    let leftAmount = toUnitAmount(displayPool.poolAssets[0].amount, left.decimals)
+    let rightAmount = toUnitAmount(displayPool.poolAssets[1].amount, right.decimals)
 
     if (shouldSwapForDisplay(left, right)) {
       ;[left, right] = [right, left]
@@ -652,7 +688,7 @@ const MarketPairDetails = () => {
     }
 
     return {
-      pool: selectedPool,
+      pool: displayPool,
       left,
       right,
       leftAmount,

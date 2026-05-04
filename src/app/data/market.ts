@@ -1010,6 +1010,11 @@ const fetchPoolForPair = async (
   }
 }
 
+export const fetchMarketPool = async (pair: MarketDexPair) => {
+  const pairDexMap = await getPairDexMap()
+  return fetchPoolForPair(pair, pairDexMap)
+}
+
 export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
   const local = await fetchLocalMarketIndex()
   if (local?.pools.size) {
@@ -1093,7 +1098,7 @@ export const fetchPairCandles = async ({
     let stop = false
     for (let page = 1; page <= maxPages && !stop; page += 1) {
       const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
-        events: `wasm._contract_address='${pairAddress}'`,
+        query: `wasm._contract_address='${pairAddress}'`,
         order_by: "2",
         page: String(page),
         limit: "100"
@@ -1257,7 +1262,7 @@ export const fetchPairTrades = async ({
 
   for (let page = 1; page <= maxPages; page += 1) {
     const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
-      events: `wasm._contract_address='${pairAddress}'`,
+      query: `wasm._contract_address='${pairAddress}'`,
       order_by: "2",
       page: String(page),
       limit: "100"
