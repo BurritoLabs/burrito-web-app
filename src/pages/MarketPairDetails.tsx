@@ -1333,44 +1333,61 @@ const MarketPairDetails = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {trades.map((trade) => (
-                      <tr key={`${trade.txhash}-${trade.timestamp}-${trade.side}`}>
-                        <td>{formatTradeTime(trade.timestamp)}</td>
-                        <td>
-                          <span
-                            className={`${styles.sideBadge} ${
-                              trade.side === "buy" ? styles.sideBuy : styles.sideSell
-                            }`}
-                          >
-                            {trade.side}
-                          </span>
-                        </td>
-                        <td>{formatTradePrice(trade.price)}</td>
-                        <td>
-                          {formatTradeAmount(trade.amountBase)} {detail.left.symbol}
-                        </td>
-                        <td>
-                          <a
-                            href={`https://finder.burrito.money/classic/address/${trade.trader}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={styles.tradesLink}
-                          >
-                            {truncateHash(trade.trader, 8, 6)}
-                          </a>
-                        </td>
-                        <td>
-                          <a
-                            href={`https://finder.burrito.money/classic/tx/${trade.txhash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={styles.tradesLink}
-                          >
-                            {truncateHash(trade.txhash, 8, 6)}
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
+                    {trades.map((trade, index) => {
+                      const quotePrice = `${formatTradePrice(trade.price)} ${detail.priceQuote.symbol}`
+                      const usdPrice =
+                        detail.priceQuoteUsd !== undefined
+                          ? formatChartDetailUsd(trade.price * detail.priceQuoteUsd)
+                          : undefined
+
+                      return (
+                        <tr key={`${trade.txhash}-${trade.timestamp}-${trade.side}-${index}`}>
+                          <td>{formatTradeTime(trade.timestamp)}</td>
+                          <td>
+                            <span
+                              className={`${styles.sideBadge} ${
+                                trade.side === "buy" ? styles.sideBuy : styles.sideSell
+                              }`}
+                            >
+                              {trade.side}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={styles.tradePriceCell}>
+                              <span className={styles.tradePricePrimary}>
+                                {usdPrice ?? quotePrice}
+                              </span>
+                              {usdPrice ? (
+                                <span className={styles.tradePriceQuote}>≈ {quotePrice}</span>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td>
+                            {formatTradeAmount(trade.amountBase)} {detail.left.symbol}
+                          </td>
+                          <td>
+                            <a
+                              href={`https://finder.burrito.money/classic/address/${trade.trader}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={styles.tradesLink}
+                            >
+                              {truncateHash(trade.trader, 8, 6)}
+                            </a>
+                          </td>
+                          <td>
+                            <a
+                              href={`https://finder.burrito.money/classic/tx/${trade.txhash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={styles.tradesLink}
+                            >
+                              {truncateHash(trade.txhash, 8, 6)}
+                            </a>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

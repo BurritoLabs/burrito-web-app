@@ -630,6 +630,25 @@
   border-color: rgba(255, 105, 105, 0.35);
 }
 
+.tradePriceCell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
+.tradePricePrimary {
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: var(--bold);
+}
+
+.tradePriceQuote {
+  color: rgba(234, 245, 235, 0.56);
+  font-size: 11px;
+  font-weight: var(--medium);
+}
+
 .tradesLink {
   color: rgba(133, 230, 91, 0.95);
   text-decoration: none;
