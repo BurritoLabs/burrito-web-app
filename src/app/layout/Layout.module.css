@@ -37,10 +37,10 @@
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(1100px 740px at 70% 26%, rgba(82, 196, 26, 0.18), transparent 62%),
-    radial-gradient(980px 620px at 52% 44%, rgba(82, 196, 26, 0.10), transparent 66%);
+    radial-gradient(1100px 740px at 70% 26%, rgba(104, 216, 63, 0.13), transparent 62%),
+    radial-gradient(980px 620px at 52% 44%, rgba(104, 216, 63, 0.075), transparent 66%);
   filter: blur(12px);
-  opacity: 0.92;
+  opacity: 0.82;
   animation: burritoSystemBreath 7.5s ease-in-out infinite;
   will-change: opacity;
 }
@@ -56,7 +56,7 @@
   left: -420px;
   bottom: -40px;
   transform: rotate(55deg);
-  background-color: rgba(82, 196, 26, 0.42);
+  background-color: rgba(104, 216, 63, 0.28);
   filter: blur(110px);
   animation: burritoSystemBreath 7.5s ease-in-out infinite;
   will-change: opacity;
@@ -76,9 +76,9 @@
   grid-area: banner;
   background: linear-gradient(
     90deg,
-    rgba(82, 196, 26, 0.22),
+    rgba(104, 216, 63, 0.18),
     rgba(255, 255, 255, 0.06),
-    rgba(82, 196, 26, 0.16)
+    rgba(104, 216, 63, 0.12)
   );
   color: var(--fg);
   font-size: var(--font-size-small);
@@ -138,7 +138,7 @@
   min-width: 0;
   overflow: hidden;
   position: relative;
-  background: linear-gradient(180deg, #0b1210 0%, #0c1411 100%);
+  background: linear-gradient(180deg, #101a17 0%, #101b17 100%);
   border-left: var(--border-width) solid var(--card-border);
 }
 
@@ -163,8 +163,8 @@
   background:
     linear-gradient(
       180deg,
-      rgba(12, 20, 17, 0.82) 0%,
-      rgba(12, 20, 17, 0.9) 100%
+      rgba(16, 29, 24, 0.78) 0%,
+      rgba(16, 29, 24, 0.86) 100%
     );
   border-left: var(--border-width) solid var(--card-border);
   pointer-events: none;
@@ -241,8 +241,8 @@
   .globalGlow::before {
     inset: -10vh -12vw;
     background:
-      radial-gradient(720px 420px at 65% 22%, rgba(82, 196, 26, 0.14), transparent 62%),
-      radial-gradient(600px 360px at 48% 38%, rgba(82, 196, 26, 0.08), transparent 66%);
+      radial-gradient(720px 420px at 65% 22%, rgba(104, 216, 63, 0.11), transparent 62%),
+      radial-gradient(600px 360px at 48% 38%, rgba(104, 216, 63, 0.06), transparent 66%);
     filter: blur(10px);
     opacity: 0.72;
   }
