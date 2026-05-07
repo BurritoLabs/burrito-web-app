@@ -24,6 +24,8 @@ blacklists, hidden owner controls, or a custom DEX contract.
 9. Project owners can add more liquidity, withdraw unlocked LP from the pool,
    withdraw locked LP after unlock, update registry metadata, and hide/restore
    their published listing.
+10. If local browser storage is lost, connect the creator wallet and use
+    `Sync my launches` in `Manage` to recover published registry launches.
 
 ## Contracts
 
@@ -49,7 +51,8 @@ VITE_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
 
 Until those are set, the UI keeps LP locking and public publishing disabled.
 That is intentional and prevents users from thinking the launch is complete
-before the contracts exist.
+before the contracts exist. Production Explore also shows an empty state instead
+of fake sample launches when the registry is not configured.
 
 ## Manual Test Checklist
 
@@ -57,6 +60,13 @@ before the contracts exist.
 - `CW20 only` creates a token and opens the record in `Manage`.
 - `Launch with pool` creates a token and pre-fills planned liquidity and lock days in `Manage`.
 - Importing an existing CW20 loads name, symbol, decimals, and total supply.
+- Importing a published CW20 recovers registry metadata, pair contract, LP token,
+  LP lock id, unlock time, and listing visibility.
+- `Sync my launches` loads every registry page, filters by the connected creator
+  address, and restores matching launches into `Manage`.
+- Explore search filters by symbol, name, pair, creator, token contract, pair
+  contract, or registry id.
+- Explore stats show total, live, risk, and unlocked launch counts.
 - Pair lookup shows whether a Terraswap LUNC pair exists.
 - Pair creation stores pair contract and LP token after LCD indexing.
 - Liquidity provision broadcasts `increase_allowance` and `provide_liquidity` in one transaction.
@@ -67,7 +77,9 @@ before the contracts exist.
 - Public listing stays disabled when `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is empty.
 - Published listing metadata and visibility can be updated through the registry
   contract.
-- Registry Explore shows real on-chain records when configured.
+- Registry Explore shows real on-chain records when configured, newest first.
+- Registry Explore classifies records as live, ended, or risk based on LP lock
+  state and missing public info.
 - Registry Explore shows an empty state, not fake launches, when configured but empty.
 - Mobile width keeps cards inside the viewport.
 

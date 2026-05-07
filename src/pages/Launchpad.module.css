@@ -940,6 +940,75 @@
   gap: 8px;
 }
 
+.exploreControls {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  min-width: min(440px, 100%);
+}
+
+.launchSearch {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 6px;
+}
+
+.launchSearch span {
+  color: rgba(240, 250, 241, 0.58);
+  font-size: var(--font-size-xxs);
+  font-weight: var(--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.launchSearch input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(240, 250, 241, 0.92);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  outline: none;
+}
+
+.launchSearch input:focus {
+  border-color: rgba(104, 216, 63, 0.5);
+  box-shadow: 0 0 0 1px rgba(104, 216, 63, 0.2);
+}
+
+.launchStatsStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.launchStatsStrip div {
+  min-width: 86px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  display: grid;
+  gap: 2px;
+}
+
+.launchStatsStrip span {
+  color: rgba(240, 250, 241, 0.55);
+  font-size: var(--font-size-xxs);
+  font-weight: var(--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.launchStatsStrip strong {
+  color: #ffffff;
+  font-size: var(--font-size-title);
+}
+
 .filterButton {
   height: 32px;
   padding: 0 12px;
@@ -987,6 +1056,34 @@
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.ownerControlPanel {
+  display: grid;
+  gap: 10px;
+  min-width: min(440px, 100%);
+}
+
+.ownerSyncRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ownerSyncNote,
+.ownerSyncError {
+  max-width: 320px;
+  color: rgba(218, 247, 203, 0.78);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  line-height: 1.35;
+  text-align: right;
+}
+
+.ownerSyncError {
+  color: #ff7d7d;
 }
 
 .ownerEmptyHint {
@@ -1419,9 +1516,22 @@
   }
 
   .filterBar,
-  .ownerSelector {
+  .exploreControls,
+  .launchSearch,
+  .ownerSelector,
+  .ownerControlPanel {
     width: 100%;
     justify-content: flex-start;
+    justify-items: stretch;
+  }
+
+  .ownerSyncRow {
+    justify-content: flex-start;
+  }
+
+  .ownerSyncNote,
+  .ownerSyncError {
+    text-align: left;
   }
 
   .filterButton,

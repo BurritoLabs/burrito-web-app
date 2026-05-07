@@ -40,6 +40,7 @@ import {
   buildRegisterLaunchMessage,
   buildUpdateLaunchMessage,
   extractRegistryLaunchIdFromEvents,
+  fetchLaunchRegistryLaunch,
   fetchLaunchRegistryLaunches,
   isLaunchRegistryConfigured,
   LAUNCHPAD_REGISTRY_ADDRESS,
@@ -396,6 +397,72 @@ const formatPrice = (value: number) => {
 const formatDateTime = (value: string | number | Date) =>
   new Date(value).toLocaleString()
 
+const buildOwnerRecordFromRegistryLaunch = (
+  launch: LaunchRegistryLaunch,
+  tokenInfo?: Cw20TokenInfo | null
+): OwnerLaunchRecord => {
+  const symbol = (
+    launch.metadata?.symbol ||
+    tokenInfo?.symbol ||
+    "TOKEN"
+  ).toUpperCase()
+  const name = launch.metadata?.name || tokenInfo?.name || symbol
+  const unlockAt = new Date(launch.lp_unlock_time * 1000).toISOString()
+  const createdAt = launch.created_at
+    ? new Date(launch.created_at * 1000).toISOString()
+    : new Date().toISOString()
+  const updatedAt = launch.updated_at
+    ? new Date(launch.updated_at * 1000).toISOString()
+    : createdAt
+
+  return {
+    id: launch.token_contract,
+    symbol,
+    name,
+    pair: `${symbol} / LUNC`,
+    liquidity: "On-chain LP",
+    lockExpiry: formatDateTime(unlockAt),
+    infoStatus: "Published",
+    ownerStatus:
+      launch.status === "hidden" ? "Listing hidden" : "Launch published",
+    mode: "Published launch",
+    contractAddress: launch.token_contract,
+    decimals: tokenInfo?.decimals,
+    totalSupply: tokenInfo?.total_supply,
+    website: launch.metadata?.website ?? "",
+    xProfile: launch.metadata?.x_profile ?? "",
+    description: launch.metadata?.description ?? "",
+    pairAddress: launch.pair_contract,
+    liquidityToken: launch.lp_token,
+    lpLockId: launch.lp_lock_id,
+    lpUnlockAt: unlockAt,
+    registryLaunchId: String(launch.id),
+    registryStatus: launch.status,
+    publishedAt: updatedAt,
+    createdAt
+  }
+}
+
+const mergeRecoveredOwnerRecord = (
+  existing: OwnerLaunchRecord | undefined,
+  recovered: OwnerLaunchRecord
+): OwnerLaunchRecord => {
+  if (!existing) return recovered
+  return {
+    ...existing,
+    ...recovered,
+    txHash: existing.txHash,
+    pairTxHash: existing.pairTxHash,
+    liquidityTxHash: existing.liquidityTxHash,
+    liquidityWithdrawTxHash: existing.liquidityWithdrawTxHash,
+    lpLockTxHash: existing.lpLockTxHash,
+    lpWithdrawTxHash: existing.lpWithdrawTxHash,
+    registryTxHash: existing.registryTxHash,
+    registryUpdateTxHash: existing.registryUpdateTxHash,
+    registryStatusTxHash: existing.registryStatusTxHash
+  }
+}
+
 const Launchpad = () => {
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const [activeTab, setActiveTab] = useState<LaunchTab>("create")
@@ -403,6 +470,7 @@ const Launchpad = () => {
     useState<CreateStep>("token")
   const [activeLaunchFilter, setActiveLaunchFilter] =
     useState<LaunchFilter>("all")
+  const [launchSearch, setLaunchSearch] = useState("")
   const [activeOwnerId, setActiveOwnerId] = useState("")
   const [draft, setDraft] = useState<DraftLaunch>(() => loadStoredDraft())
   const [createdLaunches, setCreatedLaunches] = useState<OwnerLaunchRecord[]>(
@@ -418,6 +486,9 @@ const Launchpad = () => {
   const [importAddress, setImportAddress] = useState("")
   const [importSubmitting, setImportSubmitting] = useState(false)
   const [importError, setImportError] = useState<string>()
+  const [syncSubmitting, setSyncSubmitting] = useState(false)
+  const [syncError, setSyncError] = useState<string>()
+  const [syncResult, setSyncResult] = useState("")
   const [pairLookup, setPairLookup] = useState<Record<string, PairLookupState>>(
     {}
   )
@@ -786,24 +857,46 @@ const Launchpad = () => {
         throw new Error("This contract does not look like a CW20 token.")
       }
 
-      const importedRecord: OwnerLaunchRecord = {
-        id: address,
-        symbol: tokenInfo.symbol.toUpperCase(),
-        name: tokenInfo.name,
-        pair: `${tokenInfo.symbol.toUpperCase()} standalone`,
-        liquidity: "--",
-        lockExpiry: "No LP",
-        infoStatus: "Imported contract",
-        ownerStatus: "CW20 contract imported",
-        mode: "CW20 only",
-        contractAddress: address,
-        decimals: tokenInfo.decimals,
-        totalSupply: tokenInfo.total_supply,
-        createdAt: new Date().toISOString()
-      }
+      const [registryLaunch, pair] = await Promise.all([
+        fetchLaunchRegistryLaunch(address).catch(() => null),
+        fetchTerraswapLuncPair(address).catch(() => null)
+      ])
+      const symbol = (
+        registryLaunch?.metadata?.symbol ||
+        tokenInfo.symbol
+      ).toUpperCase()
+      const name = registryLaunch?.metadata?.name || tokenInfo.name
+      const importedRecord: OwnerLaunchRecord = registryLaunch
+        ? buildOwnerRecordFromRegistryLaunch(registryLaunch, tokenInfo)
+        : {
+            id: address,
+            symbol,
+            name,
+            pair: pair ? `${symbol} / LUNC` : `${symbol} standalone`,
+            liquidity: pair ? "Pair exists" : "--",
+            lockExpiry: pair ? "LP not locked" : "No LP",
+            infoStatus: "Imported contract",
+            ownerStatus: pair ? "Pair found" : "CW20 contract imported",
+            mode: pair ? "CW20 + Pair" : "CW20 only",
+            contractAddress: address,
+            decimals: tokenInfo.decimals,
+            totalSupply: tokenInfo.total_supply,
+            pairAddress: pair?.contract_addr,
+            liquidityToken: pair?.liquidity_token,
+            createdAt: new Date().toISOString()
+          }
+      setPairLookup((current) => ({
+        ...current,
+        [address]: {
+          status: pair ? "found" : "missing",
+          pair
+        }
+      }))
       setCreatedLaunches((current) => [
         importedRecord,
-        ...current.filter((record) => record.id !== address)
+        ...current.filter(
+          (record) => record.id !== address && record.contractAddress !== address
+        )
       ])
       setActiveOwnerId(address)
       setImportAddress("")
@@ -813,6 +906,92 @@ const Launchpad = () => {
       )
     } finally {
       setImportSubmitting(false)
+    }
+  }
+
+  const handleSyncOwnerLaunches = async () => {
+    if (!account?.address) {
+      setSyncError("Connect a wallet first.")
+      setSyncResult("")
+      return
+    }
+    if (!isLaunchRegistryConfigured) {
+      setSyncError("Launch registry contract is not configured.")
+      setSyncResult("")
+      return
+    }
+
+    try {
+      setSyncSubmitting(true)
+      setSyncError(undefined)
+      setSyncResult("")
+      const launches = await fetchLaunchRegistryLaunches()
+      setRegistryLaunches(launches)
+      const ownerAddress = account.address.toLowerCase()
+      const ownedLaunches = launches.filter(
+        (launch) => launch.creator.toLowerCase() === ownerAddress
+      )
+      if (!ownedLaunches.length) {
+        setSyncResult("No published launches found for this wallet.")
+        return
+      }
+
+      const recoveredRecords = await Promise.all(
+        ownedLaunches.map(async (launch) => {
+          const tokenInfo = await queryContractSmart<Cw20TokenInfo>(
+            launch.token_contract,
+            { token_info: {} }
+          ).catch(() => null)
+          return buildOwnerRecordFromRegistryLaunch(launch, tokenInfo)
+        })
+      )
+      setPairLookup((current) => {
+        const next = { ...current }
+        for (const launch of ownedLaunches) {
+          next[launch.token_contract] = {
+            status: "found",
+            pair: {
+              asset_infos: [],
+              contract_addr: launch.pair_contract,
+              liquidity_token: launch.lp_token
+            }
+          }
+        }
+        return next
+      })
+      setCreatedLaunches((current) => {
+        const recoveredKeys = new Set(
+          recoveredRecords.map((record) => record.contractAddress ?? record.id)
+        )
+        const mergedRecords = recoveredRecords.map((record) =>
+          mergeRecoveredOwnerRecord(
+            current.find(
+              (item) =>
+                item.id === record.id ||
+                item.contractAddress === record.contractAddress
+            ),
+            record
+          )
+        )
+        const untouchedRecords = current.filter(
+          (record) =>
+            !recoveredKeys.has(record.id) &&
+            !recoveredKeys.has(record.contractAddress ?? "")
+        )
+        return [...mergedRecords, ...untouchedRecords]
+      })
+      setActiveOwnerId(recoveredRecords[0]?.id ?? "")
+      setSyncResult(
+        `${recoveredRecords.length} launch${
+          recoveredRecords.length === 1 ? "" : "es"
+        } synced from registry.`
+      )
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : "Sync launches failed."
+      )
+    } finally {
+      setSyncSubmitting(false)
     }
   }
 
@@ -894,7 +1073,8 @@ const Launchpad = () => {
   )
   const registeredLaunchCards = useMemo(
     () =>
-      registryLaunches
+      [...registryLaunches]
+        .sort((a, b) => b.created_at - a.created_at || b.id - a.id)
         .filter((launch) => launch.status !== "hidden")
         .map<LaunchCardItem>((launch) => {
           const nowSeconds = Math.floor(Date.now() / 1000)
@@ -902,17 +1082,30 @@ const Launchpad = () => {
             0,
             Math.ceil((launch.lp_unlock_time - nowSeconds) / 86400)
           )
+          const hasPublicInfo = Boolean(
+            launch.metadata.website || launch.metadata.description
+          )
+          const state: Exclude<LaunchFilter, "all"> =
+            unlockDays <= 0 ? "ended" : hasPublicInfo ? "live" : "risk"
+          const status =
+            state === "ended"
+              ? "LP unlocked"
+              : state === "risk"
+              ? "Needs public info"
+              : "Published launch"
           return {
             id: `registry-${launch.id}`,
             symbol: launch.metadata.symbol,
             name: launch.metadata.name,
             pair: `${launch.metadata.symbol} / LUNC`,
-            state: "live" as const,
-            status: "Published launch",
+            state,
+            status,
             liquidity: "On-chain LP",
             lock: unlockDays > 0 ? `${unlockDays} days` : "Unlocked",
             creator: truncateHash(launch.creator),
-            risk: `LP lock #${launch.lp_lock_id}`,
+            risk: hasPublicInfo
+              ? `LP lock #${launch.lp_lock_id}`
+              : "Public info incomplete",
             progress: 100,
             tokenContract: launch.token_contract,
             pairContract: launch.pair_contract,
@@ -922,23 +1115,51 @@ const Launchpad = () => {
     [registryLaunches]
   )
   const shouldShowSampleLaunches =
-    !isLaunchRegistryConfigured && registeredLaunchCards.length === 0
+    import.meta.env.DEV &&
+    !isLaunchRegistryConfigured &&
+    registeredLaunchCards.length === 0
   const launchSource = registeredLaunchCards.length
     ? registeredLaunchCards
     : shouldShowSampleLaunches
     ? sampleLaunches
     : []
-  const filteredLaunches =
-    activeLaunchFilter === "all"
-      ? launchSource
-      : launchSource.filter((launch) => launch.state === activeLaunchFilter)
+  const launchStats = launchSource.reduce(
+    (stats, launch) => ({
+      total: stats.total + 1,
+      live: stats.live + (launch.state === "live" ? 1 : 0),
+      ended: stats.ended + (launch.state === "ended" ? 1 : 0),
+      risk: stats.risk + (launch.state === "risk" ? 1 : 0)
+    }),
+    { total: 0, live: 0, ended: 0, risk: 0 }
+  )
+  const normalizedLaunchSearch = launchSearch.trim().toLowerCase()
+  const filteredLaunches = launchSource.filter((launch) => {
+    if (activeLaunchFilter !== "all" && launch.state !== activeLaunchFilter) {
+      return false
+    }
+    if (!normalizedLaunchSearch) return true
+    return [
+      launch.symbol,
+      launch.name,
+      launch.pair,
+      launch.creator,
+      launch.tokenContract,
+      launch.pairContract,
+      launch.registryLaunchId ? String(launch.registryLaunchId) : ""
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedLaunchSearch)
+  })
   const exploreEmptyText = registryLoading
     ? "Loading on-chain Burrito launches..."
     : registryError
     ? `Registry error: ${registryError}`
+    : normalizedLaunchSearch
+    ? "No launches match your search."
     : isLaunchRegistryConfigured
     ? "No on-chain Burrito launches have been published yet."
-    : "Registry contract is not configured yet. Sample cards are shown as local design previews."
+    : "Registry contract is not configured yet. No public launches are live."
   const ownerRecords = useMemo(
     () => [...createdLaunches, ...ownerLaunches],
     [createdLaunches]
@@ -1067,7 +1288,9 @@ const Launchpad = () => {
       activeOwnerLaunch?.lpLockId &&
       activeOwnerLaunch?.lpUnlockAt
   )
-  const isActiveListingPublished = Boolean(activeOwnerLaunch?.registryTxHash)
+  const isActiveListingPublished = Boolean(
+    activeOwnerLaunch?.registryTxHash || activeOwnerLaunch?.registryLaunchId
+  )
   const activeRegistryStatus = activeOwnerLaunch?.registryStatus ?? "live"
   const canPublishListing = Boolean(
     (hasPublicListingPrerequisites || isActiveListingPublished) &&
@@ -1653,7 +1876,9 @@ const Launchpad = () => {
       setPublishError("Create or import a CW20 token first.")
       return
     }
-    const isUpdatingExistingListing = Boolean(activeOwnerLaunch.registryTxHash)
+    const isUpdatingExistingListing = Boolean(
+      activeOwnerLaunch.registryTxHash || activeOwnerLaunch.registryLaunchId
+    )
     if (
       !isUpdatingExistingListing &&
       (!activePairAddress ||
@@ -1761,8 +1986,9 @@ const Launchpad = () => {
                 xProfile: publishXProfile.trim(),
                 description: publishDescription.trim(),
                 registryLaunchId: launchId,
-                registryTxHash:
-                  record.registryTxHash || result.transactionHash,
+                registryTxHash: isUpdatingExistingListing
+                  ? record.registryTxHash
+                  : result.transactionHash,
                 registryUpdateTxHash: isUpdatingExistingListing
                   ? result.transactionHash
                   : record.registryUpdateTxHash,
@@ -1785,7 +2011,7 @@ const Launchpad = () => {
   }
 
   const handleSetListingStatus = async (status: "live" | "hidden") => {
-    if (!activeOwnerLaunch?.contractAddress || !activeOwnerLaunch.registryTxHash) {
+    if (!activeOwnerLaunch?.contractAddress || !isActiveListingPublished) {
       setListingStatusError("Publish this launch before changing visibility.")
       return
     }
@@ -2466,26 +2692,56 @@ const Launchpad = () => {
                 </p>
               ) : (
                 <p>
-                  Registry contract is not configured yet; showing local sample
-                  cards only as product previews.
+                  {shouldShowSampleLaunches
+                    ? "Registry contract is not configured yet; showing local sample cards only as product previews."
+                    : "Registry contract is not configured yet. Public launch discovery is disabled until deployment."}
                 </p>
               )}
+              <div className={styles.launchStatsStrip}>
+                <div>
+                  <span>Total</span>
+                  <strong>{launchStats.total}</strong>
+                </div>
+                <div>
+                  <span>Live</span>
+                  <strong>{launchStats.live}</strong>
+                </div>
+                <div>
+                  <span>Risk</span>
+                  <strong>{launchStats.risk}</strong>
+                </div>
+                <div>
+                  <span>Unlocked</span>
+                  <strong>{launchStats.ended}</strong>
+                </div>
+              </div>
             </div>
-            <div className={styles.filterBar}>
-              {launchFilters.map((filter) => (
-                <button
-                  key={filter.id}
-                  className={`${styles.filterButton} ${
-                    activeLaunchFilter === filter.id
-                      ? styles.filterButtonActive
-                      : ""
-                  }`}
-                  type="button"
-                  onClick={() => setActiveLaunchFilter(filter.id)}
-                >
-                  {filter.label}
-                </button>
-              ))}
+            <div className={styles.exploreControls}>
+              <label className={styles.launchSearch}>
+                <span>Search launches</span>
+                <input
+                  value={launchSearch}
+                  onChange={(event) => setLaunchSearch(event.target.value)}
+                  placeholder="Symbol, name, contract..."
+                  spellCheck={false}
+                />
+              </label>
+              <div className={styles.filterBar}>
+                {launchFilters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    className={`${styles.filterButton} ${
+                      activeLaunchFilter === filter.id
+                        ? styles.filterButtonActive
+                        : ""
+                    }`}
+                    type="button"
+                    onClick={() => setActiveLaunchFilter(filter.id)}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </article>
           {filteredLaunches.map((item) => (
@@ -2570,29 +2826,50 @@ const Launchpad = () => {
                 expires, and the unlock date must stay visible to traders.
               </p>
             </div>
-            <div className={styles.ownerSelector}>
-              {ownerRecords.length ? (
-                ownerRecords.map((launch) => (
-                  <button
-                    key={launch.id}
-                    className={`${styles.ownerSelectButton} ${
-                      activeOwnerLaunch?.id === launch.id
-                        ? styles.ownerSelectButtonActive
-                        : ""
-                    }`}
-                    type="button"
-                    onClick={() => setActiveOwnerId(launch.id)}
-                  >
-                    <span>{launch.mode}</span>
-                    <strong>{launch.pair}</strong>
-                  </button>
-                ))
-              ) : (
-                <div className={styles.ownerEmptyHint}>
-                  Create a token or import an existing CW20 to unlock owner
-                  tools.
-                </div>
-              )}
+            <div className={styles.ownerControlPanel}>
+              <div className={styles.ownerSelector}>
+                {ownerRecords.length ? (
+                  ownerRecords.map((launch) => (
+                    <button
+                      key={launch.id}
+                      className={`${styles.ownerSelectButton} ${
+                        activeOwnerLaunch?.id === launch.id
+                          ? styles.ownerSelectButtonActive
+                          : ""
+                      }`}
+                      type="button"
+                      onClick={() => setActiveOwnerId(launch.id)}
+                    >
+                      <span>{launch.mode}</span>
+                      <strong>{launch.pair}</strong>
+                    </button>
+                  ))
+                ) : (
+                  <div className={styles.ownerEmptyHint}>
+                    Create a token or import an existing CW20 to unlock owner
+                    tools.
+                  </div>
+                )}
+              </div>
+              <div className={styles.ownerSyncRow}>
+                <button
+                  className="uiButton uiButtonOutline"
+                  type="button"
+                  disabled={
+                    syncSubmitting ||
+                    !account?.address ||
+                    !isLaunchRegistryConfigured
+                  }
+                  onClick={handleSyncOwnerLaunches}
+                >
+                  {syncSubmitting ? "Syncing..." : "Sync my launches"}
+                </button>
+                {syncError ? (
+                  <span className={styles.ownerSyncError}>{syncError}</span>
+                ) : syncResult ? (
+                  <span className={styles.ownerSyncNote}>{syncResult}</span>
+                ) : null}
+              </div>
             </div>
           </article>
 
@@ -2604,7 +2881,8 @@ const Launchpad = () => {
               <span>Import token</span>
               <h3>Add an existing CW20</h3>
               <p>
-                Paste a token contract address to add it to local creator tools.
+                Paste a token contract address to recover its registry listing,
+                Terraswap pair, and local creator tools.
               </p>
             </div>
             <div className={styles.importRow}>
@@ -2659,6 +2937,7 @@ const Launchpad = () => {
               activeOwnerLaunch.liquidityWithdrawTxHash ||
               activeOwnerLaunch.lpWithdrawTxHash ||
               activeOwnerLaunch.registryTxHash ||
+              activeOwnerLaunch.registryLaunchId ||
               activeOwnerLaunch.registryUpdateTxHash ||
               activeOwnerLaunch.registryStatusTxHash ||
               activeOwnerLaunch.createdAt ? (
@@ -2740,6 +3019,12 @@ const Launchpad = () => {
                         {truncateHash(activeOwnerLaunch.registryTxHash)}
                       </strong>
                     </a>
+                  ) : null}
+                  {activeOwnerLaunch.registryLaunchId ? (
+                    <div>
+                      <span>Registry ID</span>
+                      <strong>#{activeOwnerLaunch.registryLaunchId}</strong>
+                    </div>
                   ) : null}
                   {activeOwnerLaunch.registryUpdateTxHash ? (
                     <a
@@ -3304,7 +3589,7 @@ const Launchpad = () => {
                 <div>
                   <span>Status</span>
                   <strong>
-                    {activeOwnerLaunch.registryTxHash
+                    {isActiveListingPublished
                       ? activeRegistryStatus === "hidden"
                         ? "Hidden, editable"
                         : "Published, editable"
@@ -3321,7 +3606,7 @@ const Launchpad = () => {
                   contract is deployed and `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is
                   configured.
                 </div>
-              ) : !hasPublicListingPrerequisites ? (
+              ) : !hasPublicListingPrerequisites && !isActiveListingPublished ? (
                 <div className={styles.noticeBox}>
                   A public listing requires token contract, LUNC pair, LP token,
                   LP lock id, and unlock time. Finish pool setup and LP lock
@@ -3362,7 +3647,7 @@ const Launchpad = () => {
                     </label>
                   </div>
                   <div className={styles.noticeBox}>
-                    {activeOwnerLaunch.registryTxHash
+                    {isActiveListingPublished
                       ? "This updates the public website, X profile, and description stored in the Burrito registry."
                       : "This publishes public facts to the Burrito registry contract. It does not verify the project or make Burrito an auditor."}
                   </div>
@@ -3372,7 +3657,9 @@ const Launchpad = () => {
                   {publishTxHash ? (
                     <div className={styles.txResult}>
                       <div>
-                        <span>Publish tx</span>
+                        <span>
+                          {isActiveListingPublished ? "Update tx" : "Publish tx"}
+                        </span>
                         <a
                           href={`https://finder.burrito.money/classic/tx/${publishTxHash}`}
                           target="_blank"
@@ -3390,13 +3677,13 @@ const Launchpad = () => {
                   >
                     {publishSubmitting
                       ? "Broadcasting..."
-                      : activeOwnerLaunch.registryTxHash
+                      : isActiveListingPublished
                       ? "Update listing"
                       : !connectorId || !account?.address
                       ? "Connect wallet first"
                       : "Publish listing"}
                   </button>
-                  {activeOwnerLaunch.registryTxHash ? (
+                  {isActiveListingPublished ? (
                     <div className={styles.visibilityPanel}>
                       <div>
                         <span>Listing visibility</span>

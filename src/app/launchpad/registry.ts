@@ -40,22 +40,86 @@ type LaunchesResponse = {
   launches?: LaunchRegistryLaunch[]
 }
 
+type LaunchesQuery = {
+  launches: {
+    start_after?: number
+    limit: number
+  }
+}
+
+type LaunchResponse =
+  | LaunchRegistryLaunch
+  | {
+      launch?: LaunchRegistryLaunch | null
+    }
+  | null
+
 const cleanOptional = (value: string) => {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
 }
 
+const isLaunchRecord = (value: unknown): value is LaunchRegistryLaunch =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      "token_contract" in value &&
+      "pair_contract" in value
+  )
+
 export const fetchLaunchRegistryLaunches = async () => {
   if (!isLaunchRegistryConfigured) return []
-  const response = await queryContractSmart<LaunchesResponse>(
-    LAUNCHPAD_REGISTRY_ADDRESS,
-    {
+  const launches: LaunchRegistryLaunch[] = []
+  const limit = 100
+  let startAfter: number | undefined
+
+  for (let page = 0; page < 10; page += 1) {
+    const query: LaunchesQuery = {
       launches: {
-        limit: 100
+        limit
       }
     }
-  )
-  return response.launches ?? []
+    if (typeof startAfter === "number") {
+      query.launches.start_after = startAfter
+    }
+    const response = await queryContractSmart<LaunchesResponse>(
+      LAUNCHPAD_REGISTRY_ADDRESS,
+      query
+    )
+    const pageLaunches = response.launches ?? []
+    launches.push(...pageLaunches)
+    if (pageLaunches.length < limit) break
+    startAfter = pageLaunches[pageLaunches.length - 1]?.id
+    if (typeof startAfter !== "number") break
+  }
+
+  return launches
+}
+
+export const fetchLaunchRegistryLaunch = async (tokenContract: string) => {
+  if (!isLaunchRegistryConfigured) return null
+  try {
+    const response = await queryContractSmart<LaunchResponse>(
+      LAUNCHPAD_REGISTRY_ADDRESS,
+      {
+        launch: {
+          token_contract: tokenContract
+        }
+      }
+    )
+    if (isLaunchRecord(response)) return response
+    if (
+      response &&
+      typeof response === "object" &&
+      "launch" in response &&
+      isLaunchRecord(response.launch)
+    ) {
+      return response.launch
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 export const buildRegisterLaunchMessage = ({
