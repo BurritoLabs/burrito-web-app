@@ -14,3 +14,10 @@ npm run dev
 ```
 npm run build
 ```
+
+## Launchpad
+
+Launchpad V1 docs:
+
+- `docs/launchpad-v1.md`
+- `docs/launchpad-deploy.md`
