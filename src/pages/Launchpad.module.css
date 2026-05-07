@@ -104,7 +104,6 @@
 .launchCardStats span,
 .ownerSummaryGrid span,
 .poolStatusGrid span,
-.ownerAction span,
 .previewStats span,
 .lockStrip span,
 .progressHeader span,
@@ -257,8 +256,7 @@
 .ownerIntro,
 .poolSetup,
 .lockSetup,
-.listingSetup,
-.ownerAction {
+.listingSetup {
   background: rgba(16, 29, 24, 0.76);
 }
 
@@ -286,7 +284,6 @@
 .exploreIntro h3,
 .ownerIntro h3,
 .ownerImport h3,
-.ownerAction h3,
 .planHeader h3 {
   color: #ffffff;
   font-size: var(--font-size-title-lg);
@@ -764,8 +761,7 @@
   width: 100%;
 }
 
-.fullButton:disabled,
-.ownerAction button:disabled {
+.fullButton:disabled {
   cursor: default;
   opacity: 0.72;
 }
@@ -900,8 +896,7 @@
 
 .exploreIntro p,
 .ownerIntro p,
-.ownerImport p,
-.ownerAction p {
+.ownerImport p {
   margin: 0;
   max-width: 780px;
   color: var(--text-muted);
@@ -940,7 +935,6 @@
 }
 
 .launchCard,
-.ownerAction,
 .emptyState {
   min-height: 210px;
   display: grid;
@@ -1784,7 +1778,6 @@
   .poolSetup,
   .lockSetup,
   .listingSetup,
-  .ownerAction,
   .emptyState,
   .planCard,
   .recordCard {

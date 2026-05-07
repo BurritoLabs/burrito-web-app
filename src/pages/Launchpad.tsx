@@ -339,21 +339,6 @@ const sampleLaunches: LaunchCardItem[] = [
   }
 ]
 
-const futureOwnerActions = [
-  {
-    title: "Extend existing lock",
-    text: "The current locker creates fixed locks. Extending the same lock should be a later contract upgrade, not a frontend-only promise."
-  },
-  {
-    title: "Project logo",
-    text: "Token logos should go through a controlled metadata path so a random launch cannot impersonate another asset."
-  },
-  {
-    title: "Launch analytics",
-    text: "A later version can show holders, LP depth, trade count, and recent buys directly in the creator dashboard."
-  }
-]
-
 const ownerLaunches: OwnerLaunchRecord[] = []
 
 const loadStoredDraft = () => {
@@ -4442,29 +4427,6 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          <article className={`card ${styles.ownerAction}`}>
-            <div>
-              <span>Next required action</span>
-              <h3>Keep creator controls separate from trader screens.</h3>
-              <p>
-                Traders should only see public launch facts. Project owners need
-                authenticated controls for metadata, liquidity, locks, and public notes.
-              </p>
-            </div>
-          </article>
-
-          {futureOwnerActions.map((action) => (
-            <article className={`card ${styles.ownerAction}`} key={action.title}>
-              <div>
-                <span>Future owner tool</span>
-                <h3>{action.title}</h3>
-                <p>{action.text}</p>
-              </div>
-              <button className="uiButton uiButtonOutline" type="button" disabled>
-                Coming later
-              </button>
-            </article>
-          ))}
         </section>
       ) : null}
 
