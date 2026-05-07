@@ -1,13 +1,12 @@
 use cosmwasm_std::{
-    entry_point, from_json, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo,
-    Order, Response, StdResult, WasmMsg,
+    entry_point, from_json, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order,
+    Response, StdResult, WasmMsg,
 };
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
-    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockResponse, LocksResponse,
-    QueryMsg,
+    ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockResponse, LocksResponse, QueryMsg,
 };
 use crate::state::{
     Config, Lock, CONFIG, DEFAULT_QUERY_LIMIT, LOCKS, MAX_LOCK_SECONDS, MAX_QUERY_LIMIT,
@@ -26,7 +25,12 @@ pub fn instantiate(
         None => info.sender,
     };
 
-    CONFIG.save(deps.storage, &Config { owner: owner.clone() })?;
+    CONFIG.save(
+        deps.storage,
+        &Config {
+            owner: owner.clone(),
+        },
+    )?;
     NEXT_LOCK_ID.save(deps.storage, &1)?;
 
     Ok(Response::new()

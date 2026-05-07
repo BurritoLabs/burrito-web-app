@@ -305,9 +305,7 @@ fn execute_update_config(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::Launch { token_contract } => {
-            to_json_binary(&query_launch(deps, token_contract)?)
-        }
+        QueryMsg::Launch { token_contract } => to_json_binary(&query_launch(deps, token_contract)?),
         QueryMsg::Launches { start_after, limit } => {
             to_json_binary(&query_launches(deps, start_after, limit)?)
         }
@@ -442,26 +440,22 @@ mod tests {
             WasmQuery::Smart { contract_addr, msg } if contract_addr == LOCKER => {
                 let request: LockerQueryMsg = from_json(msg).unwrap();
                 match request {
-                    LockerQueryMsg::Lock { lock_id } => {
-                        SystemResult::Ok(ContractResult::Ok(
-                            to_json_binary(&LockerLockResponse {
-                                id: lock_id,
-                                owner: CREATOR.to_string(),
-                                lp_token: LP.to_string(),
-                                pair_contract: PAIR.to_string(),
-                                amount: Uint128::new(123),
-                                unlock_time,
-                                created_at: unlock_time - 10,
-                                withdrawn: false,
-                            })
-                            .unwrap(),
-                        ))
-                    }
+                    LockerQueryMsg::Lock { lock_id } => SystemResult::Ok(ContractResult::Ok(
+                        to_json_binary(&LockerLockResponse {
+                            id: lock_id,
+                            owner: CREATOR.to_string(),
+                            lp_token: LP.to_string(),
+                            pair_contract: PAIR.to_string(),
+                            amount: Uint128::new(123),
+                            unlock_time,
+                            created_at: unlock_time - 10,
+                            withdrawn: false,
+                        })
+                        .unwrap(),
+                    )),
                 }
             }
-            _ => SystemResult::Ok(ContractResult::Err(
-                "unsupported wasm query".to_string(),
-            )),
+            _ => SystemResult::Ok(ContractResult::Err("unsupported wasm query".to_string())),
         }
     }
 
@@ -594,27 +588,22 @@ mod tests {
             WasmQuery::Smart { contract_addr, msg } if contract_addr == LOCKER => {
                 let request: LockerQueryMsg = from_json(msg).unwrap();
                 match request {
-                    LockerQueryMsg::Lock { lock_id } => {
-                        SystemResult::Ok(ContractResult::Ok(
-                            to_json_binary(&LockerLockResponse {
-                                id: lock_id,
-                                owner: "terra1other0000000000000000000000000000000000"
-                                    .to_string(),
-                                lp_token: LP.to_string(),
-                                pair_contract: PAIR.to_string(),
-                                amount: Uint128::new(123),
-                                unlock_time,
-                                created_at: unlock_time - 10,
-                                withdrawn: false,
-                            })
-                            .unwrap(),
-                        ))
-                    }
+                    LockerQueryMsg::Lock { lock_id } => SystemResult::Ok(ContractResult::Ok(
+                        to_json_binary(&LockerLockResponse {
+                            id: lock_id,
+                            owner: "terra1other0000000000000000000000000000000000".to_string(),
+                            lp_token: LP.to_string(),
+                            pair_contract: PAIR.to_string(),
+                            amount: Uint128::new(123),
+                            unlock_time,
+                            created_at: unlock_time - 10,
+                            withdrawn: false,
+                        })
+                        .unwrap(),
+                    )),
                 }
             }
-            _ => SystemResult::Ok(ContractResult::Err(
-                "unsupported wasm query".to_string(),
-            )),
+            _ => SystemResult::Ok(ContractResult::Err("unsupported wasm query".to_string())),
         });
 
         let error = execute(

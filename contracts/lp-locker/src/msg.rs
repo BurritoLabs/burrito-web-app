@@ -26,7 +26,9 @@ pub enum Cw20HookMsg {
 #[cw_serde]
 pub enum QueryMsg {
     Config {},
-    Lock { lock_id: u64 },
+    Lock {
+        lock_id: u64,
+    },
     LocksByOwner {
         owner: String,
         start_after: Option<u64>,

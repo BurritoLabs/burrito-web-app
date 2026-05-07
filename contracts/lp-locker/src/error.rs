@@ -13,10 +13,7 @@ pub enum ContractError {
     InvalidAmount {},
 
     #[error("lock duration must be between {min_seconds} and {max_seconds} seconds")]
-    InvalidUnlockTime {
-        min_seconds: u64,
-        max_seconds: u64,
-    },
+    InvalidUnlockTime { min_seconds: u64, max_seconds: u64 },
 
     #[error("lock {lock_id} was not found")]
     LockNotFound { lock_id: u64 },
