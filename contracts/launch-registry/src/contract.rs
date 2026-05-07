@@ -282,12 +282,11 @@ fn execute_update_launch(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let token_contract = deps.api.addr_validate(&token_contract)?;
-    let mut launch =
-        LAUNCHES
-            .may_load(deps.storage, &token_contract)?
-            .ok_or_else(|| ContractError::LaunchNotFound {
-                token_contract: token_contract.to_string(),
-            })?;
+    let mut launch = LAUNCHES
+        .may_load(deps.storage, &token_contract)?
+        .ok_or_else(|| ContractError::LaunchNotFound {
+            token_contract: token_contract.to_string(),
+        })?;
 
     if info.sender != launch.creator && info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
