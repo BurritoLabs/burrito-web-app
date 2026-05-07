@@ -21,9 +21,9 @@ blacklists, hidden owner controls, or a custom DEX contract.
 6. Lock the minted LP token after the locker contract is configured.
 7. Publish the listing after the registry contract is configured.
 8. Use `Explore` to view on-chain registry launches.
-9. Project owners can add more liquidity, withdraw unlocked LP from the pool,
-   withdraw locked LP after unlock, update registry metadata, and hide/restore
-   their published listing.
+9. Project owners can distribute CW20 tokens, add more liquidity, withdraw
+   unlocked LP from the pool, withdraw locked LP after unlock, update registry
+   metadata, and hide/restore their published listing.
 10. If local browser storage is lost, connect the creator wallet and use
     `Sync my launches` in `Manage` to recover published registry launches.
 
@@ -62,6 +62,8 @@ of fake sample launches when the registry is not configured.
 - `CW20 only` creates a token and opens the record in `Manage`.
 - `Launch with pool` creates a token and pre-fills planned liquidity and lock days in `Manage`.
 - Importing an existing CW20 loads name, symbol, decimals, and total supply.
+- Manage can batch CW20 transfers by broadcasting one transfer message per
+  recipient line, which makes CW20-only launches usable without forcing a pool.
 - Importing a published CW20 recovers registry metadata, pair contract, LP token,
   LP lock id, unlock time, and listing visibility.
 - `Sync my launches` loads every registry page, filters by the connected creator
@@ -91,8 +93,8 @@ of fake sample launches when the registry is not configured.
   local-only cleanup action that does not mutate on-chain state.
 - Manage shows a launch readiness checklist for token, pair, liquidity, LP lock,
   registry, and publish status, with a next-action summary for creators.
-- Manage next-action CTAs scroll directly to the import, pair, LP lock, or
-  listing tool that needs attention.
+- Manage next-action CTAs scroll directly to the import, distribution, pair,
+  LP lock, or listing tool that needs attention.
 - Create and Publish validate optional public links. Website must be a full
   `http://` or `https://` URL, and X can be `@handle`, `x.com`, or
   `twitter.com`.

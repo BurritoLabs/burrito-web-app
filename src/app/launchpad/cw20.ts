@@ -1,5 +1,8 @@
 import { toUtf8 } from "@cosmjs/encoding"
-import { MsgInstantiateContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
+import {
+  MsgExecuteContract,
+  MsgInstantiateContract
+} from "cosmjs-types/cosmwasm/wasm/v1/tx"
 
 export const LAUNCHPAD_CW20_CODE_ID = 3n
 export const LAUNCHPAD_CW20_CODE_ID_LABEL = "Terra Classic CW20 code ID 3"
@@ -102,6 +105,33 @@ export const buildCw20InstantiateMessage = (
     codeId: LAUNCHPAD_CW20_CODE_ID,
     label,
     msg: toUtf8(JSON.stringify(buildCw20InstantiatePayload(input))),
+    funds: []
+  })
+})
+
+export const buildCw20TransferMessage = ({
+  sender,
+  tokenAddress,
+  recipient,
+  amount
+}: {
+  sender: string
+  tokenAddress: string
+  recipient: string
+  amount: string
+}) => ({
+  typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+  value: MsgExecuteContract.fromPartial({
+    sender,
+    contract: tokenAddress,
+    msg: toUtf8(
+      JSON.stringify({
+        transfer: {
+          recipient,
+          amount
+        }
+      })
+    ),
     funds: []
   })
 })

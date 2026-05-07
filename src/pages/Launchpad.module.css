@@ -1380,6 +1380,7 @@
 }
 
 .poolSetup,
+.tokenDistribution,
 .lockSetup,
 .listingSetup {
   display: grid;
@@ -1411,9 +1412,14 @@
 }
 
 .poolSetup :global(.uiButton),
+.tokenDistribution :global(.uiButton),
 .lockSetup :global(.uiButton),
 .listingSetup :global(.uiButton) {
   width: 100%;
+}
+
+.tokenDistribution .poolStatusGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .liquidityForm {
@@ -1668,6 +1674,10 @@
   .createStepper {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .tokenDistribution .poolStatusGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
@@ -1775,6 +1785,7 @@
   .ownerIntro,
   .ownerImport,
   .ownerReadiness,
+  .tokenDistribution,
   .poolSetup,
   .lockSetup,
   .listingSetup,

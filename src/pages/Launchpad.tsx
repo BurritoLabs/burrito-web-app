@@ -10,6 +10,7 @@ import PageShell from "./PageShell"
 import styles from "./Launchpad.module.css"
 import {
   buildCw20InstantiateMessage,
+  buildCw20TransferMessage,
   extractContractAddressFromEvents,
   formatBaseUnitsToTokenAmount,
   LAUNCHPAD_CW20_CODE_ID_LABEL,
@@ -84,6 +85,7 @@ type OwnerLaunchRecord = {
   pairTxHash?: string
   liquidityTxHash?: string
   liquidityWithdrawTxHash?: string
+  distributionTxHash?: string
   lpLockId?: string
   lpLockTxHash?: string
   lpUnlockAt?: string
@@ -127,6 +129,12 @@ type TokenBalanceLookupState = {
 
 type Cw20BalanceResponse = {
   balance?: string
+}
+
+type Cw20DistributionTransfer = {
+  recipient: string
+  amount: string
+  displayAmount: string
 }
 
 type DraftLaunch = {
@@ -457,6 +465,61 @@ const normalizeOptionalXProfile = (value: string) => {
   return normalized
 }
 
+const TERRA_ADDRESS_PATTERN = /^terra1[0-9a-z]{38,80}$/
+
+const parseDistributionTransfers = (
+  value: string,
+  decimals: number,
+  symbol: string
+) => {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (!lines.length) return []
+  if (lines.length > 50) {
+    throw new Error("Distribution supports up to 50 recipients per transaction.")
+  }
+
+  return lines.map<Cw20DistributionTransfer>((line, index) => {
+    const lineNumber = index + 1
+    const parts = line.split(/[\s,]+/).filter(Boolean)
+    if (parts.length !== 2) {
+      throw new Error(`Line ${lineNumber}: use "terra1... amount".`)
+    }
+
+    const [recipient, amountValue] = parts
+    if (!TERRA_ADDRESS_PATTERN.test(recipient)) {
+      throw new Error(`Line ${lineNumber}: recipient must be a terra1 address.`)
+    }
+
+    return {
+      recipient,
+      amount: parseTokenAmountToBaseUnits(
+        amountValue,
+        decimals,
+        `${symbol} amount on line ${lineNumber}`
+      ),
+      displayAmount: amountValue
+    }
+  })
+}
+
+const getDistributionTotalAmount = (
+  transfers: Cw20DistributionTransfer[],
+  decimals: number
+) => {
+  const total = transfers.reduce((sum, transfer) => {
+    try {
+      return sum + BigInt(transfer.amount)
+    } catch {
+      return sum
+    }
+  }, 0n)
+  return formatBaseUnitsToTokenAmount(total.toString(), decimals, 6)
+}
+
 const buildOwnerRecordFromRegistryLaunch = (
   launch: LaunchRegistryLaunch,
   tokenInfo?: Cw20TokenInfo | null
@@ -590,6 +653,10 @@ const Launchpad = () => {
   const [withdrawLpSubmitting, setWithdrawLpSubmitting] = useState(false)
   const [withdrawLpError, setWithdrawLpError] = useState<string>()
   const [withdrawLpTxHash, setWithdrawLpTxHash] = useState("")
+  const [distributionInput, setDistributionInput] = useState("")
+  const [distributionSubmitting, setDistributionSubmitting] = useState(false)
+  const [distributionError, setDistributionError] = useState<string>()
+  const [distributionTxHash, setDistributionTxHash] = useState("")
   const [registryLaunches, setRegistryLaunches] = useState<
     LaunchRegistryLaunch[]
   >([])
@@ -1392,6 +1459,9 @@ const Launchpad = () => {
   const activeOwnerWebsite = activeOwnerLaunch?.website ?? ""
   const activeOwnerXProfile = activeOwnerLaunch?.xProfile ?? ""
   const activeOwnerDescription = activeOwnerLaunch?.description ?? ""
+  const activeOwnerIsCw20Only = Boolean(
+    activeOwnerLaunch?.mode.toLowerCase().includes("cw20 only")
+  )
   const isActiveOwnerLocalRecord = Boolean(
     activeOwnerLaunch &&
       createdLaunches.some((record) => record.id === activeOwnerLaunch.id)
@@ -1440,10 +1510,41 @@ const Launchpad = () => {
     typeof activeOwnerLaunch?.decimals === "number"
       ? activeOwnerLaunch.decimals
       : 6
+  const distributionPreview = useMemo(() => {
+    try {
+      const transfers = parseDistributionTransfers(
+        distributionInput,
+        activeTokenDecimals,
+        activeOwnerLaunch?.symbol ?? "TOKEN"
+      )
+      return {
+        transfers,
+        error: "",
+        totalAmount: getDistributionTotalAmount(transfers, activeTokenDecimals)
+      }
+    } catch (error) {
+      return {
+        transfers: [] as Cw20DistributionTransfer[],
+        error:
+          error instanceof Error
+            ? error.message
+            : "Distribution list is invalid.",
+        totalAmount: "--"
+      }
+    }
+  }, [activeOwnerLaunch?.symbol, activeTokenDecimals, distributionInput])
   const canCreatePair =
     Boolean(activeTokenAddress) &&
     !activePairAddress &&
     activePairLookup.status !== "loading"
+  const canDistributeTokens = Boolean(
+    activeTokenAddress &&
+      connectorId &&
+      account?.address &&
+      distributionPreview.transfers.length &&
+      !distributionPreview.error &&
+      !distributionSubmitting
+  )
   const hasLiquidityInput = Boolean(
     liquidityTokenAmount.trim() && liquidityLuncAmount.trim()
   )
@@ -1559,49 +1660,77 @@ const Launchpad = () => {
   const hasLockedLp = Boolean(
     activeOwnerLaunch?.lpLockId && activeOwnerLaunch.lpUnlockAt
   )
+  const hasDistributedTokens = Boolean(
+    activeOwnerLaunch?.distributionTxHash || distributionTxHash
+  )
   const activeOwnerReadiness = activeOwnerLaunch
-    ? [
-        {
-          label: "Token",
-          done: Boolean(activeOwnerLaunch.contractAddress),
-          value: activeOwnerLaunch.contractAddress
-            ? truncateHash(activeOwnerLaunch.contractAddress)
-            : "Create or import"
-        },
-        {
-          label: "Pair",
-          done: Boolean(activePairAddress),
-          value: activePairAddress ? truncateHash(activePairAddress) : "Needed"
-        },
-        {
-          label: "Liquidity",
-          done: hasProvidedLiquidity,
-          value: hasProvidedLiquidity ? "Provided" : "Add initial LP"
-        },
-        {
-          label: "LP lock",
-          done: hasLockedLp,
-          value: hasLockedLp
-            ? activeOwnerLaunch.lockExpiry
-            : isLpLockerConfigured
-            ? "Ready to lock"
-            : "Locker env needed"
-        },
-        {
-          label: "Registry",
-          done: isLaunchRegistryConfigured,
-          value: isLaunchRegistryConfigured ? "Configured" : "Env needed"
-        },
-        {
-          label: "Publish",
-          done: isActiveListingPublished,
-          value: isActiveListingPublished
-            ? activeRegistryStatus === "hidden"
-              ? "Hidden"
-              : "Live"
-            : "Not published"
-        }
-      ]
+    ? activeOwnerIsCw20Only
+      ? [
+          {
+            label: "Token",
+            done: Boolean(activeOwnerLaunch.contractAddress),
+            value: activeOwnerLaunch.contractAddress
+              ? truncateHash(activeOwnerLaunch.contractAddress)
+              : "Create or import"
+          },
+          {
+            label: "Distribution",
+            done: hasDistributedTokens,
+            value: hasDistributedTokens ? "Sent" : "Manual"
+          },
+          {
+            label: "Market route",
+            done: false,
+            value: activePairAddress ? "Pair found" : "Skipped"
+          },
+          {
+            label: "Public listing",
+            done: false,
+            value: "Not used"
+          }
+        ]
+      : [
+          {
+            label: "Token",
+            done: Boolean(activeOwnerLaunch.contractAddress),
+            value: activeOwnerLaunch.contractAddress
+              ? truncateHash(activeOwnerLaunch.contractAddress)
+              : "Create or import"
+          },
+          {
+            label: "Pair",
+            done: Boolean(activePairAddress),
+            value: activePairAddress ? truncateHash(activePairAddress) : "Needed"
+          },
+          {
+            label: "Liquidity",
+            done: hasProvidedLiquidity,
+            value: hasProvidedLiquidity ? "Provided" : "Add initial LP"
+          },
+          {
+            label: "LP lock",
+            done: hasLockedLp,
+            value: hasLockedLp
+              ? activeOwnerLaunch.lockExpiry
+              : isLpLockerConfigured
+              ? "Ready to lock"
+              : "Locker env needed"
+          },
+          {
+            label: "Registry",
+            done: isLaunchRegistryConfigured,
+            value: isLaunchRegistryConfigured ? "Configured" : "Env needed"
+          },
+          {
+            label: "Publish",
+            done: isActiveListingPublished,
+            value: isActiveListingPublished
+              ? activeRegistryStatus === "hidden"
+                ? "Hidden"
+                : "Live"
+              : "Not published"
+          }
+        ]
     : []
   const activeOwnerNextAction: OwnerNextAction = !activeOwnerLaunch
     ? {
@@ -1616,6 +1745,13 @@ const Launchpad = () => {
         text: "Import the CW20 contract again so the creator dashboard can read chain state.",
         actionLabel: "Go to import",
         targetId: "launchpad-import"
+      }
+    : activeOwnerIsCw20Only
+    ? {
+        title: "Distribute the CW20 token",
+        text: "CW20 only mode skips pool and listing setup. Use the distribution tool to send tokens to holders manually.",
+        actionLabel: "Open distribution",
+        targetId: "launchpad-distribution"
       }
     : !activePairAddress
     ? {
@@ -1834,6 +1970,9 @@ const Launchpad = () => {
     setLockLpTxHash("")
     setWithdrawLpError(undefined)
     setWithdrawLpTxHash("")
+    setDistributionError(undefined)
+    setDistributionTxHash("")
+    setDistributionInput("")
     setPublishError(undefined)
     setPublishTxHash("")
     setListingStatusError(undefined)
@@ -2234,6 +2373,73 @@ const Launchpad = () => {
       failTx(message)
     } finally {
       setWithdrawLpSubmitting(false)
+    }
+  }
+
+  const handleDistributeTokens = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!activeOwnerLaunch?.contractAddress) {
+      setDistributionError("Create or import a CW20 token first.")
+      return
+    }
+    if (!connectorId || !account?.address) {
+      setDistributionError("Connect a wallet first.")
+      return
+    }
+    if (distributionPreview.error) {
+      setDistributionError(distributionPreview.error)
+      return
+    }
+    if (!distributionPreview.transfers.length) {
+      setDistributionError("Add at least one recipient and amount.")
+      return
+    }
+
+    try {
+      setDistributionSubmitting(true)
+      setDistributionError(undefined)
+      setDistributionTxHash("")
+      startTx(`Distribute ${activeOwnerLaunch.symbol}`)
+      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const client = await connectClassicSigningClientForConnector(connectorId)
+      const messages = distributionPreview.transfers.map((transfer) =>
+        buildCw20TransferMessage({
+          sender: signerAddress,
+          tokenAddress: activeOwnerLaunch.contractAddress ?? "",
+          recipient: transfer.recipient,
+          amount: transfer.amount
+        })
+      )
+      const result = await client.signAndBroadcast(
+        signerAddress,
+        messages,
+        "auto",
+        `Burrito distribute ${activeOwnerLaunch.symbol}`
+      )
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Distribute tokens failed")
+      }
+
+      setDistributionTxHash(result.transactionHash)
+      setCreatedLaunches((current) =>
+        current.map((record) =>
+          record.id === activeOwnerLaunch.id
+            ? {
+                ...record,
+                ownerStatus: "Tokens distributed",
+                distributionTxHash: result.transactionHash
+              }
+            : record
+        )
+      )
+      finishTx(result.transactionHash)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Distribute tokens failed."
+      setDistributionError(message)
+      failTx(message)
+    } finally {
+      setDistributionSubmitting(false)
     }
   }
 
@@ -3613,6 +3819,8 @@ const Launchpad = () => {
               ) : null}
               {activeOwnerLaunch.contractAddress ||
               activeOwnerLaunch.txHash ||
+              activeOwnerLaunch.distributionTxHash ||
+              distributionTxHash ||
               activeOwnerLaunch.lpLockTxHash ||
               activeOwnerLaunch.liquidityWithdrawTxHash ||
               activeOwnerLaunch.lpWithdrawTxHash ||
@@ -3649,6 +3857,25 @@ const Launchpad = () => {
                       <span>Created</span>
                       <strong>{formatDateTime(activeOwnerLaunch.createdAt)}</strong>
                     </div>
+                  ) : null}
+                  {activeOwnerLaunch.distributionTxHash ||
+                  distributionTxHash ? (
+                    <a
+                      href={`https://finder.burrito.money/classic/tx/${
+                        activeOwnerLaunch.distributionTxHash ||
+                        distributionTxHash
+                      }`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>Distribution tx</span>
+                      <strong>
+                        {truncateHash(
+                          activeOwnerLaunch.distributionTxHash ||
+                            distributionTxHash
+                        )}
+                      </strong>
+                    </a>
                   ) : null}
                   {activeOwnerLaunch.lpLockTxHash ? (
                     <a
@@ -3732,6 +3959,105 @@ const Launchpad = () => {
                   ) : null}
                 </div>
               ) : null}
+            </article>
+          ) : null}
+
+          {activeOwnerLaunch ? (
+            <article
+              id="launchpad-distribution"
+              className={`card ${styles.tokenDistribution}`}
+            >
+              <div className={styles.planHeader}>
+                <span>CW20 distribution</span>
+                <h3>Send tokens to holders</h3>
+                <p>
+                  Use this for CW20 only tokens, team allocations, community
+                  tests, or post-launch distributions. One line is one transfer.
+                </p>
+              </div>
+              <div className={styles.poolStatusGrid}>
+                <div>
+                  <span>Token</span>
+                  <strong>
+                    {activeOwnerLaunch.contractAddress
+                      ? truncateHash(activeOwnerLaunch.contractAddress)
+                      : "No CW20"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Decimals</span>
+                  <strong>{activeTokenDecimals}</strong>
+                </div>
+                <div>
+                  <span>Recipients</span>
+                  <strong>{distributionPreview.transfers.length}</strong>
+                </div>
+                <div>
+                  <span>Total amount</span>
+                  <strong>
+                    {distributionPreview.transfers.length
+                      ? `${distributionPreview.totalAmount} ${activeOwnerLaunch.symbol}`
+                      : "--"}
+                  </strong>
+                </div>
+              </div>
+              <form
+                className={styles.liquidityForm}
+                onSubmit={handleDistributeTokens}
+              >
+                <label className={`${styles.field} ${styles.fullField}`}>
+                  <span>Recipients and amounts</span>
+                  <textarea
+                    value={distributionInput}
+                    onChange={(event) =>
+                      setDistributionInput(event.target.value)
+                    }
+                    placeholder={`terra1... 1000\nterra1... 2500`}
+                    spellCheck={false}
+                  />
+                </label>
+                <div className={styles.noticeBox}>
+                  Format: `terra1address amount`. Burrito will broadcast one
+                  CW20 transfer message per line in a single transaction.
+                </div>
+                {distributionPreview.error && distributionInput.trim() ? (
+                  <div className={styles.txError}>
+                    {distributionPreview.error}
+                  </div>
+                ) : null}
+                {distributionError ? (
+                  <div className={styles.txError}>{distributionError}</div>
+                ) : null}
+                {distributionTxHash ? (
+                  <div className={styles.txResult}>
+                    <div>
+                      <span>Distribution tx</span>
+                      <a
+                        href={`https://finder.burrito.money/classic/tx/${distributionTxHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {truncateHash(distributionTxHash)}
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
+                <button
+                  className="uiButton uiButtonPrimary"
+                  type="submit"
+                  disabled={!canDistributeTokens}
+                >
+                  {distributionSubmitting
+                    ? "Broadcasting..."
+                    : !connectorId || !account?.address
+                    ? "Connect wallet first"
+                    : distributionPreview.transfers.length
+                    ? `Send ${distributionPreview.transfers.length} transfer${
+                        distributionPreview.transfers.length === 1 ? "" : "s"
+                      }`
+                    : "Enter recipients"}
+                </button>
+              </form>
             </article>
           ) : null}
 
