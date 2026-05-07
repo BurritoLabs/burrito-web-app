@@ -1051,6 +1051,74 @@
   min-width: 92px;
 }
 
+.launchCardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.launchDetailPanel {
+  grid-column: 1 / -1;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(104, 216, 63, 0.14), transparent 34%),
+    rgba(16, 29, 24, 0.82);
+  display: grid;
+  gap: 16px;
+}
+
+.launchDetailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.launchDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.launchDetailGrid div {
+  min-height: 68px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  display: grid;
+  align-content: space-between;
+  min-width: 0;
+}
+
+.launchDetailGrid span {
+  color: rgba(240, 250, 241, 0.6);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.launchDetailGrid strong {
+  color: #ffffff;
+  font-size: var(--font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.launchDescription {
+  margin: 0;
+  color: rgba(240, 250, 241, 0.74);
+  font-size: var(--font-size-small);
+  line-height: 1.55;
+}
+
+.launchDetailActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .ownerSelector {
   display: flex;
   justify-content: flex-end;
@@ -1506,8 +1574,10 @@
   .formHeader,
   .formHeaderActions,
   .exploreIntro,
+  .launchDetailHeader,
   .ownerIntro,
   .launchCardBottom,
+  .launchDetailActions,
   .lockStrip,
   .codeIdLine,
   .txResult div {
@@ -1554,6 +1624,10 @@
   .importRow :global(.uiButton) {
     width: 100%;
   }
+
+  .launchDetailGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 420px) {
@@ -1562,6 +1636,7 @@
   .readinessCard,
   .packageCard,
   .exploreIntro,
+  .launchDetailPanel,
   .launchCard,
   .ownerIntro,
   .ownerImport,

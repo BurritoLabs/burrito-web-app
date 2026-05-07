@@ -155,6 +155,12 @@ type LaunchCardItem = {
   tokenContract?: string
   pairContract?: string
   registryLaunchId?: number
+  lpLockId?: string
+  website?: string | null
+  xProfile?: string | null
+  description?: string | null
+  createdAt?: number
+  unlockTime?: number
   sample?: boolean
 }
 
@@ -471,6 +477,7 @@ const Launchpad = () => {
   const [activeLaunchFilter, setActiveLaunchFilter] =
     useState<LaunchFilter>("all")
   const [launchSearch, setLaunchSearch] = useState("")
+  const [selectedLaunchId, setSelectedLaunchId] = useState("")
   const [activeOwnerId, setActiveOwnerId] = useState("")
   const [draft, setDraft] = useState<DraftLaunch>(() => loadStoredDraft())
   const [createdLaunches, setCreatedLaunches] = useState<OwnerLaunchRecord[]>(
@@ -1109,7 +1116,13 @@ const Launchpad = () => {
             progress: 100,
             tokenContract: launch.token_contract,
             pairContract: launch.pair_contract,
-            registryLaunchId: launch.id
+            registryLaunchId: launch.id,
+            lpLockId: launch.lp_lock_id,
+            website: launch.metadata.website,
+            xProfile: launch.metadata.x_profile,
+            description: launch.metadata.description,
+            createdAt: launch.created_at,
+            unlockTime: launch.lp_unlock_time
           }
         }),
     [registryLaunches]
@@ -1151,6 +1164,9 @@ const Launchpad = () => {
       .toLowerCase()
       .includes(normalizedLaunchSearch)
   })
+  const selectedLaunch =
+    filteredLaunches.find((launch) => launch.id === selectedLaunchId) ??
+    filteredLaunches[0]
   const exploreEmptyText = registryLoading
     ? "Loading on-chain Burrito launches..."
     : registryError
@@ -2744,6 +2760,111 @@ const Launchpad = () => {
               </div>
             </div>
           </article>
+          {selectedLaunch ? (
+            <article className={`card ${styles.launchDetailPanel}`}>
+              <div className={styles.launchDetailHeader}>
+                <div className={styles.launchCardTop}>
+                  <div className={styles.launchLogo}>
+                    {selectedLaunch.symbol.slice(0, 2)}
+                  </div>
+                  <div>
+                    <span>{selectedLaunch.status}</span>
+                    <strong>{selectedLaunch.pair}</strong>
+                    <p>{selectedLaunch.name}</p>
+                  </div>
+                </div>
+                <div className={styles.riskLine}>{selectedLaunch.risk}</div>
+              </div>
+              <div className={styles.launchDetailGrid}>
+                <div>
+                  <span>Creator</span>
+                  <strong>{selectedLaunch.creator}</strong>
+                </div>
+                <div>
+                  <span>LP lock</span>
+                  <strong>{selectedLaunch.lock}</strong>
+                </div>
+                <div>
+                  <span>Registry</span>
+                  <strong>
+                    {selectedLaunch.registryLaunchId
+                      ? `#${selectedLaunch.registryLaunchId}`
+                      : "--"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Token</span>
+                  <strong>
+                    {selectedLaunch.tokenContract
+                      ? truncateHash(selectedLaunch.tokenContract)
+                      : "--"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Pair</span>
+                  <strong>
+                    {selectedLaunch.pairContract
+                      ? truncateHash(selectedLaunch.pairContract)
+                      : "--"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Published</span>
+                  <strong>
+                    {selectedLaunch.createdAt
+                      ? formatDateTime(selectedLaunch.createdAt * 1000)
+                      : "--"}
+                  </strong>
+                </div>
+              </div>
+              <p className={styles.launchDescription}>
+                {selectedLaunch.description ||
+                  "No public description has been added yet. Treat this launch as higher risk until the creator publishes enough project information."}
+              </p>
+              <div className={styles.launchDetailActions}>
+                {selectedLaunch.website ? (
+                  <a
+                    className="uiButton uiButtonOutline"
+                    href={selectedLaunch.website}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Website
+                  </a>
+                ) : null}
+                {selectedLaunch.xProfile ? (
+                  <a
+                    className="uiButton uiButtonOutline"
+                    href={selectedLaunch.xProfile}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    X profile
+                  </a>
+                ) : null}
+                {selectedLaunch.tokenContract ? (
+                  <a
+                    className="uiButton uiButtonOutline"
+                    href={`https://finder.burrito.money/classic/address/${selectedLaunch.tokenContract}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Token contract
+                  </a>
+                ) : null}
+                {selectedLaunch.pairContract ? (
+                  <Link
+                    className="uiButton uiButtonPrimary"
+                    to={`/market/pair/terraswap/${encodeURIComponent(
+                      selectedLaunch.pairContract
+                    )}`}
+                  >
+                    Open market
+                  </Link>
+                ) : null}
+              </div>
+            </article>
+          ) : null}
           {filteredLaunches.map((item) => (
             <article className={`card ${styles.launchCard}`} key={item.id}>
               <div className={styles.launchCardTop}>
@@ -2779,29 +2900,38 @@ const Launchpad = () => {
               </div>
               <div className={styles.launchCardBottom}>
                 <div className={styles.riskLine}>{item.risk}</div>
-                {item.pairContract ? (
-                  <Link
+                <div className={styles.launchCardActions}>
+                  <button
                     className="uiButton uiButtonOutline"
-                    to={`/market/pair/terraswap/${encodeURIComponent(
-                      item.pairContract
-                    )}`}
+                    type="button"
+                    onClick={() => setSelectedLaunchId(item.id)}
                   >
-                    Open market
-                  </Link>
-                ) : item.tokenContract ? (
-                  <a
-                    className="uiButton uiButtonOutline"
-                    href={`https://finder.burrito.money/classic/address/${item.tokenContract}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Token
-                  </a>
-                ) : (
-                  <button className="uiButton uiButtonOutline" type="button" disabled>
-                    Preview
+                    Details
                   </button>
-                )}
+                  {item.pairContract ? (
+                    <Link
+                      className="uiButton uiButtonOutline"
+                      to={`/market/pair/terraswap/${encodeURIComponent(
+                        item.pairContract
+                      )}`}
+                    >
+                      Market
+                    </Link>
+                  ) : item.tokenContract ? (
+                    <a
+                      className="uiButton uiButtonOutline"
+                      href={`https://finder.burrito.money/classic/address/${item.tokenContract}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Token
+                    </a>
+                  ) : (
+                    <button className="uiButton uiButtonOutline" type="button" disabled>
+                      Preview
+                    </button>
+                  )}
+                </div>
               </div>
             </article>
           ))}
