@@ -4,6 +4,7 @@ import {
   ContractIcon,
   GovIcon,
   HistoryIcon,
+  LaunchpadIcon,
   MarketIcon,
   StakeIcon,
   SwapIcon,
@@ -17,6 +18,7 @@ const Dashboard = lazy(() => import("../pages/Dashboard"))
 const Wallet = lazy(() => import("../pages/Wallet"))
 const Market = lazy(() => import("../pages/Market"))
 const MarketPairDetails = lazy(() => import("../pages/MarketPairDetails"))
+const Launchpad = lazy(() => import("../pages/Launchpad"))
 const Swap = lazy(() => import("../pages/Swap"))
 const History = lazy(() => import("../pages/History"))
 const Stake = lazy(() => import("../pages/Stake"))
@@ -49,6 +51,11 @@ export const navMenu = [
     path: "/market",
     title: "Market",
     icon: <MarketIcon {...ICON_SIZE} />
+  },
+  {
+    path: "/launchpad",
+    title: "Launchpad",
+    icon: <LaunchpadIcon {...ICON_SIZE} />
   },
   {
     path: "/history",
@@ -86,6 +93,7 @@ const appRoutes = [
   { path: "/wallet", element: renderPage(Wallet) },
   { path: "/swap", element: renderPage(Swap) },
   { path: "/market", element: renderPage(Market) },
+  { path: "/launchpad", element: renderPage(Launchpad) },
   { path: "/history", element: renderPage(History) },
   { path: "/stake", element: renderPage(Stake) },
   { path: "/gov", element: renderPage(Governance) },

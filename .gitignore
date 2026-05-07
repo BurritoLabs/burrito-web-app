@@ -11,6 +11,11 @@ node_modules
 dist-ssr
 *.local
 
+# Rust / CosmWasm build outputs
+target
+artifacts
+*.wasm
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

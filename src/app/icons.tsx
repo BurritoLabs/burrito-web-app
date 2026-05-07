@@ -37,6 +37,20 @@ export const MarketIcon = (props: IconProps) => (
   </svg>
 )
 
+export const LaunchpadIcon = (props: IconProps) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+    <path
+      d="M12 2.4c.4 0 .8.2 1.1.6l4.5 6.5c.2.3.3.7.2 1.1l-.9 4.7c-.1.5-.5.8-1 .8h-1.8l-.7 3.9c-.1.5-.7.7-1.1.3L10.2 18H8.1c-.5 0-.9-.3-1-.8l-.9-4.7c-.1-.4 0-.8.2-1.1L10.9 3c.3-.4.7-.6 1.1-.6Zm0 3.3-3.4 5 .7 3.5h5.4l.7-3.5L12 5.7Z"
+      fill="currentColor"
+    />
+    <path
+      d="M12 11.9a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6ZM5.1 17.1c.3-.6 1-.8 1.6-.5l2.1 1.1-1.2 2.2-2.1-1.1c-.6-.3-.8-1.1-.4-1.7Zm13.8 0c.3.6.1 1.4-.5 1.7l-2.1 1.1-1.2-2.2 2.1-1.1c.7-.3 1.4-.1 1.7.5Z"
+      fill="currentColor"
+      opacity="0.82"
+    />
+  </svg>
+)
+
 export const HistoryIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path

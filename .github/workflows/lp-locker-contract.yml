@@ -1,0 +1,71 @@
+name: Launchpad Contracts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/lp-locker-contract.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "contracts/**"
+      - ".github/workflows/lp-locker-contract.yml"
+
+jobs:
+  build:
+    name: Test and build ${{ matrix.contract }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        contract:
+          - lp-locker
+          - launch-registry
+    defaults:
+      run:
+        working-directory: contracts/${{ matrix.contract }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/${{ matrix.contract }}
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build raw wasm
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Optimize wasm
+        working-directory: .
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/contracts/${{ matrix.contract }}:/code" \
+            --mount type=volume,source=burrito_${{ matrix.contract }}_target,target=/code/target \
+            --mount type=volume,source=burrito_${{ matrix.contract }}_registry,target=/usr/local/cargo/registry \
+            cosmwasm/optimizer:0.16.1
+
+      - name: Upload optimized wasm
+        uses: actions/upload-artifact@v4
+        with:
+          name: burrito-${{ matrix.contract }}-wasm
+          path: contracts/${{ matrix.contract }}/artifacts/*.wasm
+          if-no-files-found: error
