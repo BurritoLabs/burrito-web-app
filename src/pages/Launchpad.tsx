@@ -432,6 +432,35 @@ const formatPrice = (value: number) => {
 const formatDateTime = (value: string | number | Date) =>
   new Date(value).toLocaleString()
 
+const normalizeOptionalHttpUrl = (value: string, field: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  try {
+    const url = new URL(trimmed)
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error()
+    }
+    return url.toString()
+  } catch {
+    throw new Error(`${field} must be a full http:// or https:// URL.`)
+  }
+}
+
+const normalizeOptionalXProfile = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  const handle = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed
+  if (/^[A-Za-z0-9_]{1,15}$/.test(handle)) {
+    return `https://x.com/${handle}`
+  }
+  const normalized = normalizeOptionalHttpUrl(trimmed, "X profile")
+  const host = new URL(normalized).hostname.replace(/^www\./, "")
+  if (host !== "x.com" && host !== "twitter.com") {
+    throw new Error("X profile must be an x.com or twitter.com profile URL.")
+  }
+  return normalized
+}
+
 const buildOwnerRecordFromRegistryLaunch = (
   launch: LaunchRegistryLaunch,
   tokenInfo?: Cw20TokenInfo | null
@@ -843,6 +872,11 @@ const Launchpad = () => {
       setCreateSubmitting(true)
       setCreateError(undefined)
       setCreatedToken(undefined)
+      const normalizedWebsite = normalizeOptionalHttpUrl(
+        draft.website,
+        "Website"
+      )
+      const normalizedXProfile = normalizeOptionalXProfile(draft.xProfile)
       startTx(`Create ${tokenSymbol}`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
@@ -892,8 +926,8 @@ const Launchpad = () => {
         txHash: result.transactionHash,
         decimals,
         totalSupply: draft.supply,
-        website: draft.website.trim(),
-        xProfile: draft.xProfile.trim(),
+        website: normalizedWebsite,
+        xProfile: normalizedXProfile,
         description: draft.description.trim(),
         createdAt: new Date().toISOString(),
         plannedTokenAmount: isLaunchWithPool
@@ -2176,6 +2210,12 @@ const Launchpad = () => {
           throw new Error("Invalid LP unlock time.")
         }
       }
+      const normalizedWebsite = normalizeOptionalHttpUrl(
+        publishWebsite,
+        "Website"
+      )
+      const normalizedXProfile = normalizeOptionalXProfile(publishXProfile)
+      const normalizedDescription = publishDescription.trim()
 
       startTx(
         isUpdatingExistingListing
@@ -2194,9 +2234,9 @@ const Launchpad = () => {
                 metadata: {
                   name: activeOwnerLaunch.name,
                   symbol: activeOwnerLaunch.symbol,
-                  website: publishWebsite,
-                  xProfile: publishXProfile,
-                  description: publishDescription
+                  website: normalizedWebsite,
+                  xProfile: normalizedXProfile,
+                  description: normalizedDescription
                 }
               })
             : buildRegisterLaunchMessage({
@@ -2210,9 +2250,9 @@ const Launchpad = () => {
                 metadata: {
                   name: activeOwnerLaunch.name,
                   symbol: activeOwnerLaunch.symbol,
-                  website: publishWebsite,
-                  xProfile: publishXProfile,
-                  description: publishDescription
+                  website: normalizedWebsite,
+                  xProfile: normalizedXProfile,
+                  description: normalizedDescription
                 }
               })
         ],
@@ -2244,9 +2284,9 @@ const Launchpad = () => {
                 ownerStatus: isUpdatingExistingListing
                   ? "Listing metadata updated"
                   : "Launch published",
-                website: publishWebsite.trim(),
-                xProfile: publishXProfile.trim(),
-                description: publishDescription.trim(),
+                website: normalizedWebsite,
+                xProfile: normalizedXProfile,
+                description: normalizedDescription,
                 registryLaunchId: launchId,
                 registryTxHash: isUpdatingExistingListing
                   ? record.registryTxHash
