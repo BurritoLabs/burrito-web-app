@@ -283,6 +283,7 @@ fn verify_token_metadata(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_update_launch(
     deps: DepsMut,
     env: Env,
