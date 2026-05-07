@@ -37,7 +37,11 @@ export default defineConfig({
             hasPackage(id, "@interchain-ui") ||
             hasPackage(id, "@hexxagon") ||
             hasPackage(id, "@cosmjs") ||
-            hasPackage(id, "@confio") ||
+            hasPackage(id, "@confio")
+          ) {
+            return "wallet-kit"
+          }
+          if (
             hasPackage(id, "@noble") ||
             hasPackage(id, "bn.js") ||
             hasPackage(id, "elliptic") ||
@@ -48,7 +52,7 @@ export default defineConfig({
             hasPackage(id, "minimalistic-crypto-utils") ||
             hasPackage(id, "safe-buffer")
           ) {
-            return "cosmos"
+            return "crypto-vendor"
           }
           if (
             hasPackage(id, "react-router") ||
