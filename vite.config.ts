@@ -33,15 +33,6 @@ export default defineConfig({
             return "protobuf"
           }
           if (
-            hasPackage(id, "@cosmos-kit") ||
-            hasPackage(id, "@interchain-ui") ||
-            hasPackage(id, "@hexxagon") ||
-            hasPackage(id, "@cosmjs") ||
-            hasPackage(id, "@confio")
-          ) {
-            return "wallet-kit"
-          }
-          if (
             hasPackage(id, "@noble") ||
             hasPackage(id, "bn.js") ||
             hasPackage(id, "elliptic") ||
