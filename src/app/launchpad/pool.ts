@@ -101,7 +101,7 @@ export const buildCreateTerraswapLuncPairMessage = (
     msg: toUtf8(
       JSON.stringify({
         create_pair: {
-          asset_infos: buildLuncPairAssetInfos(tokenAddress)
+          assets: buildLuncPairAssetInfos(tokenAddress)
         }
       })
     ),
