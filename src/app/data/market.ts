@@ -87,6 +87,7 @@ type LocalCandle = {
 }
 
 type LocalPairCandlePayload = {
+  generatedAt?: string
   candles?: Partial<Record<"1h" | "24h" | "7d", Record<string, LocalCandle[]>>>
 }
 
@@ -195,6 +196,16 @@ const buildLcdUrl = (path: string, params: Record<string, string>) => {
   })
   return url.toString()
 }
+
+const buildPairSwapQuery = (pairAddress: string) =>
+  `wasm._contract_address='${pairAddress}' AND wasm.action='swap'`
+
+const buildPairContractQuery = (pairAddress: string) => `wasm._contract_address='${pairAddress}'`
+
+const getPairTxQueryVariants = (pairAddress: string) => [
+  buildPairSwapQuery(pairAddress),
+  buildPairContractQuery(pairAddress)
+]
 
 const resolveTimeframeFromBucketMs = (bucketMs: number) => {
   // Pair details page uses finer buckets for better intra-window granularity.
@@ -808,13 +819,15 @@ const fetchPairCandlesFromLocal = async ({
   timeframe,
   leftAssetKey,
   rightAssetKey,
-  maxCandles
+  maxCandles,
+  minLatestBucketStart
 }: {
   pairAddress: string
   timeframe: "1h" | "24h" | "7d"
   leftAssetKey: string
   rightAssetKey: string
   maxCandles: number
+  minLatestBucketStart?: number
 }) => {
   const payload = await loadLocalPairCandlesFile(pairAddress)
   if (!payload?.candles) return null
@@ -855,8 +868,13 @@ const fetchPairCandlesFromLocal = async ({
     .filter((item): item is PairCandle => item !== null)
     .sort((a, b) => a.bucketStart - b.bucketStart)
 
-  if (!candles.length) return null
-  return candles.slice(-maxCandles)
+  const freshCandles =
+    minLatestBucketStart !== undefined
+      ? candles.filter((item) => item.bucketStart >= minLatestBucketStart)
+      : candles
+
+  if (!freshCandles.length) return null
+  return freshCandles.slice(-maxCandles)
 }
 
 const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) => {
@@ -1097,57 +1115,63 @@ export const fetchPairCandles = async ({
     const lookbackStart = now - bucketMs * effectiveLookbackBuckets
     const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
     const normalizedRightKey = normalizeAssetKey(rightAssetKey)
-    const ticks: SwapTick[] = []
 
-    let stop = false
-    for (let page = 1; page <= maxPages && !stop; page += 1) {
-      const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
-        query: `wasm._contract_address='${pairAddress}'`,
-        order_by: "2",
-        page: String(page),
-        limit: "100"
-      })
+    for (const txQuery of getPairTxQueryVariants(pairAddress)) {
+      const ticks: SwapTick[] = []
+      let stop = false
 
-      let data: TxListResponse
-      try {
-        const response = await fetch(url)
-        if (!response.ok) break
-        data = (await response.json()) as TxListResponse
-      } catch {
-        break
-      }
+      for (let page = 1; page <= maxPages && !stop; page += 1) {
+        const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
+          query: txQuery,
+          order_by: "2",
+          page: String(page),
+          limit: "100"
+        })
 
-      const responses = data.tx_responses ?? []
-      if (!responses.length) break
-
-      for (const response of responses) {
-        const timestamp = Date.parse(response.timestamp ?? "")
-        if (Number.isFinite(timestamp) && timestamp < lookbackStart) {
-          stop = true
+        let data: TxListResponse
+        try {
+          const response = await fetch(url)
+          if (!response.ok) break
+          data = (await response.json()) as TxListResponse
+        } catch {
           break
         }
 
-        ticks.push(
-          ...parseSwapTicksFromTxResponse({
-            response,
-            pairAddress,
-            leftKey: normalizedLeftKey,
-            rightKey: normalizedRightKey,
-            leftDecimals,
-            rightDecimals
-          })
-        )
+        const responses = data.tx_responses ?? []
+        if (!responses.length) break
+
+        for (const response of responses) {
+          const timestamp = Date.parse(response.timestamp ?? "")
+          if (Number.isFinite(timestamp) && timestamp < lookbackStart) {
+            stop = true
+            break
+          }
+
+          ticks.push(
+            ...parseSwapTicksFromTxResponse({
+              response,
+              pairAddress,
+              leftKey: normalizedLeftKey,
+              rightKey: normalizedRightKey,
+              leftDecimals,
+              rightDecimals
+            })
+          )
+        }
+
+        if (responses.length < 100) break
       }
 
-      if (responses.length < 100) break
+      const candles = buildCandles({
+        ticks: sanitizeSwapTicks(ticks),
+        bucketMs,
+        lookbackStart,
+        maxCandles
+      })
+      if (candles.length > 0) return candles
     }
 
-    return buildCandles({
-      ticks: sanitizeSwapTicks(ticks),
-      bucketMs,
-      lookbackStart,
-      maxCandles
-    })
+    return []
   }
 
   const timeframe = resolveTimeframeFromBucketMs(bucketMs)
@@ -1207,7 +1231,8 @@ export const fetchPairCandles = async ({
       timeframe,
       leftAssetKey,
       rightAssetKey,
-      maxCandles
+      maxCandles,
+      minLatestBucketStart: Date.now() - bucketMs * (lookbackBuckets + 1)
     })
     if (localCandles?.length && candlesMatchExpectedPrice(localCandles, expectedPrice)) {
       candidates.push(localCandles)
@@ -1261,56 +1286,71 @@ export const fetchPairTrades = async ({
   const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
   const normalizedRightKey = normalizeAssetKey(rightAssetKey)
 
-  const trades: PairTrade[] = []
-  let reachedEnd = false
+  let bestTrades: PairTrade[] = []
+  let bestReachedEnd = false
 
-  for (let page = 1; page <= maxPages; page += 1) {
-    const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
-      query: `wasm._contract_address='${pairAddress}'`,
-      order_by: "2",
-      page: String(page),
-      limit: "100"
-    })
+  for (const txQuery of getPairTxQueryVariants(pairAddress)) {
+    const trades: PairTrade[] = []
+    let reachedEnd = false
 
-    let data: TxListResponse
-    try {
-      const response = await fetch(url)
-      if (!response.ok) break
-      data = (await response.json()) as TxListResponse
-    } catch {
-      break
-    }
+    for (let page = 1; page <= maxPages; page += 1) {
+      const url = buildLcdUrl("/cosmos/tx/v1beta1/txs", {
+        query: txQuery,
+        order_by: "2",
+        page: String(page),
+        limit: "100"
+      })
 
-    const responses = data.tx_responses ?? []
-    if (!responses.length) {
-      reachedEnd = true
-      break
-    }
+      let data: TxListResponse
+      try {
+        const response = await fetch(url)
+        if (!response.ok) break
+        data = (await response.json()) as TxListResponse
+      } catch {
+        break
+      }
 
-    for (const response of responses) {
-      trades.push(
-        ...parseSwapTradesFromTxResponse({
-          response,
-          pairAddress,
-          leftKey: normalizedLeftKey,
-          rightKey: normalizedRightKey,
-          leftDecimals,
-          rightDecimals
-        })
-      )
+      const responses = data.tx_responses ?? []
+      if (!responses.length) {
+        reachedEnd = true
+        break
+      }
+
+      for (const response of responses) {
+        trades.push(
+          ...parseSwapTradesFromTxResponse({
+            response,
+            pairAddress,
+            leftKey: normalizedLeftKey,
+            rightKey: normalizedRightKey,
+            leftDecimals,
+            rightDecimals
+          })
+        )
+
+        if (trades.length >= targetCount) break
+      }
 
       if (trades.length >= targetCount) break
+      if (responses.length < 100) {
+        reachedEnd = true
+        break
+      }
     }
 
-    if (trades.length >= targetCount) break
-    if (responses.length < 100) {
-      reachedEnd = true
+    if (trades.length > 0 || !bestTrades.length) {
+      bestTrades = trades
+      bestReachedEnd = reachedEnd
+    }
+
+    if (trades.length >= targetCount || trades.length > 0) {
+      if (trades.length >= targetCount) break
       break
     }
   }
 
   // Keep a deterministic order for pagination slices.
-  trades.sort((a, b) => {
+  bestTrades.sort((a, b) => {
     if (a.timestamp === b.timestamp) return b.txhash.localeCompare(a.txhash)
     return b.timestamp - a.timestamp
   })
@@ -1318,8 +1358,8 @@ export const fetchPairTrades = async ({
   const start = Math.max(0, offset)
   const end = start + Math.max(1, limit)
   return {
-    trades: trades.slice(start, end),
-    hasMore: !reachedEnd || trades.length > end
+    trades: bestTrades.slice(start, end),
+    hasMore: !bestReachedEnd || bestTrades.length > end
   }
 }
 

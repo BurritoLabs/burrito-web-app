@@ -22,7 +22,7 @@ import {
   fetchPairCandles,
   fetchPairTrades,
   fetchMarketDexPairs,
-  fetchMarketPool,
+  fetchMarketPoolLive,
   fetchMarketPools
 } from "../app/data/market"
 import {
@@ -451,7 +451,7 @@ const MarketPairDetails = () => {
       selectedPairForLivePool?.dexId,
       selectedPairForLivePool?.pair
     ],
-    queryFn: () => fetchMarketPool(selectedPairForLivePool!),
+    queryFn: () => fetchMarketPoolLive(selectedPairForLivePool!),
     enabled: Boolean(selectedPairForLivePool),
     staleTime: 45_000,
     refetchInterval: 90_000
