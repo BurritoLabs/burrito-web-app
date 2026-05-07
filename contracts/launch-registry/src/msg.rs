@@ -1,4 +1,4 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -29,11 +29,15 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
+    #[returns(LaunchResponse)]
     Launch {
         token_contract: String,
     },
+    #[returns(LaunchesResponse)]
     Launches {
         start_after: Option<u64>,
         limit: Option<u32>,

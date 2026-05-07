@@ -1,4 +1,4 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
 use cw20::Cw20ReceiveMsg;
 
@@ -24,16 +24,21 @@ pub enum Cw20HookMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(ConfigResponse)]
     Config {},
+    #[returns(LockResponse)]
     Lock {
         lock_id: u64,
     },
+    #[returns(LocksResponse)]
     LocksByOwner {
         owner: String,
         start_after: Option<u64>,
         limit: Option<u32>,
     },
+    #[returns(LocksResponse)]
     LocksByLpToken {
         lp_token: String,
         start_after: Option<u64>,
