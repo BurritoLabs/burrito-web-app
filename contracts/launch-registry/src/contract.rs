@@ -317,8 +317,7 @@ fn execute_update_launch(
             if lp_unlock_time <= env.block.time.seconds() {
                 return Err(ContractError::InvalidUnlockTime {});
             }
-            let lp_lock_id =
-                normalize_required("lp_lock_id", lp_lock_id, LOCK_ID_MAX)?;
+            let lp_lock_id = normalize_required("lp_lock_id", lp_lock_id, LOCK_ID_MAX)?;
             let parsed_lp_lock_id = lp_lock_id
                 .parse::<u64>()
                 .map_err(|_| ContractError::InvalidLockId {})?;
