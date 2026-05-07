@@ -79,6 +79,8 @@ of fake sample launches when the registry is not configured.
 - Public listing stays disabled when `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is empty.
 - Published listing metadata and visibility can be updated through the registry
   contract.
+- Manage has copy/open shortcuts for token and pair contracts, plus a
+  local-only cleanup action that does not mutate on-chain state.
 - Registry Explore shows real on-chain records when configured, newest first.
 - Registry Explore classifies records as live, ended, or risk based on LP lock
   state and missing public info.

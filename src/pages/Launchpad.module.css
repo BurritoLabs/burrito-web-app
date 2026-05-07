@@ -1225,6 +1225,17 @@
   font-size: var(--font-size-title);
 }
 
+.ownerQuickActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ownerQuickActions :global(.uiButton) {
+  min-width: 118px;
+}
+
 .ownerLinkGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1578,6 +1589,7 @@
   .ownerIntro,
   .launchCardBottom,
   .launchDetailActions,
+  .ownerQuickActions,
   .lockStrip,
   .codeIdLine,
   .txResult div {
@@ -1614,6 +1626,10 @@
   }
 
   .stepActions :global(.uiButton) {
+    width: 100%;
+  }
+
+  .ownerQuickActions :global(.uiButton) {
     width: 100%;
   }
 

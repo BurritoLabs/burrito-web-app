@@ -309,8 +309,8 @@ const futureOwnerActions = [
     text: "Token logos should go through a controlled metadata path so a random launch cannot impersonate another asset."
   },
   {
-    title: "Listing visibility",
-    text: "The registry supports hidden status. A small admin/creator control can be added after the registry address is live."
+    title: "Launch analytics",
+    text: "A later version can show holders, LP depth, trade count, and recent buys directly in the creator dashboard."
   }
 ]
 
@@ -546,12 +546,29 @@ const Launchpad = () => {
   >(null)
   const [listingStatusError, setListingStatusError] = useState<string>()
   const [listingStatusTxHash, setListingStatusTxHash] = useState("")
+  const [copiedValue, setCopiedValue] = useState("")
+  const [copyError, setCopyError] = useState("")
+  const [localRecordNotice, setLocalRecordNotice] = useState("")
 
   const updateDraft =
     (field: keyof DraftLaunch) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setDraft((current) => ({ ...current, [field]: event.target.value }))
     }
+
+  const handleCopyText = async (value: string) => {
+    if (!value) return
+    try {
+      setCopyError("")
+      await navigator.clipboard.writeText(value)
+      setCopiedValue(value)
+      window.setTimeout(() => {
+        setCopiedValue((current) => (current === value ? "" : current))
+      }, 1600)
+    } catch {
+      setCopyError("Copy failed. Select the address manually.")
+    }
+  }
 
   const launchMath = useMemo(() => {
     const supply = Math.max(0, toNumber(draft.supply))
@@ -1198,6 +1215,10 @@ const Launchpad = () => {
   const activeOwnerWebsite = activeOwnerLaunch?.website ?? ""
   const activeOwnerXProfile = activeOwnerLaunch?.xProfile ?? ""
   const activeOwnerDescription = activeOwnerLaunch?.description ?? ""
+  const isActiveOwnerLocalRecord = Boolean(
+    activeOwnerLaunch &&
+      createdLaunches.some((record) => record.id === activeOwnerLaunch.id)
+  )
   const activeOwnerPlannedTokenAmount =
     activeOwnerLaunch?.plannedTokenAmount ?? ""
   const activeOwnerPlannedLuncAmount = activeOwnerLaunch?.plannedLuncAmount ?? ""
@@ -1308,6 +1329,21 @@ const Launchpad = () => {
     activeOwnerLaunch?.registryTxHash || activeOwnerLaunch?.registryLaunchId
   )
   const activeRegistryStatus = activeOwnerLaunch?.registryStatus ?? "live"
+
+  const handleRemoveLocalRecord = () => {
+    if (!activeOwnerLaunch || !isActiveOwnerLocalRecord) return
+    const confirmed = window.confirm(
+      `Remove ${activeOwnerLaunch.pair} from this browser only? This does not touch the token, pool, LP lock, or registry on-chain.`
+    )
+    if (!confirmed) return
+
+    setCreatedLaunches((current) =>
+      current.filter((record) => record.id !== activeOwnerLaunch.id)
+    )
+    setLocalRecordNotice(
+      `${activeOwnerLaunch.pair} was removed from local browser storage. On-chain data is unchanged and can be recovered with Import or Sync.`
+    )
+  }
   const canPublishListing = Boolean(
     (hasPublicListingPrerequisites || isActiveListingPublished) &&
       isLaunchRegistryConfigured &&
@@ -1483,6 +1519,7 @@ const Launchpad = () => {
     setListingStatusError(undefined)
     setListingStatusTxHash("")
     setListingStatusSubmitting(null)
+    setLocalRecordNotice("")
   }, [activeOwnerId])
 
   useEffect(() => {
@@ -2843,6 +2880,19 @@ const Launchpad = () => {
                   </a>
                 ) : null}
                 {selectedLaunch.tokenContract ? (
+                  <button
+                    className="uiButton uiButtonOutline"
+                    type="button"
+                    onClick={() =>
+                      handleCopyText(selectedLaunch.tokenContract ?? "")
+                    }
+                  >
+                    {copiedValue === selectedLaunch.tokenContract
+                      ? "Copied"
+                      : "Copy token"}
+                  </button>
+                ) : null}
+                {selectedLaunch.tokenContract ? (
                   <a
                     className="uiButton uiButtonOutline"
                     href={`https://finder.burrito.money/classic/address/${selectedLaunch.tokenContract}`}
@@ -2851,6 +2901,19 @@ const Launchpad = () => {
                   >
                     Token contract
                   </a>
+                ) : null}
+                {selectedLaunch.pairContract ? (
+                  <button
+                    className="uiButton uiButtonOutline"
+                    type="button"
+                    onClick={() =>
+                      handleCopyText(selectedLaunch.pairContract ?? "")
+                    }
+                  >
+                    {copiedValue === selectedLaunch.pairContract
+                      ? "Copied"
+                      : "Copy pair"}
+                  </button>
                 ) : null}
                 {selectedLaunch.pairContract ? (
                   <Link
@@ -2863,6 +2926,7 @@ const Launchpad = () => {
                   </Link>
                 ) : null}
               </div>
+              {copyError ? <div className={styles.txError}>{copyError}</div> : null}
             </article>
           ) : null}
           {filteredLaunches.map((item) => (
@@ -3061,6 +3125,62 @@ const Launchpad = () => {
                   <strong>{activeOwnerLaunch.infoStatus}</strong>
                 </div>
               </div>
+              <div className={styles.ownerQuickActions}>
+                {activeOwnerLaunch.contractAddress ? (
+                  <button
+                    className="uiButton uiButtonOutline"
+                    type="button"
+                    onClick={() =>
+                      handleCopyText(activeOwnerLaunch.contractAddress ?? "")
+                    }
+                  >
+                    {copiedValue === activeOwnerLaunch.contractAddress
+                      ? "Copied"
+                      : "Copy token"}
+                  </button>
+                ) : null}
+                {activePairAddress ? (
+                  <button
+                    className="uiButton uiButtonOutline"
+                    type="button"
+                    onClick={() => handleCopyText(activePairAddress)}
+                  >
+                    {copiedValue === activePairAddress ? "Copied" : "Copy pair"}
+                  </button>
+                ) : null}
+                {activeOwnerLaunch.contractAddress ? (
+                  <a
+                    className="uiButton uiButtonOutline"
+                    href={`https://finder.burrito.money/classic/address/${activeOwnerLaunch.contractAddress}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open token
+                  </a>
+                ) : null}
+                {activePairAddress ? (
+                  <Link
+                    className="uiButton uiButtonPrimary"
+                    to={`/market/pair/terraswap/${encodeURIComponent(
+                      activePairAddress
+                    )}`}
+                  >
+                    Open market
+                  </Link>
+                ) : null}
+                <button
+                  className="uiButton uiButtonOutline"
+                  type="button"
+                  disabled={!isActiveOwnerLocalRecord}
+                  onClick={handleRemoveLocalRecord}
+                >
+                  Remove local record
+                </button>
+              </div>
+              {copyError ? <div className={styles.txError}>{copyError}</div> : null}
+              {localRecordNotice ? (
+                <div className={styles.ownerSyncNote}>{localRecordNotice}</div>
+              ) : null}
               {activeOwnerLaunch.contractAddress ||
               activeOwnerLaunch.txHash ||
               activeOwnerLaunch.lpLockTxHash ||
