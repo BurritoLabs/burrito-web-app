@@ -31,10 +31,12 @@ import {
   buildLockLpMessage,
   buildWithdrawLockedLpMessage,
   extractLpLockIdFromEvents,
+  fetchLpLock,
   getLpUnlockTimestampSeconds,
   isLpLockerConfigured,
   LAUNCHPAD_LP_LOCKER_ADDRESS,
-  parseLpAmountToBaseUnits
+  parseLpAmountToBaseUnits,
+  type LpLockResponse
 } from "../app/launchpad/locker"
 import {
   buildRegisterLaunchMessage,
@@ -162,6 +164,8 @@ type LaunchCardItem = {
   description?: string | null
   createdAt?: number
   unlockTime?: number
+  lockedLpAmount?: string
+  lpWithdrawn?: boolean
   sample?: boolean
 }
 
@@ -597,6 +601,9 @@ const Launchpad = () => {
   const [registryLaunches, setRegistryLaunches] = useState<
     LaunchRegistryLaunch[]
   >([])
+  const [registryLpLocks, setRegistryLpLocks] = useState<
+    Record<string, LpLockResponse | null>
+  >({})
   const [registryLoading, setRegistryLoading] = useState(false)
   const [registryError, setRegistryError] = useState<string>()
   const [publishWebsite, setPublishWebsite] = useState("")
@@ -839,6 +846,39 @@ const Launchpad = () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!isLpLockerConfigured || !registryLaunches.length) return
+    const missingLockIds = registryLaunches
+      .map((launch) => launch.lp_lock_id)
+      .filter((lockId) => lockId && !(lockId in registryLpLocks))
+      .slice(0, 50)
+    if (!missingLockIds.length) return
+
+    let cancelled = false
+    Promise.all(
+      missingLockIds.map(async (lockId) => {
+        try {
+          return [lockId, await fetchLpLock(lockId)] as const
+        } catch {
+          return [lockId, null] as const
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) return
+      setRegistryLpLocks((current) => {
+        const next = { ...current }
+        entries.forEach(([lockId, lock]) => {
+          next[lockId] = lock
+        })
+        return next
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [registryLaunches, registryLpLocks])
 
   const goToPreviousCreateStep = () => {
     const previous = createSteps[activeCreateStepIndex - 1]?.id
@@ -1202,6 +1242,8 @@ const Launchpad = () => {
         .filter((launch) => launch.status !== "hidden")
         .map<LaunchCardItem>((launch) => {
           const nowSeconds = Math.floor(Date.now() / 1000)
+          const lpLock = registryLpLocks[launch.lp_lock_id]
+          const lpWithdrawn = Boolean(lpLock?.withdrawn)
           const unlockDays = Math.max(
             0,
             Math.ceil((launch.lp_unlock_time - nowSeconds) / 86400)
@@ -1210,13 +1252,24 @@ const Launchpad = () => {
             launch.metadata.website || launch.metadata.description
           )
           const state: Exclude<LaunchFilter, "all"> =
-            unlockDays <= 0 ? "ended" : hasPublicInfo ? "live" : "risk"
+            lpWithdrawn
+              ? "risk"
+              : unlockDays <= 0
+              ? "ended"
+              : hasPublicInfo
+              ? "live"
+              : "risk"
           const status =
-            state === "ended"
+            lpWithdrawn
+              ? "LP withdrawn"
+              : state === "ended"
               ? "LP unlocked"
               : state === "risk"
               ? "Needs public info"
               : "Published launch"
+          const lockedLpAmount = lpLock
+            ? `${formatBaseUnitsToTokenAmount(lpLock.amount, 6, 2)} LP`
+            : undefined
           return {
             id: `registry-${launch.id}`,
             symbol: launch.metadata.symbol,
@@ -1224,17 +1277,21 @@ const Launchpad = () => {
             pair: `${launch.metadata.symbol} / LUNC`,
             state,
             status,
-            liquidity: "On-chain LP",
+            liquidity: lockedLpAmount ?? "On-chain LP",
             lock: unlockDays > 0 ? `${unlockDays} days` : "Unlocked",
             creator: truncateHash(launch.creator),
-            risk: hasPublicInfo
+            risk: lpWithdrawn
+              ? "LP no longer locked"
+              : hasPublicInfo
               ? `LP lock #${launch.lp_lock_id}`
               : "Public info incomplete",
-            progress: 100,
+            progress: lpWithdrawn ? 20 : 100,
             tokenContract: launch.token_contract,
             pairContract: launch.pair_contract,
             registryLaunchId: launch.id,
             lpLockId: launch.lp_lock_id,
+            lockedLpAmount,
+            lpWithdrawn,
             website: launch.metadata.website,
             xProfile: launch.metadata.x_profile,
             description: launch.metadata.description,
@@ -1242,7 +1299,7 @@ const Launchpad = () => {
             unlockTime: launch.lp_unlock_time
           }
         }),
-    [registryLaunches]
+    [registryLaunches, registryLpLocks]
   )
   const shouldShowSampleLaunches =
     import.meta.env.DEV &&
@@ -3101,6 +3158,22 @@ const Launchpad = () => {
                 <div>
                   <span>LP lock</span>
                   <strong>{selectedLaunch.lock}</strong>
+                </div>
+                <div>
+                  <span>Locked LP</span>
+                  <strong>{selectedLaunch.lockedLpAmount ?? "--"}</strong>
+                </div>
+                <div>
+                  <span>LP status</span>
+                  <strong>
+                    {selectedLaunch.lpWithdrawn
+                      ? "Withdrawn"
+                      : selectedLaunch.lockedLpAmount
+                      ? "Locked"
+                      : selectedLaunch.sample
+                      ? "Preview"
+                      : "Checking"}
+                  </strong>
                 </div>
                 <div>
                   <span>Registry</span>

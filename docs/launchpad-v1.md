@@ -73,6 +73,8 @@ of fake sample launches when the registry is not configured.
 - Explore stats show total, live, risk, and unlocked launch counts.
 - Explore detail panel shows creator, token contract, pair contract, LP lock,
   publish time, description, website, X profile, and market link.
+- Explore queries the Burrito LP locker for published launches and shows the
+  locked LP amount plus withdrawn status when available.
 - Explore supports `/launchpad?tab=explore&launch=...` deep links and can copy
   a public launch link from the detail panel.
 - Pair lookup shows whether a Terraswap LUNC pair exists.

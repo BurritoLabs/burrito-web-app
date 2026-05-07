@@ -1,5 +1,6 @@
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
+import { queryContractSmart } from "../data/classic"
 import { parseTokenAmountToBaseUnits } from "./cw20"
 
 const rawLockerAddress =
@@ -12,6 +13,17 @@ export const LAUNCHPAD_LP_LOCKER_ADDRESS = /^terra1[0-9a-z]{38,80}$/.test(
   : ""
 
 export const isLpLockerConfigured = Boolean(LAUNCHPAD_LP_LOCKER_ADDRESS)
+
+export type LpLockResponse = {
+  id: number
+  owner: string
+  lp_token: string
+  pair_contract: string
+  amount: string
+  unlock_time: number
+  created_at: number
+  withdrawn: boolean
+}
 
 export const parseLpAmountToBaseUnits = (value: string, decimals: number) =>
   parseTokenAmountToBaseUnits(value, decimals, "LP token amount")
@@ -105,6 +117,19 @@ export const buildWithdrawLockedLpMessage = ({
       funds: []
     })
   }
+}
+
+export const fetchLpLock = async (lockId: string | number) => {
+  if (!isLpLockerConfigured) return null
+  const normalized =
+    typeof lockId === "number" ? String(lockId) : lockId.trim()
+  if (!/^\d+$/.test(normalized)) return null
+
+  return queryContractSmart<LpLockResponse>(LAUNCHPAD_LP_LOCKER_ADDRESS, {
+    lock: {
+      lock_id: Number(normalized)
+    }
+  })
 }
 
 export const extractLpLockIdFromEvents = (
