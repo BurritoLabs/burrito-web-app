@@ -1,4 +1,4 @@
-import { toUtf8 } from "@cosmjs/encoding"
+import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { CLASSIC_DENOMS } from "../chain"
 import { queryContractSmart } from "../data/classic"
@@ -214,3 +214,37 @@ export const buildProvideTerraswapLiquidityMessage = ({
     })
   }
 }
+
+export const buildWithdrawTerraswapLiquidityMessage = ({
+  sender,
+  pairAddress,
+  lpTokenAddress,
+  lpAmount
+}: {
+  sender: string
+  pairAddress: string
+  lpTokenAddress: string
+  lpAmount: string
+}) => ({
+  typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+  value: MsgExecuteContract.fromPartial({
+    sender,
+    contract: lpTokenAddress,
+    msg: toUtf8(
+      JSON.stringify({
+        send: {
+          contract: pairAddress,
+          amount: lpAmount,
+          msg: toBase64(
+            toUtf8(
+              JSON.stringify({
+                withdraw_liquidity: {}
+              })
+            )
+          )
+        }
+      })
+    ),
+    funds: []
+  })
+})

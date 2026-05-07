@@ -16,11 +16,44 @@
   text-transform: uppercase;
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionSubtext {
+  margin: 5px 0 0;
+  color: rgba(234, 245, 235, 0.52);
+  font-size: var(--font-size-small);
+}
+
+.sourcePill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(104, 216, 63, 0.28);
+  background: rgba(104, 216, 63, 0.1);
+  color: var(--green);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  white-space: nowrap;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   grid-auto-flow: dense;
+}
+
+.metricsActivity {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .metricsTwo {
@@ -46,6 +79,11 @@
   gap: 8px;
   padding: 20px 22px;
   min-height: 120px;
+}
+
+.metricsActivity .metricCard {
+  min-height: 118px;
+  padding: 16px;
 }
 
 .metricCardLarge {
@@ -107,6 +145,13 @@
 
 .neutral {
   color: rgba(234, 245, 235, 0.55);
+}
+
+.activityEmpty {
+  padding: 20px;
+  color: rgba(234, 245, 235, 0.62);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
 }
 
 .chartCard {
@@ -199,6 +244,10 @@
 }
 
 @media (max-width: 991.98px) {
+  .metricsActivity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .metricsTop {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -230,6 +279,20 @@
 }
 
 @media (max-width: 640px) {
+  .sectionTitleRow {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .sourcePill {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .metricsActivity {
+    grid-template-columns: 1fr;
+  }
+
   .metricsTop {
     grid-template-columns: 1fr;
   }

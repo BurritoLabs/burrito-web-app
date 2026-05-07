@@ -19,6 +19,7 @@ import {
   buildCreateTerraswapLuncPairMessage,
   buildIncreaseAllowanceMessage,
   buildProvideTerraswapLiquidityMessage,
+  buildWithdrawTerraswapLiquidityMessage,
   fetchTerraswapLuncPair,
   formatSlippageTolerance,
   parseLuncAmountToBaseUnits,
@@ -37,6 +38,7 @@ import {
 } from "../app/launchpad/locker"
 import {
   buildRegisterLaunchMessage,
+  buildUpdateLaunchMessage,
   extractRegistryLaunchIdFromEvents,
   fetchLaunchRegistryLaunches,
   isLaunchRegistryConfigured,
@@ -77,12 +79,16 @@ type OwnerLaunchRecord = {
   liquidityToken?: string
   pairTxHash?: string
   liquidityTxHash?: string
+  liquidityWithdrawTxHash?: string
   lpLockId?: string
   lpLockTxHash?: string
   lpUnlockAt?: string
   lpWithdrawTxHash?: string
   registryLaunchId?: string
   registryTxHash?: string
+  registryUpdateTxHash?: string
+  registryStatus?: "live" | "hidden"
+  registryStatusTxHash?: string
   publishedAt?: string
   createdAt?: string
   plannedTokenAmount?: string
@@ -286,49 +292,22 @@ const sampleLaunches: LaunchCardItem[] = [
   }
 ]
 
-const ownerActions = [
+const futureOwnerActions = [
   {
-    title: "Lock LP",
-    text: "Move LP tokens into a time-lock contract so buyers can verify the unlock date."
+    title: "Extend existing lock",
+    text: "The current locker creates fixed locks. Extending the same lock should be a later contract upgrade, not a frontend-only promise."
   },
   {
-    title: "Extend LP lock",
-    text: "Push the unlock date further out to improve market confidence."
+    title: "Project logo",
+    text: "Token logos should go through a controlled metadata path so a random launch cannot impersonate another asset."
   },
   {
-    title: "Withdraw LP",
-    text: "Withdraw locked LP only after the lock expires and the status is public."
-  },
-  {
-    title: "Update metadata",
-    text: "Refresh website, social links, logo, description, and public launch notes."
+    title: "Listing visibility",
+    text: "The registry supports hidden status. A small admin/creator control can be added after the registry address is live."
   }
 ]
 
-const ownerLaunches: OwnerLaunchRecord[] = [
-  {
-    id: "sample-taco",
-    symbol: "TACO",
-    name: "Taco Protocol",
-    pair: "TACO / LUNC",
-    liquidity: "$42,000",
-    lockExpiry: "Aug 24, 2026",
-    infoStatus: "Public info complete",
-    ownerStatus: "Owner controls available",
-    mode: "Launch with pool"
-  },
-  {
-    id: "sample-salsa",
-    symbol: "SALSA",
-    name: "Salsa Finance",
-    pair: "SALSA / LUNC",
-    liquidity: "$18,400",
-    lockExpiry: "Nov 12, 2026",
-    infoStatus: "Missing website",
-    ownerStatus: "Public info needs update",
-    mode: "Launch with pool"
-  }
-]
+const ownerLaunches: OwnerLaunchRecord[] = []
 
 const loadStoredDraft = () => {
   if (typeof window === "undefined") return initialDraft
@@ -424,7 +403,7 @@ const Launchpad = () => {
     useState<CreateStep>("token")
   const [activeLaunchFilter, setActiveLaunchFilter] =
     useState<LaunchFilter>("all")
-  const [activeOwnerId, setActiveOwnerId] = useState(ownerLaunches[0].id)
+  const [activeOwnerId, setActiveOwnerId] = useState("")
   const [draft, setDraft] = useState<DraftLaunch>(() => loadStoredDraft())
   const [createdLaunches, setCreatedLaunches] = useState<OwnerLaunchRecord[]>(
     () => loadCreatedLaunches()
@@ -459,6 +438,12 @@ const Launchpad = () => {
     useState(false)
   const [provideLiquidityError, setProvideLiquidityError] = useState<string>()
   const [provideLiquidityTxHash, setProvideLiquidityTxHash] = useState("")
+  const [withdrawLiquidityAmount, setWithdrawLiquidityAmount] = useState("")
+  const [withdrawLiquiditySubmitting, setWithdrawLiquiditySubmitting] =
+    useState(false)
+  const [withdrawLiquidityError, setWithdrawLiquidityError] =
+    useState<string>()
+  const [withdrawLiquidityTxHash, setWithdrawLiquidityTxHash] = useState("")
   const [lockLpAmount, setLockLpAmount] = useState("")
   const [lockLpDays, setLockLpDays] = useState("90")
   const [lockLpSubmitting, setLockLpSubmitting] = useState(false)
@@ -478,6 +463,11 @@ const Launchpad = () => {
   const [publishSubmitting, setPublishSubmitting] = useState(false)
   const [publishError, setPublishError] = useState<string>()
   const [publishTxHash, setPublishTxHash] = useState("")
+  const [listingStatusSubmitting, setListingStatusSubmitting] = useState<
+    "live" | "hidden" | null
+  >(null)
+  const [listingStatusError, setListingStatusError] = useState<string>()
+  const [listingStatusTxHash, setListingStatusTxHash] = useState("")
 
   const updateDraft =
     (field: keyof DraftLaunch) =>
@@ -956,6 +946,17 @@ const Launchpad = () => {
   const activeOwnerLaunch =
     ownerRecords.find((launch) => launch.id === activeOwnerId) ??
     ownerRecords[0]
+
+  useEffect(() => {
+    if (!ownerRecords.length) {
+      if (activeOwnerId) setActiveOwnerId("")
+      return
+    }
+    if (!ownerRecords.some((launch) => launch.id === activeOwnerId)) {
+      setActiveOwnerId(ownerRecords[0].id)
+    }
+  }, [activeOwnerId, ownerRecords])
+
   const activeOwnerRecordId = activeOwnerLaunch?.id ?? ""
   const activeOwnerWebsite = activeOwnerLaunch?.website ?? ""
   const activeOwnerXProfile = activeOwnerLaunch?.xProfile ?? ""
@@ -1019,6 +1020,15 @@ const Launchpad = () => {
       hasLiquidityInput &&
       !provideLiquiditySubmitting
   )
+  const hasWithdrawLiquidityInput = Boolean(withdrawLiquidityAmount.trim())
+  const canWithdrawLiquidity = Boolean(
+    activePairAddress &&
+      activeLiquidityToken &&
+      connectorId &&
+      account?.address &&
+      hasWithdrawLiquidityInput &&
+      !withdrawLiquiditySubmitting
+  )
   const hasLockInput = Boolean(lockLpAmount.trim() && lockLpDays.trim())
   const canLockLp = Boolean(
     activeLiquidityToken &&
@@ -1057,13 +1067,14 @@ const Launchpad = () => {
       activeOwnerLaunch?.lpLockId &&
       activeOwnerLaunch?.lpUnlockAt
   )
+  const isActiveListingPublished = Boolean(activeOwnerLaunch?.registryTxHash)
+  const activeRegistryStatus = activeOwnerLaunch?.registryStatus ?? "live"
   const canPublishListing = Boolean(
-    hasPublicListingPrerequisites &&
+    (hasPublicListingPrerequisites || isActiveListingPublished) &&
       isLaunchRegistryConfigured &&
-      isLpLockerConfigured &&
+      (isActiveListingPublished || isLpLockerConfigured) &&
       connectorId &&
       account?.address &&
-      !activeOwnerLaunch?.registryTxHash &&
       !publishSubmitting
   )
   const publicRecordItems = isCw20Only
@@ -1221,12 +1232,18 @@ const Launchpad = () => {
   useEffect(() => {
     setProvideLiquidityError(undefined)
     setProvideLiquidityTxHash("")
+    setWithdrawLiquidityError(undefined)
+    setWithdrawLiquidityTxHash("")
+    setWithdrawLiquidityAmount("")
     setLockLpError(undefined)
     setLockLpTxHash("")
     setWithdrawLpError(undefined)
     setWithdrawLpTxHash("")
     setPublishError(undefined)
     setPublishTxHash("")
+    setListingStatusError(undefined)
+    setListingStatusTxHash("")
+    setListingStatusSubmitting(null)
   }, [activeOwnerId])
 
   useEffect(() => {
@@ -1421,6 +1438,70 @@ const Launchpad = () => {
     }
   }
 
+  const handleWithdrawLiquidity = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!activeOwnerLaunch || !activePairAddress || !activeLiquidityToken) {
+      setWithdrawLiquidityError("Create or find the pair and LP token first.")
+      return
+    }
+    if (!connectorId || !account?.address) {
+      setWithdrawLiquidityError("Connect a wallet first.")
+      return
+    }
+
+    try {
+      setWithdrawLiquiditySubmitting(true)
+      setWithdrawLiquidityError(undefined)
+      setWithdrawLiquidityTxHash("")
+      const amount = parseLpAmountToBaseUnits(
+        withdrawLiquidityAmount,
+        activeLpDecimals
+      )
+
+      startTx(`Withdraw ${activeOwnerLaunch.symbol} / LUNC liquidity`)
+      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const client = await connectClassicSigningClientForConnector(connectorId)
+      const result = await client.signAndBroadcast(
+        signerAddress,
+        [
+          buildWithdrawTerraswapLiquidityMessage({
+            sender: signerAddress,
+            pairAddress: activePairAddress,
+            lpTokenAddress: activeLiquidityToken,
+            lpAmount: amount
+          })
+        ],
+        "auto",
+        "Burrito withdraw liquidity"
+      )
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Withdraw liquidity failed")
+      }
+
+      setWithdrawLiquidityTxHash(result.transactionHash)
+      setLpBalanceRefreshNonce((current) => current + 1)
+      setCreatedLaunches((current) =>
+        current.map((record) =>
+          record.id === activeOwnerLaunch.id
+            ? {
+                ...record,
+                ownerStatus: "Liquidity withdrawn",
+                liquidityWithdrawTxHash: result.transactionHash
+              }
+            : record
+        )
+      )
+      finishTx(result.transactionHash)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Withdraw liquidity failed."
+      setWithdrawLiquidityError(message)
+      failTx(message)
+    } finally {
+      setWithdrawLiquiditySubmitting(false)
+    }
+  }
+
   const handleLockLp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!activeOwnerLaunch || !activePairAddress || !activeLiquidityToken) {
@@ -1568,12 +1649,17 @@ const Launchpad = () => {
 
   const handlePublishListing = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!activeOwnerLaunch?.contractAddress) {
+      setPublishError("Create or import a CW20 token first.")
+      return
+    }
+    const isUpdatingExistingListing = Boolean(activeOwnerLaunch.registryTxHash)
     if (
-      !activeOwnerLaunch?.contractAddress ||
-      !activePairAddress ||
-      !activeLiquidityToken ||
-      !activeOwnerLaunch.lpLockId ||
-      !activeOwnerLaunch.lpUnlockAt
+      !isUpdatingExistingListing &&
+      (!activePairAddress ||
+        !activeLiquidityToken ||
+        !activeOwnerLaunch.lpLockId ||
+        !activeOwnerLaunch.lpUnlockAt)
     ) {
       setPublishError("Create token, pair, liquidity, and LP lock first.")
       return
@@ -1582,7 +1668,7 @@ const Launchpad = () => {
       setPublishError("Launch registry contract is not configured.")
       return
     }
-    if (!isLpLockerConfigured) {
+    if (!isUpdatingExistingListing && !isLpLockerConfigured) {
       setPublishError("LP locker contract is not configured.")
       return
     }
@@ -1595,44 +1681,71 @@ const Launchpad = () => {
       setPublishSubmitting(true)
       setPublishError(undefined)
       setPublishTxHash("")
-      const lpUnlockTime = Math.floor(
-        new Date(activeOwnerLaunch.lpUnlockAt).getTime() / 1000
-      )
-      if (!Number.isFinite(lpUnlockTime) || lpUnlockTime <= 0) {
-        throw new Error("Invalid LP unlock time.")
+      const lpUnlockTime = activeOwnerLaunch.lpUnlockAt
+        ? Math.floor(new Date(activeOwnerLaunch.lpUnlockAt).getTime() / 1000)
+        : 0
+      if (!isUpdatingExistingListing) {
+        if (!Number.isFinite(lpUnlockTime) || lpUnlockTime <= 0) {
+          throw new Error("Invalid LP unlock time.")
+        }
       }
 
-      startTx(`Publish ${activeOwnerLaunch.symbol} launch`)
+      startTx(
+        isUpdatingExistingListing
+          ? `Update ${activeOwnerLaunch.symbol} listing`
+          : `Publish ${activeOwnerLaunch.symbol} launch`
+      )
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
         signerAddress,
         [
-          buildRegisterLaunchMessage({
-            sender: signerAddress,
-            tokenContract: activeOwnerLaunch.contractAddress,
-            pairContract: activePairAddress,
-            lpToken: activeLiquidityToken,
-            lockerContract: LAUNCHPAD_LP_LOCKER_ADDRESS,
-            lpLockId: activeOwnerLaunch.lpLockId,
-            lpUnlockTime,
-            metadata: {
-              name: activeOwnerLaunch.name,
-              symbol: activeOwnerLaunch.symbol,
-              website: publishWebsite,
-              xProfile: publishXProfile,
-              description: publishDescription
-            }
-          })
+          isUpdatingExistingListing
+            ? buildUpdateLaunchMessage({
+                sender: signerAddress,
+                tokenContract: activeOwnerLaunch.contractAddress,
+                metadata: {
+                  name: activeOwnerLaunch.name,
+                  symbol: activeOwnerLaunch.symbol,
+                  website: publishWebsite,
+                  xProfile: publishXProfile,
+                  description: publishDescription
+                }
+              })
+            : buildRegisterLaunchMessage({
+                sender: signerAddress,
+                tokenContract: activeOwnerLaunch.contractAddress,
+                pairContract: activePairAddress,
+                lpToken: activeLiquidityToken,
+                lockerContract: LAUNCHPAD_LP_LOCKER_ADDRESS,
+                lpLockId: activeOwnerLaunch.lpLockId ?? "",
+                lpUnlockTime,
+                metadata: {
+                  name: activeOwnerLaunch.name,
+                  symbol: activeOwnerLaunch.symbol,
+                  website: publishWebsite,
+                  xProfile: publishXProfile,
+                  description: publishDescription
+                }
+              })
         ],
         "auto",
-        "Burrito publish launch"
+        isUpdatingExistingListing
+          ? "Burrito update launch"
+          : "Burrito publish launch"
       )
       if (result.code !== 0) {
-        throw new Error(result.rawLog || "Publish listing failed")
+        throw new Error(
+          result.rawLog ||
+            (isUpdatingExistingListing
+              ? "Update listing failed"
+              : "Publish listing failed")
+        )
       }
 
-      const launchId = extractRegistryLaunchIdFromEvents(result.events)
+      const launchId = isUpdatingExistingListing
+        ? activeOwnerLaunch.registryLaunchId ?? ""
+        : extractRegistryLaunchIdFromEvents(result.events)
       setPublishTxHash(result.transactionHash)
       setCreatedLaunches((current) =>
         current.map((record) =>
@@ -1641,13 +1754,20 @@ const Launchpad = () => {
                 ...record,
                 mode: "Published launch",
                 infoStatus: "Published",
-                ownerStatus: "Launch published",
+                ownerStatus: isUpdatingExistingListing
+                  ? "Listing metadata updated"
+                  : "Launch published",
                 website: publishWebsite.trim(),
                 xProfile: publishXProfile.trim(),
                 description: publishDescription.trim(),
                 registryLaunchId: launchId,
-                registryTxHash: result.transactionHash,
-                publishedAt: new Date().toISOString()
+                registryTxHash:
+                  record.registryTxHash || result.transactionHash,
+                registryUpdateTxHash: isUpdatingExistingListing
+                  ? result.transactionHash
+                  : record.registryUpdateTxHash,
+                publishedAt:
+                  record.publishedAt || new Date().toISOString()
               }
             : record
         )
@@ -1661,6 +1781,79 @@ const Launchpad = () => {
       failTx(message)
     } finally {
       setPublishSubmitting(false)
+    }
+  }
+
+  const handleSetListingStatus = async (status: "live" | "hidden") => {
+    if (!activeOwnerLaunch?.contractAddress || !activeOwnerLaunch.registryTxHash) {
+      setListingStatusError("Publish this launch before changing visibility.")
+      return
+    }
+    if (!isLaunchRegistryConfigured) {
+      setListingStatusError("Launch registry contract is not configured.")
+      return
+    }
+    if (!connectorId || !account?.address) {
+      setListingStatusError("Connect a wallet first.")
+      return
+    }
+
+    try {
+      setListingStatusSubmitting(status)
+      setListingStatusError(undefined)
+      setListingStatusTxHash("")
+      startTx(
+        status === "hidden"
+          ? `Hide ${activeOwnerLaunch.symbol} listing`
+          : `Restore ${activeOwnerLaunch.symbol} listing`
+      )
+      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const client = await connectClassicSigningClientForConnector(connectorId)
+      const result = await client.signAndBroadcast(
+        signerAddress,
+        [
+          buildUpdateLaunchMessage({
+            sender: signerAddress,
+            tokenContract: activeOwnerLaunch.contractAddress,
+            status
+          })
+        ],
+        "auto",
+        status === "hidden"
+          ? "Burrito hide launch"
+          : "Burrito restore launch"
+      )
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Update listing visibility failed")
+      }
+
+      setListingStatusTxHash(result.transactionHash)
+      setCreatedLaunches((current) =>
+        current.map((record) =>
+          record.id === activeOwnerLaunch.id
+            ? {
+                ...record,
+                ownerStatus:
+                  status === "hidden"
+                    ? "Listing hidden"
+                    : "Launch published",
+                registryStatus: status,
+                registryStatusTxHash: result.transactionHash
+              }
+            : record
+        )
+      )
+      await refreshRegistryLaunches()
+      finishTx(result.transactionHash)
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Update listing visibility failed."
+      setListingStatusError(message)
+      failTx(message)
+    } finally {
+      setListingStatusSubmitting(null)
     }
   }
 
@@ -2378,21 +2571,28 @@ const Launchpad = () => {
               </p>
             </div>
             <div className={styles.ownerSelector}>
-              {ownerRecords.map((launch) => (
-                <button
-                  key={launch.id}
-                  className={`${styles.ownerSelectButton} ${
-                    activeOwnerLaunch?.id === launch.id
-                      ? styles.ownerSelectButtonActive
-                      : ""
-                  }`}
-                  type="button"
-                  onClick={() => setActiveOwnerId(launch.id)}
-                >
-                  <span>{launch.mode}</span>
-                  <strong>{launch.pair}</strong>
-                </button>
-              ))}
+              {ownerRecords.length ? (
+                ownerRecords.map((launch) => (
+                  <button
+                    key={launch.id}
+                    className={`${styles.ownerSelectButton} ${
+                      activeOwnerLaunch?.id === launch.id
+                        ? styles.ownerSelectButtonActive
+                        : ""
+                    }`}
+                    type="button"
+                    onClick={() => setActiveOwnerId(launch.id)}
+                  >
+                    <span>{launch.mode}</span>
+                    <strong>{launch.pair}</strong>
+                  </button>
+                ))
+              ) : (
+                <div className={styles.ownerEmptyHint}>
+                  Create a token or import an existing CW20 to unlock owner
+                  tools.
+                </div>
+              )}
             </div>
           </article>
 
@@ -2456,8 +2656,11 @@ const Launchpad = () => {
               {activeOwnerLaunch.contractAddress ||
               activeOwnerLaunch.txHash ||
               activeOwnerLaunch.lpLockTxHash ||
+              activeOwnerLaunch.liquidityWithdrawTxHash ||
               activeOwnerLaunch.lpWithdrawTxHash ||
               activeOwnerLaunch.registryTxHash ||
+              activeOwnerLaunch.registryUpdateTxHash ||
+              activeOwnerLaunch.registryStatusTxHash ||
               activeOwnerLaunch.createdAt ? (
                 <div className={styles.ownerLinkGrid}>
                   {activeOwnerLaunch.contractAddress ? (
@@ -2512,6 +2715,20 @@ const Launchpad = () => {
                       </strong>
                     </a>
                   ) : null}
+                  {activeOwnerLaunch.liquidityWithdrawTxHash ? (
+                    <a
+                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.liquidityWithdrawTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>Remove LP tx</span>
+                      <strong>
+                        {truncateHash(
+                          activeOwnerLaunch.liquidityWithdrawTxHash
+                        )}
+                      </strong>
+                    </a>
+                  ) : null}
                   {activeOwnerLaunch.registryTxHash ? (
                     <a
                       href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.registryTxHash}`}
@@ -2521,6 +2738,30 @@ const Launchpad = () => {
                       <span>Publish tx</span>
                       <strong>
                         {truncateHash(activeOwnerLaunch.registryTxHash)}
+                      </strong>
+                    </a>
+                  ) : null}
+                  {activeOwnerLaunch.registryUpdateTxHash ? (
+                    <a
+                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.registryUpdateTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>Update tx</span>
+                      <strong>
+                        {truncateHash(activeOwnerLaunch.registryUpdateTxHash)}
+                      </strong>
+                    </a>
+                  ) : null}
+                  {activeOwnerLaunch.registryStatusTxHash ? (
+                    <a
+                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.registryStatusTxHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>Status tx</span>
+                      <strong>
+                        {truncateHash(activeOwnerLaunch.registryStatusTxHash)}
                       </strong>
                     </a>
                   ) : null}
@@ -2609,6 +2850,25 @@ const Launchpad = () => {
                         {truncateHash(
                           activeOwnerLaunch.liquidityTxHash ||
                             provideLiquidityTxHash
+                        )}
+                      </strong>
+                    </a>
+                  ) : null}
+                  {activeOwnerLaunch.liquidityWithdrawTxHash ||
+                  withdrawLiquidityTxHash ? (
+                    <a
+                      href={`https://finder.burrito.money/classic/tx/${
+                        activeOwnerLaunch.liquidityWithdrawTxHash ||
+                        withdrawLiquidityTxHash
+                      }`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>Remove LP tx</span>
+                      <strong>
+                        {truncateHash(
+                          activeOwnerLaunch.liquidityWithdrawTxHash ||
+                            withdrawLiquidityTxHash
                         )}
                       </strong>
                     </a>
@@ -2741,6 +3001,86 @@ const Launchpad = () => {
                       : hasLiquidityInput
                       ? "Provide liquidity"
                       : "Enter liquidity amounts"}
+                  </button>
+                </form>
+              ) : null}
+
+              {activeLiquidityToken ? (
+                <form
+                  className={styles.liquidityForm}
+                  onSubmit={handleWithdrawLiquidity}
+                >
+                  <div className={styles.planHeader}>
+                    <span>Withdraw liquidity</span>
+                    <h3>Remove unlocked LP from the pool</h3>
+                  </div>
+                  <div className={styles.liquidityInputs}>
+                    <label className={styles.field}>
+                      <span>LP token amount</span>
+                      <input
+                        value={withdrawLiquidityAmount}
+                        onChange={(event) =>
+                          setWithdrawLiquidityAmount(event.target.value)
+                        }
+                        placeholder="100"
+                        inputMode="decimal"
+                      />
+                    </label>
+                    <div className={`${styles.readOnlyField} ${styles.balanceField}`}>
+                      <span>Wallet LP balance</span>
+                      <strong>
+                        {activeLpBalanceLookup.status === "loading"
+                          ? "Checking..."
+                          : activeLpBalanceDisplay}
+                      </strong>
+                      <button
+                        className={styles.textButton}
+                        type="button"
+                        disabled={!hasActiveLpBalance}
+                        onClick={() =>
+                          setWithdrawLiquidityAmount(activeLpBalanceInputAmount)
+                        }
+                      >
+                        Use full balance
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles.noticeBox}>
+                    This sends unlocked LP tokens back to the Terraswap pair and
+                    receives the underlying {activeOwnerLaunch.symbol} + LUNC.
+                    Locked LP must be withdrawn from the locker first.
+                  </div>
+                  {withdrawLiquidityError ? (
+                    <div className={styles.txError}>
+                      {withdrawLiquidityError}
+                    </div>
+                  ) : null}
+                  {withdrawLiquidityTxHash ? (
+                    <div className={styles.txResult}>
+                      <div>
+                        <span>Remove LP tx</span>
+                        <a
+                          href={`https://finder.burrito.money/classic/tx/${withdrawLiquidityTxHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {truncateHash(withdrawLiquidityTxHash)}
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+                  <button
+                    className="uiButton uiButtonOutline"
+                    type="submit"
+                    disabled={!canWithdrawLiquidity}
+                  >
+                    {withdrawLiquiditySubmitting
+                      ? "Broadcasting..."
+                      : !connectorId || !account?.address
+                      ? "Connect wallet first"
+                      : hasWithdrawLiquidityInput
+                      ? "Withdraw liquidity"
+                      : "Enter LP amount"}
                   </button>
                 </form>
               ) : null}
@@ -2965,7 +3305,9 @@ const Launchpad = () => {
                   <span>Status</span>
                   <strong>
                     {activeOwnerLaunch.registryTxHash
-                      ? "Published"
+                      ? activeRegistryStatus === "hidden"
+                        ? "Hidden, editable"
+                        : "Published, editable"
                       : hasPublicListingPrerequisites
                       ? "Ready"
                       : "Needs LP lock"}
@@ -3020,8 +3362,9 @@ const Launchpad = () => {
                     </label>
                   </div>
                   <div className={styles.noticeBox}>
-                    This publishes public facts to the Burrito registry contract.
-                    It does not verify the project or make Burrito an auditor.
+                    {activeOwnerLaunch.registryTxHash
+                      ? "This updates the public website, X profile, and description stored in the Burrito registry."
+                      : "This publishes public facts to the Burrito registry contract. It does not verify the project or make Burrito an auditor."}
                   </div>
                   {publishError ? (
                     <div className={styles.txError}>{publishError}</div>
@@ -3048,11 +3391,70 @@ const Launchpad = () => {
                     {publishSubmitting
                       ? "Broadcasting..."
                       : activeOwnerLaunch.registryTxHash
-                      ? "Listing published"
+                      ? "Update listing"
                       : !connectorId || !account?.address
                       ? "Connect wallet first"
                       : "Publish listing"}
                   </button>
+                  {activeOwnerLaunch.registryTxHash ? (
+                    <div className={styles.visibilityPanel}>
+                      <div>
+                        <span>Listing visibility</span>
+                        <strong>
+                          {activeRegistryStatus === "hidden"
+                            ? "Hidden from Explore"
+                            : "Visible in Explore"}
+                        </strong>
+                      </div>
+                      {listingStatusError ? (
+                        <div className={styles.txError}>
+                          {listingStatusError}
+                        </div>
+                      ) : null}
+                      {listingStatusTxHash ? (
+                        <div className={styles.txResult}>
+                          <div>
+                            <span>Status tx</span>
+                            <a
+                              href={`https://finder.burrito.money/classic/tx/${listingStatusTxHash}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {truncateHash(listingStatusTxHash)}
+                            </a>
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className={styles.visibilityActions}>
+                        <button
+                          className="uiButton uiButtonOutline"
+                          type="button"
+                          disabled={
+                            activeRegistryStatus === "hidden" ||
+                            listingStatusSubmitting !== null
+                          }
+                          onClick={() => handleSetListingStatus("hidden")}
+                        >
+                          {listingStatusSubmitting === "hidden"
+                            ? "Broadcasting..."
+                            : "Hide listing"}
+                        </button>
+                        <button
+                          className="uiButton uiButtonOutline"
+                          type="button"
+                          disabled={
+                            activeRegistryStatus === "live" ||
+                            listingStatusSubmitting !== null
+                          }
+                          onClick={() => handleSetListingStatus("live")}
+                        >
+                          {listingStatusSubmitting === "live"
+                            ? "Broadcasting..."
+                            : "Restore listing"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </form>
               )}
             </article>
@@ -3069,10 +3471,10 @@ const Launchpad = () => {
             </div>
           </article>
 
-          {ownerActions.map((action) => (
+          {futureOwnerActions.map((action) => (
             <article className={`card ${styles.ownerAction}`} key={action.title}>
               <div>
-                <span>Owner action</span>
+                <span>Future owner tool</span>
                 <h3>{action.title}</h3>
                 <p>{action.text}</p>
               </div>

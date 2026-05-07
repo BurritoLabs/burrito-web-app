@@ -116,6 +116,54 @@ export const buildRegisterLaunchMessage = ({
   }
 }
 
+export const buildUpdateLaunchMessage = ({
+  sender,
+  tokenContract,
+  metadata,
+  status
+}: {
+  sender: string
+  tokenContract: string
+  metadata?: {
+    name: string
+    symbol: string
+    website: string
+    xProfile: string
+    description: string
+  }
+  status?: "live" | "hidden"
+}) => {
+  if (!isLaunchRegistryConfigured) {
+    throw new Error("Launch registry contract is not configured.")
+  }
+
+  return {
+    typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+    value: MsgExecuteContract.fromPartial({
+      sender,
+      contract: LAUNCHPAD_REGISTRY_ADDRESS,
+      msg: toUtf8(
+        JSON.stringify({
+          update_launch: {
+            token_contract: tokenContract,
+            metadata: metadata
+              ? {
+                  name: metadata.name.trim(),
+                  symbol: metadata.symbol.trim().toUpperCase(),
+                  website: cleanOptional(metadata.website),
+                  x_profile: cleanOptional(metadata.xProfile),
+                  description: cleanOptional(metadata.description)
+                }
+              : null,
+            status: status ?? null
+          }
+        })
+      ),
+      funds: []
+    })
+  }
+}
+
 export const extractRegistryLaunchIdFromEvents = (
   events:
     | ReadonlyArray<{

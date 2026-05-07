@@ -6,6 +6,7 @@ import {
   fetchCurrentDashboardSnapshot,
   type DashboardSnapshot
 } from "../app/data/dashboard"
+import { fetchBinodesDashboardActivity } from "../app/data/binodes"
 import { fetchPrices } from "../app/data/classic"
 import { formatNumber, formatPercent } from "../app/utils/format"
 
@@ -31,6 +32,37 @@ const formatUsdSmart = (value?: number) => {
 const formatUsdStandard = (value?: number) => {
   if (value === undefined || value === null || Number.isNaN(value)) return "--"
   return `$${formatNumber(value, 2)}`
+}
+
+const formatUsdCompact = (value?: number, signed = false) => {
+  if (value === undefined || value === null || Number.isNaN(value)) return "--"
+  const sign = signed && value > 0 ? "+" : ""
+  return `${sign}$${new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2
+  }).format(value)}`
+}
+
+const formatCompactValue = (value?: number, decimals = 2) => {
+  if (value === undefined || value === null || Number.isNaN(value)) return "--"
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: decimals
+  }).format(value)
+}
+
+const formatUtcHour = (value?: string) => {
+  if (!value) return "--"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "--"
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short"
+  })
 }
 
 const formatOracleDelta = (value?: number, unit?: string) => {
@@ -96,6 +128,131 @@ const Dashboard = () => {
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
   })
+
+  const {
+    data: activity,
+    isLoading: activityLoading,
+    isError: activityError
+  } = useQuery({
+    queryKey: ["binodes", "dashboard", "activity"],
+    queryFn: fetchBinodesDashboardActivity,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000
+  })
+
+  const activityMetrics = useMemo<MetricItem[]>(() => {
+    if (!activity) return []
+    const network = activity.network
+    const dex = activity.dex
+    const burns = activity.burns
+    const ibc = activity.ibc
+    const stake = activity.stake
+    const fees = activity.fees
+    const governance = activity.governance
+    const burnUsd =
+      (burns?.fee_burn_usd ?? 0) + (burns?.voluntary_burn_usd ?? 0)
+
+    return [
+      {
+        key: "activityTx",
+        label: "Tx this hour",
+        value: formatValue(network?.tx_total_cnt, 0)
+      },
+      {
+        key: "activityAddresses",
+        label: "Active addresses",
+        value: formatValue(network?.active_addr_cnt, 0),
+        delta:
+          network?.new_addr_cnt === undefined
+            ? undefined
+            : `${formatNumber(network.new_addr_cnt, 0)} new`
+      },
+      {
+        key: "activityDexVolume",
+        label: "DEX volume",
+        value: formatUsdCompact(dex?.dex_volume_usd ?? network?.dex_volume_usd),
+        delta:
+          dex?.dex_tx_cnt === undefined
+            ? undefined
+            : `${formatNumber(dex.dex_tx_cnt, 0)} swaps`
+      },
+      {
+        key: "activityTransfer",
+        label: "Transfer volume",
+        value: formatUsdCompact(network?.transfer_amt_usd),
+        delta:
+          network?.transfer_cnt === undefined
+            ? undefined
+            : `${formatNumber(network.transfer_cnt, 0)} transfers`
+      },
+      {
+        key: "activityBurn",
+        label: "Burned value",
+        value: formatUsdCompact(burnUsd || undefined),
+        delta:
+          burns?.voluntary_burn_cnt === undefined
+            ? undefined
+            : `${formatNumber(burns.voluntary_burn_cnt, 0)} voluntary burns`
+      },
+      {
+        key: "activityIbc",
+        label: "IBC net flow",
+        value: formatUsdCompact(ibc?.net_ibc_flow_usd, true),
+        delta:
+          ibc?.ibc_tx_cnt === undefined
+            ? undefined
+            : `${formatNumber(ibc.ibc_tx_cnt, 0)} IBC txs`,
+        deltaRaw: ibc?.net_ibc_flow_usd
+      },
+      {
+        key: "activityDelegated",
+        label: "Delegated",
+        value: formatCompactValue(stake?.staking_delegate_actual),
+        unit: "LUNC",
+        delta:
+          stake?.staking_delegate_cnt === undefined
+            ? undefined
+            : `${formatNumber(stake.staking_delegate_cnt, 0)} delegations`
+      },
+      {
+        key: "activityUndelegated",
+        label: "Undelegated",
+        value: formatCompactValue(stake?.staking_undelegate_actual),
+        unit: "LUNC",
+        delta:
+          stake?.staking_undelegate_cnt === undefined
+            ? undefined
+            : `${formatNumber(stake.staking_undelegate_cnt, 0)} undelegations`
+      },
+      {
+        key: "activityGasFees",
+        label: "Gas fees",
+        value: formatUsdCompact(fees?.fee_gas_usd),
+        delta:
+          fees?.gas_used === undefined
+            ? undefined
+            : `${formatCompactValue(fees.gas_used, 1)} gas used`
+      },
+      {
+        key: "activityGovernance",
+        label: "Governance votes",
+        value: formatValue(governance?.gov_vote_cnt, 0),
+        delta:
+          governance?.gov_proposal_submit_cnt === undefined
+            ? undefined
+            : `${formatNumber(governance.gov_proposal_submit_cnt, 0)} proposals`
+      }
+    ]
+  }, [activity])
+
+  const activityTimestamp =
+    activity?.network?.dt ??
+    activity?.dex?.dt ??
+    activity?.burns?.dt ??
+    activity?.ibc?.dt ??
+    activity?.stake?.dt ??
+    activity?.fees?.dt ??
+    activity?.governance?.dt
 
   const metrics = useMemo<MetricItem[]>(() => {
     if (!currentSnapshot) return []
@@ -291,6 +448,58 @@ const Dashboard = () => {
   return (
     <PageShell title="Dashboard">
       <div className={styles.page}>
+        <section className={styles.section}>
+          <div className={styles.sectionTitleRow}>
+            <div>
+              <div className={styles.sectionHeader}>Network Activity</div>
+              <p className={styles.sectionSubtext}>
+                Live indexed Terra Classic activity from BiNodes. Current bucket:
+                {" "}
+                {formatUtcHour(activityTimestamp)}
+              </p>
+            </div>
+            <span className={styles.sourcePill}>
+              {activityLoading
+                ? "Loading BiNodes"
+                : activityError
+                  ? "BiNodes fallback inactive"
+                  : "Powered by BiNodes"}
+            </span>
+          </div>
+          {activityMetrics.length ? (
+            <div className={styles.metricsActivity}>
+              {activityMetrics.map((item) => (
+                <div key={item.key} className={`card ${styles.metricCard}`}>
+                  <div className={styles.metricLabel}>{item.label}</div>
+                  <div className={styles.metricValue}>
+                    {item.value}
+                    {item.unit ? <span>{item.unit}</span> : null}
+                  </div>
+                  {item.delta !== undefined && item.delta !== "--" ? (
+                    <div
+                      className={`${styles.delta} ${
+                        item.deltaRaw === undefined
+                          ? styles.neutral
+                          : item.deltaRaw >= 0
+                            ? styles.up
+                            : styles.down
+                      }`}
+                    >
+                      {item.delta}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`card ${styles.activityEmpty}`}>
+              {activityLoading
+                ? "Loading BiNodes activity..."
+                : "BiNodes activity is unavailable. Existing dashboard data remains active."}
+            </div>
+          )}
+        </section>
+
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Market</div>
           <div className={styles.metricsTop}>

@@ -21,6 +21,9 @@ blacklists, hidden owner controls, or a custom DEX contract.
 6. Lock the minted LP token after the locker contract is configured.
 7. Publish the listing after the registry contract is configured.
 8. Use `Explore` to view on-chain registry launches.
+9. Project owners can add more liquidity, withdraw unlocked LP from the pool,
+   withdraw locked LP after unlock, update registry metadata, and hide/restore
+   their published listing.
 
 ## Contracts
 
@@ -57,9 +60,13 @@ before the contracts exist.
 - Pair lookup shows whether a Terraswap LUNC pair exists.
 - Pair creation stores pair contract and LP token after LCD indexing.
 - Liquidity provision broadcasts `increase_allowance` and `provide_liquidity` in one transaction.
+- Liquidity withdrawal sends unlocked LP CW20 tokens to the pair contract with
+  the Terraswap `withdraw_liquidity` hook.
 - LP lock panel shows wallet LP balance and can fill the full balance.
 - LP lock stays disabled when `VITE_LAUNCHPAD_LP_LOCKER_ADDRESS` is empty.
 - Public listing stays disabled when `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is empty.
+- Published listing metadata and visibility can be updated through the registry
+  contract.
 - Registry Explore shows real on-chain records when configured.
 - Registry Explore shows an empty state, not fake launches, when configured but empty.
 - Mobile width keeps cards inside the viewport.
