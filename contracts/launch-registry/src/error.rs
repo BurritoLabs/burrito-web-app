@@ -30,6 +30,9 @@ pub enum ContractError {
     #[error("lp lock verification failed: {reason}")]
     InvalidLpLock { reason: &'static str },
 
+    #[error("metadata field {field} does not match CW20 token info")]
+    TokenMetadataMismatch { field: &'static str },
+
     #[error("locker contract is not the configured Burrito locker")]
     InvalidLockerContract {},
 }

@@ -96,6 +96,9 @@ of fake sample launches when the registry is not configured.
 - Create and Publish validate optional public links. Website must be a full
   `http://` or `https://` URL, and X can be `@handle`, `x.com`, or
   `twitter.com`.
+- The registry contract verifies listing name and symbol against the CW20
+  token's own `token_info`, so creators cannot publish spoofed metadata through
+  the public registry.
 - Registry Explore shows real on-chain records when configured, newest first.
 - Registry Explore classifies records as live, ended, or risk based on LP lock
   state and missing public info.

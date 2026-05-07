@@ -25,6 +25,11 @@ enum LockerQueryMsg {
 }
 
 #[cw_serde]
+enum Cw20QueryMsg {
+    TokenInfo {},
+}
+
+#[cw_serde]
 struct LockerLockResponse {
     id: u64,
     owner: String,
@@ -34,6 +39,14 @@ struct LockerLockResponse {
     unlock_time: u64,
     created_at: u64,
     withdrawn: bool,
+}
+
+#[cw_serde]
+struct Cw20TokenInfoResponse {
+    name: String,
+    symbol: String,
+    decimals: u8,
+    total_supply: Uint128,
 }
 
 #[entry_point]
@@ -152,6 +165,7 @@ fn execute_register_launch(
         parsed_lp_lock_id,
         lp_unlock_time,
     )?;
+    verify_token_metadata(deps.as_ref(), &token_contract, &metadata)?;
 
     let launch = Launch {
         id,
@@ -239,6 +253,25 @@ fn verify_lp_lock(
     Ok(())
 }
 
+fn verify_token_metadata(
+    deps: Deps,
+    token_contract: &Addr,
+    metadata: &LaunchMetadata,
+) -> Result<(), ContractError> {
+    let token_info: Cw20TokenInfoResponse = deps
+        .querier
+        .query_wasm_smart(token_contract.to_string(), &Cw20QueryMsg::TokenInfo {})?;
+
+    if token_info.name.trim() != metadata.name {
+        return Err(ContractError::TokenMetadataMismatch { field: "name" });
+    }
+    if token_info.symbol.trim().to_uppercase() != metadata.symbol {
+        return Err(ContractError::TokenMetadataMismatch { field: "symbol" });
+    }
+
+    Ok(())
+}
+
 fn execute_update_launch(
     deps: DepsMut,
     env: Env,
@@ -249,26 +282,26 @@ fn execute_update_launch(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let token_contract = deps.api.addr_validate(&token_contract)?;
-    LAUNCHES.update(
-        deps.storage,
-        &token_contract,
-        |launch| -> Result<_, ContractError> {
-            let mut launch = launch.ok_or_else(|| ContractError::LaunchNotFound {
+    let mut launch =
+        LAUNCHES
+            .may_load(deps.storage, &token_contract)?
+            .ok_or_else(|| ContractError::LaunchNotFound {
                 token_contract: token_contract.to_string(),
             })?;
-            if info.sender != launch.creator && info.sender != config.owner {
-                return Err(ContractError::Unauthorized {});
-            }
-            if let Some(metadata) = metadata {
-                launch.metadata = validate_metadata(metadata)?;
-            }
-            if let Some(status) = status {
-                launch.status = status;
-            }
-            launch.updated_at = env.block.time.seconds();
-            Ok(launch)
-        },
-    )?;
+
+    if info.sender != launch.creator && info.sender != config.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+    if let Some(metadata) = metadata {
+        let metadata = validate_metadata(metadata)?;
+        verify_token_metadata(deps.as_ref(), &token_contract, &metadata)?;
+        launch.metadata = metadata;
+    }
+    if let Some(status) = status {
+        launch.status = status;
+    }
+    launch.updated_at = env.block.time.seconds();
+    LAUNCHES.save(deps.storage, &token_contract, &launch)?;
 
     Ok(Response::new()
         .add_attribute("action", "update_launch")
@@ -435,7 +468,10 @@ mod tests {
         }
     }
 
-    fn mock_locker_query(unlock_time: u64) -> impl Fn(&WasmQuery) -> QuerierResult {
+    fn mock_registry_queries(
+        unlock_time: u64,
+        token_symbol: &'static str,
+    ) -> impl Fn(&WasmQuery) -> QuerierResult {
         move |query| match query {
             WasmQuery::Smart { contract_addr, msg } if contract_addr == LOCKER => {
                 let request: LockerQueryMsg = from_json(msg).unwrap();
@@ -450,6 +486,20 @@ mod tests {
                             unlock_time,
                             created_at: unlock_time - 10,
                             withdrawn: false,
+                        })
+                        .unwrap(),
+                    )),
+                }
+            }
+            WasmQuery::Smart { contract_addr, msg } if contract_addr == TOKEN => {
+                let request: Cw20QueryMsg = from_json(msg).unwrap();
+                match request {
+                    Cw20QueryMsg::TokenInfo {} => SystemResult::Ok(ContractResult::Ok(
+                        to_json_binary(&Cw20TokenInfoResponse {
+                            name: "Taco Token".to_string(),
+                            symbol: token_symbol.to_string(),
+                            decimals: 6,
+                            total_supply: Uint128::new(1_000_000_000),
                         })
                         .unwrap(),
                     )),
@@ -474,7 +524,8 @@ mod tests {
         )
         .unwrap();
         let unlock_time = env.block.time.seconds() + 100;
-        deps.querier.update_wasm(mock_locker_query(unlock_time));
+        deps.querier
+            .update_wasm(mock_registry_queries(unlock_time, "TACO"));
 
         execute(
             deps.as_mut(),
@@ -506,6 +557,46 @@ mod tests {
     }
 
     #[test]
+    fn rejects_listing_when_metadata_does_not_match_cw20_token_info() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        instantiate(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(CREATOR, &[]),
+            InstantiateMsg {
+                owner: None,
+                locker_contract: LOCKER.to_string(),
+            },
+        )
+        .unwrap();
+        let unlock_time = env.block.time.seconds() + 100;
+        deps.querier
+            .update_wasm(mock_registry_queries(unlock_time, "REAL"));
+
+        let error = execute(
+            deps.as_mut(),
+            env,
+            mock_info(CREATOR, &[]),
+            ExecuteMsg::RegisterLaunch {
+                token_contract: TOKEN.to_string(),
+                pair_contract: PAIR.to_string(),
+                lp_token: LP.to_string(),
+                locker_contract: LOCKER.to_string(),
+                lp_lock_id: "1".to_string(),
+                lp_unlock_time: unlock_time,
+                metadata: metadata(),
+            },
+        )
+        .unwrap_err();
+
+        match error {
+            ContractError::TokenMetadataMismatch { field: "symbol" } => {}
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
     fn creator_can_update_metadata() {
         let mut deps = mock_dependencies();
         let env = mock_env();
@@ -520,7 +611,8 @@ mod tests {
         )
         .unwrap();
         let unlock_time = env.block.time.seconds() + 100;
-        deps.querier.update_wasm(mock_locker_query(unlock_time));
+        deps.querier
+            .update_wasm(mock_registry_queries(unlock_time, "TACO"));
 
         execute(
             deps.as_mut(),

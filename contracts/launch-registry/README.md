@@ -57,3 +57,6 @@ The registry only accepts listings whose `locker_contract` matches this
 configured Burrito locker. It also queries the locker during registration and
 rejects listings if the LP lock owner, LP token, pair contract, unlock time, or
 withdrawn status do not match.
+
+The registry also queries the CW20 token contract and rejects listings or
+metadata updates when the submitted name or symbol does not match `token_info`.
