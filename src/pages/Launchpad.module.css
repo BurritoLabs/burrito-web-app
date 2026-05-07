@@ -87,6 +87,82 @@
   pointer-events: none;
 }
 
+.manageHero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+  gap: 18px;
+  align-items: center;
+  background:
+    radial-gradient(520px 260px at 0% 0%, rgba(104, 216, 63, 0.12), transparent 62%),
+    rgba(16, 29, 24, 0.76);
+}
+
+.manageHeroCopy {
+  display: grid;
+  gap: 8px;
+}
+
+.manageHeroCopy span,
+.manageHeroSteps span {
+  color: rgba(240, 250, 241, 0.58);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.manageHeroCopy h2 {
+  color: #ffffff;
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.manageHeroCopy p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size);
+  line-height: 1.5;
+}
+
+.manageHeroSteps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.manageHeroSteps div {
+  min-height: 78px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 193, 7, 0.24);
+  background: rgba(255, 193, 7, 0.065);
+  display: grid;
+  align-content: space-between;
+  min-width: 0;
+}
+
+.manageHeroSteps strong {
+  color: #ffffff;
+  font-size: var(--font-size-title);
+}
+
+.manageHeroSteps small {
+  color: rgba(255, 230, 173, 0.88);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+.manageHeroSteps .manageStepDone {
+  border-color: rgba(104, 216, 63, 0.3);
+  background: rgba(104, 216, 63, 0.1);
+}
+
+.manageHeroSteps .manageStepDone small {
+  color: var(--green);
+}
+
 .panelTop {
   position: relative;
   z-index: 1;
@@ -894,6 +970,10 @@
   gap: 16px;
 }
 
+.ownerIntro {
+  order: 1;
+}
+
 .exploreIntro p,
 .ownerIntro p,
 .ownerImport p {
@@ -904,6 +984,7 @@
 
 .ownerImport {
   grid-column: span 3;
+  order: 8;
   background: rgba(16, 29, 24, 0.76);
   display: grid;
   gap: 14px;
@@ -1252,16 +1333,21 @@
 
 .ownerReadiness,
 .ownerSummary {
-  grid-column: span 2;
+  grid-column: 1 / -1;
   background: rgba(16, 29, 24, 0.76);
   display: grid;
   gap: 16px;
 }
 
 .ownerReadiness {
+  order: 2;
   background:
     radial-gradient(circle at 8% 0%, rgba(104, 216, 63, 0.12), transparent 34%),
     rgba(16, 29, 24, 0.78);
+}
+
+.ownerSummary {
+  order: 6;
 }
 
 .ownerReadinessGrid {
@@ -1386,6 +1472,32 @@
   display: grid;
   gap: 14px;
   align-content: start;
+}
+
+.poolSetup,
+.lockSetup,
+.listingSetup {
+  min-height: 100%;
+}
+
+.poolSetup {
+  order: 3;
+}
+
+.lockSetup {
+  order: 4;
+}
+
+.listingSetup {
+  order: 5;
+}
+
+.tokenDistribution {
+  order: 7;
+}
+
+.ownerPrimaryTool {
+  order: 3;
 }
 
 .poolStatusGrid {
@@ -1616,6 +1728,7 @@
 
 @media (max-width: 991.98px) {
   .hero,
+  .manageHero,
   .createGrid,
   .launchPlanGrid {
     grid-template-columns: 1fr;
@@ -1654,6 +1767,7 @@
   .previewStats,
   .packageGrid,
   .systemStatus,
+  .manageHeroSteps,
   .ownerReadinessGrid,
   .launchCardStats,
   .ownerSummaryGrid,
@@ -1688,6 +1802,7 @@
 
   .heroCopy,
   .heroPanel,
+  .manageHero,
   .rulesCard {
     border-radius: 10px;
   }
@@ -1783,6 +1898,7 @@
   .launchDetailPanel,
   .launchCard,
   .ownerIntro,
+  .manageHero,
   .ownerImport,
   .ownerReadiness,
   .tokenDistribution,

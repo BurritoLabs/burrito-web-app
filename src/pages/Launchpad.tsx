@@ -1825,6 +1825,57 @@ const Launchpad = () => {
         actionLabel: "Manage listing",
         targetId: "launchpad-listing"
       }
+  const manageFlowSteps = activeOwnerIsCw20Only
+    ? [
+        {
+          eyebrow: "01",
+          label: "Token",
+          detail: activeOwnerLaunch?.contractAddress ? "Created" : "Needed",
+          done: Boolean(activeOwnerLaunch?.contractAddress)
+        },
+        {
+          eyebrow: "02",
+          label: "Distribution",
+          detail: hasDistributedTokens ? "Sent" : "Optional",
+          done: hasDistributedTokens
+        },
+        {
+          eyebrow: "03",
+          label: "Owner tools",
+          detail: "Local",
+          done: Boolean(activeOwnerLaunch)
+        }
+      ]
+    : [
+        {
+          eyebrow: "01",
+          label: "Pair",
+          detail: activePairAddress ? "Created" : "Next",
+          done: Boolean(activePairAddress)
+        },
+        {
+          eyebrow: "02",
+          label: "Liquidity",
+          detail: hasProvidedLiquidity ? "Added" : "Needed",
+          done: hasProvidedLiquidity
+        },
+        {
+          eyebrow: "03",
+          label: "LP lock",
+          detail: hasLockedLp ? "Locked" : "Needed",
+          done: hasLockedLp
+        },
+        {
+          eyebrow: "04",
+          label: "Publish",
+          detail: isActiveListingPublished ? "Live" : "Final",
+          done: isActiveListingPublished
+        }
+      ]
+  const showOwnerDistributionTool = Boolean(
+    activeOwnerLaunch &&
+      (activeOwnerIsCw20Only || hasDistributedTokens || isActiveListingPublished)
+  )
   const publicRecordItems = isCw20Only
     ? cw20PublicRecordItems
     : launchPublicRecordItems
@@ -2766,43 +2817,70 @@ const Launchpad = () => {
       title="Launchpad"
       extra={<span className={styles.phasePill}>Phase 2 Launchpad</span>}
     >
-      <section className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <span className={styles.kicker}>Burrito Launchpad V1</span>
-          <h2>Launch a token with visible liquidity and a clear lock.</h2>
-          <p>
-            V1 should keep the launch model narrow: fixed-supply CW20, Token /
-            LUNC pool, public creator address, visible LP lock, registry listing,
-            and plain risk labels without Burrito acting as a token judge.
-          </p>
-        </div>
-        <div className={styles.heroPanel}>
-          <div className={styles.panelTop}>
-            <span>Recommended V1</span>
-            <strong>CW20 / LUNC</strong>
+      {activeTab === "manage" ? (
+        <section className={`card ${styles.manageHero}`}>
+          <div className={styles.manageHeroCopy}>
+            <span>Owner workspace</span>
+            <h2>Finish one launch step at a time.</h2>
+            <p>
+              Manage focuses on the next required action first. Create the
+              pair, add liquidity, lock LP, then publish. Advanced tools stay
+              below the main flow.
+            </p>
           </div>
-          <div className={styles.metricGrid}>
-            <div>
-              <span>DEX route</span>
-              <strong>Terraswap</strong>
+          <div className={styles.manageHeroSteps}>
+            {manageFlowSteps.map((step) => (
+              <div
+                className={step.done ? styles.manageStepDone : ""}
+                key={step.label}
+              >
+                <span>{step.eyebrow}</span>
+                <strong>{step.label}</strong>
+                <small>{step.detail}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className={styles.hero}>
+          <div className={styles.heroCopy}>
+            <span className={styles.kicker}>Burrito Launchpad V1</span>
+            <h2>Launch a token with visible liquidity and a clear lock.</h2>
+            <p>
+              V1 should keep the launch model narrow: fixed-supply CW20, Token /
+              LUNC pool, public creator address, visible LP lock, registry
+              listing, and plain risk labels without Burrito acting as a token
+              judge.
+            </p>
+          </div>
+          <div className={styles.heroPanel}>
+            <div className={styles.panelTop}>
+              <span>Recommended V1</span>
+              <strong>CW20 / LUNC</strong>
             </div>
-            <div>
-              <span>LP lock</span>
-              <strong>30d min</strong>
-            </div>
-            <div>
-              <span>Listing</span>
-              <strong>
-                {isLaunchRegistryConfigured ? "Registry live" : "Env needed"}
-              </strong>
-            </div>
-            <div>
-              <span>Risk label</span>
-              <strong>Open launch</strong>
+            <div className={styles.metricGrid}>
+              <div>
+                <span>DEX route</span>
+                <strong>Terraswap</strong>
+              </div>
+              <div>
+                <span>LP lock</span>
+                <strong>30d min</strong>
+              </div>
+              <div>
+                <span>Listing</span>
+                <strong>
+                  {isLaunchRegistryConfigured ? "Registry live" : "Env needed"}
+                </strong>
+              </div>
+              <div>
+                <span>Risk label</span>
+                <strong>Open launch</strong>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className={`card ${styles.systemStatus}`}>
         {launchpadStatusItems.map((item) => (
@@ -4076,10 +4154,12 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch ? (
+          {activeOwnerLaunch && showOwnerDistributionTool ? (
             <article
               id="launchpad-distribution"
-              className={`card ${styles.tokenDistribution}`}
+              className={`card ${styles.tokenDistribution} ${
+                activeOwnerIsCw20Only ? styles.ownerPrimaryTool : ""
+              }`}
             >
               <div className={styles.planHeader}>
                 <span>CW20 distribution</span>
@@ -4175,10 +4255,10 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch ? (
+          {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
             <article id="launchpad-pool" className={`card ${styles.poolSetup}`}>
               <div className={styles.planHeader}>
-                <span>Pool setup</span>
+                <span>Step 1 / Pool setup</span>
                 <h3>Terraswap LUNC pair</h3>
               </div>
               <div className={styles.poolStatusGrid}>
@@ -4492,10 +4572,10 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch ? (
+          {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
             <article id="launchpad-lock" className={`card ${styles.lockSetup}`}>
               <div className={styles.planHeader}>
-                <span>LP lock</span>
+                <span>Step 2 / LP lock</span>
                 <h3>Lock liquidity tokens</h3>
               </div>
               <div className={styles.poolStatusGrid}>
@@ -4741,10 +4821,10 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch ? (
+          {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
             <article id="launchpad-listing" className={`card ${styles.listingSetup}`}>
               <div className={styles.planHeader}>
-                <span>Public listing</span>
+                <span>Step 3 / Public listing</span>
                 <h3>Publish to Launchpad</h3>
               </div>
               <div className={styles.poolStatusGrid}>
