@@ -184,7 +184,9 @@ export const buildUpdateLaunchMessage = ({
   sender,
   tokenContract,
   metadata,
-  status
+  status,
+  lpLockId,
+  lpUnlockTime
 }: {
   sender: string
   tokenContract: string
@@ -196,6 +198,8 @@ export const buildUpdateLaunchMessage = ({
     description: string
   }
   status?: "live" | "hidden"
+  lpLockId?: string
+  lpUnlockTime?: number
 }) => {
   if (!isLaunchRegistryConfigured) {
     throw new Error("Launch registry contract is not configured.")
@@ -219,7 +223,9 @@ export const buildUpdateLaunchMessage = ({
                   description: cleanOptional(metadata.description)
                 }
               : null,
-            status: status ?? null
+            status: status ?? null,
+            lp_lock_id: lpLockId ?? null,
+            lp_unlock_time: lpUnlockTime ?? null
           }
         })
       ),

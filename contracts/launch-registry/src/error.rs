@@ -27,6 +27,9 @@ pub enum ContractError {
     #[error("lp lock id must be a positive integer")]
     InvalidLockId {},
 
+    #[error("lp lock id and unlock time must be updated together")]
+    IncompleteLpLockUpdate {},
+
     #[error("lp lock verification failed: {reason}")]
     InvalidLpLock { reason: &'static str },
 

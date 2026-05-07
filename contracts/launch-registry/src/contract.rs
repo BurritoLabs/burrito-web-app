@@ -109,7 +109,18 @@ pub fn execute(
             token_contract,
             metadata,
             status,
-        } => execute_update_launch(deps, env, info, token_contract, metadata, status),
+            lp_lock_id,
+            lp_unlock_time,
+        } => execute_update_launch(
+            deps,
+            env,
+            info,
+            token_contract,
+            metadata,
+            status,
+            lp_lock_id,
+            lp_unlock_time,
+        ),
         ExecuteMsg::UpdateConfig {
             owner,
             locker_contract,
@@ -279,6 +290,8 @@ fn execute_update_launch(
     token_contract: String,
     metadata: Option<LaunchMetadata>,
     status: Option<LaunchStatus>,
+    lp_lock_id: Option<String>,
+    lp_unlock_time: Option<u64>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let token_contract = deps.api.addr_validate(&token_contract)?;
@@ -299,12 +312,39 @@ fn execute_update_launch(
     if let Some(status) = status {
         launch.status = status;
     }
+    match (lp_lock_id, lp_unlock_time) {
+        (Some(lp_lock_id), Some(lp_unlock_time)) => {
+            if lp_unlock_time <= env.block.time.seconds() {
+                return Err(ContractError::InvalidUnlockTime {});
+            }
+            let lp_lock_id =
+                normalize_required("lp_lock_id", lp_lock_id, LOCK_ID_MAX)?;
+            let parsed_lp_lock_id = lp_lock_id
+                .parse::<u64>()
+                .map_err(|_| ContractError::InvalidLockId {})?;
+            verify_lp_lock(
+                deps.as_ref(),
+                &launch.creator,
+                &launch.locker_contract,
+                &launch.pair_contract,
+                &launch.lp_token,
+                parsed_lp_lock_id,
+                lp_unlock_time,
+            )?;
+            launch.lp_lock_id = lp_lock_id;
+            launch.lp_unlock_time = lp_unlock_time;
+        }
+        (None, None) => {}
+        _ => return Err(ContractError::IncompleteLpLockUpdate {}),
+    }
     launch.updated_at = env.block.time.seconds();
     LAUNCHES.save(deps.storage, &token_contract, &launch)?;
 
     Ok(Response::new()
         .add_attribute("action", "update_launch")
-        .add_attribute("token_contract", token_contract.to_string()))
+        .add_attribute("token_contract", token_contract.to_string())
+        .add_attribute("lp_lock_id", launch.lp_lock_id.clone())
+        .add_attribute("lp_unlock_time", launch.lp_unlock_time.to_string()))
 }
 
 fn execute_update_config(
@@ -643,6 +683,8 @@ mod tests {
                     description: Some("Updated".to_string()),
                 }),
                 status: Some(LaunchStatus::Hidden),
+                lp_lock_id: None,
+                lp_unlock_time: None,
             },
         )
         .unwrap();
@@ -658,6 +700,71 @@ mod tests {
         let launch: LaunchResponse = from_json(response).unwrap();
         assert_eq!(launch.metadata.description, Some("Updated".to_string()));
         assert_eq!(launch.status.as_str(), "hidden");
+    }
+
+    #[test]
+    fn creator_can_update_lp_lock() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        instantiate(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(CREATOR, &[]),
+            InstantiateMsg {
+                owner: None,
+                locker_contract: LOCKER.to_string(),
+            },
+        )
+        .unwrap();
+        let unlock_time = env.block.time.seconds() + 100;
+        deps.querier
+            .update_wasm(mock_registry_queries(unlock_time, "TACO"));
+
+        execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(CREATOR, &[]),
+            ExecuteMsg::RegisterLaunch {
+                token_contract: TOKEN.to_string(),
+                pair_contract: PAIR.to_string(),
+                lp_token: LP.to_string(),
+                locker_contract: LOCKER.to_string(),
+                lp_lock_id: "1".to_string(),
+                lp_unlock_time: unlock_time,
+                metadata: metadata(),
+            },
+        )
+        .unwrap();
+
+        let next_unlock_time = env.block.time.seconds() + 200;
+        deps.querier
+            .update_wasm(mock_registry_queries(next_unlock_time, "TACO"));
+
+        execute(
+            deps.as_mut(),
+            env.clone(),
+            mock_info(CREATOR, &[]),
+            ExecuteMsg::UpdateLaunch {
+                token_contract: TOKEN.to_string(),
+                metadata: None,
+                status: None,
+                lp_lock_id: Some("2".to_string()),
+                lp_unlock_time: Some(next_unlock_time),
+            },
+        )
+        .unwrap();
+
+        let response = query(
+            deps.as_ref(),
+            env,
+            QueryMsg::Launch {
+                token_contract: TOKEN.to_string(),
+            },
+        )
+        .unwrap();
+        let launch: LaunchResponse = from_json(response).unwrap();
+        assert_eq!(launch.lp_lock_id, "2");
+        assert_eq!(launch.lp_unlock_time, next_unlock_time);
     }
 
     #[test]

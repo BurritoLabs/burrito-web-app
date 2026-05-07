@@ -21,6 +21,8 @@ pub enum ExecuteMsg {
         token_contract: String,
         metadata: Option<LaunchMetadata>,
         status: Option<LaunchStatus>,
+        lp_lock_id: Option<String>,
+        lp_unlock_time: Option<u64>,
     },
     UpdateConfig {
         owner: Option<String>,

@@ -89,6 +89,7 @@ type OwnerLaunchRecord = {
   lpLockId?: string
   lpLockTxHash?: string
   lpUnlockAt?: string
+  lpLockUpdateTxHash?: string
   lpWithdrawTxHash?: string
   registryLaunchId?: string
   registryTxHash?: string
@@ -650,6 +651,9 @@ const Launchpad = () => {
   const [lockLpSubmitting, setLockLpSubmitting] = useState(false)
   const [lockLpError, setLockLpError] = useState<string>()
   const [lockLpTxHash, setLockLpTxHash] = useState("")
+  const [lockRegistrySubmitting, setLockRegistrySubmitting] = useState(false)
+  const [lockRegistryError, setLockRegistryError] = useState<string>()
+  const [lockRegistryTxHash, setLockRegistryTxHash] = useState("")
   const [withdrawLpSubmitting, setWithdrawLpSubmitting] = useState(false)
   const [withdrawLpError, setWithdrawLpError] = useState<string>()
   const [withdrawLpTxHash, setWithdrawLpTxHash] = useState("")
@@ -1596,6 +1600,9 @@ const Launchpad = () => {
       account?.address &&
       !withdrawLpSubmitting
   )
+  const activeLpLockUpdateTime = activeOwnerLaunch?.lpUnlockAt
+    ? Math.floor(new Date(activeOwnerLaunch.lpUnlockAt).getTime() / 1000)
+    : 0
   const hasPublicListingPrerequisites = Boolean(
     activeOwnerLaunch?.contractAddress &&
       activePairAddress &&
@@ -1605,6 +1612,16 @@ const Launchpad = () => {
   )
   const isActiveListingPublished = Boolean(
     activeOwnerLaunch?.registryTxHash || activeOwnerLaunch?.registryLaunchId
+  )
+  const canUpdateRegistryLock = Boolean(
+    activeOwnerLaunch?.contractAddress &&
+      activeOwnerLaunch?.lpLockId &&
+      activeLpLockUpdateTime > Math.floor(Date.now() / 1000) &&
+      isActiveListingPublished &&
+      isLaunchRegistryConfigured &&
+      connectorId &&
+      account?.address &&
+      !lockRegistrySubmitting
   )
   const activeRegistryStatus = activeOwnerLaunch?.registryStatus ?? "live"
 
@@ -1968,6 +1985,9 @@ const Launchpad = () => {
     setWithdrawLiquidityAmount("")
     setLockLpError(undefined)
     setLockLpTxHash("")
+    setLockRegistryError(undefined)
+    setLockRegistryTxHash("")
+    setLockRegistrySubmitting(false)
     setWithdrawLpError(undefined)
     setWithdrawLpTxHash("")
     setDistributionError(undefined)
@@ -2293,7 +2313,10 @@ const Launchpad = () => {
                 ...record,
                 mode: "Launch ready",
                 lockExpiry: formatDateTime(unlockDate),
-                ownerStatus: "LP locked",
+                ownerStatus:
+                  record.registryTxHash || record.registryLaunchId
+                    ? "LP locked, update public lock"
+                    : "LP locked",
                 lpLockId: lockId,
                 lpLockTxHash: result.transactionHash,
                 lpUnlockAt: unlockDate
@@ -2308,6 +2331,76 @@ const Launchpad = () => {
       failTx(message)
     } finally {
       setLockLpSubmitting(false)
+    }
+  }
+
+  const handleUpdateRegistryLock = async () => {
+    if (!activeOwnerLaunch?.contractAddress || !activeOwnerLaunch.lpLockId) {
+      setLockRegistryError("No public lock data is available for this launch.")
+      return
+    }
+    if (!isActiveListingPublished) {
+      setLockRegistryError("Publish this launch before updating public lock data.")
+      return
+    }
+    if (!isLaunchRegistryConfigured) {
+      setLockRegistryError("Launch registry contract is not configured.")
+      return
+    }
+    if (!activeLpLockUpdateTime || activeLpLockUpdateTime <= Math.floor(Date.now() / 1000)) {
+      setLockRegistryError("The selected LP lock must still be active.")
+      return
+    }
+    if (!connectorId || !account?.address) {
+      setLockRegistryError("Connect a wallet first.")
+      return
+    }
+
+    try {
+      setLockRegistrySubmitting(true)
+      setLockRegistryError(undefined)
+      setLockRegistryTxHash("")
+      startTx(`Update ${activeOwnerLaunch.symbol} public LP lock`)
+      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const client = await connectClassicSigningClientForConnector(connectorId)
+      const result = await client.signAndBroadcast(
+        signerAddress,
+        [
+          buildUpdateLaunchMessage({
+            sender: signerAddress,
+            tokenContract: activeOwnerLaunch.contractAddress,
+            lpLockId: activeOwnerLaunch.lpLockId,
+            lpUnlockTime: activeLpLockUpdateTime
+          })
+        ],
+        "auto",
+        "Burrito update launch LP lock"
+      )
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || "Update public LP lock failed")
+      }
+
+      setLockRegistryTxHash(result.transactionHash)
+      setCreatedLaunches((current) =>
+        current.map((record) =>
+          record.id === activeOwnerLaunch.id
+            ? {
+                ...record,
+                ownerStatus: "Public LP lock updated",
+                lpLockUpdateTxHash: result.transactionHash
+              }
+            : record
+        )
+      )
+      await refreshRegistryLaunches()
+      finishTx(result.transactionHash)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Update public LP lock failed."
+      setLockRegistryError(message)
+      failTx(message)
+    } finally {
+      setLockRegistrySubmitting(false)
     }
   }
 
@@ -3822,6 +3915,8 @@ const Launchpad = () => {
               activeOwnerLaunch.distributionTxHash ||
               distributionTxHash ||
               activeOwnerLaunch.lpLockTxHash ||
+              activeOwnerLaunch.lpLockUpdateTxHash ||
+              lockRegistryTxHash ||
               activeOwnerLaunch.liquidityWithdrawTxHash ||
               activeOwnerLaunch.lpWithdrawTxHash ||
               activeOwnerLaunch.registryTxHash ||
@@ -3886,6 +3981,25 @@ const Launchpad = () => {
                       <span>LP lock tx</span>
                       <strong>
                         {truncateHash(activeOwnerLaunch.lpLockTxHash)}
+                      </strong>
+                    </a>
+                  ) : null}
+                  {activeOwnerLaunch.lpLockUpdateTxHash ||
+                  lockRegistryTxHash ? (
+                    <a
+                      href={`https://finder.burrito.money/classic/tx/${
+                        activeOwnerLaunch.lpLockUpdateTxHash ||
+                        lockRegistryTxHash
+                      }`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>Public lock tx</span>
+                      <strong>
+                        {truncateHash(
+                          activeOwnerLaunch.lpLockUpdateTxHash ||
+                            lockRegistryTxHash
+                        )}
                       </strong>
                     </a>
                   ) : null}
@@ -4526,6 +4640,10 @@ const Launchpad = () => {
                           <strong>{activeOwnerLaunch.lpLockId}</strong>
                         </div>
                         <div>
+                          <span>Unlock</span>
+                          <strong>{activeOwnerLaunch.lockExpiry}</strong>
+                        </div>
+                        <div>
                           <span>Status</span>
                           <strong>
                             {activeOwnerLaunch.lpWithdrawTxHash
@@ -4536,6 +4654,52 @@ const Launchpad = () => {
                           </strong>
                         </div>
                       </div>
+                      {isActiveListingPublished ? (
+                        <div className={styles.noticeBox}>
+                          If this is a new or extended LP lock, update the
+                          public Launchpad listing so traders see the current
+                          lock id and unlock date.
+                        </div>
+                      ) : null}
+                      {lockRegistryError ? (
+                        <div className={styles.txError}>{lockRegistryError}</div>
+                      ) : null}
+                      {lockRegistryTxHash ||
+                      activeOwnerLaunch.lpLockUpdateTxHash ? (
+                        <div className={styles.txResult}>
+                          <div>
+                            <span>Public lock tx</span>
+                            <a
+                              href={`https://finder.burrito.money/classic/tx/${
+                                lockRegistryTxHash ||
+                                activeOwnerLaunch.lpLockUpdateTxHash
+                              }`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {truncateHash(
+                                lockRegistryTxHash ||
+                                  activeOwnerLaunch.lpLockUpdateTxHash ||
+                                  ""
+                              )}
+                            </a>
+                          </div>
+                        </div>
+                      ) : null}
+                      {isActiveListingPublished ? (
+                        <button
+                          className="uiButton uiButtonPrimary"
+                          type="button"
+                          disabled={!canUpdateRegistryLock}
+                          onClick={handleUpdateRegistryLock}
+                        >
+                          {lockRegistrySubmitting
+                            ? "Broadcasting..."
+                            : !connectorId || !account?.address
+                            ? "Connect wallet first"
+                            : "Update public LP lock"}
+                        </button>
+                      ) : null}
                       {withdrawLpError ? (
                         <div className={styles.txError}>{withdrawLpError}</div>
                       ) : null}

@@ -89,6 +89,9 @@ of fake sample launches when the registry is not configured.
 - Public listing stays disabled when `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is empty.
 - Published listing metadata and visibility can be updated through the registry
   contract.
+- Published listing LP lock id and unlock time can be updated after a creator
+  creates a new lock; the registry contract re-validates the lock against the
+  Burrito locker before accepting it.
 - Manage has copy/open shortcuts for token and pair contracts, plus a
   local-only cleanup action that does not mutate on-chain state.
 - Manage shows a launch readiness checklist for token, pair, liquidity, LP lock,

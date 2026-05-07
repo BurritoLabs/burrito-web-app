@@ -60,3 +60,8 @@ withdrawn status do not match.
 
 The registry also queries the CW20 token contract and rejects listings or
 metadata updates when the submitted name or symbol does not match `token_info`.
+
+Published launches can update metadata, visibility, and LP lock facts through
+`update_launch`. Updating `lp_lock_id` requires `lp_unlock_time` in the same
+message, and the registry re-queries the locker before saving the new public
+lock data.
