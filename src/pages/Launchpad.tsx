@@ -169,6 +169,13 @@ type LaunchCardItem = {
   sample?: boolean
 }
 
+type OwnerNextAction = {
+  title: string
+  text: string
+  actionLabel?: string
+  targetId?: string
+}
+
 const initialDraft: DraftLaunch = {
   mode: "launchpad",
   name: "",
@@ -661,6 +668,14 @@ const Launchpad = () => {
     next.set("tab", "explore")
     next.set("launch", launchId)
     setSearchParams(next)
+  }
+
+  const scrollToManageSection = (targetId?: string) => {
+    if (!targetId) return
+    document.getElementById(targetId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    })
   }
 
   const launchMath = useMemo(() => {
@@ -1603,54 +1618,74 @@ const Launchpad = () => {
         }
       ]
     : []
-  const activeOwnerNextAction = !activeOwnerLaunch
+  const activeOwnerNextAction: OwnerNextAction = !activeOwnerLaunch
     ? {
         title: "Create or import a CW20 token",
-        text: "Owner tools unlock after a token exists in this browser."
+        text: "Owner tools unlock after a token exists in this browser.",
+        actionLabel: "Import token",
+        targetId: "launchpad-import"
       }
     : !activeOwnerLaunch.contractAddress
     ? {
         title: "Recover the token contract",
-        text: "Import the CW20 contract again so the creator dashboard can read chain state."
+        text: "Import the CW20 contract again so the creator dashboard can read chain state.",
+        actionLabel: "Go to import",
+        targetId: "launchpad-import"
       }
     : !activePairAddress
     ? {
         title: "Create the LUNC pair",
-        text: "A token has no launch market until the Terraswap Token / LUNC pair exists."
+        text: "A token has no launch market until the Terraswap Token / LUNC pair exists.",
+        actionLabel: "Open pair setup",
+        targetId: "launchpad-pool"
       }
     : !hasProvidedLiquidity
     ? {
         title: "Provide initial liquidity",
-        text: "The pair exists, but traders still need funded liquidity before price discovery is meaningful."
+        text: "The pair exists, but traders still need funded liquidity before price discovery is meaningful.",
+        actionLabel: "Open liquidity form",
+        targetId: "launchpad-pool"
       }
     : !isLpLockerConfigured
     ? {
         title: "Configure LP locker",
-        text: "Set VITE_LAUNCHPAD_LP_LOCKER_ADDRESS and redeploy before creators can lock LP."
+        text: "Set VITE_LAUNCHPAD_LP_LOCKER_ADDRESS and redeploy before creators can lock LP.",
+        actionLabel: "View lock panel",
+        targetId: "launchpad-lock"
       }
     : !hasLockedLp
     ? {
         title: "Lock LP tokens",
-        text: "Lock the LP token so Explore can show a public unlock date."
+        text: "Lock the LP token so Explore can show a public unlock date.",
+        actionLabel: "Open lock form",
+        targetId: "launchpad-lock"
       }
     : !isLaunchRegistryConfigured
     ? {
         title: "Configure registry",
-        text: "Set VITE_LAUNCHPAD_REGISTRY_ADDRESS and redeploy before public listing."
+        text: "Set VITE_LAUNCHPAD_REGISTRY_ADDRESS and redeploy before public listing.",
+        actionLabel: "View publish panel",
+        targetId: "launchpad-listing"
       }
     : !isActiveListingPublished
     ? {
         title: "Publish the launch",
-        text: "All core requirements are ready. Publish metadata to the Burrito registry."
+        text: "All core requirements are ready. Publish metadata to the Burrito registry.",
+        actionLabel: "Open publish form",
+        targetId: "launchpad-listing"
       }
     : activeRegistryStatus === "hidden"
     ? {
         title: "Listing is hidden",
-        text: "Restore it when the creator wants the launch visible in Explore again."
+        text: "Restore it when the creator wants the launch visible in Explore again.",
+        actionLabel: "Restore listing",
+        targetId: "launchpad-listing"
       }
     : {
         title: "Launch is live",
-        text: "Keep project info current, add liquidity when needed, and monitor the LP unlock date."
+        text: "Keep project info current, add liquidity when needed, and monitor the LP unlock date.",
+        actionLabel: "Manage listing",
+        targetId: "launchpad-listing"
       }
   const publicRecordItems = isCw20Only
     ? cw20PublicRecordItems
@@ -3433,6 +3468,7 @@ const Launchpad = () => {
           </article>
 
           <form
+            id="launchpad-import"
             className={`card ${styles.ownerImport}`}
             onSubmit={handleImportCw20}
           >
@@ -3471,6 +3507,19 @@ const Launchpad = () => {
                 <h3>{activeOwnerNextAction.title}</h3>
                 <p>{activeOwnerNextAction.text}</p>
               </div>
+              {activeOwnerNextAction.actionLabel ? (
+                <div className={styles.ownerNextActions}>
+                  <button
+                    className="uiButton uiButtonPrimary"
+                    type="button"
+                    onClick={() =>
+                      scrollToManageSection(activeOwnerNextAction.targetId)
+                    }
+                  >
+                    {activeOwnerNextAction.actionLabel}
+                  </button>
+                </div>
+              ) : null}
               <div className={styles.ownerReadinessGrid}>
                 {activeOwnerReadiness.map((item) => (
                   <div
@@ -3702,7 +3751,7 @@ const Launchpad = () => {
           ) : null}
 
           {activeOwnerLaunch ? (
-            <article className={`card ${styles.poolSetup}`}>
+            <article id="launchpad-pool" className={`card ${styles.poolSetup}`}>
               <div className={styles.planHeader}>
                 <span>Pool setup</span>
                 <h3>Terraswap LUNC pair</h3>
@@ -4019,7 +4068,7 @@ const Launchpad = () => {
           ) : null}
 
           {activeOwnerLaunch ? (
-            <article className={`card ${styles.lockSetup}`}>
+            <article id="launchpad-lock" className={`card ${styles.lockSetup}`}>
               <div className={styles.planHeader}>
                 <span>LP lock</span>
                 <h3>Lock liquidity tokens</h3>
@@ -4218,7 +4267,7 @@ const Launchpad = () => {
           ) : null}
 
           {activeOwnerLaunch ? (
-            <article className={`card ${styles.listingSetup}`}>
+            <article id="launchpad-listing" className={`card ${styles.listingSetup}`}>
               <div className={styles.planHeader}>
                 <span>Public listing</span>
                 <h3>Publish to Launchpad</h3>

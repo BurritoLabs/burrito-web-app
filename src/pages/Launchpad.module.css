@@ -1276,6 +1276,16 @@
   gap: 8px;
 }
 
+.ownerNextActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ownerNextActions :global(.uiButton) {
+  min-height: 38px;
+}
+
 .ownerReadinessGrid div {
   min-height: 66px;
   padding: 10px;
@@ -1740,6 +1750,10 @@
   }
 
   .ownerQuickActions :global(.uiButton) {
+    width: 100%;
+  }
+
+  .ownerNextActions :global(.uiButton) {
     width: 100%;
   }
 

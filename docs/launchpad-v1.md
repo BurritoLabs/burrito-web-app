@@ -91,6 +91,8 @@ of fake sample launches when the registry is not configured.
   local-only cleanup action that does not mutate on-chain state.
 - Manage shows a launch readiness checklist for token, pair, liquidity, LP lock,
   registry, and publish status, with a next-action summary for creators.
+- Manage next-action CTAs scroll directly to the import, pair, LP lock, or
+  listing tool that needs attention.
 - Create and Publish validate optional public links. Website must be a full
   `http://` or `https://` URL, and X can be `@handle`, `x.com`, or
   `twitter.com`.
