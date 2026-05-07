@@ -34,9 +34,7 @@ pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(LaunchResponse)]
-    Launch {
-        token_contract: String,
-    },
+    Launch { token_contract: String },
     #[returns(LaunchesResponse)]
     Launches {
         start_after: Option<u64>,

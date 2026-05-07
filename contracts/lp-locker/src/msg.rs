@@ -29,9 +29,7 @@ pub enum QueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(LockResponse)]
-    Lock {
-        lock_id: u64,
-    },
+    Lock { lock_id: u64 },
     #[returns(LocksResponse)]
     LocksByOwner {
         owner: String,
