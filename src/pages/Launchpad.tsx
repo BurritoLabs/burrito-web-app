@@ -5,7 +5,7 @@ import {
   type ChangeEvent,
   type FormEvent
 } from "react"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import PageShell from "./PageShell"
 import styles from "./Launchpad.module.css"
 import {
@@ -186,6 +186,19 @@ const tabs: Array<{ id: LaunchTab; label: string; eyebrow: string }> = [
   { id: "explore", label: "Explore", eyebrow: "New launches" },
   { id: "manage", label: "Manage", eyebrow: "Owner tools" }
 ]
+
+const normalizeLaunchTab = (value: string | null): LaunchTab | null => {
+  if (value === "create" || value === "explore" || value === "manage") {
+    return value
+  }
+  return null
+}
+
+const getLaunchpadDeepLink = (launchId: string) => {
+  const query = `tab=explore&launch=${encodeURIComponent(launchId)}`
+  if (typeof window === "undefined") return `/launchpad?${query}`
+  return `${window.location.origin}/launchpad?${query}`
+}
 
 const createSteps: Array<{ id: CreateStep; label: string; eyebrow: string }> = [
   { id: "token", label: "Token", eyebrow: "01" },
@@ -471,13 +484,18 @@ const mergeRecoveredOwnerRecord = (
 
 const Launchpad = () => {
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
-  const [activeTab, setActiveTab] = useState<LaunchTab>("create")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<LaunchTab>(
+    () => normalizeLaunchTab(searchParams.get("tab")) ?? "create"
+  )
   const [activeCreateStep, setActiveCreateStep] =
     useState<CreateStep>("token")
   const [activeLaunchFilter, setActiveLaunchFilter] =
     useState<LaunchFilter>("all")
   const [launchSearch, setLaunchSearch] = useState("")
-  const [selectedLaunchId, setSelectedLaunchId] = useState("")
+  const [selectedLaunchId, setSelectedLaunchId] = useState(
+    () => searchParams.get("launch") ?? ""
+  )
   const [activeOwnerId, setActiveOwnerId] = useState("")
   const [draft, setDraft] = useState<DraftLaunch>(() => loadStoredDraft())
   const [createdLaunches, setCreatedLaunches] = useState<OwnerLaunchRecord[]>(
@@ -568,6 +586,28 @@ const Launchpad = () => {
     } catch {
       setCopyError("Copy failed. Select the address manually.")
     }
+  }
+
+  const handleSelectTab = (tab: LaunchTab) => {
+    setActiveTab(tab)
+    const next = new URLSearchParams(searchParams)
+    if (tab === "create") {
+      next.delete("tab")
+    } else {
+      next.set("tab", tab)
+    }
+    if (tab !== "explore") {
+      next.delete("launch")
+    }
+    setSearchParams(next)
+  }
+
+  const handleSelectLaunch = (launchId: string) => {
+    setSelectedLaunchId(launchId)
+    const next = new URLSearchParams(searchParams)
+    next.set("tab", "explore")
+    next.set("launch", launchId)
+    setSearchParams(next)
   }
 
   const launchMath = useMemo(() => {
@@ -721,6 +761,15 @@ const Launchpad = () => {
   }, [createdLaunches])
 
   useEffect(() => {
+    const urlTab = normalizeLaunchTab(searchParams.get("tab")) ?? "create"
+    const urlLaunchId = searchParams.get("launch") ?? ""
+    setActiveTab((current) => (current === urlTab ? current : urlTab))
+    setSelectedLaunchId((current) =>
+      current === urlLaunchId ? current : urlLaunchId
+    )
+  }, [searchParams])
+
+  useEffect(() => {
     if (!isLaunchRegistryConfigured) return
     let cancelled = false
     setRegistryLoading(true)
@@ -847,7 +896,7 @@ const Launchpad = () => {
         ...current.filter((record) => record.id !== recordId)
       ])
       setActiveOwnerId(recordId)
-      setActiveTab("manage")
+      handleSelectTab("manage")
       finishTx(result.transactionHash)
     } catch (error) {
       const message =
@@ -2223,7 +2272,7 @@ const Launchpad = () => {
               activeTab === tab.id ? styles.tabButtonActive : ""
             }`}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleSelectTab(tab.id)}
           >
             <span>{tab.eyebrow}</span>
             <strong>{tab.label}</strong>
@@ -2964,6 +3013,17 @@ const Launchpad = () => {
                     Open market
                   </Link>
                 ) : null}
+                <button
+                  className="uiButton uiButtonOutline"
+                  type="button"
+                  onClick={() =>
+                    handleCopyText(getLaunchpadDeepLink(selectedLaunch.id))
+                  }
+                >
+                  {copiedValue === getLaunchpadDeepLink(selectedLaunch.id)
+                    ? "Copied"
+                    : "Copy launch link"}
+                </button>
               </div>
               {copyError ? <div className={styles.txError}>{copyError}</div> : null}
             </article>
@@ -3007,7 +3067,7 @@ const Launchpad = () => {
                   <button
                     className="uiButton uiButtonOutline"
                     type="button"
-                    onClick={() => setSelectedLaunchId(item.id)}
+                    onClick={() => handleSelectLaunch(item.id)}
                   >
                     Details
                   </button>
@@ -3205,6 +3265,16 @@ const Launchpad = () => {
                     )}`}
                   >
                     Open market
+                  </Link>
+                ) : null}
+                {activeOwnerLaunch.registryLaunchId ? (
+                  <Link
+                    className="uiButton uiButtonOutline"
+                    to={`/launchpad?tab=explore&launch=registry-${encodeURIComponent(
+                      activeOwnerLaunch.registryLaunchId
+                    )}`}
+                  >
+                    Open listing
                   </Link>
                 ) : null}
                 <button

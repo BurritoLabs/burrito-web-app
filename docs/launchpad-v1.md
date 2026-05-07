@@ -71,6 +71,8 @@ of fake sample launches when the registry is not configured.
 - Explore stats show total, live, risk, and unlocked launch counts.
 - Explore detail panel shows creator, token contract, pair contract, LP lock,
   publish time, description, website, X profile, and market link.
+- Explore supports `/launchpad?tab=explore&launch=...` deep links and can copy
+  a public launch link from the detail panel.
 - Pair lookup shows whether a Terraswap LUNC pair exists.
 - Pair creation stores pair contract and LP token after LCD indexing.
 - Liquidity provision broadcasts `increase_allowance` and `provide_liquidity` in one transaction.
