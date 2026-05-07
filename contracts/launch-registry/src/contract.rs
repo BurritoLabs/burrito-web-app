@@ -335,12 +335,12 @@ fn query_launches(
     let start = start_after.map(cw_storage_plus::Bound::exclusive);
     let launches = LAUNCH_INDEX
         .range(deps.storage, start, None, Order::Ascending)
-        .filter_map(|item| match item {
+        .map(|item| match item {
             Ok((_id, token_contract)) => match LAUNCHES.load(deps.storage, &token_contract) {
-                Ok(launch) => Some(Ok(launch_response(launch))),
-                Err(error) => Some(Err(error)),
+                Ok(launch) => Ok(launch_response(launch)),
+                Err(error) => Err(error),
             },
-            Err(error) => Some(Err(error)),
+            Err(error) => Err(error),
         })
         .take(limit)
         .collect::<StdResult<Vec<_>>>()?;
