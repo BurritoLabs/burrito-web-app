@@ -1423,6 +1423,107 @@ const Launchpad = () => {
       ready: Boolean(connectorId && account?.address)
     }
   ]
+  const hasProvidedLiquidity = Boolean(
+    activeOwnerLaunch?.liquidityTxHash ||
+      activeOwnerLaunch?.lpLockId ||
+      isActiveListingPublished
+  )
+  const hasLockedLp = Boolean(
+    activeOwnerLaunch?.lpLockId && activeOwnerLaunch.lpUnlockAt
+  )
+  const activeOwnerReadiness = activeOwnerLaunch
+    ? [
+        {
+          label: "Token",
+          done: Boolean(activeOwnerLaunch.contractAddress),
+          value: activeOwnerLaunch.contractAddress
+            ? truncateHash(activeOwnerLaunch.contractAddress)
+            : "Create or import"
+        },
+        {
+          label: "Pair",
+          done: Boolean(activePairAddress),
+          value: activePairAddress ? truncateHash(activePairAddress) : "Needed"
+        },
+        {
+          label: "Liquidity",
+          done: hasProvidedLiquidity,
+          value: hasProvidedLiquidity ? "Provided" : "Add initial LP"
+        },
+        {
+          label: "LP lock",
+          done: hasLockedLp,
+          value: hasLockedLp
+            ? activeOwnerLaunch.lockExpiry
+            : isLpLockerConfigured
+            ? "Ready to lock"
+            : "Locker env needed"
+        },
+        {
+          label: "Registry",
+          done: isLaunchRegistryConfigured,
+          value: isLaunchRegistryConfigured ? "Configured" : "Env needed"
+        },
+        {
+          label: "Publish",
+          done: isActiveListingPublished,
+          value: isActiveListingPublished
+            ? activeRegistryStatus === "hidden"
+              ? "Hidden"
+              : "Live"
+            : "Not published"
+        }
+      ]
+    : []
+  const activeOwnerNextAction = !activeOwnerLaunch
+    ? {
+        title: "Create or import a CW20 token",
+        text: "Owner tools unlock after a token exists in this browser."
+      }
+    : !activeOwnerLaunch.contractAddress
+    ? {
+        title: "Recover the token contract",
+        text: "Import the CW20 contract again so the creator dashboard can read chain state."
+      }
+    : !activePairAddress
+    ? {
+        title: "Create the LUNC pair",
+        text: "A token has no launch market until the Terraswap Token / LUNC pair exists."
+      }
+    : !hasProvidedLiquidity
+    ? {
+        title: "Provide initial liquidity",
+        text: "The pair exists, but traders still need funded liquidity before price discovery is meaningful."
+      }
+    : !isLpLockerConfigured
+    ? {
+        title: "Configure LP locker",
+        text: "Set VITE_LAUNCHPAD_LP_LOCKER_ADDRESS and redeploy before creators can lock LP."
+      }
+    : !hasLockedLp
+    ? {
+        title: "Lock LP tokens",
+        text: "Lock the LP token so Explore can show a public unlock date."
+      }
+    : !isLaunchRegistryConfigured
+    ? {
+        title: "Configure registry",
+        text: "Set VITE_LAUNCHPAD_REGISTRY_ADDRESS and redeploy before public listing."
+      }
+    : !isActiveListingPublished
+    ? {
+        title: "Publish the launch",
+        text: "All core requirements are ready. Publish metadata to the Burrito registry."
+      }
+    : activeRegistryStatus === "hidden"
+    ? {
+        title: "Listing is hidden",
+        text: "Restore it when the creator wants the launch visible in Explore again."
+      }
+    : {
+        title: "Launch is live",
+        text: "Keep project info current, add liquidity when needed, and monitor the LP unlock date."
+      }
   const publicRecordItems = isCw20Only
     ? cw20PublicRecordItems
     : launchPublicRecordItems
@@ -3197,6 +3298,27 @@ const Launchpad = () => {
               <div className={styles.txError}>{importError}</div>
             ) : null}
           </form>
+
+          {activeOwnerLaunch ? (
+            <article className={`card ${styles.ownerReadiness}`}>
+              <div className={styles.planHeader}>
+                <span>Launch readiness</span>
+                <h3>{activeOwnerNextAction.title}</h3>
+                <p>{activeOwnerNextAction.text}</p>
+              </div>
+              <div className={styles.ownerReadinessGrid}>
+                {activeOwnerReadiness.map((item) => (
+                  <div
+                    className={item.done ? styles.readinessDone : ""}
+                    key={item.label}
+                  >
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ) : null}
 
           {activeOwnerLaunch ? (
             <article className={`card ${styles.ownerSummary}`}>

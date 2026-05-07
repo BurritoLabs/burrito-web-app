@@ -1243,11 +1243,58 @@
   color: #ffffff;
 }
 
+.ownerReadiness,
 .ownerSummary {
   grid-column: span 2;
   background: rgba(16, 29, 24, 0.76);
   display: grid;
   gap: 16px;
+}
+
+.ownerReadiness {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(104, 216, 63, 0.12), transparent 34%),
+    rgba(16, 29, 24, 0.78);
+}
+
+.ownerReadinessGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ownerReadinessGrid div {
+  min-height: 66px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 193, 7, 0.22);
+  background: rgba(255, 193, 7, 0.065);
+  display: grid;
+  align-content: space-between;
+  min-width: 0;
+}
+
+.ownerReadinessGrid span {
+  color: rgba(240, 250, 241, 0.62);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ownerReadinessGrid strong {
+  color: rgba(255, 236, 181, 0.96);
+  font-size: var(--font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.ownerReadinessGrid .readinessDone {
+  border-color: rgba(104, 216, 63, 0.26);
+  background: rgba(104, 216, 63, 0.085);
+}
+
+.ownerReadinessGrid .readinessDone strong {
+  color: var(--green);
 }
 
 .ownerSummaryGrid {
@@ -1562,7 +1609,8 @@
 
   .exploreIntro,
   .ownerIntro,
-  .ownerImport {
+  .ownerImport,
+  .ownerReadiness {
     grid-column: auto;
   }
 
@@ -1583,6 +1631,7 @@
   .previewStats,
   .packageGrid,
   .systemStatus,
+  .ownerReadinessGrid,
   .launchCardStats,
   .ownerSummaryGrid,
   .ownerLinkGrid,
@@ -1703,6 +1752,7 @@
   .launchCard,
   .ownerIntro,
   .ownerImport,
+  .ownerReadiness,
   .poolSetup,
   .lockSetup,
   .listingSetup,

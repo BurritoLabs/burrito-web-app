@@ -85,6 +85,8 @@ of fake sample launches when the registry is not configured.
   contract.
 - Manage has copy/open shortcuts for token and pair contracts, plus a
   local-only cleanup action that does not mutate on-chain state.
+- Manage shows a launch readiness checklist for token, pair, liquidity, LP lock,
+  registry, and publish status, with a next-action summary for creators.
 - Registry Explore shows real on-chain records when configured, newest first.
 - Registry Explore classifies records as live, ended, or risk based on LP lock
   state and missing public info.
