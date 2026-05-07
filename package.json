@@ -11,7 +11,8 @@
     "build:market-candles": "node scripts/build-market-candles.mjs",
     "build:market-all": "npm run build:market-index && npm run build:market-candles",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:launchpad": "node scripts/deploy-launchpad-contracts.mjs"
   },
   "dependencies": {
     "@cosmjs/encoding": "^0.32.4",

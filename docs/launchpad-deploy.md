@@ -32,6 +32,57 @@ It uploads two optimized wasm artifacts:
 The local Windows machine does not need Rust or Docker if the GitHub workflow is
 used as the contract build source.
 
+Download both artifacts, unzip them, and place the wasm files here:
+
+```text
+artifacts/launchpad/burrito_lp_locker.wasm
+artifacts/launchpad/burrito_launch_registry.wasm
+```
+
+`artifacts/` is gitignored on purpose. These files are deployment inputs, not
+frontend source code.
+
+## Node Deploy Script
+
+The project includes a deploy helper:
+
+```bash
+npm run deploy:launchpad -- --dry-run
+```
+
+For the real deployment, run it locally with a funded Terra Classic deployer
+wallet. Do not paste the mnemonic into chat or commit it to the repo.
+
+PowerShell example:
+
+```powershell
+$env:DEPLOYER_MNEMONIC="your local deployer mnemonic"
+npm run deploy:launchpad
+Remove-Item Env:\DEPLOYER_MNEMONIC
+```
+
+Optional variables:
+
+```text
+CLASSIC_RPC=https://terra-classic-rpc.publicnode.com:443
+LP_LOCKER_WASM=artifacts/launchpad/burrito_lp_locker.wasm
+LAUNCH_REGISTRY_WASM=artifacts/launchpad/burrito_launch_registry.wasm
+DEPLOY_OWNER_ADDRESS=terra1...
+DEPLOY_ADMIN_ADDRESS=terra1...
+DEPLOY_GAS_PRICE=28.325uluna
+STORE_GAS=5000000
+INSTANTIATE_GAS=600000
+```
+
+The script stores and instantiates `lp-locker`, then stores and instantiates
+`launch-registry` with the `lp-locker` address. It writes the result to:
+
+```text
+artifacts/launchpad/deploy-result.json
+```
+
+Use the `cloudflare` values from that file as the Cloudflare Pages variables.
+
 ## Instantiate Messages
 
 `lp-locker`:
