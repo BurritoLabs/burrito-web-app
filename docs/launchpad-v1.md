@@ -57,6 +57,8 @@ of fake sample launches when the registry is not configured.
 ## Manual Test Checklist
 
 - Create mode accepts lowercase symbols but saves uppercase symbols.
+- Page status strip shows whether CW20 creation, LP locker, registry, and wallet
+  connection are ready in the current deploy environment.
 - `CW20 only` creates a token and opens the record in `Manage`.
 - `Launch with pool` creates a token and pre-fills planned liquidity and lock days in `Manage`.
 - Importing an existing CW20 loads name, symbol, decimals, and total supply.

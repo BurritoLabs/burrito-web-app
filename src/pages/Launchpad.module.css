@@ -152,6 +152,52 @@
   font-size: var(--font-size-title-lg);
 }
 
+.systemStatus {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  background: rgba(16, 29, 24, 0.72);
+}
+
+.systemStatus div {
+  min-height: 60px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.systemStatus span:not(.statusDot) {
+  color: rgba(240, 250, 241, 0.62);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.systemStatus strong {
+  grid-column: 2;
+  color: #ffffff;
+  font-size: var(--font-size-small);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 193, 7, 0.95);
+  box-shadow: 0 0 14px rgba(255, 193, 7, 0.26);
+}
+
+.statusDotReady {
+  background: var(--green);
+  box-shadow: 0 0 14px rgba(104, 216, 63, 0.34);
+}
+
 .tabBar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1536,6 +1582,7 @@
   .modeGrid,
   .previewStats,
   .packageGrid,
+  .systemStatus,
   .launchCardStats,
   .ownerSummaryGrid,
   .ownerLinkGrid,

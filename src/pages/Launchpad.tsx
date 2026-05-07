@@ -1352,6 +1352,28 @@ const Launchpad = () => {
       account?.address &&
       !publishSubmitting
   )
+  const launchpadStatusItems = [
+    {
+      label: "CW20 create",
+      value: "Ready",
+      ready: true
+    },
+    {
+      label: "LP locker",
+      value: isLpLockerConfigured ? "Configured" : "Needs env",
+      ready: isLpLockerConfigured
+    },
+    {
+      label: "Registry",
+      value: isLaunchRegistryConfigured ? "Configured" : "Needs env",
+      ready: isLaunchRegistryConfigured
+    },
+    {
+      label: "Wallet",
+      value: connectorId && account?.address ? "Connected" : "Connect to launch",
+      ready: Boolean(connectorId && account?.address)
+    }
+  ]
   const publicRecordItems = isCw20Only
     ? cw20PublicRecordItems
     : launchPublicRecordItems
@@ -2139,7 +2161,7 @@ const Launchpad = () => {
   return (
     <PageShell
       title="Launchpad"
-      extra={<span className={styles.phasePill}>Phase 2 local draft</span>}
+      extra={<span className={styles.phasePill}>Phase 2 Launchpad</span>}
     >
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
@@ -2147,8 +2169,8 @@ const Launchpad = () => {
           <h2>Launch a token with visible liquidity and a clear lock.</h2>
           <p>
             V1 should keep the launch model narrow: fixed-supply CW20, Token /
-            LUNC pool, public creator address, visible LP lock, and plain risk
-            labels without Burrito acting as a token judge.
+            LUNC pool, public creator address, visible LP lock, registry listing,
+            and plain risk labels without Burrito acting as a token judge.
           </p>
         </div>
         <div className={styles.heroPanel}>
@@ -2167,7 +2189,9 @@ const Launchpad = () => {
             </div>
             <div>
               <span>Listing</span>
-              <strong>Auto draft</strong>
+              <strong>
+                {isLaunchRegistryConfigured ? "Registry live" : "Env needed"}
+              </strong>
             </div>
             <div>
               <span>Risk label</span>
@@ -2175,6 +2199,20 @@ const Launchpad = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className={`card ${styles.systemStatus}`}>
+        {launchpadStatusItems.map((item) => (
+          <div key={item.label}>
+            <span
+              className={`${styles.statusDot} ${
+                item.ready ? styles.statusDotReady : ""
+              }`}
+            />
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
       </section>
 
       <nav className={styles.tabBar} aria-label="Launchpad sections">
@@ -2201,7 +2239,8 @@ const Launchpad = () => {
                 <h3>Create token draft</h3>
                 <p>
                   CW20 creation, pair creation, and initial liquidity are live.
-                  LP locking remains the next contract step.
+                  LP locking and public publishing turn on when the configured
+                  contracts are present in the deploy environment.
                 </p>
               </div>
               <div className={styles.formHeaderActions}>
