@@ -68,6 +68,8 @@ of fake sample launches when the registry is not configured.
   address, and restores matching launches into `Manage`.
 - Explore search filters by symbol, name, pair, creator, token contract, pair
   contract, or registry id.
+- Explore sorting supports newest, oldest, unlock soon, longest lock, and risk
+  first.
 - Explore stats show total, live, risk, and unlocked launch counts.
 - Explore detail panel shows creator, token contract, pair contract, LP lock,
   publish time, description, website, X profile, and market link.

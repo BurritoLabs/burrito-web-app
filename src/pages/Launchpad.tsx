@@ -57,6 +57,7 @@ import { fetchContractInfo, queryContractSmart } from "../app/data/classic"
 type LaunchTab = "create" | "explore" | "manage"
 type CreateStep = "token" | "liquidity" | "safety" | "summary"
 type LaunchFilter = "all" | "live" | "pending" | "ended" | "risk"
+type LaunchSort = "newest" | "oldest" | "unlockSoon" | "unlockLong" | "risk"
 type LaunchMode = "launchpad" | "cw20"
 
 type OwnerLaunchRecord = {
@@ -252,6 +253,21 @@ const launchFilters: Array<{ id: LaunchFilter; label: string }> = [
   { id: "ended", label: "Ended" },
   { id: "risk", label: "Risk flagged" }
 ]
+
+const launchSortOptions: Array<{ id: LaunchSort; label: string }> = [
+  { id: "newest", label: "Newest" },
+  { id: "oldest", label: "Oldest" },
+  { id: "unlockSoon", label: "Unlock soon" },
+  { id: "unlockLong", label: "Longest lock" },
+  { id: "risk", label: "Risk first" }
+]
+
+const launchRiskRank = (launch: LaunchCardItem) => {
+  if (launch.state === "risk") return 0
+  if (launch.state === "pending") return 1
+  if (launch.state === "live") return 2
+  return 3
+}
 
 const sampleLaunches: LaunchCardItem[] = [
   {
@@ -492,6 +508,7 @@ const Launchpad = () => {
     useState<CreateStep>("token")
   const [activeLaunchFilter, setActiveLaunchFilter] =
     useState<LaunchFilter>("all")
+  const [launchSort, setLaunchSort] = useState<LaunchSort>("newest")
   const [launchSearch, setLaunchSearch] = useState("")
   const [selectedLaunchId, setSelectedLaunchId] = useState(
     () => searchParams.get("launch") ?? ""
@@ -1212,24 +1229,44 @@ const Launchpad = () => {
     { total: 0, live: 0, ended: 0, risk: 0 }
   )
   const normalizedLaunchSearch = launchSearch.trim().toLowerCase()
-  const filteredLaunches = launchSource.filter((launch) => {
-    if (activeLaunchFilter !== "all" && launch.state !== activeLaunchFilter) {
-      return false
-    }
-    if (!normalizedLaunchSearch) return true
-    return [
-      launch.symbol,
-      launch.name,
-      launch.pair,
-      launch.creator,
-      launch.tokenContract,
-      launch.pairContract,
-      launch.registryLaunchId ? String(launch.registryLaunchId) : ""
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(normalizedLaunchSearch)
-  })
+  const filteredLaunches = launchSource
+    .filter((launch) => {
+      if (activeLaunchFilter !== "all" && launch.state !== activeLaunchFilter) {
+        return false
+      }
+      if (!normalizedLaunchSearch) return true
+      return [
+        launch.symbol,
+        launch.name,
+        launch.pair,
+        launch.creator,
+        launch.tokenContract,
+        launch.pairContract,
+        launch.registryLaunchId ? String(launch.registryLaunchId) : ""
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedLaunchSearch)
+    })
+    .sort((a, b) => {
+      if (launchSort === "oldest") {
+        return (a.createdAt ?? 0) - (b.createdAt ?? 0)
+      }
+      if (launchSort === "unlockSoon") {
+        return (a.unlockTime ?? Number.MAX_SAFE_INTEGER) -
+          (b.unlockTime ?? Number.MAX_SAFE_INTEGER)
+      }
+      if (launchSort === "unlockLong") {
+        return (b.unlockTime ?? 0) - (a.unlockTime ?? 0)
+      }
+      if (launchSort === "risk") {
+        return (
+          launchRiskRank(a) - launchRiskRank(b) ||
+          (b.createdAt ?? 0) - (a.createdAt ?? 0)
+        )
+      }
+      return (b.createdAt ?? 0) - (a.createdAt ?? 0)
+    })
   const selectedLaunch =
     filteredLaunches.find((launch) => launch.id === selectedLaunchId) ??
     filteredLaunches[0]
@@ -2967,6 +3004,21 @@ const Launchpad = () => {
                   placeholder="Symbol, name, contract..."
                   spellCheck={false}
                 />
+              </label>
+              <label className={styles.launchSort}>
+                <span>Sort</span>
+                <select
+                  value={launchSort}
+                  onChange={(event) =>
+                    setLaunchSort(event.target.value as LaunchSort)
+                  }
+                >
+                  {launchSortOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className={styles.filterBar}>
                 {launchFilters.map((filter) => (
