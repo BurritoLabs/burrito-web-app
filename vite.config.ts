@@ -19,6 +19,7 @@ export default defineConfig({
     })
   ],
   build: {
+    minify: "terser",
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -26,13 +27,17 @@ export default defineConfig({
 
           if (hasPackage(id, "lightweight-charts")) return "chart"
           if (hasPackage(id, "@tanstack/react-query")) return "query"
+          if (hasPackage(id, "cosmjs-types")) return "cosmos-proto"
+          if (hasPackage(id, "@terra-money")) return "terra-tools"
+          if (hasPackage(id, "protobufjs") || hasPackage(id, "long")) {
+            return "protobuf"
+          }
           if (
+            hasPackage(id, "@cosmos-kit") ||
+            hasPackage(id, "@interchain-ui") ||
+            hasPackage(id, "@hexxagon") ||
             hasPackage(id, "@cosmjs") ||
-            hasPackage(id, "cosmjs-types") ||
             hasPackage(id, "@confio") ||
-            hasPackage(id, "@terra-money") ||
-            hasPackage(id, "protobufjs") ||
-            hasPackage(id, "long") ||
             hasPackage(id, "@noble") ||
             hasPackage(id, "bn.js") ||
             hasPackage(id, "elliptic") ||
