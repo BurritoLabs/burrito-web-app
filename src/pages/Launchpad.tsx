@@ -3083,6 +3083,14 @@ const Launchpad = () => {
                       inputMode="numeric"
                     />
                   </label>
+                  <label className={`${styles.field} ${styles.fullField}`}>
+                    <span>Logo URL</span>
+                    <input
+                      value={draft.logoUrl}
+                      onChange={updateDraft("logoUrl")}
+                      placeholder="https://.../logo.png"
+                    />
+                  </label>
                 </div>
                 <div className={styles.noticeBox}>
                   V1 uses fixed supply. Minting, tax, blacklist, and hidden
@@ -3191,16 +3199,6 @@ const Launchpad = () => {
                       placeholder="https://"
                     />
                   </label>
-                  <label className={styles.field}>
-                    <span>Logo URL</span>
-                    <input
-                      value={draft.logoUrl}
-                      onChange={updateDraft("logoUrl")}
-                      placeholder="https://.../logo.png"
-                    />
-                  </label>
-                </div>
-                <div className={styles.formGrid}>
                   <label className={styles.field}>
                     <span>X / Twitter</span>
                     <input
