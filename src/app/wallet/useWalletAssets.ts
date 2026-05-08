@@ -13,6 +13,10 @@ import { useCw20Balances } from "../data/cw20"
 import { useDexEstimatedPrices, useDirectAnchorDexPrices } from "../data/dexPrices"
 import { fetchMarketDexPairs, fetchMarketPools } from "../data/market"
 import {
+  fetchLaunchRegistryLaunches,
+  isLaunchRegistryConfigured
+} from "../launchpad/registry"
+import {
   useCw20Whitelist,
   useResolvedCw20Whitelist,
   useResolvedNativeWhitelist,
@@ -203,6 +207,31 @@ export const useWalletAssets = (accountAddress?: string) => {
   )
 
   const { data: cw20WhitelistBase = {} } = useCw20Whitelist()
+  const { data: launchpadCw20Contracts = [] } = useQuery({
+    queryKey: ["wallet", "launchpad-cw20-contracts"],
+    queryFn: async () => {
+      if (!isLaunchRegistryConfigured) return []
+      const launches = await fetchLaunchRegistryLaunches()
+      return Array.from(
+        new Set(
+          launches
+            .map((launch) => launch.token_contract?.trim().toLowerCase())
+            .filter((contract): contract is string => Boolean(contract))
+        )
+      )
+    },
+    enabled: isLaunchRegistryConfigured,
+    staleTime: 5 * 60 * 1000
+  })
+  const { data: launchpadCw20Whitelist = {} } =
+    useResolvedCw20Whitelist(launchpadCw20Contracts)
+  const cw20BalanceWhitelist = useMemo(
+    () => ({
+      ...cw20WhitelistBase,
+      ...launchpadCw20Whitelist
+    }),
+    [cw20WhitelistBase, launchpadCw20Whitelist]
+  )
   const nativeDenoms = useMemo(
     () =>
       balances
@@ -219,12 +248,19 @@ export const useWalletAssets = (accountAddress?: string) => {
     [balances]
   )
   const { data: ibcWhitelist } = useResolvedIbcWhitelist(ibcDenoms)
-  const { data: cw20BalancesBase = [] } = useCw20Balances(accountAddress, cw20WhitelistBase)
+  const { data: cw20BalancesBase = [] } = useCw20Balances(
+    accountAddress,
+    cw20BalanceWhitelist
+  )
   const resolvedCw20Contracts = useMemo(
     () =>
-      cw20BalancesBase
-        .filter((token) => Number(token.balance) > 0)
-        .map((token) => token.address),
+      Array.from(
+        new Set(
+          cw20BalancesBase
+            .filter((token) => Number(token.balance) > 0)
+            .map((token) => token.address.toLowerCase())
+        )
+      ),
     [cw20BalancesBase]
   )
   const { data: cw20Whitelist = cw20WhitelistBase } =
