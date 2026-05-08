@@ -3,6 +3,10 @@ import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { queryContractSmart } from "../data/classic"
 import { parseTokenAmountToBaseUnits } from "./cw20"
 
+const MIN_LP_LOCK_SECONDS = 30 * 24 * 60 * 60
+const MAX_LP_LOCK_SECONDS = 3650 * 24 * 60 * 60
+const LP_LOCK_CHAIN_TIME_BUFFER_SECONDS = 10 * 60
+
 const rawLockerAddress =
   import.meta.env.VITE_LAUNCHPAD_LP_LOCKER_ADDRESS?.trim() ?? ""
 
@@ -39,7 +43,19 @@ export const getLpUnlockTimestampSeconds = (daysValue: string) => {
     throw new Error("Lock days must be between 30 and 3650.")
   }
 
-  return Math.floor(Date.now() / 1000) + days * 24 * 60 * 60
+  const requestedDuration = days * 24 * 60 * 60
+  const safeDuration =
+    requestedDuration === MAX_LP_LOCK_SECONDS
+      ? MAX_LP_LOCK_SECONDS
+      : Math.min(
+          requestedDuration + LP_LOCK_CHAIN_TIME_BUFFER_SECONDS,
+          MAX_LP_LOCK_SECONDS
+        )
+
+  return (
+    Math.floor(Date.now() / 1000) +
+    Math.max(safeDuration, MIN_LP_LOCK_SECONDS)
+  )
 }
 
 export const buildLockLpMessage = ({
