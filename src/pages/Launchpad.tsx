@@ -50,10 +50,12 @@ import {
   type LaunchRegistryLaunch
 } from "../app/launchpad/registry"
 import { useWallet } from "../app/wallet/WalletContext"
+import { useResolvedCw20Whitelist } from "../app/data/terraAssets"
 import {
   connectClassicSigningClientForConnector,
   getSignerAddressForConnector
 } from "../app/wallet/walletAdapters"
+import { sanitizeAssetIconUrl } from "../app/utils/assetIcons"
 import { truncateHash } from "../app/utils/format"
 import { fetchContractInfo, queryContractSmart } from "../app/data/classic"
 
@@ -80,6 +82,7 @@ type OwnerLaunchRecord = {
   website?: string
   xProfile?: string
   description?: string
+  logoUrl?: string
   pairAddress?: string
   liquidityToken?: string
   pairTxHash?: string
@@ -150,6 +153,7 @@ type DraftLaunch = {
   website: string
   xProfile: string
   description: string
+  logoUrl: string
 }
 
 type LaunchCardItem = {
@@ -171,6 +175,7 @@ type LaunchCardItem = {
   website?: string | null
   xProfile?: string | null
   description?: string | null
+  logoUrl?: string | null
   createdAt?: number
   unlockTime?: number
   lockedLpAmount?: string
@@ -196,7 +201,8 @@ const initialDraft: DraftLaunch = {
   lockDays: "90",
   website: "",
   xProfile: "",
-  description: ""
+  description: "",
+  logoUrl: ""
 }
 
 const DRAFT_STORAGE_KEY = "burrito.launchpad.draft.v1"
@@ -451,6 +457,18 @@ const normalizeOptionalHttpUrl = (value: string, field: string) => {
   }
 }
 
+const normalizeOptionalImageUrl = (value: string) => {
+  const normalized = normalizeOptionalHttpUrl(value, "Logo URL")
+  if (!normalized) return ""
+  const sanitized = sanitizeAssetIconUrl(normalized)
+  if (!sanitized) {
+    throw new Error(
+      "Logo URL must point to a public image file, IPFS image, or supported image endpoint."
+    )
+  }
+  return sanitized
+}
+
 const normalizeOptionalXProfile = (value: string) => {
   const trimmed = value.trim()
   if (!trimmed) return ""
@@ -583,8 +601,28 @@ const mergeRecoveredOwnerRecord = (
     lpWithdrawTxHash: existing.lpWithdrawTxHash,
     registryTxHash: existing.registryTxHash,
     registryUpdateTxHash: existing.registryUpdateTxHash,
-    registryStatusTxHash: existing.registryStatusTxHash
+    registryStatusTxHash: existing.registryStatusTxHash,
+    logoUrl: existing.logoUrl ?? recovered.logoUrl
   }
+}
+
+const LaunchTokenLogo = ({
+  symbol,
+  logoUrl
+}: {
+  symbol: string
+  logoUrl?: string | null
+}) => {
+  const icon = sanitizeAssetIconUrl(logoUrl ?? undefined)
+  return (
+    <div className={styles.launchLogo}>
+      {icon ? (
+        <img alt="" loading="lazy" referrerPolicy="no-referrer" src={icon} />
+      ) : (
+        symbol.slice(0, 2)
+      )}
+    </div>
+  )
 }
 
 const Launchpad = () => {
@@ -761,6 +799,11 @@ const Launchpad = () => {
   const isCw20Only = draft.mode === "cw20"
   const lockDays = toNumber(draft.lockDays)
   const decimals = toNumber(draft.decimals)
+  const registryTokenContracts = useMemo(
+    () => registryLaunches.map((launch) => launch.token_contract),
+    [registryLaunches]
+  )
+  const registryTokenMetadata = useResolvedCw20Whitelist(registryTokenContracts)
 
   const readiness = useMemo(() => {
     const symbol = draft.symbol.trim().toUpperCase()
@@ -988,6 +1031,7 @@ const Launchpad = () => {
         "Website"
       )
       const normalizedXProfile = normalizeOptionalXProfile(draft.xProfile)
+      const normalizedLogoUrl = normalizeOptionalImageUrl(draft.logoUrl)
       startTx(`Create ${tokenSymbol}`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
@@ -997,7 +1041,10 @@ const Launchpad = () => {
           name: draft.name,
           symbol: tokenSymbol,
           supply: draft.supply,
-          decimals
+          decimals,
+          logoUrl: normalizedLogoUrl,
+          website: normalizedWebsite,
+          description: draft.description
         },
         `Burrito ${tokenSymbol}`
       )
@@ -1040,6 +1087,7 @@ const Launchpad = () => {
         website: normalizedWebsite,
         xProfile: normalizedXProfile,
         description: draft.description.trim(),
+        logoUrl: normalizedLogoUrl,
         createdAt: new Date().toISOString(),
         plannedTokenAmount: isLaunchWithPool
           ? String(launchMath.tokenForPool)
@@ -1313,6 +1361,14 @@ const Launchpad = () => {
         .filter((launch) => launch.status !== "hidden")
         .map<LaunchCardItem>((launch) => {
           const nowSeconds = Math.floor(Date.now() / 1000)
+          const tokenMeta =
+            registryTokenMetadata.data?.[launch.token_contract.toLowerCase()]
+          const symbol = (
+            launch.metadata.symbol ||
+            tokenMeta?.symbol ||
+            "TOKEN"
+          ).toUpperCase()
+          const name = launch.metadata.name || tokenMeta?.name || symbol
           const lpLock = registryLpLocks[launch.lp_lock_id]
           const lpWithdrawn = Boolean(lpLock?.withdrawn)
           const unlockDays = Math.max(
@@ -1343,9 +1399,9 @@ const Launchpad = () => {
             : undefined
           return {
             id: `registry-${launch.id}`,
-            symbol: launch.metadata.symbol,
-            name: launch.metadata.name,
-            pair: `${launch.metadata.symbol} / LUNC`,
+            symbol,
+            name,
+            pair: `${symbol} / LUNC`,
             state,
             status,
             liquidity: lockedLpAmount ?? "On-chain LP",
@@ -1366,11 +1422,12 @@ const Launchpad = () => {
             website: launch.metadata.website,
             xProfile: launch.metadata.x_profile,
             description: launch.metadata.description,
+            logoUrl: tokenMeta?.icon,
             createdAt: launch.created_at,
             unlockTime: launch.lp_unlock_time
           }
         }),
-    [registryLaunches, registryLpLocks]
+    [registryLaunches, registryLpLocks, registryTokenMetadata.data]
   )
   const shouldShowSampleLaunches =
     import.meta.env.DEV &&
@@ -3135,6 +3192,16 @@ const Launchpad = () => {
                     />
                   </label>
                   <label className={styles.field}>
+                    <span>Logo URL</span>
+                    <input
+                      value={draft.logoUrl}
+                      onChange={updateDraft("logoUrl")}
+                      placeholder="https://.../logo.png"
+                    />
+                  </label>
+                </div>
+                <div className={styles.formGrid}>
+                  <label className={styles.field}>
                     <span>X / Twitter</span>
                     <input
                       value={draft.xProfile}
@@ -3263,7 +3330,7 @@ const Launchpad = () => {
           <aside className={styles.previewStack}>
             <article className={`card ${styles.previewCard}`}>
               <div className={styles.launchTokenHeader}>
-                <div className={styles.launchLogo}>{tokenSymbol.slice(0, 2)}</div>
+                <LaunchTokenLogo symbol={tokenSymbol} logoUrl={draft.logoUrl} />
                 <div>
                   <span>Launch preview</span>
                   <strong>{isCw20Only ? tokenSymbol : `${tokenSymbol} / LUNC`}</strong>
@@ -3536,9 +3603,10 @@ const Launchpad = () => {
             <article className={`card ${styles.launchDetailPanel}`}>
               <div className={styles.launchDetailHeader}>
                 <div className={styles.launchCardTop}>
-                  <div className={styles.launchLogo}>
-                    {selectedLaunch.symbol.slice(0, 2)}
-                  </div>
+                  <LaunchTokenLogo
+                    symbol={selectedLaunch.symbol}
+                    logoUrl={selectedLaunch.logoUrl}
+                  />
                   <div>
                     <span>{selectedLaunch.status}</span>
                     <strong>{selectedLaunch.pair}</strong>
@@ -3694,7 +3762,7 @@ const Launchpad = () => {
           {filteredLaunches.map((item) => (
             <article className={`card ${styles.launchCard}`} key={item.id}>
               <div className={styles.launchCardTop}>
-                <div className={styles.launchLogo}>{item.symbol.slice(0, 2)}</div>
+                <LaunchTokenLogo symbol={item.symbol} logoUrl={item.logoUrl} />
                 <div>
                   <span>
                     {item.sample ? "Sample preview" : item.status}
@@ -3899,9 +3967,10 @@ const Launchpad = () => {
           {activeOwnerLaunch ? (
             <article className={`card ${styles.ownerSummary}`}>
               <div className={styles.launchCardTop}>
-                <div className={styles.launchLogo}>
-                  {activeOwnerLaunch.symbol.slice(0, 2)}
-                </div>
+                <LaunchTokenLogo
+                  symbol={activeOwnerLaunch.symbol}
+                  logoUrl={activeOwnerLaunch.logoUrl}
+                />
                 <div>
                   <span>{activeOwnerLaunch.ownerStatus}</span>
                   <strong>{activeOwnerLaunch.pair}</strong>

@@ -13,6 +13,9 @@ export type Cw20InstantiateInput = {
   symbol: string
   supply: string
   decimals: number
+  logoUrl?: string
+  website?: string
+  description?: string
 }
 
 export const parseTokenAmountToBaseUnits = (
@@ -80,19 +83,40 @@ export const buildCw20InstantiatePayload = ({
   name,
   symbol,
   supply,
-  decimals
-}: Cw20InstantiateInput) => ({
-  name: name.trim(),
-  symbol: symbol.trim().toUpperCase(),
   decimals,
-  initial_balances: [
-    {
-      address: creatorAddress,
-      amount: parseTokenAmountToBaseUnits(supply, decimals, "Supply")
-    }
-  ],
-  mint: null
-})
+  logoUrl,
+  website,
+  description
+}: Cw20InstantiateInput) => {
+  const cleanLogoUrl = logoUrl?.trim()
+  const cleanWebsite = website?.trim()
+  const cleanDescription = description?.trim()
+
+  return {
+    name: name.trim(),
+    symbol: symbol.trim().toUpperCase(),
+    decimals,
+    initial_balances: [
+      {
+        address: creatorAddress,
+        amount: parseTokenAmountToBaseUnits(supply, decimals, "Supply")
+      }
+    ],
+    mint: null,
+    ...(cleanLogoUrl
+      ? {
+          marketing: {
+            project: cleanWebsite || undefined,
+            description: cleanDescription || undefined,
+            marketing: creatorAddress,
+            logo: {
+              url: cleanLogoUrl
+            }
+          }
+        }
+      : {})
+  }
+}
 
 export const buildCw20InstantiateMessage = (
   input: Cw20InstantiateInput,

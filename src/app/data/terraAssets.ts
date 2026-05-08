@@ -84,6 +84,17 @@ type Cw20TokenInfoResponse = {
   }
 }
 
+type Cw20MarketingLogo = { url?: string } | { embedded?: unknown } | null
+
+type Cw20MarketingInfoResponse = {
+  data?: {
+    project?: string
+    description?: string
+    marketing?: string
+    logo?: Cw20MarketingLogo
+  }
+}
+
 type IbcCacheEntry = {
   ts: number
   token: IbcToken
@@ -95,6 +106,7 @@ type Cw20TokenInfoCacheEntry = {
     name?: string
     symbol?: string
     decimals?: number
+    icon?: string
   }
 }
 
@@ -107,7 +119,7 @@ const IBC_CACHE_KEY = "burritoIbcTraceCacheV1"
 const IBC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV1"
 const NATIVE_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV1"
+const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV2"
 const CW20_TOKEN_INFO_CACHE_TTL = 24 * 60 * 60 * 1000
 let ibcCache: Record<string, IbcCacheEntry> | null = null
 let nativeTokenCache: Record<string, NativeTokenCacheEntry> | null = null
@@ -271,7 +283,7 @@ const getCachedCw20TokenInfo = (contract: string) => {
 
 const cacheCw20TokenInfo = (
   contract: string,
-  token: { name?: string; symbol?: string; decimals?: number }
+  token: { name?: string; symbol?: string; decimals?: number; icon?: string }
 ) => {
   const cache = readCw20TokenInfoCache()
   writeCw20TokenInfoCache({
@@ -290,7 +302,7 @@ const mergeCw20TokenMetadata = ({
 }: {
   contract: string
   fallback?: Cw20Token
-  onChain?: { name?: string; symbol?: string; decimals?: number }
+  onChain?: { name?: string; symbol?: string; decimals?: number; icon?: string }
 }): Cw20Token => {
   const symbol = onChain?.symbol?.trim() || fallback?.symbol || contract.slice(0, 6).toUpperCase()
   const name =
@@ -305,11 +317,16 @@ const mergeCw20TokenMetadata = ({
     symbol,
     name,
     protocol: localOverride?.protocol ?? fallback?.protocol,
-    icon: sanitizeAssetIconUrl(localOverride?.icon ?? fallback?.icon),
+    icon: sanitizeAssetIconUrl(localOverride?.icon ?? onChain?.icon ?? fallback?.icon),
     decimals: Number.isFinite(onChain?.decimals)
       ? onChain?.decimals
       : (localOverride?.decimals ?? fallback?.decimals ?? 6)
   }
+}
+
+const extractCw20MarketingLogo = (logo?: Cw20MarketingLogo) => {
+  if (!logo || typeof logo !== "object" || !("url" in logo)) return undefined
+  return sanitizeAssetIconUrl(logo.url)
 }
 
 const deriveSymbolFromDenom = (denom?: string) => {
@@ -566,12 +583,34 @@ export const fetchCw20TokenInfos = async (
         const symbol = info?.symbol?.trim()
         const name = info?.name?.trim()
         const parsedDecimals = Number(info?.decimals)
+        let icon: string | undefined
+        try {
+          const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
+          const marketingResponse = await fetch(
+            `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
+          )
+          if (marketingResponse.ok) {
+            const marketingPayload =
+              (await marketingResponse.json()) as Cw20MarketingInfoResponse
+            icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
+          }
+        } catch {
+          icon = undefined
+        }
         const onChain = {
           symbol: symbol || undefined,
           name: name || undefined,
-          decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : undefined
+          decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : undefined,
+          icon
         }
-        if (!onChain.symbol && !onChain.name && onChain.decimals === undefined) continue
+        if (
+          !onChain.symbol &&
+          !onChain.name &&
+          onChain.decimals === undefined &&
+          !onChain.icon
+        ) {
+          continue
+        }
         cacheCw20TokenInfo(contract, onChain)
         results[contract] = mergeCw20TokenMetadata({
           contract,

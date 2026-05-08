@@ -1,4 +1,8 @@
 import { CLASSIC_CHAIN } from "../chain"
+import {
+  fetchLaunchRegistryLaunches,
+  isLaunchRegistryConfigured
+} from "../launchpad/registry"
 import { queryContractSmart } from "./classic"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
 
@@ -782,6 +786,51 @@ const fetchLocalMarketIndex = async () => {
   return localMarketIndexInFlight
 }
 
+const fetchLaunchpadMarketPairs = async (): Promise<MarketDexPair[]> => {
+  if (!isLaunchRegistryConfigured) return []
+
+  try {
+    const launches = await fetchLaunchRegistryLaunches()
+    return launches
+      .filter(
+        (launch) =>
+          launch.status !== "hidden" &&
+          launch.pair_contract &&
+          launch.token_contract
+      )
+      .map((launch) => ({
+        pair: launch.pair_contract.toLowerCase(),
+        dexId: "terraswap",
+        dexLabel: "Terraswap",
+        type: "xyk",
+        assets: [launch.token_contract.toLowerCase(), "uluna"] as [string, string]
+      }))
+  } catch {
+    return []
+  }
+}
+
+const mergeMarketPairs = (
+  base: MarketDexPair[],
+  additions: MarketDexPair[]
+) => {
+  if (!additions.length) return base
+  const map = new Map<string, MarketDexPair>()
+  base.forEach((pair) => {
+    map.set(pair.pair.toLowerCase(), {
+      ...pair,
+      pair: pair.pair.toLowerCase()
+    })
+  })
+  additions.forEach((pair) => {
+    map.set(pair.pair.toLowerCase(), {
+      ...pair,
+      pair: pair.pair.toLowerCase()
+    })
+  })
+  return Array.from(map.values())
+}
+
 const loadLocalPairCandlesFile = async (pairAddress: string) => {
   const normalizedPair = pairAddress.toLowerCase()
   const cached = localPairCandlesCache.get(normalizedPair)
@@ -962,9 +1011,12 @@ const getPairDexMap = async () => {
 }
 
 export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
-  const local = await fetchLocalMarketIndex()
+  const [local, launchpadPairs] = await Promise.all([
+    fetchLocalMarketIndex(),
+    fetchLaunchpadMarketPairs()
+  ])
   if (local?.pairs.length) {
-    return local.pairs
+    return mergeMarketPairs(local.pairs, launchpadPairs)
   }
 
   const response = await fetch(HEXXAGON_DEX_PAIRS_URL)
@@ -975,7 +1027,7 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
   const source = await response.text()
   const payload = parseCommonJsArray<HexxagonDexPair>(source)
 
-  return payload
+  const externalPairs = payload
     .filter((item) => {
       if (!item?.token || !item?.dex || !item?.assets || item.assets.length < 2) {
         return false
@@ -988,8 +1040,10 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
       dexId: item.dex!.toLowerCase(),
       dexLabel: pickDexLabel(item.dex!),
       type: item.type ?? "xyk",
-      assets: [item.assets![0], item.assets![1]]
+      assets: [item.assets![0], item.assets![1]] as [string, string]
     }))
+
+  return mergeMarketPairs(externalPairs, launchpadPairs)
 }
 
 const fetchPoolForPair = async (
@@ -1039,21 +1093,27 @@ export const fetchMarketPoolLive = async (pair: MarketDexPair) =>
 
 export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
   const local = await fetchLocalMarketIndex()
+  const snapshots: MarketPoolSnapshot[] = []
+  let pairsToFetch = pairs
+
   if (local?.pools.size) {
-    const fromLocal = pairs
-      .map((pair) => local.pools.get(pair.pair.toLowerCase()))
-      .filter((item): item is MarketPoolSnapshot => Boolean(item))
-    if (fromLocal.length === pairs.length) {
-      return fromLocal
-    }
+    pairsToFetch = []
+    pairs.forEach((pair) => {
+      const localPool = local.pools.get(pair.pair.toLowerCase())
+      if (localPool) {
+        snapshots.push(localPool)
+      } else {
+        pairsToFetch.push(pair)
+      }
+    })
+    if (!pairsToFetch.length) return snapshots
   }
 
-  const snapshots: MarketPoolSnapshot[] = []
   const chunkSize = 8
   const pairDexMap = await getPairDexMap()
 
-  for (let index = 0; index < pairs.length; index += chunkSize) {
-    const chunk = pairs.slice(index, index + chunkSize)
+  for (let index = 0; index < pairsToFetch.length; index += chunkSize) {
+    const chunk = pairsToFetch.slice(index, index + chunkSize)
     const resolved = await Promise.all(chunk.map((pair) => fetchPoolForPair(pair, pairDexMap)))
     resolved.forEach((item) => {
       if (item) snapshots.push(item)
