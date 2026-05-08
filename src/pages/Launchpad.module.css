@@ -1,20 +1,20 @@
 .phasePill {
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 14px;
+  height: 30px;
+  padding: 0 12px;
   border-radius: 999px;
-  border: var(--border-width) solid rgba(104, 216, 63, 0.34);
-  background: rgba(104, 216, 63, 0.12);
-  color: var(--green);
+  border: var(--border-width) solid rgba(104, 216, 63, 0.28);
+  background: rgba(104, 216, 63, 0.1);
+  color: rgba(181, 245, 149, 0.96);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.72fr);
+  gap: 14px;
   align-items: stretch;
 }
 
@@ -32,8 +32,8 @@
 }
 
 .heroCopy {
-  min-height: 260px;
-  padding: clamp(24px, 4vw, 44px);
+  min-height: 220px;
+  padding: clamp(22px, 3.1vw, 34px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -41,8 +41,8 @@
 
 .kicker {
   width: fit-content;
-  margin-bottom: 18px;
-  padding: 6px 11px;
+  margin-bottom: 14px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: rgba(104, 216, 63, 0.14);
   color: var(--green);
@@ -53,25 +53,26 @@
 .heroCopy h2 {
   max-width: 760px;
   color: #ffffff;
-  font-size: clamp(30px, 4vw, 48px);
-  line-height: 1.02;
+  font-size: clamp(28px, 3.25vw, 40px);
+  line-height: 1.04;
   letter-spacing: -0.045em;
 }
 
 .heroCopy p {
-  max-width: 620px;
-  margin: 18px 0 0;
+  max-width: 660px;
+  margin: 14px 0 0;
   color: var(--text-muted);
-  font-size: var(--font-size);
+  font-size: var(--font-size-small);
+  line-height: 1.55;
 }
 
 .heroPanel {
   position: relative;
   overflow: hidden;
-  padding: 22px;
+  padding: 18px;
   display: grid;
   align-content: space-between;
-  gap: 22px;
+  gap: 16px;
 }
 
 .heroPanel::after {
@@ -89,8 +90,8 @@
 
 .manageHero {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 0.88fr) minmax(340px, 1.12fr);
+  gap: 14px;
   align-items: center;
   background:
     radial-gradient(520px 260px at 0% 0%, rgba(104, 216, 63, 0.12), transparent 62%),
@@ -113,7 +114,7 @@
 
 .manageHeroCopy h2 {
   color: #ffffff;
-  font-size: clamp(28px, 3vw, 38px);
+  font-size: clamp(26px, 2.7vw, 34px);
   line-height: 1.04;
   letter-spacing: -0.045em;
 }
@@ -122,7 +123,7 @@
   max-width: 620px;
   margin: 0;
   color: var(--text-muted);
-  font-size: var(--font-size);
+  font-size: var(--font-size-small);
   line-height: 1.5;
 }
 
@@ -133,7 +134,7 @@
 }
 
 .manageHeroSteps div {
-  min-height: 78px;
+  min-height: 70px;
   padding: 12px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 193, 7, 0.24);
@@ -145,7 +146,7 @@
 
 .manageHeroSteps strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
 }
 
 .manageHeroSteps small {
@@ -199,7 +200,7 @@
 
 .panelTop strong {
   color: #ffffff;
-  font-size: clamp(28px, 3.6vw, 42px);
+  font-size: clamp(26px, 3vw, 36px);
   line-height: 1;
   letter-spacing: -0.045em;
 }
@@ -213,8 +214,8 @@
 }
 
 .metricGrid div {
-  min-height: 94px;
-  padding: 14px;
+  min-height: 82px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.055);
@@ -224,22 +225,24 @@
 
 .metricGrid strong {
   color: #ffffff;
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-title);
 }
 
 .systemStatus {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  background: rgba(16, 29, 24, 0.72);
+  gap: 8px;
+  padding: 10px;
+  background: rgba(16, 29, 24, 0.58);
+  backdrop-filter: blur(10px);
 }
 
 .systemStatus div {
-  min-height: 60px;
-  padding: 10px 12px;
+  min-height: 52px;
+  padding: 9px 10px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.095);
+  background: rgba(255, 255, 255, 0.032);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 4px 8px;
@@ -256,7 +259,7 @@
 
 .systemStatus strong {
   grid-column: 2;
-  color: #ffffff;
+  color: rgba(240, 250, 241, 0.88);
   font-size: var(--font-size-small);
 }
 
@@ -276,17 +279,19 @@
 .tabBar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
-  background: rgba(16, 29, 24, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.018)),
+    rgba(16, 29, 24, 0.72);
 }
 
 .tabButton {
   min-width: 0;
-  min-height: 64px;
-  padding: 10px 14px;
+  min-height: 54px;
+  padding: 9px 12px;
   display: grid;
   justify-items: start;
   align-content: center;
@@ -308,7 +313,7 @@
 
 .tabButton strong {
   color: inherit;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
 }
 
 .tabButtonActive {
@@ -319,8 +324,8 @@
 
 .createGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.22fr) minmax(300px, 0.78fr);
+  gap: 16px;
   align-items: start;
 }
 
@@ -338,7 +343,7 @@
 
 .formCard {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .formHeader {
@@ -362,7 +367,7 @@
 .ownerImport h3,
 .planHeader h3 {
   color: #ffffff;
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-title);
   letter-spacing: -0.03em;
 }
 
@@ -403,8 +408,8 @@
 .createStepper {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   border-radius: var(--radius-lg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.035);
@@ -412,8 +417,8 @@
 
 .createStepButton {
   min-width: 0;
-  min-height: 54px;
-  padding: 9px 10px;
+  min-height: 48px;
+  padding: 8px 9px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid transparent;
   background: transparent;
@@ -473,8 +478,8 @@
 
 .modeCard {
   min-width: 0;
-  min-height: 118px;
-  padding: 14px;
+  min-height: 104px;
+  padding: 12px;
   border-radius: var(--radius-lg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.045);
@@ -499,7 +504,7 @@
 
 .modeCard strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
 }
 
 .modeCard p {
@@ -516,13 +521,13 @@
 
 .formSection {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .formGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .field {
@@ -552,7 +557,7 @@
 }
 
 .field textarea {
-  min-height: 110px;
+  min-height: 100px;
   resize: vertical;
   padding: 12px;
   line-height: 1.5;
@@ -607,8 +612,8 @@
 .liquiditySplit div,
 .reviewGrid div,
 .cw20OnlyGrid div {
-  min-height: 70px;
-  padding: 12px;
+  min-height: 64px;
+  padding: 11px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -631,7 +636,7 @@
 .reviewGrid strong,
 .cw20OnlyGrid strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
   overflow-wrap: anywhere;
 }
 
@@ -677,16 +682,16 @@
 
 .previewStack {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   position: sticky;
-  top: 20px;
+  top: 14px;
 }
 
 .previewCard,
 .readinessCard,
 .packageCard {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .launchTokenHeader,
@@ -745,8 +750,8 @@
 
 .previewStats div,
 .launchCardStats div {
-  min-height: 76px;
-  padding: 12px;
+  min-height: 66px;
+  padding: 11px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -758,13 +763,13 @@
 .previewStats strong,
 .launchCardStats strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
   overflow-wrap: anywhere;
 }
 
 .lockStrip {
-  min-height: 52px;
-  padding: 12px;
+  min-height: 46px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(104, 216, 63, 0.32);
   background: rgba(104, 216, 63, 0.11);
@@ -792,7 +797,7 @@
 
 .progressHeader strong {
   color: var(--green);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-title);
 }
 
 .progressTrack {
@@ -919,8 +924,8 @@
 }
 
 .packageGrid div {
-  min-height: 68px;
-  padding: 12px;
+  min-height: 60px;
+  padding: 11px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -938,7 +943,7 @@
 
 .packageGrid strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
 }
 
 .confirmBox {
@@ -967,7 +972,7 @@
 .manageGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .exploreIntro,
@@ -977,6 +982,9 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.016)),
+    rgba(16, 29, 24, 0.76);
 }
 
 .ownerIntro {
@@ -994,9 +1002,9 @@
 .ownerImport {
   grid-column: span 3;
   order: 8;
-  background: rgba(16, 29, 24, 0.76);
+  background: rgba(16, 29, 24, 0.66);
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .importRow {
@@ -1026,9 +1034,9 @@
 
 .launchCard,
 .emptyState {
-  min-height: 210px;
+  min-height: 188px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
   align-content: space-between;
 }
 
@@ -1054,7 +1062,7 @@
 
 .riskLine {
   width: fit-content;
-  padding: 5px 10px;
+  padding: 4px 9px;
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.065);
@@ -1067,13 +1075,13 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .exploreControls {
   display: grid;
   justify-items: end;
-  gap: 10px;
+  gap: 8px;
   min-width: min(440px, 100%);
 }
 
@@ -1131,7 +1139,7 @@
 
 .launchStatsStrip div {
   min-width: 86px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1149,12 +1157,12 @@
 
 .launchStatsStrip strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
 }
 
 .filterButton {
-  height: 32px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 10px;
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.055);
@@ -1207,7 +1215,7 @@
     radial-gradient(circle at 12% 0%, rgba(104, 216, 63, 0.14), transparent 34%),
     rgba(16, 29, 24, 0.82);
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .launchDetailHeader {
@@ -1224,8 +1232,8 @@
 }
 
 .launchDetailGrid div {
-  min-height: 68px;
-  padding: 12px;
+  min-height: 60px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1271,7 +1279,7 @@
 
 .ownerControlPanel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: min(440px, 100%);
 }
 
@@ -1310,9 +1318,9 @@
 }
 
 .ownerSelectButton {
-  min-width: 150px;
-  min-height: 52px;
-  padding: 9px 11px;
+  min-width: 142px;
+  min-height: 48px;
+  padding: 8px 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.045);
@@ -1345,7 +1353,7 @@
   grid-column: 1 / -1;
   background: rgba(16, 29, 24, 0.76);
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .ownerReadiness {
@@ -1376,8 +1384,8 @@
 }
 
 .ownerReadinessGrid div {
-  min-height: 66px;
-  padding: 10px;
+  min-height: 56px;
+  padding: 9px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 193, 7, 0.22);
   background: rgba(255, 193, 7, 0.065);
@@ -1416,8 +1424,8 @@
 }
 
 .ownerSummaryGrid div {
-  min-height: 76px;
-  padding: 12px;
+  min-height: 66px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1427,13 +1435,13 @@
 
 .ownerSummaryGrid strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
 }
 
 .ownerQuickActions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -1443,14 +1451,14 @@
 
 .ownerLinkGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
 }
 
 .ownerLinkGrid a,
 .ownerLinkGrid div {
-  min-height: 64px;
-  padding: 12px;
+  min-height: 58px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(104, 216, 63, 0.2);
   background: rgba(104, 216, 63, 0.075);
@@ -1479,7 +1487,7 @@
 .lockSetup,
 .listingSetup {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-content: start;
 }
 
@@ -1511,13 +1519,13 @@
 
 .poolStatusGrid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .poolStatusGrid div {
-  min-height: 68px;
-  padding: 12px;
+  min-height: 60px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1528,7 +1536,7 @@
 
 .poolStatusGrid strong {
   color: #ffffff;
-  font-size: var(--font-size-title);
+  font-size: var(--font-size);
   overflow-wrap: anywhere;
 }
 
@@ -1545,30 +1553,30 @@
 
 .liquidityForm {
   margin-top: 2px;
-  padding-top: 14px;
-  border-top: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  display: grid;
-  gap: 14px;
-}
-
-.lockedLpPanel {
-  margin-top: 2px;
-  padding-top: 14px;
-  border-top: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  display: grid;
-  gap: 14px;
-}
-
-.visibilityPanel {
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: var(--border-width) solid rgba(255, 255, 255, 0.1);
   display: grid;
   gap: 12px;
 }
 
+.lockedLpPanel {
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 12px;
+}
+
+.visibilityPanel {
+  padding-top: 12px;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 10px;
+}
+
 .visibilityPanel > div:first-child {
-  min-height: 62px;
-  padding: 12px;
+  min-height: 58px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1597,10 +1605,10 @@
 }
 
 .rulesCard {
-  padding: 20px 22px;
+  padding: 18px 20px;
   display: grid;
   grid-template-columns: minmax(220px, 0.6fr) minmax(0, 1fr);
-  gap: 24px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -1611,7 +1619,7 @@
 
 .rulesCard strong {
   color: #ffffff;
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-title);
 }
 
 .rulesCard ul {
@@ -1644,7 +1652,7 @@
 .launchPlanGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-  gap: 18px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -1652,7 +1660,7 @@
 .recordCard {
   background: rgba(16, 29, 24, 0.76);
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .planHeader {
@@ -1662,14 +1670,14 @@
 
 .planList {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .planRow {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1679,8 +1687,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: rgba(104, 216, 63, 0.14);
   color: var(--green);
@@ -1706,8 +1714,8 @@
 }
 
 .recordList div {
-  min-height: 68px;
-  padding: 12px;
+  min-height: 60px;
+  padding: 10px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.045);
@@ -1726,7 +1734,7 @@
 }
 
 .warningList div {
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 193, 7, 0.24);
   background: rgba(255, 193, 7, 0.08);
@@ -1775,12 +1783,7 @@
   .modeGrid,
   .previewStats,
   .packageGrid,
-  .systemStatus,
-  .manageHeroSteps,
-  .ownerReadinessGrid,
-  .launchCardStats,
   .ownerSummaryGrid,
-  .ownerLinkGrid,
   .reviewGrid,
   .cw20OnlyGrid,
   .recordList,
@@ -1790,15 +1793,53 @@
     grid-template-columns: 1fr;
   }
 
-  .tabBar {
-    grid-template-columns: 1fr;
-  }
-
-  .createStepper {
+  .systemStatus,
+  .manageHeroSteps,
+  .ownerReadinessGrid,
+  .launchCardStats,
+  .ownerLinkGrid,
+  .poolStatusGrid,
+  .tokenDistribution .poolStatusGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tokenDistribution .poolStatusGrid {
+  .tabBar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tabButton {
+    min-height: 46px;
+    padding: 8px;
+  }
+
+  .createStepper {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .createStepButton {
+    min-height: 44px;
+    padding: 7px;
+  }
+
+  .createStepButton span {
+    font-size: 9px;
+  }
+
+  .createStepButton strong {
+    font-size: var(--font-size-xxs);
+  }
+
+  .launchStatsStrip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .poolStatusGrid,
+  .tokenDistribution .poolStatusGrid,
+  .ownerReadinessGrid,
+  .ownerLinkGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -1818,11 +1859,11 @@
 
   .heroCopy {
     min-height: auto;
-    padding: 24px 18px;
+    padding: 22px 18px;
   }
 
   .heroCopy h2 {
-    font-size: 30px;
+    font-size: 28px;
   }
 
   .metricGrid {
@@ -1867,6 +1908,10 @@
   .filterButton,
   .ownerSelectButton {
     flex: 1 1 auto;
+  }
+
+  .ownerSelectButton {
+    min-width: 0;
   }
 
   .stepActions {
@@ -1917,6 +1962,19 @@
   .emptyState,
   .planCard,
   .recordCard {
-    padding: 18px;
+    padding: 16px;
+  }
+
+  .heroCopy h2,
+  .manageHeroCopy h2 {
+    font-size: 26px;
+  }
+
+  .systemStatus {
+    grid-template-columns: 1fr;
+  }
+
+  .tabButton strong {
+    font-size: var(--font-size-small);
   }
 }
