@@ -51,6 +51,14 @@ export const buildLuncPairAssetInfos = (tokenAddress: string) => [
   }
 ]
 
+export const buildLuncPairCreationAssets = (
+  tokenAddress: string
+): TerraswapLiquidityAsset[] =>
+  buildLuncPairAssetInfos(tokenAddress).map((info) => ({
+    info,
+    amount: "0"
+  }))
+
 const isMissingPairError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error)
   return (
@@ -101,7 +109,7 @@ export const buildCreateTerraswapLuncPairMessage = (
     msg: toUtf8(
       JSON.stringify({
         create_pair: {
-          assets: buildLuncPairAssetInfos(tokenAddress)
+          assets: buildLuncPairCreationAssets(tokenAddress)
         }
       })
     ),
