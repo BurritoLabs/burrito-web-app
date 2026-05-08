@@ -55,12 +55,16 @@ import {
   connectClassicSigningClientForConnector,
   getSignerAddressForConnector
 } from "../app/wallet/walletAdapters"
-import { sanitizeAssetIconUrl } from "../app/utils/assetIcons"
+import {
+  buildClassicNativeIconCandidates,
+  buildCw20IconCandidates,
+  sanitizeAssetIconUrl
+} from "../app/utils/assetIcons"
 import { truncateHash } from "../app/utils/format"
 import { fetchContractInfo, queryContractSmart } from "../app/data/classic"
 
 type LaunchTab = "create" | "explore" | "manage"
-type CreateStep = "token" | "liquidity" | "safety" | "summary"
+type CreateStep = "token" | "launch"
 type LaunchFilter = "all" | "live" | "pending" | "ended" | "risk"
 type LaunchSort = "newest" | "oldest" | "unlockSoon" | "unlockLong" | "risk"
 type LaunchMode = "launchpad" | "cw20"
@@ -229,9 +233,7 @@ const getLaunchpadDeepLink = (launchId: string) => {
 
 const createSteps: Array<{ id: CreateStep; label: string; eyebrow: string }> = [
   { id: "token", label: "Token", eyebrow: "01" },
-  { id: "liquidity", label: "Liquidity", eyebrow: "02" },
-  { id: "safety", label: "Safety", eyebrow: "03" },
-  { id: "summary", label: "Summary", eyebrow: "04" }
+  { id: "launch", label: "Launch", eyebrow: "02" }
 ]
 
 const modeOptions: Array<{
@@ -261,15 +263,6 @@ const launchChecklist = [
   "Initial LP lock required",
   "Public launch facts shown before trading",
   "No tax, blacklist, or hidden mint controls in V1"
-]
-
-const cw20OnlyChecklist = [
-  "Creates token contract only",
-  "No initial price",
-  "No automatic Market listing",
-  "No Swap route until a pool exists",
-  "Creator must manage distribution manually",
-  "Best for utility tokens, tests, or private launches"
 ]
 
 const launchFilters: Array<{ id: LaunchFilter; label: string }> = [
@@ -398,24 +391,6 @@ const saveCreatedLaunches = (records: OwnerLaunchRecord[]) => {
     // Local creator history is a convenience layer.
   }
 }
-
-const launchPublicRecordItems = [
-  "Token contract",
-  "Pair contract",
-  "Creator address",
-  "Initial liquidity",
-  "LP lock expiry",
-  "Risk labels"
-]
-
-const cw20PublicRecordItems = [
-  "Token contract",
-  "Creator address",
-  "Total supply",
-  "Decimals",
-  "Project info",
-  "No pool warning"
-]
 
 const toNumber = (value: string) => {
   const parsed = Number(value.replace(/,/g, "").trim())
@@ -606,21 +581,69 @@ const mergeRecoveredOwnerRecord = (
   }
 }
 
+const luncIconCandidates = buildClassicNativeIconCandidates({
+  denom: "uluna",
+  symbol: "LUNC"
+})
+
+const isLuncPairLabel = (pair: string) => /\/\s*LUNC$/i.test(pair.trim())
+
 const LaunchTokenLogo = ({
   symbol,
-  logoUrl
+  logoUrl,
+  pairedWithLunc = false
 }: {
   symbol: string
   logoUrl?: string | null
+  pairedWithLunc?: boolean
 }) => {
-  const icon = sanitizeAssetIconUrl(logoUrl ?? undefined)
+  const candidates = buildCw20IconCandidates(logoUrl ?? undefined, symbol)
+  if (pairedWithLunc) {
+    return (
+      <div className={styles.launchPairLogo}>
+        <span className={styles.launchPairPrimary}>
+          <LaunchTokenLogoInner candidates={candidates} />
+        </span>
+        <span className={styles.launchPairSecondary}>
+          <LaunchTokenLogoInner candidates={luncIconCandidates} />
+        </span>
+      </div>
+    )
+  }
+
+  return <LaunchTokenLogoInner candidates={candidates} />
+}
+
+const LaunchTokenLogoInner = ({
+  candidates
+}: {
+  candidates: string[]
+}) => {
+  const candidateKey = candidates.join("|")
+  return <LaunchTokenLogoImage key={candidateKey} candidates={candidates} />
+}
+
+const LaunchTokenLogoImage = ({
+  candidates
+}: {
+  candidates: string[]
+}) => {
+  const [index, setIndex] = useState(0)
+  const icon = candidates[index]
+
   return (
     <div className={styles.launchLogo}>
-      {icon ? (
-        <img alt="" loading="lazy" referrerPolicy="no-referrer" src={icon} />
-      ) : (
-        symbol.slice(0, 2)
-      )}
+      <img
+        alt=""
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        src={icon}
+        onError={() => {
+          if (index < candidates.length - 1) {
+            setIndex((current) => current + 1)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -890,21 +913,11 @@ const Launchpad = () => {
       done: tokenStepDone,
       hint: "Add a valid name, 2-12 character symbol, supply, and 0-18 decimals."
     },
-    liquidity: {
-      done: liquidityStepDone,
+    launch: {
+      done: liquidityStepDone && safetyStepDone && readiness.percent === 100,
       hint: isCw20Only
-        ? "CW20 only mode skips liquidity. Switch to Launch with pool if this token should trade immediately."
-        : "Set LUNC liquidity and seed at least 10% of supply into the pool."
-    },
-    safety: {
-      done: safetyStepDone,
-      hint: isCw20Only
-        ? "Add enough public info so users understand what this standalone token is for."
-        : "Use at least a 30 day LP lock and add public project information."
-    },
-    summary: {
-      done: readiness.percent === 100,
-      hint: "Complete every previous section before building transactions."
+        ? "CW20 only skips pool and public launch listing. Use it only for standalone tokens."
+        : "Set liquidity, public info, and at least a 30 day LP lock before launch setup."
     }
   } satisfies Record<CreateStep, { done: boolean; hint: string }>
   const activeCreateStepIndex = createSteps.findIndex(
@@ -999,11 +1012,6 @@ const Launchpad = () => {
     if (previous) setActiveCreateStep(previous)
   }
 
-  const goToNextCreateStep = () => {
-    const next = createSteps[activeCreateStepIndex + 1]?.id
-    if (next) setActiveCreateStep(next)
-  }
-
   const resetDraft = () => {
     setDraft(initialDraft)
     setActiveCreateStep("token")
@@ -1012,9 +1020,16 @@ const Launchpad = () => {
     setCreatedToken(undefined)
   }
 
-  const handleCreateTokenContract = async () => {
-    if (!riskAcknowledged || !canPreviewBuild) {
-      setCreateError("Complete the draft and confirm the risk notice first.")
+  const handleCreateTokenContract = async (
+    mode: "token-only" | "full-launch" = "full-launch"
+  ) => {
+    const requiresFullLaunch = mode === "full-launch"
+    if (requiresFullLaunch && (!riskAcknowledged || !canPreviewBuild)) {
+      setCreateError("Complete the launch setup and confirm the risk notice first.")
+      return
+    }
+    if (!requiresFullLaunch && !tokenStepDone) {
+      setCreateError("Complete token name, symbol, supply, and decimals first.")
       return
     }
     if (!connectorId || !account?.address) {
@@ -1278,82 +1293,6 @@ const Launchpad = () => {
     }
   }
 
-  const launchWarnings = useMemo(() => {
-    const warnings: string[] = []
-    if (isCw20Only) {
-      warnings.push("CW20 only mode will not create a tradable market.")
-      warnings.push("Users cannot swap this token until someone creates and funds a pool.")
-      if (!draft.website.trim()) {
-        warnings.push("Project website is missing.")
-      }
-      return warnings
-    }
-    if (launchMath.poolPercent < 50) {
-      warnings.push("Less than 50% of supply is seeded into LP.")
-    }
-    if (lockDays < 90) {
-      warnings.push("LP lock is short. 90 days or more is easier for users to trust.")
-    }
-    if (launchMath.luncLiquidity > 0 && launchMath.luncLiquidity < 1_000_000) {
-      warnings.push("Initial LUNC liquidity is low, so price impact may be high.")
-    }
-    if (!draft.website.trim()) {
-      warnings.push("Project website is missing.")
-    }
-    return warnings
-  }, [
-    draft.website,
-    isCw20Only,
-    launchMath.luncLiquidity,
-    launchMath.poolPercent,
-    lockDays
-  ])
-  const transactionPlan = useMemo(
-    () => [
-      {
-        title: "Instantiate CW20",
-        text: `Create ${tokenSymbol} with fixed supply and public metadata.`
-      },
-      ...(isCw20Only
-        ? [
-            {
-              title: "Skip pool creation",
-              text: "No Token / LUNC pair is created in CW20 only mode."
-            },
-            {
-              title: "Show contract record",
-              text: "The token can be managed from creator tools, but it is not a launch market."
-            }
-          ]
-        : [
-            {
-              title: "Create Token / LUNC pair",
-              text: `Open a Terraswap pool for ${tokenSymbol} / LUNC.`
-            },
-            {
-              title: "Provide initial liquidity",
-              text: `Deposit ${formatCompact(launchMath.tokenForPool)} ${tokenSymbol} and ${formatCompact(
-                launchMath.luncLiquidity
-              )} LUNC.`
-            },
-            {
-              title: "Lock LP",
-              text: `Lock initial LP for ${formatNumber(lockDays, 0)} days before listing.`
-            },
-            {
-              title: "Create Burrito listing",
-              text: "Register public facts, risk labels, and owner controls."
-            }
-          ])
-    ],
-    [
-      isCw20Only,
-      launchMath.luncLiquidity,
-      launchMath.tokenForPool,
-      lockDays,
-      tokenSymbol
-    ]
-  )
   const registeredLaunchCards = useMemo(
     () =>
       [...registryLaunches]
@@ -1933,22 +1872,6 @@ const Launchpad = () => {
     activeOwnerLaunch &&
       (activeOwnerIsCw20Only || hasDistributedTokens || isActiveListingPublished)
   )
-  const publicRecordItems = isCw20Only
-    ? cw20PublicRecordItems
-    : launchPublicRecordItems
-  const transactionPackageItems = isCw20Only
-    ? [
-        { label: "Transactions", value: "1" },
-        { label: "Needs LUNC", value: "Gas only" },
-        { label: "Pool", value: "Skipped" },
-        { label: "Market / Swap", value: "No route" }
-      ]
-    : [
-        { label: "Transactions", value: "4-5" },
-        { label: "Needs LUNC", value: "Gas + LP" },
-        { label: "Pool", value: `${tokenSymbol} / LUNC` },
-        { label: "Market / Swap", value: "Launch route" }
-      ]
   const riskConfirmationText = isCw20Only
     ? "I understand CW20 only mode creates a token contract without price, pool, Market listing, or Swap route."
     : "I understand the launch price comes from initial liquidity, and LP lock details will be public."
@@ -2902,39 +2825,12 @@ const Launchpad = () => {
         <section className={styles.hero}>
           <div className={styles.heroCopy}>
             <span className={styles.kicker}>Burrito Launchpad V1</span>
-            <h2>Launch a token with visible liquidity and a clear lock.</h2>
+            <h2>Create a CW20 token and publish a clear LUNC launch.</h2>
             <p>
-              V1 should keep the launch model narrow: fixed-supply CW20, Token /
-              LUNC pool, public creator address, visible LP lock, registry
-              listing, and plain risk labels without Burrito acting as a token
-              judge.
+              Keep the first version simple: create the token, set the LUNC
+              launch terms, then finish pair, liquidity, LP lock, and listing
+              from Manage.
             </p>
-          </div>
-          <div className={styles.heroPanel}>
-            <div className={styles.panelTop}>
-              <span>Recommended V1</span>
-              <strong>CW20 / LUNC</strong>
-            </div>
-            <div className={styles.metricGrid}>
-              <div>
-                <span>DEX route</span>
-                <strong>Terraswap</strong>
-              </div>
-              <div>
-                <span>LP lock</span>
-                <strong>30d min</strong>
-              </div>
-              <div>
-                <span>Listing</span>
-                <strong>
-                  {isLaunchRegistryConfigured ? "Registry live" : "Env needed"}
-                </strong>
-              </div>
-              <div>
-                <span>Risk label</span>
-                <strong>Open launch</strong>
-              </div>
-            </div>
           </div>
         </section>
       )}
@@ -2976,9 +2872,8 @@ const Launchpad = () => {
               <div>
                 <h3>Create token draft</h3>
                 <p>
-                  CW20 creation, pair creation, and initial liquidity are live.
-                  LP locking and public publishing turn on when the configured
-                  contracts are present in the deploy environment.
+                  Two stages only: create the CW20 token first, then choose
+                  whether it becomes a public LUNC launch.
                 </p>
               </div>
               <div className={styles.formHeaderActions}>
@@ -3011,28 +2906,6 @@ const Launchpad = () => {
                   </button>
                 )
               })}
-            </div>
-
-            <div className={styles.modeGrid}>
-              {modeOptions.map((option) => (
-                <button
-                  key={option.id}
-                  className={`${styles.modeCard} ${
-                    draft.mode === option.id ? styles.modeCardActive : ""
-                  }`}
-                  type="button"
-                  onClick={() => {
-                    setDraft((current) => ({ ...current, mode: option.id }))
-                    if (option.id === "cw20" && activeCreateStep === "liquidity") {
-                      setActiveCreateStep("safety")
-                    }
-                  }}
-                >
-                  <span>{option.label}</span>
-                  <strong>{option.title}</strong>
-                  <p>{option.text}</p>
-                </button>
-              ))}
             </div>
 
             {!activeStepStatus.done ? (
@@ -3099,7 +2972,28 @@ const Launchpad = () => {
               </div>
             ) : null}
 
-            {activeCreateStep === "liquidity" && !isCw20Only ? (
+            {activeCreateStep === "launch" ? (
+              <div className={styles.modeGrid}>
+                {modeOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    className={`${styles.modeCard} ${
+                      draft.mode === option.id ? styles.modeCardActive : ""
+                    }`}
+                    type="button"
+                    onClick={() =>
+                      setDraft((current) => ({ ...current, mode: option.id }))
+                    }
+                  >
+                    <span>{option.label}</span>
+                    <strong>{option.title}</strong>
+                    <p>{option.text}</p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {activeCreateStep === "launch" && !isCw20Only ? (
               <div className={styles.formSection}>
                 <div className={styles.sectionLabel}>Initial pool</div>
                 <div className={styles.formGrid}>
@@ -3143,7 +3037,7 @@ const Launchpad = () => {
               </div>
             ) : null}
 
-            {activeCreateStep === "liquidity" && isCw20Only ? (
+            {activeCreateStep === "launch" && isCw20Only ? (
               <div className={styles.formSection}>
                 <div className={styles.sectionLabel}>Liquidity skipped</div>
                 <div className={styles.noticeBox}>
@@ -3151,28 +3045,10 @@ const Launchpad = () => {
                   price, no K-line, no recent trades, and no Swap route until a
                   separate pool is created and funded.
                 </div>
-                <div className={styles.cw20OnlyGrid}>
-                  <div>
-                    <span>Market status</span>
-                    <strong>No pool</strong>
-                  </div>
-                  <div>
-                    <span>Start price</span>
-                    <strong>--</strong>
-                  </div>
-                  <div>
-                    <span>Swap route</span>
-                    <strong>Unavailable</strong>
-                  </div>
-                  <div>
-                    <span>Use case</span>
-                    <strong>Advanced token</strong>
-                  </div>
-                </div>
               </div>
             ) : null}
 
-            {activeCreateStep === "safety" ? (
+            {activeCreateStep === "launch" ? (
               <div className={styles.formSection}>
                 <div className={styles.sectionLabel}>Safety and public info</div>
                 <div className={styles.formGrid}>
@@ -3217,66 +3093,6 @@ const Launchpad = () => {
                     rows={4}
                   />
                 </label>
-                <div className={styles.safetyRulesMini}>
-                  {(isCw20Only ? cw20OnlyChecklist : launchChecklist).map((item) => (
-                    <span key={item}>{item}</span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {activeCreateStep === "summary" ? (
-              <div className={styles.formSection}>
-                <div className={styles.sectionLabel}>Launch package summary</div>
-                <div className={styles.reviewGrid}>
-                  <div>
-                    <span>Name</span>
-                    <strong>{draft.name.trim() || "--"}</strong>
-                  </div>
-                  <div>
-                    <span>Symbol</span>
-                    <strong>{tokenSymbol}</strong>
-                  </div>
-                  <div>
-                    <span>Supply</span>
-                    <strong>{formatCompact(launchMath.supply)}</strong>
-                  </div>
-                  <div>
-                    <span>Decimals</span>
-                    <strong>{formatNumber(decimals, 0)}</strong>
-                  </div>
-                  <div>
-                    <span>Initial liquidity</span>
-                    <strong>
-                      {isCw20Only
-                        ? "No pool"
-                        : `${formatCompact(launchMath.luncLiquidity)} LUNC`}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>LP lock</span>
-                    <strong>
-                      {isCw20Only ? "Not used" : `${formatNumber(lockDays, 0)} days`}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Start price</span>
-                    <strong>
-                      {isCw20Only
-                        ? "--"
-                        : `${formatPrice(launchMath.startPriceLunc)} LUNC`}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Status</span>
-                    <strong>{isCw20Only ? "CW20 only" : "Open launch"}</strong>
-                  </div>
-                </div>
-                <div className={styles.noticeBox}>
-                  CW20 only creates just the token contract. Launch with pool
-                  still needs LP locking and a Burrito listing before it should
-                  be treated as a complete public launch.
-                </div>
                 <label className={styles.confirmBox}>
                   <input
                     type="checkbox"
@@ -3303,24 +3119,25 @@ const Launchpad = () => {
                 className="uiButton uiButtonPrimary"
                 type="button"
                 disabled={
+                  createSubmitting ||
                   !activeStepStatus.done ||
-                  (activeStepIsLast && (!riskAcknowledged || createSubmitting))
+                  (activeStepIsLast && !riskAcknowledged)
                 }
-                onClick={
-                  activeStepIsLast
-                    ? handleCreateTokenContract
-                    : goToNextCreateStep
+                onClick={() =>
+                  handleCreateTokenContract(
+                    activeStepIsLast ? "full-launch" : "token-only"
+                  )
                 }
               >
-                {activeStepIsLast
-                  ? createSubmitting
-                    ? "Broadcasting..."
-                    : riskAcknowledged
+                {createSubmitting
+                  ? "Broadcasting..."
+                  : activeStepIsLast
+                  ? riskAcknowledged
                     ? isCw20Only
                       ? "Create CW20"
-                      : "Create token and continue"
+                      : "Create launch"
                     : "Confirm risks"
-                  : "Next"}
+                  : "Create token"}
               </button>
             </div>
           </form>
@@ -3328,7 +3145,11 @@ const Launchpad = () => {
           <aside className={styles.previewStack}>
             <article className={`card ${styles.previewCard}`}>
               <div className={styles.launchTokenHeader}>
-                <LaunchTokenLogo symbol={tokenSymbol} logoUrl={draft.logoUrl} />
+                <LaunchTokenLogo
+                  symbol={tokenSymbol}
+                  logoUrl={draft.logoUrl}
+                  pairedWithLunc={!isCw20Only}
+                />
                 <div>
                   <span>Launch preview</span>
                   <strong>{isCw20Only ? tokenSymbol : `${tokenSymbol} / LUNC`}</strong>
@@ -3364,48 +3185,41 @@ const Launchpad = () => {
                     : `${formatNumber(toNumber(draft.lockDays), 0)} days`}
                 </strong>
               </div>
-            </article>
-
-            <article className={`card ${styles.readinessCard}`}>
               <div className={styles.progressHeader}>
                 <div>
-                  <span>Launch readiness</span>
+                  <span>Ready</span>
                   <strong>{readiness.percent}%</strong>
                 </div>
                 <div className={styles.progressTrack}>
                   <i style={{ width: `${readiness.percent}%` }} />
                 </div>
               </div>
-              <div className={styles.checkList}>
-                {readiness.items.map((item) => (
-                  <div
-                    className={`${styles.checkItem} ${
-                      item.done ? styles.checkItemDone : ""
-                    }`}
-                    key={item.label}
-                  >
-                    <span />
-                    {item.label}
-                  </div>
-                ))}
-              </div>
               <button
                 className={`uiButton uiButtonPrimary ${styles.fullButton}`}
                 type="button"
                 disabled={
                   createSubmitting ||
-                  !canPreviewBuild ||
-                  !riskAcknowledged
+                  (activeCreateStep === "token"
+                    ? !tokenStepDone
+                    : !canPreviewBuild || !riskAcknowledged)
                 }
-                onClick={handleCreateTokenContract}
+                onClick={() =>
+                  handleCreateTokenContract(
+                    activeCreateStep === "token" ? "token-only" : "full-launch"
+                  )
+                }
               >
                 {createSubmitting
                   ? "Broadcasting..."
+                  : activeCreateStep === "token"
+                  ? tokenStepDone
+                    ? "Create token"
+                    : "Complete token first"
                   : canPreviewBuild
                   ? riskAcknowledged
                     ? isCw20Only
                       ? "Create CW20"
-                      : "Create token and continue"
+                      : "Create launch"
                     : "Risk confirmation needed"
                   : "Complete draft first"}
               </button>
@@ -3443,68 +3257,7 @@ const Launchpad = () => {
                 </div>
               ) : null}
             </article>
-
-            <article className={`card ${styles.packageCard}`}>
-              <div className={styles.planHeader}>
-                <span>Transaction package</span>
-                <h3>{isCw20Only ? "CW20 only" : "Launch with pool"}</h3>
-              </div>
-              <div className={styles.packageGrid}>
-                {transactionPackageItems.map((item) => (
-                  <div key={item.label}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
           </aside>
-        </section>
-      ) : null}
-
-      {activeTab === "create" ? (
-        <section className={styles.launchPlanGrid}>
-          <article className={`card ${styles.planCard}`}>
-            <div className={styles.planHeader}>
-              <span>Execution preview</span>
-              <h3>What the real launch flow will build</h3>
-            </div>
-            <div className={styles.planList}>
-              {transactionPlan.map((item, index) => (
-                <div className={styles.planRow} key={item.title}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className={`card ${styles.recordCard}`}>
-            <div className={styles.planHeader}>
-              <span>Public record</span>
-              <h3>What traders must see before buying</h3>
-            </div>
-            <div className={styles.recordList}>
-              {publicRecordItems.map((item) => (
-                <div key={item}>
-                  <span>{item}</span>
-                  <strong>Required</strong>
-                </div>
-              ))}
-            </div>
-            <div className={styles.warningList}>
-              {launchWarnings.length ? (
-                launchWarnings.map((warning) => (
-                  <div key={warning}>{warning}</div>
-                ))
-              ) : (
-                <div>Draft inputs look reasonable for a V1 launch.</div>
-              )}
-            </div>
-          </article>
         </section>
       ) : null}
 
@@ -3604,6 +3357,7 @@ const Launchpad = () => {
                   <LaunchTokenLogo
                     symbol={selectedLaunch.symbol}
                     logoUrl={selectedLaunch.logoUrl}
+                    pairedWithLunc={isLuncPairLabel(selectedLaunch.pair)}
                   />
                   <div>
                     <span>{selectedLaunch.status}</span>
@@ -3760,7 +3514,11 @@ const Launchpad = () => {
           {filteredLaunches.map((item) => (
             <article className={`card ${styles.launchCard}`} key={item.id}>
               <div className={styles.launchCardTop}>
-                <LaunchTokenLogo symbol={item.symbol} logoUrl={item.logoUrl} />
+                <LaunchTokenLogo
+                  symbol={item.symbol}
+                  logoUrl={item.logoUrl}
+                  pairedWithLunc={isLuncPairLabel(item.pair)}
+                />
                 <div>
                   <span>
                     {item.sample ? "Sample preview" : item.status}
@@ -3968,6 +3726,7 @@ const Launchpad = () => {
                 <LaunchTokenLogo
                   symbol={activeOwnerLaunch.symbol}
                   logoUrl={activeOwnerLaunch.logoUrl}
+                  pairedWithLunc={isLuncPairLabel(activeOwnerLaunch.pair)}
                 />
                 <div>
                   <span>{activeOwnerLaunch.ownerStatus}</span>
