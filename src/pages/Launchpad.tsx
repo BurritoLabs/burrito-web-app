@@ -230,6 +230,9 @@ const getLaunchpadDeepLink = (launchId: string) => {
   return `${window.location.origin}/launchpad?${query}`
 }
 
+const getLaunchpadMarketPath = (pairContract: string) =>
+  `/market/pair/terraswap/${encodeURIComponent(pairContract)}?from=launchpad`
+
 const createSteps: Array<{ id: CreateStep; label: string; eyebrow: string }> = [
   { id: "token", label: "Token", eyebrow: "01" },
   { id: "launch", label: "Launch", eyebrow: "02" }
@@ -3191,9 +3194,7 @@ const Launchpad = () => {
                 {selectedLaunch.pairContract ? (
                   <Link
                     className="uiButton uiButtonPrimary"
-                    to={`/market/pair/terraswap/${encodeURIComponent(
-                      selectedLaunch.pairContract
-                    )}`}
+                    to={getLaunchpadMarketPath(selectedLaunch.pairContract)}
                   >
                     Open market
                   </Link>
@@ -3252,9 +3253,7 @@ const Launchpad = () => {
                   {item.pairContract ? (
                     <Link
                       className="uiButton uiButtonOutline"
-                      to={`/market/pair/terraswap/${encodeURIComponent(
-                        item.pairContract
-                      )}`}
+                      to={getLaunchpadMarketPath(item.pairContract)}
                     >
                       Market
                     </Link>
@@ -3466,9 +3465,7 @@ const Launchpad = () => {
                 {activePairAddress ? (
                   <Link
                     className="uiButton uiButtonPrimary"
-                    to={`/market/pair/terraswap/${encodeURIComponent(
-                      activePairAddress
-                    )}`}
+                    to={getLaunchpadMarketPath(activePairAddress)}
                   >
                     Open market
                   </Link>

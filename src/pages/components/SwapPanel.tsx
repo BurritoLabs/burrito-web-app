@@ -9,7 +9,7 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import { fetchBalances, fetchPrices } from "../../app/data/classic"
 import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
 import { useCw20Balances } from "../../app/data/cw20"
-import { useResolvedCw20Whitelist } from "../../app/data/terraAssets"
+import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
 import { useWallet } from "../../app/wallet/WalletContext"
@@ -600,6 +600,28 @@ const SwapPanel = ({
     Array.from(tradableCw20Set)
   )
 
+  const overrideCw20Whitelist = useMemo<Record<string, Cw20Token>>(() => {
+    const records: Record<string, Cw20Token> = {}
+    assetOverrides.forEach((asset) => {
+      if (!asset.id.startsWith("cw20:")) return
+      const contract = asset.id.slice("cw20:".length).toLowerCase()
+      if (!contract) return
+      records[contract] = {
+        token: contract,
+        symbol: asset.symbol || contract.slice(0, 6).toUpperCase(),
+        name: asset.name || asset.symbol || contract,
+        decimals: asset.decimals ?? 6,
+        icon: asset.iconCandidates?.[0]
+      }
+    })
+    return records
+  }, [assetOverrides])
+
+  const swapCw20Whitelist = useMemo(
+    () => ({ ...cw20Whitelist, ...overrideCw20Whitelist }),
+    [cw20Whitelist, overrideCw20Whitelist]
+  )
+
   const assetOverrideMap = useMemo(
     () => new Map(assetOverrides.map((asset) => [asset.id, asset])),
     [assetOverrides]
@@ -621,7 +643,7 @@ const SwapPanel = ({
       }
     }
 
-    const cw20Rows = Object.entries(cw20Whitelist)
+    const cw20Rows = Object.entries(swapCw20Whitelist)
       .map(([contract, token]) => {
         const decimals = Number(token.decimals ?? 6)
         return applyOverride({
@@ -642,9 +664,9 @@ const SwapPanel = ({
       })
 
     return [...NATIVE_ASSETS.map(applyOverride), ...cw20Rows]
-  }, [assetOverrideMap, cw20Whitelist, tradableCw20Set])
+  }, [assetOverrideMap, swapCw20Whitelist, tradableCw20Set])
 
-  const { data: cw20Balances = [] } = useCw20Balances(accountAddress, cw20Whitelist)
+  const { data: cw20Balances = [] } = useCw20Balances(accountAddress, swapCw20Whitelist)
 
   useEffect(() => {
     if (!assets.length) return

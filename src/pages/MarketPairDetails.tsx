@@ -49,12 +49,20 @@ type Timeframe = "1h" | "24h" | "7d"
 
 type MarketDetailLocationState = {
   fromMarket?: boolean
+  fromLaunchpad?: boolean
   marketLocation?: {
     pathname?: string
     search?: string
     hash?: string
   }
+  launchpadLocation?: {
+    pathname?: string
+    search?: string
+    hash?: string
+  }
 }
+
+const LAUNCHPAD_EXPLORE_PATH = "/launchpad?tab=explore"
 
 const TIMEFRAME_BUCKET_MS: Record<Timeframe, number> = {
   "1h": 5 * 60 * 1000,
@@ -363,8 +371,28 @@ const MarketPairDetails = () => {
   const [activeCandleTime, setActiveCandleTime] = useState<number | null>(null)
   const chartHostRef = useRef<HTMLDivElement | null>(null)
   const chartTooltipRef = useRef<HTMLDivElement | null>(null)
+  const isLaunchpadSource = useMemo(() => {
+    const state = location.state as MarketDetailLocationState | null
+    if (state?.fromLaunchpad) return true
+    return new URLSearchParams(location.search).get("from") === "launchpad"
+  }, [location.search, location.state])
+  const fallbackBackTo = isLaunchpadSource ? LAUNCHPAD_EXPLORE_PATH : "/market"
   const handleBack = useCallback(() => {
     const state = location.state as MarketDetailLocationState | null
+    if (state?.fromLaunchpad || isLaunchpadSource) {
+      const fallbackLocation = state?.launchpadLocation
+      if (fallbackLocation?.pathname) {
+        navigate({
+          pathname: fallbackLocation.pathname,
+          search: fallbackLocation.search ?? "",
+          hash: fallbackLocation.hash ?? ""
+        })
+        return
+      }
+      navigate(LAUNCHPAD_EXPLORE_PATH)
+      return
+    }
+
     const historyIndex =
       typeof window !== "undefined" && typeof window.history.state?.idx === "number"
         ? window.history.state.idx
@@ -386,7 +414,7 @@ const MarketPairDetails = () => {
     }
 
     navigate("/market")
-  }, [location.state, navigate])
+  }, [isLaunchpadSource, location.state, navigate])
 
   const decodedPairId = useMemo(() => {
     const decode = (value?: string) => {
@@ -1099,7 +1127,7 @@ const MarketPairDetails = () => {
 
   if (loading) {
     return (
-      <PageShell title="Pair details" backTo="/market">
+      <PageShell title="Pair details" backTo={fallbackBackTo}>
         <section className={`card ${styles.empty}`}>Loading pair details...</section>
       </PageShell>
     )
@@ -1107,7 +1135,7 @@ const MarketPairDetails = () => {
 
   if (!detail) {
     return (
-      <PageShell title="Pair details" backTo="/market">
+      <PageShell title="Pair details" backTo={fallbackBackTo}>
         <section className={`card ${styles.empty}`}>
           Pair data is unavailable. Go back to Market and choose another pair.
         </section>
