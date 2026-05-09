@@ -13,7 +13,6 @@ import {
   buildCw20TransferMessage,
   extractContractAddressFromEvents,
   formatBaseUnitsToTokenAmount,
-  LAUNCHPAD_CW20_CODE_ID_LABEL,
   parseTokenAmountToBaseUnits
 } from "../app/launchpad/cw20"
 import {
@@ -212,10 +211,10 @@ const initialDraft: DraftLaunch = {
 const DRAFT_STORAGE_KEY = "burrito.launchpad.draft.v1"
 const CREATED_LAUNCHES_STORAGE_KEY = "burrito.launchpad.created.v1"
 
-const tabs: Array<{ id: LaunchTab; label: string; eyebrow: string }> = [
-  { id: "create", label: "Create", eyebrow: "Token + pool" },
-  { id: "explore", label: "Explore", eyebrow: "New launches" },
-  { id: "manage", label: "Manage", eyebrow: "Owner tools" }
+const tabs: Array<{ id: LaunchTab; label: string }> = [
+  { id: "create", label: "Create" },
+  { id: "explore", label: "Explore" },
+  { id: "manage", label: "Manage" }
 ]
 
 const normalizeLaunchTab = (value: string | null): LaunchTab | null => {
@@ -240,29 +239,17 @@ const modeOptions: Array<{
   id: LaunchMode
   title: string
   label: string
-  text: string
 }> = [
   {
     id: "launchpad",
     title: "Launch with pool",
-    label: "Recommended",
-    text: "Create CW20, create Token / LUNC pair, add initial liquidity, then show it in Launchpad."
+    label: "Recommended"
   },
   {
     id: "cw20",
     title: "CW20 only",
-    label: "Advanced",
-    text: "Only create the token contract. No pool, no launch listing, no automatic trading route."
+    label: "Advanced"
   }
-]
-
-const launchChecklist = [
-  "Fixed-supply CW20 token",
-  "Creator address shown publicly",
-  "Token / LUNC pool required",
-  "Initial LP lock required",
-  "Public launch facts shown before trading",
-  "No tax, blacklist, or hidden mint controls in V1"
 ]
 
 const launchFilters: Array<{ id: LaunchFilter; label: string }> = [
@@ -1377,15 +1364,6 @@ const Launchpad = () => {
     : shouldShowSampleLaunches
     ? sampleLaunches
     : []
-  const launchStats = launchSource.reduce(
-    (stats, launch) => ({
-      total: stats.total + 1,
-      live: stats.live + (launch.state === "live" ? 1 : 0),
-      ended: stats.ended + (launch.state === "ended" ? 1 : 0),
-      risk: stats.risk + (launch.state === "risk" ? 1 : 0)
-    }),
-    { total: 0, live: 0, ended: 0, risk: 0 }
-  )
   const normalizedLaunchSearch = launchSearch.trim().toLowerCase()
   const filteredLaunches = launchSource
     .filter((launch) => {
@@ -1643,28 +1621,6 @@ const Launchpad = () => {
       account?.address &&
       !publishSubmitting
   )
-  const launchpadStatusItems = [
-    {
-      label: "CW20 create",
-      value: "Ready",
-      ready: true
-    },
-    {
-      label: "LP locker",
-      value: isLpLockerConfigured ? "Configured" : "Needs env",
-      ready: isLpLockerConfigured
-    },
-    {
-      label: "Registry",
-      value: isLaunchRegistryConfigured ? "Configured" : "Needs env",
-      ready: isLaunchRegistryConfigured
-    },
-    {
-      label: "Wallet",
-      value: connectorId && account?.address ? "Connected" : "Connect to launch",
-      ready: Boolean(connectorId && account?.address)
-    }
-  ]
   const hasProvidedLiquidity = Boolean(
     activeOwnerLaunch?.liquidityTxHash ||
       activeOwnerLaunch?.lpLockId ||
@@ -1821,53 +1777,6 @@ const Launchpad = () => {
         actionLabel: "Manage listing",
         targetId: "launchpad-listing"
       }
-  const manageFlowSteps = activeOwnerIsCw20Only
-    ? [
-        {
-          eyebrow: "01",
-          label: "Token",
-          detail: activeOwnerLaunch?.contractAddress ? "Created" : "Needed",
-          done: Boolean(activeOwnerLaunch?.contractAddress)
-        },
-        {
-          eyebrow: "02",
-          label: "Distribution",
-          detail: hasDistributedTokens ? "Sent" : "Optional",
-          done: hasDistributedTokens
-        },
-        {
-          eyebrow: "03",
-          label: "Owner tools",
-          detail: "Local",
-          done: Boolean(activeOwnerLaunch)
-        }
-      ]
-    : [
-        {
-          eyebrow: "01",
-          label: "Pair",
-          detail: activePairAddress ? "Created" : "Next",
-          done: Boolean(activePairAddress)
-        },
-        {
-          eyebrow: "02",
-          label: "Liquidity",
-          detail: hasProvidedLiquidity ? "Added" : "Needed",
-          done: hasProvidedLiquidity
-        },
-        {
-          eyebrow: "03",
-          label: "LP lock",
-          detail: hasLockedLp ? "Locked" : "Needed",
-          done: hasLockedLp
-        },
-        {
-          eyebrow: "04",
-          label: "Publish",
-          detail: isActiveListingPublished ? "Live" : "Final",
-          done: isActiveListingPublished
-        }
-      ]
   const showOwnerDistributionTool = Boolean(
     activeOwnerLaunch &&
       (activeOwnerIsCw20Only || hasDistributedTokens || isActiveListingPublished)
@@ -2795,60 +2704,8 @@ const Launchpad = () => {
   return (
     <PageShell
       title="Launchpad"
-      extra={<span className={styles.phasePill}>Phase 2 Launchpad</span>}
+      extra={<span className={styles.phasePill}>V1</span>}
     >
-      {activeTab === "manage" ? (
-        <section className={`card ${styles.manageHero}`}>
-          <div className={styles.manageHeroCopy}>
-            <span>Owner workspace</span>
-            <h2>Finish one launch step at a time.</h2>
-            <p>
-              Manage focuses on the next required action first. Create the
-              pair, add liquidity, lock LP, then publish. Advanced tools stay
-              below the main flow.
-            </p>
-          </div>
-          <div className={styles.manageHeroSteps}>
-            {manageFlowSteps.map((step) => (
-              <div
-                className={step.done ? styles.manageStepDone : ""}
-                key={step.label}
-              >
-                <span>{step.eyebrow}</span>
-                <strong>{step.label}</strong>
-                <small>{step.detail}</small>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : (
-        <section className={styles.hero}>
-          <div className={styles.heroCopy}>
-            <span className={styles.kicker}>Burrito Launchpad V1</span>
-            <h2>Create a CW20 token and publish a clear LUNC launch.</h2>
-            <p>
-              Keep the first version simple: create the token, set the LUNC
-              launch terms, then finish pair, liquidity, LP lock, and listing
-              from Manage.
-            </p>
-          </div>
-        </section>
-      )}
-
-      <section className={`card ${styles.systemStatus}`}>
-        {launchpadStatusItems.map((item) => (
-          <div key={item.label}>
-            <span
-              className={`${styles.statusDot} ${
-                item.ready ? styles.statusDotReady : ""
-              }`}
-            />
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-          </div>
-        ))}
-      </section>
-
       <nav className={styles.tabBar} aria-label="Launchpad sections">
         {tabs.map((tab) => (
           <button
@@ -2859,7 +2716,6 @@ const Launchpad = () => {
             type="button"
             onClick={() => handleSelectTab(tab.id)}
           >
-            <span>{tab.eyebrow}</span>
             <strong>{tab.label}</strong>
           </button>
         ))}
@@ -2870,14 +2726,11 @@ const Launchpad = () => {
           <form className={`card ${styles.formCard}`}>
             <div className={styles.formHeader}>
               <div>
-                <h3>Create token draft</h3>
-                <p>
-                  Two stages only: create the CW20 token first, then choose
-                  whether it becomes a public LUNC launch.
-                </p>
+                <h3>
+                  {activeCreateStep === "token" ? "Create token" : "Launch setup"}
+                </h3>
               </div>
               <div className={styles.formHeaderActions}>
-                <span className={styles.statusPill}>Saved locally</span>
                 <button
                   className={styles.textButton}
                   type="button"
@@ -2966,8 +2819,8 @@ const Launchpad = () => {
                   </label>
                 </div>
                 <div className={styles.noticeBox}>
-                  V1 uses fixed supply. Minting, tax, blacklist, and hidden
-                  owner controls should not be part of the first version.
+                  Fixed supply CW20. No mint, tax, blacklist, or hidden owner
+                  controls in V1.
                 </div>
               </div>
             ) : null}
@@ -2987,7 +2840,6 @@ const Launchpad = () => {
                   >
                     <span>{option.label}</span>
                     <strong>{option.title}</strong>
-                    <p>{option.text}</p>
                   </button>
                 ))}
               </div>
@@ -3013,26 +2865,6 @@ const Launchpad = () => {
                       inputMode="decimal"
                     />
                   </label>
-                  <div className={styles.readOnlyField}>
-                    <span>Start price</span>
-                    <strong>
-                      {formatPrice(launchMath.startPriceLunc)} LUNC
-                    </strong>
-                  </div>
-                  <div className={styles.readOnlyField}>
-                    <span>Pair</span>
-                    <strong>{tokenSymbol} / LUNC</strong>
-                  </div>
-                </div>
-                <div className={styles.liquiditySplit}>
-                  <div>
-                    <span>LP allocation</span>
-                    <strong>{formatCompact(launchMath.tokenForPool)}</strong>
-                  </div>
-                  <div>
-                    <span>Creator reserve</span>
-                    <strong>{formatCompact(launchMath.creatorReserve)}</strong>
-                  </div>
                 </div>
               </div>
             ) : null}
@@ -3041,9 +2873,8 @@ const Launchpad = () => {
               <div className={styles.formSection}>
                 <div className={styles.sectionLabel}>Liquidity skipped</div>
                 <div className={styles.noticeBox}>
-                  CW20 only mode does not create a pool. This token will have no
-                  price, no K-line, no recent trades, and no Swap route until a
-                  separate pool is created and funded.
+                  CW20 only creates the token contract without a pool or Swap
+                  route.
                 </div>
               </div>
             ) : null}
@@ -3076,7 +2907,7 @@ const Launchpad = () => {
                     />
                   </label>
                   <label className={styles.field}>
-                    <span>X / Twitter</span>
+                    <span>X</span>
                     <input
                       value={draft.xProfile}
                       onChange={updateDraft("xProfile")}
@@ -3163,17 +2994,13 @@ const Launchpad = () => {
                   </strong>
                 </div>
                 <div>
-                  <span>Token to LP</span>
+                  <span>LP tokens</span>
                   <strong>
                     {isCw20Only ? "Not used" : formatCompact(launchMath.tokenForPool)}
                   </strong>
                 </div>
                 <div>
-                  <span>Creator reserve</span>
-                  <strong>{formatCompact(launchMath.creatorReserve)}</strong>
-                </div>
-                <div>
-                  <span>Initial mcap</span>
+                  <span>Mcap</span>
                   <strong>{formatCompact(launchMath.startingMcapLunc)} LUNC</strong>
                 </div>
               </div>
@@ -3193,39 +3020,6 @@ const Launchpad = () => {
                 <div className={styles.progressTrack}>
                   <i style={{ width: `${readiness.percent}%` }} />
                 </div>
-              </div>
-              <button
-                className={`uiButton uiButtonPrimary ${styles.fullButton}`}
-                type="button"
-                disabled={
-                  createSubmitting ||
-                  (activeCreateStep === "token"
-                    ? !tokenStepDone
-                    : !canPreviewBuild || !riskAcknowledged)
-                }
-                onClick={() =>
-                  handleCreateTokenContract(
-                    activeCreateStep === "token" ? "token-only" : "full-launch"
-                  )
-                }
-              >
-                {createSubmitting
-                  ? "Broadcasting..."
-                  : activeCreateStep === "token"
-                  ? tokenStepDone
-                    ? "Create token"
-                    : "Complete token first"
-                  : canPreviewBuild
-                  ? riskAcknowledged
-                    ? isCw20Only
-                      ? "Create CW20"
-                      : "Create launch"
-                    : "Risk confirmation needed"
-                  : "Complete draft first"}
-              </button>
-              <div className={styles.codeIdLine}>
-                <span>Contract code</span>
-                <strong>{LAUNCHPAD_CW20_CODE_ID_LABEL}</strong>
               </div>
               {createError ? (
                 <div className={styles.txError}>{createError}</div>
@@ -3265,47 +3059,17 @@ const Launchpad = () => {
         <section className={styles.exploreGrid}>
           <article className={`card ${styles.exploreIntro}`}>
             <div>
-              <span>Launch discovery</span>
-              <h3>Tokens created through Burrito will appear here first.</h3>
-              <p>
-                This section should show liquidity, lock status, creator address,
-                public info status, and the Token / LUNC market before users trade.
-              </p>
-              {isLaunchRegistryConfigured ? (
-                <p>
-                  {registryLoading
-                    ? "Loading on-chain registry..."
-                    : registryError
-                    ? `Registry error: ${registryError}`
-                    : registeredLaunchCards.length
-                    ? "Showing on-chain Burrito launches."
-                    : "No registry launches found yet."}
-                </p>
-              ) : (
+              <span>Explore</span>
+              <h3>New launches</h3>
+              {registryLoading ? <p>Loading registry...</p> : null}
+              {registryError ? <p>{registryError}</p> : null}
+              {!isLaunchRegistryConfigured ? (
                 <p>
                   {shouldShowSampleLaunches
-                    ? "Registry contract is not configured yet; showing local sample cards only as product previews."
-                    : "Registry contract is not configured yet. Public launch discovery is disabled until deployment."}
+                    ? "Showing preview launches until registry is configured."
+                    : "Registry is not configured."}
                 </p>
-              )}
-              <div className={styles.launchStatsStrip}>
-                <div>
-                  <span>Total</span>
-                  <strong>{launchStats.total}</strong>
-                </div>
-                <div>
-                  <span>Live</span>
-                  <strong>{launchStats.live}</strong>
-                </div>
-                <div>
-                  <span>Risk</span>
-                  <strong>{launchStats.risk}</strong>
-                </div>
-                <div>
-                  <span>Unlocked</span>
-                  <strong>{launchStats.ended}</strong>
-                </div>
-              </div>
+              ) : null}
             </div>
             <div className={styles.exploreControls}>
               <label className={styles.launchSearch}>
@@ -3369,58 +3133,22 @@ const Launchpad = () => {
               </div>
               <div className={styles.launchDetailGrid}>
                 <div>
-                  <span>Creator</span>
-                  <strong>{selectedLaunch.creator}</strong>
+                  <span>Liquidity</span>
+                  <strong>{selectedLaunch.liquidity}</strong>
                 </div>
                 <div>
                   <span>LP lock</span>
                   <strong>{selectedLaunch.lock}</strong>
                 </div>
                 <div>
-                  <span>Locked LP</span>
-                  <strong>{selectedLaunch.lockedLpAmount ?? "--"}</strong>
-                </div>
-                <div>
-                  <span>LP status</span>
-                  <strong>
-                    {selectedLaunch.lpWithdrawn
-                      ? "Withdrawn"
-                      : selectedLaunch.lockedLpAmount
-                      ? "Locked"
-                      : selectedLaunch.sample
-                      ? "Preview"
-                      : "Checking"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Registry</span>
-                  <strong>
-                    {selectedLaunch.registryLaunchId
-                      ? `#${selectedLaunch.registryLaunchId}`
-                      : "--"}
-                  </strong>
+                  <span>Creator</span>
+                  <strong>{selectedLaunch.creator}</strong>
                 </div>
                 <div>
                   <span>Token</span>
                   <strong>
                     {selectedLaunch.tokenContract
                       ? truncateHash(selectedLaunch.tokenContract)
-                      : "--"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Pair</span>
-                  <strong>
-                    {selectedLaunch.pairContract
-                      ? truncateHash(selectedLaunch.pairContract)
-                      : "--"}
-                  </strong>
-                </div>
-                <div>
-                  <span>Published</span>
-                  <strong>
-                    {selectedLaunch.createdAt
-                      ? formatDateTime(selectedLaunch.createdAt * 1000)
                       : "--"}
                   </strong>
                 </div>
@@ -3451,19 +3179,6 @@ const Launchpad = () => {
                   </a>
                 ) : null}
                 {selectedLaunch.tokenContract ? (
-                  <button
-                    className="uiButton uiButtonOutline"
-                    type="button"
-                    onClick={() =>
-                      handleCopyText(selectedLaunch.tokenContract ?? "")
-                    }
-                  >
-                    {copiedValue === selectedLaunch.tokenContract
-                      ? "Copied"
-                      : "Copy token"}
-                  </button>
-                ) : null}
-                {selectedLaunch.tokenContract ? (
                   <a
                     className="uiButton uiButtonOutline"
                     href={`https://finder.burrito.money/classic/address/${selectedLaunch.tokenContract}`}
@@ -3472,19 +3187,6 @@ const Launchpad = () => {
                   >
                     Token contract
                   </a>
-                ) : null}
-                {selectedLaunch.pairContract ? (
-                  <button
-                    className="uiButton uiButtonOutline"
-                    type="button"
-                    onClick={() =>
-                      handleCopyText(selectedLaunch.pairContract ?? "")
-                    }
-                  >
-                    {copiedValue === selectedLaunch.pairContract
-                      ? "Copied"
-                      : "Copy pair"}
-                  </button>
                 ) : null}
                 {selectedLaunch.pairContract ? (
                   <Link
@@ -3536,17 +3238,6 @@ const Launchpad = () => {
                   <span>LP lock</span>
                   <strong>{item.lock}</strong>
                 </div>
-                <div>
-                  <span>Creator</span>
-                  <strong>{item.creator}</strong>
-                </div>
-                <div>
-                  <span>Launch</span>
-                  <strong>{item.progress}%</strong>
-                </div>
-              </div>
-              <div className={styles.launchProgress}>
-                <i style={{ width: `${item.progress}%` }} />
               </div>
               <div className={styles.launchCardBottom}>
                 <div className={styles.riskLine}>{item.risk}</div>
@@ -3598,13 +3289,8 @@ const Launchpad = () => {
         <section className={styles.manageGrid}>
           <article className={`card ${styles.ownerIntro}`}>
             <div>
-              <span>Creator dashboard</span>
-              <h3>After launch, creators need maintenance tools.</h3>
-              <p>
-                The important point is that adding liquidity and extending locks
-                should be easy. Withdrawals should be possible only after the lock
-                expires, and the unlock date must stay visible to traders.
-              </p>
+              <span>Manage</span>
+              <h3>Owner tools</h3>
             </div>
             <div className={styles.ownerControlPanel}>
               <div className={styles.ownerSelector}>
@@ -3660,11 +3346,7 @@ const Launchpad = () => {
           >
             <div>
               <span>Import token</span>
-              <h3>Add an existing CW20</h3>
-              <p>
-                Paste a token contract address to recover its registry listing,
-                Terraswap pair, and local creator tools.
-              </p>
+              <h3>Add existing CW20</h3>
             </div>
             <div className={styles.importRow}>
               <input
@@ -3689,7 +3371,7 @@ const Launchpad = () => {
           {activeOwnerLaunch ? (
             <article className={`card ${styles.ownerReadiness}`}>
               <div className={styles.planHeader}>
-                <span>Launch readiness</span>
+                <span>Next action</span>
                 <h3>{activeOwnerNextAction.title}</h3>
                 <p>{activeOwnerNextAction.text}</p>
               </div>
@@ -3814,169 +3496,6 @@ const Launchpad = () => {
               {localRecordNotice ? (
                 <div className={styles.ownerSyncNote}>{localRecordNotice}</div>
               ) : null}
-              {activeOwnerLaunch.contractAddress ||
-              activeOwnerLaunch.txHash ||
-              activeOwnerLaunch.distributionTxHash ||
-              distributionTxHash ||
-              activeOwnerLaunch.lpLockTxHash ||
-              activeOwnerLaunch.lpLockUpdateTxHash ||
-              lockRegistryTxHash ||
-              activeOwnerLaunch.liquidityWithdrawTxHash ||
-              activeOwnerLaunch.lpWithdrawTxHash ||
-              activeOwnerLaunch.registryTxHash ||
-              activeOwnerLaunch.registryLaunchId ||
-              activeOwnerLaunch.registryUpdateTxHash ||
-              activeOwnerLaunch.registryStatusTxHash ||
-              activeOwnerLaunch.createdAt ? (
-                <div className={styles.ownerLinkGrid}>
-                  {activeOwnerLaunch.contractAddress ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/address/${activeOwnerLaunch.contractAddress}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Token contract</span>
-                      <strong>
-                        {truncateHash(activeOwnerLaunch.contractAddress)}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.txHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Create tx</span>
-                      <strong>{truncateHash(activeOwnerLaunch.txHash)}</strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.createdAt ? (
-                    <div>
-                      <span>Created</span>
-                      <strong>{formatDateTime(activeOwnerLaunch.createdAt)}</strong>
-                    </div>
-                  ) : null}
-                  {activeOwnerLaunch.distributionTxHash ||
-                  distributionTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${
-                        activeOwnerLaunch.distributionTxHash ||
-                        distributionTxHash
-                      }`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Distribution tx</span>
-                      <strong>
-                        {truncateHash(
-                          activeOwnerLaunch.distributionTxHash ||
-                            distributionTxHash
-                        )}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.lpLockTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.lpLockTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>LP lock tx</span>
-                      <strong>
-                        {truncateHash(activeOwnerLaunch.lpLockTxHash)}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.lpLockUpdateTxHash ||
-                  lockRegistryTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${
-                        activeOwnerLaunch.lpLockUpdateTxHash ||
-                        lockRegistryTxHash
-                      }`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Public lock tx</span>
-                      <strong>
-                        {truncateHash(
-                          activeOwnerLaunch.lpLockUpdateTxHash ||
-                            lockRegistryTxHash
-                        )}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.lpWithdrawTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.lpWithdrawTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>LP withdraw tx</span>
-                      <strong>
-                        {truncateHash(activeOwnerLaunch.lpWithdrawTxHash)}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.liquidityWithdrawTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.liquidityWithdrawTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Remove LP tx</span>
-                      <strong>
-                        {truncateHash(
-                          activeOwnerLaunch.liquidityWithdrawTxHash
-                        )}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.registryTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.registryTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Publish tx</span>
-                      <strong>
-                        {truncateHash(activeOwnerLaunch.registryTxHash)}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.registryLaunchId ? (
-                    <div>
-                      <span>Registry ID</span>
-                      <strong>#{activeOwnerLaunch.registryLaunchId}</strong>
-                    </div>
-                  ) : null}
-                  {activeOwnerLaunch.registryUpdateTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.registryUpdateTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Update tx</span>
-                      <strong>
-                        {truncateHash(activeOwnerLaunch.registryUpdateTxHash)}
-                      </strong>
-                    </a>
-                  ) : null}
-                  {activeOwnerLaunch.registryStatusTxHash ? (
-                    <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.registryStatusTxHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>Status tx</span>
-                      <strong>
-                        {truncateHash(activeOwnerLaunch.registryStatusTxHash)}
-                      </strong>
-                    </a>
-                  ) : null}
-                </div>
-              ) : null}
             </article>
           ) : null}
 
@@ -3988,11 +3507,10 @@ const Launchpad = () => {
               }`}
             >
               <div className={styles.planHeader}>
-                <span>CW20 distribution</span>
-                <h3>Send tokens to holders</h3>
+                <span>Distribution</span>
+                <h3>Send tokens</h3>
                 <p>
-                  Use this for CW20 only tokens, team allocations, community
-                  tests, or post-launch distributions. One line is one transfer.
+                  One line is one CW20 transfer.
                 </p>
               </div>
               <div className={styles.poolStatusGrid}>
@@ -4084,8 +3602,8 @@ const Launchpad = () => {
           {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
             <article id="launchpad-pool" className={`card ${styles.poolSetup}`}>
               <div className={styles.planHeader}>
-                <span>Step 1 / Pool setup</span>
-                <h3>Terraswap LUNC pair</h3>
+                <span>Step 1</span>
+                <h3>LUNC pair</h3>
               </div>
               <div className={styles.poolStatusGrid}>
                 <div>
@@ -4188,9 +3706,7 @@ const Launchpad = () => {
               ) : null}
 
               <div className={styles.noticeBox}>
-                Creating a pair only opens the pool contract. Providing
-                liquidity funds the market, but LP tokens stay unlocked until
-                the lock contract is added.
+                Create the pair first, then add liquidity.
               </div>
 
               {activePairLookup.status === "error" &&
@@ -4401,8 +3917,8 @@ const Launchpad = () => {
           {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
             <article id="launchpad-lock" className={`card ${styles.lockSetup}`}>
               <div className={styles.planHeader}>
-                <span>Step 2 / LP lock</span>
-                <h3>Lock liquidity tokens</h3>
+                <span>Step 2</span>
+                <h3>Lock LP</h3>
               </div>
               <div className={styles.poolStatusGrid}>
                 <div>
@@ -4427,8 +3943,7 @@ const Launchpad = () => {
 
               {!activeLiquidityToken ? (
                 <div className={styles.noticeBox}>
-                  Provide liquidity first. Terraswap will mint LP tokens to the
-                  provider wallet, then this tool can lock those LP tokens.
+                  Provide liquidity first. Then lock the LP token here.
                 </div>
               ) : !isLpLockerConfigured ? (
                 <div className={styles.noticeBox}>
@@ -4487,8 +4002,7 @@ const Launchpad = () => {
                       </div>
                     </div>
                     <div className={styles.noticeBox}>
-                      This sends LP CW20 tokens to the Burrito locker contract.
-                      The locker must reject withdrawals until the unlock time.
+                      This sends LP CW20 tokens to the locker until unlock time.
                     </div>
                     {activeLpTokenLookup.status === "error" &&
                     activeLpTokenLookup.error ? (
@@ -4650,8 +4164,8 @@ const Launchpad = () => {
           {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
             <article id="launchpad-listing" className={`card ${styles.listingSetup}`}>
               <div className={styles.planHeader}>
-                <span>Step 3 / Public listing</span>
-                <h3>Publish to Launchpad</h3>
+                <span>Step 3</span>
+                <h3>Publish</h3>
               </div>
               <div className={styles.poolStatusGrid}>
                 <div>
@@ -4684,9 +4198,7 @@ const Launchpad = () => {
                 </div>
               ) : !hasPublicListingPrerequisites && !isActiveListingPublished ? (
                 <div className={styles.noticeBox}>
-                  A public listing requires token contract, LUNC pair, LP token,
-                  LP lock id, and unlock time. Finish pool setup and LP lock
-                  first.
+                  Publish after pair, liquidity, and LP lock are complete.
                 </div>
               ) : (
                 <form className={styles.liquidityForm} onSubmit={handlePublishListing}>
@@ -4826,17 +4338,6 @@ const Launchpad = () => {
         </section>
       ) : null}
 
-      <section className={styles.rulesCard}>
-        <div>
-          <span>V1 rules</span>
-          <strong>Keep the first launchpad version strict.</strong>
-        </div>
-        <ul>
-          {launchChecklist.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
     </PageShell>
   )
 }

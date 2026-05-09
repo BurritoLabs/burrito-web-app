@@ -1,14 +1,15 @@
 .phasePill {
   display: inline-flex;
   align-items: center;
-  height: 30px;
-  padding: 0 12px;
+  height: 26px;
+  padding: 0 10px;
   border-radius: 999px;
   border: var(--border-width) solid rgba(104, 216, 63, 0.28);
-  background: rgba(104, 216, 63, 0.1);
+  background: rgba(104, 216, 63, 0.08);
   color: rgba(181, 245, 149, 0.96);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-xxs);
   font-weight: var(--bold);
+  letter-spacing: 0.08em;
 }
 
 .hero {
@@ -274,30 +275,31 @@
 }
 
 .tabBar {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 6px;
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
   border: var(--border-width) solid var(--card-border);
-  border-radius: var(--radius-lg);
+  border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.018)),
-    rgba(16, 29, 24, 0.72);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+    rgba(16, 29, 24, 0.64);
 }
 
 .tabButton {
   min-width: 0;
-  min-height: 54px;
-  padding: 9px 12px;
-  display: grid;
-  justify-items: start;
-  align-content: center;
-  gap: 3px;
-  border-radius: var(--radius-md);
+  min-height: 34px;
+  padding: 0 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
   border: var(--border-width) solid transparent;
   background: transparent;
   color: rgba(240, 250, 241, 0.68);
-  text-align: left;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .tabButton span {
@@ -310,7 +312,7 @@
 
 .tabButton strong {
   color: inherit;
-  font-size: var(--font-size);
+  font-size: var(--font-size-small);
 }
 
 .tabButtonActive {
@@ -321,8 +323,8 @@
 
 .createGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 16px;
+  grid-template-columns: minmax(0, 660px) minmax(280px, 360px);
+  gap: 14px;
   align-items: start;
 }
 
@@ -330,17 +332,25 @@
 .previewCard,
 .readinessCard,
 .exploreIntro,
+.launchDetailPanel,
 .launchCard,
 .ownerIntro,
+.ownerImport,
+.ownerReadiness,
+.ownerSummary,
+.tokenDistribution,
 .poolSetup,
 .lockSetup,
 .listingSetup {
-  background: rgba(16, 29, 24, 0.76);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
+    rgba(13, 26, 21, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .formCard {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .formHeader {
@@ -475,7 +485,7 @@
 
 .modeCard {
   min-width: 0;
-  min-height: 104px;
+  min-height: 74px;
   padding: 12px;
   border-radius: var(--radius-lg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
@@ -679,7 +689,7 @@
 
 .previewStack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   position: sticky;
   top: 14px;
 }
@@ -779,7 +789,7 @@
 
 .previewStats div,
 .launchCardStats div {
-  min-height: 66px;
+  min-height: 58px;
   padding: 11px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.1);
@@ -1001,19 +1011,19 @@
 .manageGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .exploreIntro,
 .ownerIntro {
   grid-column: span 3;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.016)),
-    rgba(16, 29, 24, 0.76);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.01)),
+    rgba(13, 26, 21, 0.72);
 }
 
 .ownerIntro {
@@ -1031,9 +1041,8 @@
 .ownerImport {
   grid-column: span 3;
   order: 8;
-  background: rgba(16, 29, 24, 0.66);
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .importRow {
@@ -1063,9 +1072,9 @@
 
 .launchCard,
 .emptyState {
-  min-height: 188px;
+  min-height: 164px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: space-between;
 }
 
@@ -1108,17 +1117,23 @@
 }
 
 .exploreControls {
-  display: grid;
-  justify-items: end;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
   gap: 8px;
-  min-width: min(440px, 100%);
+  flex-wrap: wrap;
+  min-width: min(560px, 100%);
 }
 
 .launchSearch,
 .launchSort {
-  width: min(360px, 100%);
+  width: min(300px, 100%);
   display: grid;
   gap: 6px;
+}
+
+.launchSort {
+  width: min(170px, 100%);
 }
 
 .launchSearch span,
@@ -1241,8 +1256,8 @@
 .launchDetailPanel {
   grid-column: 1 / -1;
   background:
-    radial-gradient(circle at 12% 0%, rgba(104, 216, 63, 0.14), transparent 34%),
-    rgba(16, 29, 24, 0.82);
+    radial-gradient(circle at 8% 0%, rgba(104, 216, 63, 0.1), transparent 30%),
+    rgba(13, 26, 21, 0.8);
   display: grid;
   gap: 12px;
 }
@@ -1256,7 +1271,7 @@
 
 .launchDetailGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1380,25 +1395,24 @@
 .ownerReadiness,
 .ownerSummary {
   grid-column: 1 / -1;
-  background: rgba(16, 29, 24, 0.76);
   display: grid;
   gap: 12px;
 }
 
 .ownerReadiness {
-  order: 2;
+  order: 3;
   background:
-    radial-gradient(circle at 8% 0%, rgba(104, 216, 63, 0.12), transparent 34%),
-    rgba(16, 29, 24, 0.78);
+    radial-gradient(circle at 8% 0%, rgba(104, 216, 63, 0.09), transparent 32%),
+    rgba(13, 26, 21, 0.78);
 }
 
 .ownerSummary {
-  order: 6;
+  order: 2;
 }
 
 .ownerReadinessGrid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
 }
 
@@ -1448,7 +1462,7 @@
 
 .ownerSummaryGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
 }
 
@@ -1527,15 +1541,15 @@
 }
 
 .poolSetup {
-  order: 3;
-}
-
-.lockSetup {
   order: 4;
 }
 
-.listingSetup {
+.lockSetup {
   order: 5;
+}
+
+.listingSetup {
+  order: 6;
 }
 
 .tokenDistribution {
@@ -1833,12 +1847,13 @@
   }
 
   .tabBar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
   }
 
   .tabButton {
-    min-height: 46px;
-    padding: 8px;
+    flex: 1 1 0;
+    min-height: 38px;
+    padding: 0 10px;
   }
 
   .createStepper {
@@ -1875,7 +1890,7 @@
 
 @media (max-width: 600px) {
   .phasePill {
-    width: 100%;
+    width: auto;
     justify-content: center;
   }
 
