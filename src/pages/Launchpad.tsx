@@ -267,9 +267,8 @@ const modeOptions: Array<{
 const launchFilters: Array<{ id: LaunchFilter; label: string }> = [
   { id: "all", label: "All" },
   { id: "live", label: "Live" },
-  { id: "pending", label: "Pending" },
   { id: "ended", label: "Ended" },
-  { id: "risk", label: "Risk flagged" }
+  { id: "risk", label: "Needs info" }
 ]
 
 const launchSortOptions: Array<{ id: LaunchSort; label: string }> = [
@@ -277,7 +276,7 @@ const launchSortOptions: Array<{ id: LaunchSort; label: string }> = [
   { id: "oldest", label: "Oldest" },
   { id: "unlockSoon", label: "Unlock soon" },
   { id: "unlockLong", label: "Longest lock" },
-  { id: "risk", label: "Risk first" }
+  { id: "risk", label: "Needs info first" }
 ]
 
 const launchRiskRank = (launch: LaunchCardItem) => {
@@ -336,7 +335,7 @@ const sampleLaunches: LaunchCardItem[] = [
     name: "Churro Labs",
     pair: "CHURRO / LUNC",
     state: "risk",
-    status: "Risk flagged",
+    status: "Needs review",
     liquidity: "$9,300",
     lock: "45 days",
     creator: "terra1...0v7k",
@@ -798,6 +797,12 @@ const Launchpad = () => {
     next.set("tab", "explore")
     next.set("launch", launchId)
     setSearchParams(next)
+    window.requestAnimationFrame(() => {
+      document.getElementById("launchpad-selected-launch")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      })
+    })
   }
 
   const scrollToManageSection = (targetId?: string) => {
@@ -835,6 +840,19 @@ const Launchpad = () => {
   const isCw20Only = draft.mode === "cw20"
   const lockDays = toNumber(draft.lockDays)
   const decimals = toNumber(draft.decimals)
+  const lockDaysIsWhole = Number.isInteger(lockDays)
+  const launchLockDaysValid =
+    isCw20Only || (lockDaysIsWhole && lockDays >= 30 && lockDays <= 3650)
+  const launchLockDaysError =
+    !isCw20Only && draft.lockDays.trim()
+      ? !lockDaysIsWhole
+        ? "LP lock days must be a whole number."
+        : lockDays < 30
+          ? "Minimum LP lock is 30 days."
+          : lockDays > 3650
+            ? "Maximum LP lock is 3650 days."
+            : ""
+      : ""
   const registryTokenContracts = useMemo(
     () => registryLaunches.map((launch) => launch.token_contract),
     [registryLaunches]
@@ -859,10 +877,6 @@ const Launchpad = () => {
       {
         label: "Decimals",
         done: Number.isInteger(decimals) && decimals >= 0 && decimals <= 18
-      },
-      {
-        label: "Public info",
-        done: Boolean(draft.website.trim() || draft.description.trim())
       }
     ]
     const launchItems = isCw20Only
@@ -874,12 +888,16 @@ const Launchpad = () => {
         ]
       : [
       {
+        label: "Public info",
+        done: Boolean(draft.website.trim() || draft.description.trim())
+      },
+      {
         label: "Pool liquidity",
         done: launchMath.luncLiquidity > 0 && launchMath.poolPercent >= 10
       },
       {
         label: "LP lock",
-        done: lockDays >= 30
+        done: launchLockDaysValid
       }
         ]
     const items = [...baseItems, ...launchItems]
@@ -896,10 +914,10 @@ const Launchpad = () => {
     draft.symbol,
     draft.website,
     isCw20Only,
+    launchLockDaysValid,
     launchMath.luncLiquidity,
     launchMath.poolPercent,
-    launchMath.supply,
-    lockDays
+    launchMath.supply
   ])
 
   const canPreviewBuild = readiness.percent === 100
@@ -919,8 +937,8 @@ const Launchpad = () => {
     launchMath.poolPercent <= 100 &&
     launchMath.tokenForPool > 0
   const safetyStepDone =
-    (isCw20Only || lockDays >= 30) &&
-    Boolean(draft.website.trim() || draft.description.trim())
+    isCw20Only ||
+    (launchLockDaysValid && Boolean(draft.website.trim() || draft.description.trim()))
   const createStepStatus = {
     token: {
       done: tokenStepDone,
@@ -2901,56 +2919,62 @@ const Launchpad = () => {
                 <div className={styles.sectionLabel}>Liquidity skipped</div>
                 <div className={styles.noticeBox}>
                   CW20 only creates the token contract without a pool or Swap
-                  route.
+                  route. Website and description are optional.
                 </div>
               </div>
             ) : null}
 
             {activeCreateStep === "launch" ? (
               <div className={styles.formSection}>
-                <div className={styles.sectionLabel}>Safety and public info</div>
-                <div className={styles.formGrid}>
-                  <label className={styles.field}>
-                    <span>LP lock days</span>
-                    <input
-                      value={draft.lockDays}
-                      onChange={updateDraft("lockDays")}
-                      inputMode="numeric"
-                      disabled={isCw20Only}
-                    />
-                  </label>
-                  <div className={styles.readOnlyField}>
-                    <span>{isCw20Only ? "Token mode" : "Launch label"}</span>
-                    <strong>{isCw20Only ? "CW20 only" : "Open launch"}</strong>
-                  </div>
+                <div className={styles.sectionLabel}>
+                  {isCw20Only ? "Confirmation" : "Safety and public info"}
                 </div>
-                <div className={styles.formGrid}>
-                  <label className={styles.field}>
-                    <span>Website</span>
-                    <input
-                      value={draft.website}
-                      onChange={updateDraft("website")}
-                      placeholder="https://"
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>X</span>
-                    <input
-                      value={draft.xProfile}
-                      onChange={updateDraft("xProfile")}
-                      placeholder="@project"
-                    />
-                  </label>
-                </div>
-                <label className={styles.field}>
-                  <span>Description</span>
-                  <textarea
-                    value={draft.description}
-                    onChange={updateDraft("description")}
-                    placeholder="Short public description shown before trading."
-                    rows={4}
-                  />
-                </label>
+                {!isCw20Only ? (
+                  <>
+                    <div className={styles.formGrid}>
+                      <label className={styles.field}>
+                        <span>LP lock days</span>
+                        <input
+                          value={draft.lockDays}
+                          onChange={updateDraft("lockDays")}
+                          inputMode="numeric"
+                        />
+                        {launchLockDaysError ? (
+                          <small className={styles.fieldWarning}>
+                            {launchLockDaysError}
+                          </small>
+                        ) : null}
+                      </label>
+                    </div>
+                    <div className={styles.formGrid}>
+                      <label className={styles.field}>
+                        <span>Website</span>
+                        <input
+                          value={draft.website}
+                          onChange={updateDraft("website")}
+                          placeholder="https://"
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>X</span>
+                        <input
+                          value={draft.xProfile}
+                          onChange={updateDraft("xProfile")}
+                          placeholder="@project"
+                        />
+                      </label>
+                    </div>
+                    <label className={styles.field}>
+                      <span>Description</span>
+                      <textarea
+                        value={draft.description}
+                        onChange={updateDraft("description")}
+                        placeholder="Short public description shown before trading."
+                        rows={4}
+                      />
+                    </label>
+                  </>
+                ) : null}
                 <label className={styles.confirmBox}>
                   <input
                     type="checkbox"
@@ -3154,7 +3178,10 @@ const Launchpad = () => {
             </div>
           </article>
           {selectedLaunch ? (
-            <article className={`card ${styles.launchDetailPanel}`}>
+            <article
+              id="launchpad-selected-launch"
+              className={`card ${styles.launchDetailPanel}`}
+            >
               <div className={styles.launchDetailHeader}>
                 <div className={styles.launchCardTop}>
                   <LaunchTokenLogo
@@ -3251,7 +3278,12 @@ const Launchpad = () => {
             </article>
           ) : null}
           {filteredLaunches.map((item) => (
-            <article className={`card ${styles.launchCard}`} key={item.id}>
+            <article
+              className={`card ${styles.launchCard} ${
+                selectedLaunch?.id === item.id ? styles.launchCardSelected : ""
+              }`}
+              key={item.id}
+            >
               <div className={styles.launchCardTop}>
                 <LaunchTokenLogo
                   symbol={item.symbol}
@@ -3280,11 +3312,15 @@ const Launchpad = () => {
                 <div className={styles.riskLine}>{item.risk}</div>
                 <div className={styles.launchCardActions}>
                   <button
-                    className="uiButton uiButtonOutline"
+                    className={
+                      selectedLaunch?.id === item.id
+                        ? "uiButton uiButtonPrimary"
+                        : "uiButton uiButtonOutline"
+                    }
                     type="button"
                     onClick={() => handleSelectLaunch(item.id)}
                   >
-                    Details
+                    {selectedLaunch?.id === item.id ? "Selected" : "Details"}
                   </button>
                   {item.pairContract ? (
                     <Link
@@ -3325,7 +3361,8 @@ const Launchpad = () => {
           <article className={`card ${styles.ownerIntro}`}>
             <div>
               <span>Manage</span>
-              <h3>Owner tools</h3>
+              <h3>My launches</h3>
+              <p>Select a launch, then finish the next required step.</p>
             </div>
             <div className={styles.ownerControlPanel}>
               <div className={styles.ownerSelector}>
@@ -3341,8 +3378,15 @@ const Launchpad = () => {
                       type="button"
                       onClick={() => setActiveOwnerId(launch.id)}
                     >
-                      <span>{launch.mode}</span>
-                      <strong>{launch.pair}</strong>
+                      <LaunchTokenLogo
+                        symbol={launch.symbol}
+                        logoUrl={launch.logoUrl}
+                        pairedWithLunc={isLuncPairLabel(launch.pair)}
+                      />
+                      <div>
+                        <span>{launch.mode}</span>
+                        <strong>{launch.pair}</strong>
+                      </div>
                     </button>
                   ))
                 ) : (
@@ -3381,7 +3425,7 @@ const Launchpad = () => {
           >
             <div>
               <span>Import token</span>
-              <h3>Add existing CW20</h3>
+              <h3>Recover an existing CW20</h3>
             </div>
             <div className={styles.importRow}>
               <input
@@ -3406,7 +3450,7 @@ const Launchpad = () => {
           {activeOwnerLaunch ? (
             <article className={`card ${styles.ownerReadiness}`}>
               <div className={styles.planHeader}>
-                <span>Next action</span>
+                <span>Next step</span>
                 <h3>{activeOwnerNextAction.title}</h3>
                 <p>{activeOwnerNextAction.text}</p>
               </div>
@@ -3439,17 +3483,22 @@ const Launchpad = () => {
 
           {activeOwnerLaunch ? (
             <article className={`card ${styles.ownerSummary}`}>
-              <div className={styles.launchCardTop}>
-                <LaunchTokenLogo
-                  symbol={activeOwnerLaunch.symbol}
-                  logoUrl={activeOwnerLaunch.logoUrl}
-                  pairedWithLunc={isLuncPairLabel(activeOwnerLaunch.pair)}
-                />
-                <div>
-                  <span>{activeOwnerLaunch.ownerStatus}</span>
-                  <strong>{activeOwnerLaunch.pair}</strong>
-                  <p>{activeOwnerLaunch.name}</p>
+              <div className={styles.ownerSummaryTop}>
+                <div className={styles.launchCardTop}>
+                  <LaunchTokenLogo
+                    symbol={activeOwnerLaunch.symbol}
+                    logoUrl={activeOwnerLaunch.logoUrl}
+                    pairedWithLunc={isLuncPairLabel(activeOwnerLaunch.pair)}
+                  />
+                  <div>
+                    <span>Selected launch</span>
+                    <strong>{activeOwnerLaunch.pair}</strong>
+                    <p>{activeOwnerLaunch.name}</p>
+                  </div>
                 </div>
+                <strong className={styles.ownerStatusBadge}>
+                  {activeOwnerLaunch.ownerStatus}
+                </strong>
               </div>
               <div className={styles.ownerSummaryGrid}>
                 <div>

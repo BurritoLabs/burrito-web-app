@@ -591,6 +591,13 @@
   line-height: 1.5;
 }
 
+.fieldWarning {
+  color: #ff8a8a;
+  font-size: var(--font-size-xs);
+  font-weight: var(--bold);
+  line-height: 1.35;
+}
+
 .field input:focus,
 .field textarea:focus {
   border-color: rgba(104, 216, 63, 0.62);
@@ -1028,19 +1035,25 @@
   accent-color: var(--green);
 }
 
-.exploreGrid,
-.manageGrid {
+.exploreGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
+.manageGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.75fr);
+  gap: 14px;
+  align-items: start;
+}
+
 .exploreIntro,
 .ownerIntro {
-  grid-column: span 3;
-  display: flex;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.01)),
@@ -1048,7 +1061,11 @@
 }
 
 .ownerIntro {
+  display: flex;
+  justify-content: space-between;
   order: 1;
+  padding: 16px 18px;
+  border-color: rgba(104, 216, 63, 0.18);
 }
 
 .exploreIntro p,
@@ -1060,7 +1077,7 @@
 }
 
 .ownerImport {
-  grid-column: span 3;
+  grid-column: 1 / -1;
   order: 8;
   display: grid;
   gap: 10px;
@@ -1099,6 +1116,14 @@
   align-content: space-between;
 }
 
+.launchCardSelected {
+  border-color: rgba(104, 216, 63, 0.44);
+  background:
+    linear-gradient(135deg, rgba(104, 216, 63, 0.11), transparent 42%),
+    rgba(13, 26, 21, 0.82);
+  box-shadow: 0 0 0 1px rgba(104, 216, 63, 0.08);
+}
+
 .emptyState {
   grid-column: 1 / -1;
   min-height: 150px;
@@ -1133,28 +1158,32 @@
 .filterBar {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
+  width: 100%;
 }
 
 .exploreControls {
   display: flex;
   align-items: flex-end;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: wrap;
-  min-width: min(560px, 100%);
+  min-width: 0;
+  width: 100%;
 }
 
-.launchSearch,
-.launchSort {
-  width: min(300px, 100%);
+.launchSearch {
+  flex: 1 1 300px;
+  min-width: min(300px, 100%);
   display: grid;
   gap: 6px;
 }
 
 .launchSort {
-  width: min(170px, 100%);
+  flex: 0 0 170px;
+  display: grid;
+  gap: 6px;
 }
 
 .launchSearch span,
@@ -1345,7 +1374,7 @@
 .ownerControlPanel {
   display: grid;
   gap: 8px;
-  min-width: min(440px, 100%);
+  min-width: min(560px, 100%);
 }
 
 .ownerSyncRow {
@@ -1383,17 +1412,44 @@
 }
 
 .ownerSelectButton {
-  min-width: 142px;
-  min-height: 48px;
-  padding: 8px 10px;
+  min-width: 166px;
+  min-height: 54px;
+  padding: 8px 11px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.045);
   color: rgba(240, 250, 241, 0.7);
-  display: grid;
-  justify-items: start;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   text-align: left;
+}
+
+.ownerSelectButton .launchLogo {
+  width: 28px;
+  height: 28px;
+}
+
+.ownerSelectButton .launchPairLogo {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+.ownerSelectButton .launchPairPrimary .launchLogo {
+  width: 30px;
+  height: 30px;
+}
+
+.ownerSelectButton .launchPairSecondary .launchLogo {
+  width: 17px;
+  height: 17px;
+}
+
+.ownerSelectButton div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .ownerSelectButton span {
@@ -1405,6 +1461,9 @@
 .ownerSelectButton strong {
   color: inherit;
   font-size: var(--font-size-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ownerSelectButtonActive {
@@ -1415,12 +1474,12 @@
 
 .ownerReadiness,
 .ownerSummary {
-  grid-column: 1 / -1;
   display: grid;
   gap: 12px;
 }
 
 .ownerReadiness {
+  grid-column: 2;
   order: 3;
   background:
     radial-gradient(circle at 8% 0%, rgba(104, 216, 63, 0.09), transparent 32%),
@@ -1428,12 +1487,37 @@
 }
 
 .ownerSummary {
+  grid-column: 1;
   order: 2;
+  background:
+    linear-gradient(135deg, rgba(104, 216, 63, 0.09), transparent 44%),
+    rgba(13, 26, 21, 0.78);
+}
+
+.ownerSummaryTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.ownerStatusBadge {
+  max-width: 220px;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(104, 216, 63, 0.28);
+  background: rgba(104, 216, 63, 0.11);
+  color: var(--green);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  line-height: 1.2;
+  text-align: right;
 }
 
 .ownerReadinessGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
@@ -1448,13 +1532,15 @@
 }
 
 .ownerReadinessGrid div {
-  min-height: 56px;
+  min-height: 44px;
   padding: 9px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 193, 7, 0.22);
   background: rgba(255, 193, 7, 0.065);
-  display: grid;
-  align-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1470,6 +1556,7 @@
   color: rgba(255, 236, 181, 0.96);
   font-size: var(--font-size-small);
   overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .ownerReadinessGrid .readinessDone {
@@ -1562,22 +1649,27 @@
 }
 
 .poolSetup {
+  grid-column: 1;
   order: 4;
 }
 
 .lockSetup {
+  grid-column: 2;
   order: 5;
 }
 
 .listingSetup {
+  grid-column: 2;
   order: 6;
 }
 
 .tokenDistribution {
+  grid-column: 2;
   order: 7;
 }
 
 .ownerPrimaryTool {
+  grid-column: 1 / -1;
   order: 3;
 }
 
@@ -1827,11 +1919,13 @@
   .exploreIntro,
   .ownerIntro,
   .ownerImport,
-  .ownerReadiness {
-    grid-column: auto;
-  }
-
-  .ownerSummary {
+  .ownerReadiness,
+  .ownerSummary,
+  .poolSetup,
+  .lockSetup,
+  .listingSetup,
+  .tokenDistribution,
+  .ownerPrimaryTool {
     grid-column: auto;
   }
 
@@ -1922,6 +2016,10 @@
     border-radius: 10px;
   }
 
+  .exploreIntro {
+    grid-template-columns: 1fr;
+  }
+
   .heroCopy {
     min-height: auto;
     padding: 22px 18px;
@@ -1940,6 +2038,7 @@
   .exploreIntro,
   .launchDetailHeader,
   .ownerIntro,
+  .ownerSummaryTop,
   .launchCardBottom,
   .launchDetailActions,
   .ownerQuickActions,
