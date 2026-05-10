@@ -477,6 +477,27 @@
   color: rgba(218, 247, 203, 0.92);
 }
 
+.feeNotice {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(104, 216, 63, 0.28);
+  background: rgba(104, 216, 63, 0.09);
+  display: grid;
+  gap: 5px;
+}
+
+.feeNotice span,
+.feeNotice small {
+  color: rgba(240, 250, 241, 0.58);
+  font-size: var(--font-size-xs);
+  font-weight: var(--bold);
+}
+
+.feeNotice strong {
+  color: #ffffff;
+  font-size: var(--font-size-title);
+}
+
 .modeGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

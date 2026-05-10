@@ -6,8 +6,10 @@ import {
   type FormEvent
 } from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./Launchpad.module.css"
+import { CLASSIC_DENOMS } from "../app/chain"
 import {
   buildCw20InstantiateMessage,
   buildCw20TransferMessage,
@@ -67,6 +69,13 @@ type CreateStep = "token" | "launch"
 type LaunchFilter = "all" | "live" | "pending" | "ended" | "risk"
 type LaunchSort = "newest" | "oldest" | "unlockSoon" | "unlockLong" | "risk"
 type LaunchMode = "launchpad" | "cw20"
+
+const LAUNCHPAD_CREATION_FEE_LUNC = 30_000
+const LAUNCHPAD_CREATION_FEE_MICRO = BigInt(LAUNCHPAD_CREATION_FEE_LUNC) * 1_000_000n
+const LAUNCHPAD_FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
+const LAUNCHPAD_CREATION_FEE_LABEL = `${new Intl.NumberFormat("en-US").format(
+  LAUNCHPAD_CREATION_FEE_LUNC
+)} LUNC`
 
 type OwnerLaunchRecord = {
   id: string
@@ -407,6 +416,20 @@ const formatPrice = (value: number) => {
 
 const formatDateTime = (value: string | number | Date) =>
   new Date(value).toLocaleString()
+
+const buildLaunchpadCreationFeeMessage = (sender: string) => ({
+  typeUrl: "/cosmos.bank.v1beta1.MsgSend",
+  value: MsgSend.fromPartial({
+    fromAddress: sender,
+    toAddress: LAUNCHPAD_FEE_RECIPIENT,
+    amount: [
+      {
+        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+        amount: LAUNCHPAD_CREATION_FEE_MICRO.toString()
+      }
+    ]
+  })
+})
 
 const normalizeOptionalHttpUrl = (value: string, field: string) => {
   const trimmed = value.trim()
@@ -1040,7 +1063,8 @@ const Launchpad = () => {
       startTx(`Create ${tokenSymbol}`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
-      const message = buildCw20InstantiateMessage(
+      const creationFeeMessage = buildLaunchpadCreationFeeMessage(signerAddress)
+      const createTokenMessage = buildCw20InstantiateMessage(
         {
           creatorAddress: signerAddress,
           name: draft.name,
@@ -1055,7 +1079,7 @@ const Launchpad = () => {
       )
       const result = await client.signAndBroadcast(
         signerAddress,
-        [message],
+        [creationFeeMessage, createTokenMessage],
         "auto",
         isCw20Only ? "Burrito CW20 only" : "Burrito launch token"
       )
@@ -2937,6 +2961,14 @@ const Launchpad = () => {
                   />
                   <span>{riskConfirmationText}</span>
                 </label>
+                <div className={styles.feeNotice}>
+                  <span>Creation fee</span>
+                  <strong>{LAUNCHPAD_CREATION_FEE_LABEL}</strong>
+                  <small>
+                    Charged once when the token contract is created. Network gas is
+                    separate.
+                  </small>
+                </div>
               </div>
             ) : null}
 
@@ -3014,6 +3046,10 @@ const Launchpad = () => {
                     ? "CW20 only"
                     : `${formatNumber(toNumber(draft.lockDays), 0)} days`}
                 </strong>
+              </div>
+              <div className={styles.lockStrip}>
+                <span>Creation fee</span>
+                <strong>{LAUNCHPAD_CREATION_FEE_LABEL}</strong>
               </div>
               <div className={styles.progressHeader}>
                 <div>
