@@ -77,6 +77,9 @@ const LAUNCHPAD_FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
 const LAUNCHPAD_CREATION_FEE_LABEL = `${new Intl.NumberFormat("en-US").format(
   LAUNCHPAD_CREATION_FEE_LUNC
 )} LUNC`
+const CW20_SYMBOL_PATTERN = /^[A-Z-]{3,12}$/
+const TERRA_TOKEN_DECIMALS = 6
+const TERRA_TOKEN_DECIMALS_LABEL = String(TERRA_TOKEN_DECIMALS)
 
 type OwnerLaunchRecord = {
   id: string
@@ -208,7 +211,7 @@ const initialDraft: DraftLaunch = {
   name: "",
   symbol: "",
   supply: "1000000000",
-  decimals: "6",
+  decimals: TERRA_TOKEN_DECIMALS_LABEL,
   tokenForPoolPercent: "60",
   luncLiquidity: "10000000",
   lockDays: "90",
@@ -364,7 +367,11 @@ const loadStoredDraft = () => {
     const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
     if (!raw) return initialDraft
     const parsed = JSON.parse(raw) as Partial<DraftLaunch>
-    return { ...initialDraft, ...parsed }
+    return {
+      ...initialDraft,
+      ...parsed,
+      decimals: TERRA_TOKEN_DECIMALS_LABEL
+    }
   } catch {
     return initialDraft
   }
@@ -855,7 +862,7 @@ const Launchpad = () => {
   const tokenSymbol = draft.symbol.trim().toUpperCase() || "TOKEN"
   const isCw20Only = draft.mode === "cw20"
   const lockDays = toNumber(draft.lockDays)
-  const decimals = toNumber(draft.decimals)
+  const decimals = TERRA_TOKEN_DECIMALS
   const lockDaysIsWhole = Number.isInteger(lockDays)
   const launchLockDaysValid =
     isCw20Only || (lockDaysIsWhole && lockDays >= 30 && lockDays <= 3650)
@@ -869,6 +876,12 @@ const Launchpad = () => {
             ? "Maximum LP lock is 3650 days."
             : ""
       : ""
+  const normalizedDraftSymbol = draft.symbol.trim().toUpperCase()
+  const symbolIsValid = CW20_SYMBOL_PATTERN.test(normalizedDraftSymbol)
+  const symbolError =
+    draft.symbol.trim() && !symbolIsValid
+      ? "Use 3-12 letters or hyphens only. Numbers are not supported."
+      : ""
   const registryTokenContracts = useMemo(
     () => registryLaunches.map((launch) => launch.token_contract),
     [registryLaunches]
@@ -876,7 +889,6 @@ const Launchpad = () => {
   const registryTokenMetadata = useResolvedCw20Whitelist(registryTokenContracts)
 
   const readiness = useMemo(() => {
-    const symbol = draft.symbol.trim().toUpperCase()
     const baseItems = [
       {
         label: "Token name",
@@ -884,15 +896,11 @@ const Launchpad = () => {
       },
       {
         label: "Symbol",
-        done: /^[A-Z0-9]{2,12}$/.test(symbol)
+        done: symbolIsValid
       },
       {
         label: "Supply",
         done: launchMath.supply > 0
-      },
-      {
-        label: "Decimals",
-        done: Number.isInteger(decimals) && decimals >= 0 && decimals <= 18
       }
     ]
     const launchItems = isCw20Only
@@ -924,28 +932,22 @@ const Launchpad = () => {
       percent: Math.round((completed / items.length) * 100)
     }
   }, [
-    decimals,
     draft.description,
     draft.name,
-    draft.symbol,
     draft.website,
     isCw20Only,
     launchLockDaysValid,
     launchMath.luncLiquidity,
     launchMath.poolPercent,
-    launchMath.supply
+    launchMath.supply,
+    symbolIsValid
   ])
 
   const canPreviewBuild = readiness.percent === 100
-  const normalizedDraftSymbol = draft.symbol.trim().toUpperCase()
-  const symbolIsValid = /^[A-Z0-9]{2,12}$/.test(normalizedDraftSymbol)
   const tokenStepDone =
     draft.name.trim().length >= 3 &&
     symbolIsValid &&
-    launchMath.supply > 0 &&
-    Number.isInteger(decimals) &&
-    decimals >= 0 &&
-    decimals <= 18
+    launchMath.supply > 0
   const liquidityStepDone =
     isCw20Only ||
     launchMath.luncLiquidity > 0 &&
@@ -958,7 +960,7 @@ const Launchpad = () => {
   const createStepStatus = {
     token: {
       done: tokenStepDone,
-      hint: "Add a valid name, 2-12 character symbol, supply, and 0-18 decimals."
+      hint: "Add a valid name, 3-12 letter symbol, and supply."
     },
     launch: {
       done: liquidityStepDone && safetyStepDone && readiness.percent === 100,
@@ -971,7 +973,6 @@ const Launchpad = () => {
     (step) => step.id === activeCreateStep
   )
   const activeStepStatus = createStepStatus[activeCreateStep]
-  const activeStepIsFirst = activeCreateStepIndex <= 0
   const activeStepIsLast = activeCreateStepIndex >= createSteps.length - 1
 
   useEffect(() => {
@@ -1054,11 +1055,6 @@ const Launchpad = () => {
     }
   }, [registryLaunches, registryLpLocks])
 
-  const goToPreviousCreateStep = () => {
-    const previous = createSteps[activeCreateStepIndex - 1]?.id
-    if (previous) setActiveCreateStep(previous)
-  }
-
   const resetDraft = () => {
     setDraft(initialDraft)
     setActiveCreateStep("token")
@@ -1076,7 +1072,7 @@ const Launchpad = () => {
       return
     }
     if (!requiresFullLaunch && !tokenStepDone) {
-      setCreateError("Complete token name, symbol, supply, and decimals first.")
+      setCreateError("Complete token name, symbol, and supply first.")
       return
     }
     if (!connectorId || !account?.address) {
@@ -2803,7 +2799,7 @@ const Launchpad = () => {
             <div className={styles.formHeader}>
               <div>
                 <h3>
-                  {activeCreateStep === "token" ? "Create token" : "Launch setup"}
+                  {activeCreateStep === "token" ? "Token details" : "Launch setup"}
                 </h3>
               </div>
               <div className={styles.formHeaderActions}>
@@ -2862,12 +2858,15 @@ const Launchpad = () => {
                           ...current,
                           symbol: event.target.value
                             .toUpperCase()
-                            .replace(/[^A-Z0-9]/g, "")
+                            .replace(/[^A-Z-]/g, "")
                         }))
                       }
                       placeholder="TACO"
                       maxLength={12}
                     />
+                    {symbolError ? (
+                      <small className={styles.fieldWarning}>{symbolError}</small>
+                    ) : null}
                   </label>
                   <label className={styles.field}>
                     <span>Total supply</span>
@@ -2875,14 +2874,6 @@ const Launchpad = () => {
                       value={draft.supply}
                       onChange={updateDraft("supply")}
                       inputMode="decimal"
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>Decimals</span>
-                    <input
-                      value={draft.decimals}
-                      onChange={updateDraft("decimals")}
-                      inputMode="numeric"
                     />
                   </label>
                   <label className={`${styles.field} ${styles.fullField}`}>
@@ -2895,8 +2886,7 @@ const Launchpad = () => {
                   </label>
                 </div>
                 <div className={styles.noticeBox}>
-                  Fixed supply CW20. No mint, tax, blacklist, or hidden owner
-                  controls in V1.
+                  Fixed supply CW20. Decimals are fixed to 6 on Terra Classic.
                 </div>
               </div>
             ) : null}
@@ -3029,14 +3019,6 @@ const Launchpad = () => {
 
             <div className={styles.stepActions}>
               <button
-                className="uiButton uiButtonOutline"
-                type="button"
-                disabled={activeStepIsFirst}
-                onClick={goToPreviousCreateStep}
-              >
-                Back
-              </button>
-              <button
                 className="uiButton uiButtonPrimary"
                 type="button"
                 disabled={
@@ -3044,21 +3026,21 @@ const Launchpad = () => {
                   !activeStepStatus.done ||
                   (activeStepIsLast && !riskAcknowledged)
                 }
-                onClick={() =>
-                  handleCreateTokenContract(
-                    activeStepIsLast ? "full-launch" : "token-only"
-                  )
-                }
+                onClick={() => {
+                  if (!activeStepIsLast) {
+                    setActiveCreateStep("launch")
+                    return
+                  }
+                  void handleCreateTokenContract("full-launch")
+                }}
               >
                 {createSubmitting
                   ? "Broadcasting..."
                   : activeStepIsLast
-                  ? riskAcknowledged
-                    ? isCw20Only
-                      ? "Create CW20"
-                      : "Create launch"
-                    : "Confirm risks"
-                  : "Create token"}
+                  ? isCw20Only
+                    ? "Create CW20"
+                    : "Create launch"
+                  : "Next"}
               </button>
             </div>
           </form>
