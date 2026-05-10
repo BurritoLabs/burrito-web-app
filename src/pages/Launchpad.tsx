@@ -69,6 +69,7 @@ type CreateStep = "token" | "launch"
 type LaunchFilter = "all" | "live" | "pending" | "ended" | "risk"
 type LaunchSort = "newest" | "oldest" | "unlockSoon" | "unlockLong" | "risk"
 type LaunchMode = "launchpad" | "cw20"
+type ManageSection = "pool" | "lock" | "listing" | "distribution"
 
 const LAUNCHPAD_CREATION_FEE_LUNC = 30_000
 const LAUNCHPAD_CREATION_FEE_MICRO = BigInt(LAUNCHPAD_CREATION_FEE_LUNC) * 1_000_000n
@@ -284,6 +285,16 @@ const launchRiskRank = (launch: LaunchCardItem) => {
   if (launch.state === "pending") return 1
   if (launch.state === "live") return 2
   return 3
+}
+
+const getManageSectionFromTarget = (
+  targetId?: string
+): ManageSection | null => {
+  if (targetId === "launchpad-distribution") return "distribution"
+  if (targetId === "launchpad-lock") return "lock"
+  if (targetId === "launchpad-listing") return "listing"
+  if (targetId === "launchpad-pool") return "pool"
+  return null
 }
 
 const sampleLaunches: LaunchCardItem[] = [
@@ -676,6 +687,8 @@ const Launchpad = () => {
     () => searchParams.get("launch") ?? ""
   )
   const [activeOwnerId, setActiveOwnerId] = useState("")
+  const [activeManageSection, setActiveManageSection] =
+    useState<ManageSection>("pool")
   const [draft, setDraft] = useState<DraftLaunch>(() => loadStoredDraft())
   const [createdLaunches, setCreatedLaunches] = useState<OwnerLaunchRecord[]>(
     () => loadCreatedLaunches()
@@ -806,11 +819,14 @@ const Launchpad = () => {
   }
 
   const scrollToManageSection = (targetId?: string) => {
-    if (!targetId) return
-    document.getElementById(targetId)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    })
+    const section = getManageSectionFromTarget(targetId)
+    if (section) setActiveManageSection(section)
+    window.setTimeout(() => {
+      document.getElementById(targetId ?? "launchpad-manage-tools")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      })
+    }, 0)
   }
 
   const launchMath = useMemo(() => {
@@ -1826,6 +1842,21 @@ const Launchpad = () => {
     activeOwnerLaunch &&
       (activeOwnerIsCw20Only || hasDistributedTokens || isActiveListingPublished)
   )
+  useEffect(() => {
+    if (!activeOwnerRecordId) return
+    if (activeOwnerIsCw20Only) {
+      setActiveManageSection("distribution")
+      return
+    }
+    if (activeManageSection === "distribution" && !showOwnerDistributionTool) {
+      setActiveManageSection("pool")
+    }
+  }, [
+    activeManageSection,
+    activeOwnerIsCw20Only,
+    activeOwnerRecordId,
+    showOwnerDistributionTool
+  ])
   const riskConfirmationText = isCw20Only
     ? "I understand CW20 only mode creates a token contract without price, pool, Market listing, or Swap route."
     : "I understand the launch price comes from initial liquidity, and LP lock details will be public."
@@ -3581,7 +3612,77 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch && showOwnerDistributionTool ? (
+          {activeOwnerLaunch ? (
+            <article
+              id="launchpad-manage-tools"
+              className={`card ${styles.ownerToolNav}`}
+            >
+              <div>
+                <span>Tools</span>
+                <h3>Manage flow</h3>
+              </div>
+              <div className={styles.ownerToolTabs}>
+                {!activeOwnerIsCw20Only ? (
+                  <>
+                    <button
+                      className={`${styles.ownerToolTab} ${
+                        activeManageSection === "pool"
+                          ? styles.ownerToolTabActive
+                          : ""
+                      }`}
+                      type="button"
+                      onClick={() => setActiveManageSection("pool")}
+                    >
+                      <span>01</span>
+                      <strong>Pool</strong>
+                    </button>
+                    <button
+                      className={`${styles.ownerToolTab} ${
+                        activeManageSection === "lock"
+                          ? styles.ownerToolTabActive
+                          : ""
+                      }`}
+                      type="button"
+                      onClick={() => setActiveManageSection("lock")}
+                    >
+                      <span>02</span>
+                      <strong>LP lock</strong>
+                    </button>
+                    <button
+                      className={`${styles.ownerToolTab} ${
+                        activeManageSection === "listing"
+                          ? styles.ownerToolTabActive
+                          : ""
+                      }`}
+                      type="button"
+                      onClick={() => setActiveManageSection("listing")}
+                    >
+                      <span>03</span>
+                      <strong>Publish</strong>
+                    </button>
+                  </>
+                ) : null}
+                {showOwnerDistributionTool ? (
+                  <button
+                    className={`${styles.ownerToolTab} ${
+                      activeManageSection === "distribution"
+                        ? styles.ownerToolTabActive
+                        : ""
+                    }`}
+                    type="button"
+                    onClick={() => setActiveManageSection("distribution")}
+                  >
+                    <span>{activeOwnerIsCw20Only ? "01" : "04"}</span>
+                    <strong>Distribute</strong>
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ) : null}
+
+          {activeOwnerLaunch &&
+          showOwnerDistributionTool &&
+          activeManageSection === "distribution" ? (
             <article
               id="launchpad-distribution"
               className={`card ${styles.tokenDistribution} ${
@@ -3681,7 +3782,9 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
+          {activeOwnerLaunch &&
+          !activeOwnerIsCw20Only &&
+          activeManageSection === "pool" ? (
             <article id="launchpad-pool" className={`card ${styles.poolSetup}`}>
               <div className={styles.planHeader}>
                 <span>Step 1</span>
@@ -3996,7 +4099,9 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
+          {activeOwnerLaunch &&
+          !activeOwnerIsCw20Only &&
+          activeManageSection === "lock" ? (
             <article id="launchpad-lock" className={`card ${styles.lockSetup}`}>
               <div className={styles.planHeader}>
                 <span>Step 2</span>
@@ -4243,7 +4348,9 @@ const Launchpad = () => {
             </article>
           ) : null}
 
-          {activeOwnerLaunch && !activeOwnerIsCw20Only ? (
+          {activeOwnerLaunch &&
+          !activeOwnerIsCw20Only &&
+          activeManageSection === "listing" ? (
             <article id="launchpad-listing" className={`card ${styles.listingSetup}`}>
               <div className={styles.planHeader}>
                 <span>Step 3</span>

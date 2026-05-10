@@ -1600,6 +1600,69 @@
   min-width: 118px;
 }
 
+.ownerToolNav {
+  grid-column: 1 / -1;
+  order: 4;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), rgba(255, 255, 255, 0.01)),
+    rgba(13, 26, 21, 0.74);
+}
+
+.ownerToolNav > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.ownerToolNav h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: var(--font-size-title);
+}
+
+.ownerToolTabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ownerToolTab {
+  min-width: 116px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(240, 250, 241, 0.7);
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  text-align: left;
+}
+
+.ownerToolTab span {
+  color: rgba(240, 250, 241, 0.48);
+  font-size: var(--font-size-xxs);
+  font-weight: var(--bold);
+  letter-spacing: 0.08em;
+}
+
+.ownerToolTab strong {
+  color: inherit;
+  font-size: var(--font-size-small);
+}
+
+.ownerToolTabActive {
+  border-color: rgba(104, 216, 63, 0.46);
+  background: rgba(104, 216, 63, 0.13);
+  color: #ffffff;
+}
+
 .ownerLinkGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1649,28 +1712,28 @@
 }
 
 .poolSetup {
-  grid-column: 1;
-  order: 4;
+  grid-column: 1 / -1;
+  order: 5;
 }
 
 .lockSetup {
-  grid-column: 2;
+  grid-column: 1 / -1;
   order: 5;
 }
 
 .listingSetup {
-  grid-column: 2;
-  order: 6;
+  grid-column: 1 / -1;
+  order: 5;
 }
 
 .tokenDistribution {
-  grid-column: 2;
-  order: 7;
+  grid-column: 1 / -1;
+  order: 5;
 }
 
 .ownerPrimaryTool {
   grid-column: 1 / -1;
-  order: 3;
+  order: 5;
 }
 
 .poolStatusGrid {
@@ -2038,6 +2101,7 @@
   .exploreIntro,
   .launchDetailHeader,
   .ownerIntro,
+  .ownerToolNav,
   .ownerSummaryTop,
   .launchCardBottom,
   .launchDetailActions,
@@ -2054,7 +2118,8 @@
   .launchSearch,
   .launchSort,
   .ownerSelector,
-  .ownerControlPanel {
+  .ownerControlPanel,
+  .ownerToolTabs {
     width: 100%;
     justify-content: flex-start;
     justify-items: stretch;
@@ -2090,6 +2155,10 @@
     width: 100%;
   }
 
+  .ownerToolTab {
+    flex: 1 1 120px;
+  }
+
   .ownerNextActions :global(.uiButton) {
     width: 100%;
   }
@@ -2116,6 +2185,7 @@
   .launchDetailPanel,
   .launchCard,
   .ownerIntro,
+  .ownerToolNav,
   .manageHero,
   .ownerImport,
   .ownerReadiness,
