@@ -135,6 +135,20 @@ export const fetchCw20Balances = async (
   }))
 }
 
+export const fetchCw20Balance = async (address: string, contract: string) => {
+  const normalizedAddress = address.trim()
+  const normalizedContract = contract.trim().toLowerCase()
+  if (!normalizedAddress || !normalizedContract) return "0"
+
+  const query = btoa(JSON.stringify({ balance: { address: normalizedAddress } }))
+  const res = await fetch(
+    `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${normalizedContract}/smart/${query}`
+  )
+  if (!res.ok) return "0"
+  const data = (await res.json()) as { data?: { balance?: string } }
+  return data?.data?.balance ?? "0"
+}
+
 export const useCw20Balances = (
   address: string | undefined,
   whitelist?: Record<string, Cw20Token>,

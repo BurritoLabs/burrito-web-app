@@ -8,7 +8,7 @@ import styles from "../Swap.module.css"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import { fetchBalances, fetchPrices } from "../../app/data/classic"
 import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
-import { useCw20Balances } from "../../app/data/cw20"
+import { fetchCw20Balance, useCw20Balances } from "../../app/data/cw20"
 import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
@@ -53,6 +53,7 @@ type DexQuote = DexConfig & {
   returnAmount: bigint
   spreadAmount: bigint
   commissionAmount: bigint
+  beliefPrice: string | undefined
 }
 
 type SmartSimulateResponse = {
@@ -231,6 +232,15 @@ const bpsToMaxSpread = (bps: bigint) => {
   return asPercent.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") || "0.005"
 }
 
+const ratioToDecimal = (numerator: bigint, denominator: bigint, precision = 18) => {
+  if (numerator <= 0n || denominator <= 0n) return undefined
+  const scale = 10n ** BigInt(precision)
+  const whole = numerator / denominator
+  const fraction = ((numerator % denominator) * scale) / denominator
+  const fractionText = fraction.toString().padStart(precision, "0").replace(/0+$/, "")
+  return fractionText ? `${whole.toString()}.${fractionText}` : whole.toString()
+}
+
 const toAssetInfo = (asset: SwapAsset) => {
   if (asset.type === "native" && asset.denom) {
     return { native_token: { denom: asset.denom } }
@@ -324,12 +334,16 @@ const simulateSwapQuote = async (
   if (!result?.return_amount) {
     throw new Error(`${dex.label} quote unavailable`)
   }
+  const returnAmount = parseBigInt(result.return_amount)
+  const beliefPrice =
+    dex.mode === "garuda" ? undefined : ratioToDecimal(amount, returnAmount)
   return {
     ...dex,
     pair,
-    returnAmount: parseBigInt(result.return_amount),
+    returnAmount,
     spreadAmount: parseBigInt(result.spread_amount),
-    commissionAmount: parseBigInt(result.commission_amount)
+    commissionAmount: parseBigInt(result.commission_amount),
+    beliefPrice
   } satisfies DexQuote
 }
 
@@ -339,7 +353,8 @@ const buildSwapMessage = (
   offerAsset: SwapAsset,
   amountMicro: bigint,
   maxSpread: string,
-  mode: DexQueryMode = "terraswap"
+  mode: DexQueryMode = "terraswap",
+  beliefPrice?: string
 ) => {
   if (offerAsset.type === "native" && offerAsset.denom) {
     const msg =
@@ -357,6 +372,7 @@ const buildSwapMessage = (
                 info: toAssetInfo(offerAsset),
                 amount: amountMicro.toString()
               },
+              ...(beliefPrice ? { belief_price: beliefPrice } : {}),
               max_spread: maxSpread
             }
           }
@@ -382,6 +398,7 @@ const buildSwapMessage = (
       toUtf8(
         JSON.stringify({
           swap: {
+            ...(beliefPrice ? { belief_price: beliefPrice } : {}),
             max_spread: maxSpread
           }
         })
@@ -795,6 +812,33 @@ const SwapPanel = ({
     refetchInterval: 5 * 60 * 1000
   })
 
+  const focusedCw20Contracts = useMemo(() => {
+    const contracts = [fromAsset, toAsset]
+      .filter((asset) => asset.type === "cw20" && asset.contract)
+      .map((asset) => asset.contract!.toLowerCase())
+    return Array.from(new Set(contracts))
+  }, [fromAsset, toAsset])
+
+  const { data: focusedCw20Balances = {} } = useQuery({
+    queryKey: [
+      "swap-focused-cw20-balances",
+      accountAddress,
+      focusedCw20Contracts.join(",")
+    ],
+    queryFn: async () => {
+      const entries = await Promise.all(
+        focusedCw20Contracts.map(async (contract) => [
+          contract,
+          await fetchCw20Balance(accountAddress ?? "", contract)
+        ])
+      )
+      return Object.fromEntries(entries) as Record<string, string>
+    },
+    enabled: Boolean(accountAddress && focusedCw20Contracts.length),
+    staleTime: 0,
+    refetchOnMount: "always"
+  })
+
   const assetBalanceMap = useMemo(() => {
     const map = new Map<string, bigint>()
 
@@ -805,13 +849,14 @@ const SwapPanel = ({
         continue
       }
       if (asset.type === "cw20" && asset.contract) {
-        const tokenBalance = cw20Balances.find((item) => item.address === asset.contract)
-        map.set(asset.id, parseBigInt(tokenBalance?.balance))
+        const contract = asset.contract.toLowerCase()
+        const tokenBalance = cw20Balances.find((item) => item.address === contract)
+        map.set(asset.id, parseBigInt(focusedCw20Balances[contract] ?? tokenBalance?.balance))
       }
     }
 
     return map
-  }, [assets, balances, cw20Balances])
+  }, [assets, balances, cw20Balances, focusedCw20Balances])
 
   const fromBalanceMicro = useMemo(() => {
     return assetBalanceMap.get(fromAsset.id) ?? 0n
@@ -855,14 +900,15 @@ const SwapPanel = ({
       selectedQuotePair
         ? {
             pair: selectedQuotePair,
-            mode: selectedQuoteMode
+            mode: selectedQuoteMode,
+            beliefPrice: selectedQuote?.beliefPrice
           }
         : undefined,
-    [selectedQuoteMode, selectedQuotePair]
+    [selectedQuote?.beliefPrice, selectedQuoteMode, selectedQuotePair]
   )
 
   const selectedQuoteSignature = selectedQuoteId
-    ? `${selectedQuoteId}:${selectedQuotePair}:${selectedQuoteMode}`
+    ? `${selectedQuoteId}:${selectedQuotePair}:${selectedQuoteMode}:${selectedQuote?.beliefPrice ?? ""}`
     : ""
 
   const hasAmountInput = amountInMicro > 0n
@@ -1097,7 +1143,8 @@ const SwapPanel = ({
           quoteFromAsset,
           swapAmountMicro,
           maxSpread,
-          feeQuote?.mode ?? "terraswap"
+          feeQuote?.mode ?? "terraswap",
+          feeQuote?.beliefPrice
         )
         const gasUsed = await client.simulate(
           signerAddress,
@@ -1200,7 +1247,8 @@ const SwapPanel = ({
         fromAsset,
         swapAmountMicro,
         maxSpread,
-        selectedQuote.mode ?? "terraswap"
+        selectedQuote.mode ?? "terraswap",
+        selectedQuote.beliefPrice
       )
       const messages = feeMsg ? [feeMsg, msg] : [msg]
       const result = await client.signAndBroadcast(signerAddress, messages, "auto", SWAP_MEMO)
