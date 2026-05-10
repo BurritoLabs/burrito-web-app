@@ -7,6 +7,10 @@ export type Cw20Balance = Cw20Token & {
   balance: string
 }
 
+type Cw20BalanceOptions = {
+  forceContracts?: string[]
+}
+
 const CACHE_TTL = 5 * 60 * 1000
 const SUPPLY_CACHE_TTL = 15 * 60 * 1000
 
@@ -46,10 +50,16 @@ const buildWhitelistSignature = (whitelist: Record<string, Cw20Token>) => {
 
 export const fetchCw20Balances = async (
   address: string,
-  whitelist: Record<string, Cw20Token>
+  whitelist: Record<string, Cw20Token>,
+  options: Cw20BalanceOptions = {}
 ) => {
   if (!address) return []
 
+  const forceContracts = new Set(
+    (options.forceContracts ?? [])
+      .map((contract) => contract.trim().toLowerCase())
+      .filter(Boolean)
+  )
   const whitelistSignature = buildWhitelistSignature(whitelist)
   const cacheKey = `cw20balance:${address}:classic:${whitelistSignature}`
   const invalidKey = "cw20invalid:classic"
@@ -63,7 +73,7 @@ export const fetchCw20Balances = async (
     })
   }
 
-  if (cached) {
+  if (cached && forceContracts.size === 0) {
     return Object.entries(cached).map(([token, balance]) => ({
       ...whitelist[token],
       address: token,
@@ -71,11 +81,13 @@ export const fetchCw20Balances = async (
     }))
   }
 
-  const entries = Object.entries(whitelist).filter(
-    ([contract]) => !invalidContracts[contract]
-  )
-
-  const results: Record<string, string> = {}
+  const results: Record<string, string> = cached ? { ...cached } : {}
+  const entries = Object.entries(whitelist).filter(([contract]) => {
+    const normalized = contract.toLowerCase()
+    if (forceContracts.has(normalized)) return true
+    if (invalidContracts[normalized]) return false
+    return !(normalized in results)
+  })
   const limit = 4
   let index = 0
 
@@ -83,7 +95,8 @@ export const fetchCw20Balances = async (
     while (index < entries.length) {
       const current = index
       index += 1
-      const [contract] = entries[current]
+      const [contractRaw] = entries[current]
+      const contract = contractRaw.toLowerCase()
       try {
         const query = btoa(JSON.stringify({ balance: { address } }))
         const res = await fetch(
@@ -91,7 +104,7 @@ export const fetchCw20Balances = async (
         )
         if (!res.ok) {
           const message = await res.text()
-          if (message.includes("no such contract")) {
+          if (message.includes("no such contract") && !forceContracts.has(contract)) {
             invalidContracts[contract] = true
           }
           results[contract] = "0"
@@ -102,7 +115,7 @@ export const fetchCw20Balances = async (
       } catch (error: unknown) {
         const message =
           error instanceof Error ? error.message : String(error ?? "")
-        if (message.includes("no such contract")) {
+        if (message.includes("no such contract") && !forceContracts.has(contract)) {
           invalidContracts[contract] = true
         }
         results[contract] = "0"
@@ -124,15 +137,22 @@ export const fetchCw20Balances = async (
 
 export const useCw20Balances = (
   address: string | undefined,
-  whitelist?: Record<string, Cw20Token>
+  whitelist?: Record<string, Cw20Token>,
+  options: Cw20BalanceOptions = {}
 ) => {
   const whitelistSignature = buildWhitelistSignature(whitelist ?? {})
+  const forceSignature = (options.forceContracts ?? [])
+    .map((contract) => contract.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join(",")
 
   return useQuery({
-    queryKey: ["cw20-balances", address, whitelistSignature],
-    queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}),
+    queryKey: ["cw20-balances", address, whitelistSignature, forceSignature],
+    queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}, options),
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
-    staleTime: 60_000
+    staleTime: forceSignature ? 0 : 60_000,
+    refetchOnMount: forceSignature ? "always" : true
   })
 }
 

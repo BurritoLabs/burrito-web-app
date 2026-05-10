@@ -616,6 +616,10 @@ const SwapPanel = ({
     })
     return records
   }, [assetOverrides])
+  const overrideCw20Contracts = useMemo(
+    () => Object.keys(overrideCw20Whitelist),
+    [overrideCw20Whitelist]
+  )
 
   const swapCw20Whitelist = useMemo(
     () => ({ ...cw20Whitelist, ...overrideCw20Whitelist }),
@@ -666,7 +670,11 @@ const SwapPanel = ({
     return [...NATIVE_ASSETS.map(applyOverride), ...cw20Rows]
   }, [assetOverrideMap, swapCw20Whitelist, tradableCw20Set])
 
-  const { data: cw20Balances = [] } = useCw20Balances(accountAddress, swapCw20Whitelist)
+  const { data: cw20Balances = [] } = useCw20Balances(
+    accountAddress,
+    swapCw20Whitelist,
+    { forceContracts: overrideCw20Contracts }
+  )
 
   useEffect(() => {
     if (!assets.length) return

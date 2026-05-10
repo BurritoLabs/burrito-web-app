@@ -54,6 +54,7 @@ const DeferredWalletPanel = () => {
     const handleNavigation = (event: Event) => {
       const detail = (event as CustomEvent<WalletPanelNavigationDetail>).detail
       pendingDetailRef.current = detail ?? { view: "wallet" }
+      window.localStorage.setItem("burritoWalletOpen", "true")
       setRequested(true)
     }
 
@@ -89,6 +90,9 @@ const DeferredWalletPanel = () => {
 
   const handleOpen = () => {
     pendingDetailRef.current = { view: "wallet" }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("burritoWalletOpen", "true")
+    }
     setRequested(true)
   }
 

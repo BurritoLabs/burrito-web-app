@@ -250,7 +250,8 @@ export const useWalletAssets = (accountAddress?: string) => {
   const { data: ibcWhitelist } = useResolvedIbcWhitelist(ibcDenoms)
   const { data: cw20BalancesBase = [] } = useCw20Balances(
     accountAddress,
-    cw20BalanceWhitelist
+    cw20BalanceWhitelist,
+    { forceContracts: launchpadCw20Contracts }
   )
   const resolvedCw20Contracts = useMemo(
     () =>
