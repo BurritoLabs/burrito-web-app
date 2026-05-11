@@ -17,6 +17,10 @@ export type BinodesNetworkOverview = {
   tx_total_cnt?: number
   gas_used?: number
   gas_wanted?: number
+  fee_gas_usd?: number
+  fee_cp_usd?: number
+  fee_op_usd?: number
+  fee_burn_usd?: number
   active_addr_cnt?: number
   new_addr_cnt?: number
   ibc_tx_cnt?: number
@@ -93,8 +97,13 @@ export type BinodesGovernanceOverview = {
   gov_vote_abstain_cnt?: number
 }
 
+export type BinodesDashboardFrequency = "HOUR" | "DAY" | "WEEK"
+
 export type BinodesDashboardActivity = {
   fetchedAt: string
+  bucketCount: number
+  frequency: BinodesDashboardFrequency
+  series: BinodesDashboardSeriesPoint[]
   network?: BinodesNetworkOverview
   dex?: BinodesDexOverview
   burns?: BinodesBurnOverview
@@ -102,6 +111,18 @@ export type BinodesDashboardActivity = {
   stake?: BinodesStakeOverview
   fees?: BinodesFeesOverview
   governance?: BinodesGovernanceOverview
+}
+
+export type BinodesDashboardSeriesPoint = {
+  dt: string
+  txTotalCnt?: number
+  feeGasUsd?: number
+  feeCpUsd?: number
+  feeOpUsd?: number
+  feeBurnUsd?: number
+  voluntaryBurnUsd?: number
+  totalFeeUsd?: number
+  burnUsd?: number
 }
 
 const buildBinodesUrl = (path: string, params?: Record<string, string>) => {
@@ -134,47 +155,309 @@ const fetchBinodesList = async <T>(
   return payload.data ?? []
 }
 
-const firstOrUndefined = <T>(items: T[]) => items[0]
+const latestDate = (items: Array<{ dt?: string }>) =>
+  items
+    .map((item) => item.dt)
+    .filter(Boolean)
+    .sort()
+    .at(-1)
 
-const settleFirst = async <T>(
+const sumNumber = <T>(items: T[], getter: (item: T) => number | undefined) =>
+  items.reduce((sum, item) => {
+    const value = getter(item)
+    return Number.isFinite(value) ? sum + Number(value) : sum
+  }, 0)
+
+const maxNumber = <T>(items: T[], getter: (item: T) => number | undefined) => {
+  const values = items
+    .map(getter)
+    .filter((value): value is number => Number.isFinite(value))
+  return values.length ? Math.max(...values) : undefined
+}
+
+const sumOrUndefined = <T>(
+  items: T[],
+  getter: (item: T) => number | undefined
+) => (items.length ? sumNumber(items, getter) : undefined)
+
+const aggregateNetworkOverview = (
+  items: BinodesNetworkOverview[]
+): BinodesNetworkOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    block_cnt: sumOrUndefined(items, (item) => item.block_cnt),
+    tx_total_cnt: sumOrUndefined(items, (item) => item.tx_total_cnt),
+    gas_used: sumOrUndefined(items, (item) => item.gas_used),
+    gas_wanted: sumOrUndefined(items, (item) => item.gas_wanted),
+    fee_gas_usd: sumOrUndefined(items, (item) => item.fee_gas_usd),
+    fee_cp_usd: sumOrUndefined(items, (item) => item.fee_cp_usd),
+    fee_op_usd: sumOrUndefined(items, (item) => item.fee_op_usd),
+    fee_burn_usd: sumOrUndefined(items, (item) => item.fee_burn_usd),
+    active_addr_cnt: maxNumber(items, (item) => item.active_addr_cnt),
+    new_addr_cnt: sumOrUndefined(items, (item) => item.new_addr_cnt),
+    ibc_tx_cnt: sumOrUndefined(items, (item) => item.ibc_tx_cnt),
+    ibc_volume_usd: sumOrUndefined(items, (item) => item.ibc_volume_usd),
+    net_ibc_flow_usd: sumOrUndefined(items, (item) => item.net_ibc_flow_usd),
+    dex_tx_cnt: sumOrUndefined(items, (item) => item.dex_tx_cnt),
+    dex_volume_usd: sumOrUndefined(items, (item) => item.dex_volume_usd),
+    transfer_cnt: sumOrUndefined(items, (item) => item.transfer_cnt),
+    transfer_amt_usd: sumOrUndefined(items, (item) => item.transfer_amt_usd)
+  }
+}
+
+const aggregateDexOverview = (
+  items: BinodesDexOverview[]
+): BinodesDexOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    dex_volume_usd: sumOrUndefined(items, (item) => item.dex_volume_usd),
+    dex_tx_cnt: sumOrUndefined(items, (item) => item.dex_tx_cnt),
+    dex_swap_in_usd: sumOrUndefined(items, (item) => item.dex_swap_in_usd),
+    dex_swap_out_usd: sumOrUndefined(items, (item) => item.dex_swap_out_usd),
+    dex_spread_loss_usd: sumOrUndefined(items, (item) => item.dex_spread_loss_usd),
+    dex_commission_paid_usd: sumOrUndefined(
+      items,
+      (item) => item.dex_commission_paid_usd
+    ),
+    dex_liquidity_add_usd: sumOrUndefined(
+      items,
+      (item) => item.dex_liquidity_add_usd
+    ),
+    dex_liquidity_remove_usd: sumOrUndefined(
+      items,
+      (item) => item.dex_liquidity_remove_usd
+    )
+  }
+}
+
+const aggregateBurnOverview = (
+  items: BinodesBurnOverview[]
+): BinodesBurnOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    fee_burn_usd: sumOrUndefined(items, (item) => item.fee_burn_usd),
+    voluntary_burn_cnt: sumOrUndefined(items, (item) => item.voluntary_burn_cnt),
+    voluntary_burn_usd: sumOrUndefined(items, (item) => item.voluntary_burn_usd)
+  }
+}
+
+const aggregateIbcOverview = (
+  items: BinodesIbcOverview[]
+): BinodesIbcOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    ibc_tx_in_cnt: sumOrUndefined(items, (item) => item.ibc_tx_in_cnt),
+    ibc_volume_in_usd: sumOrUndefined(items, (item) => item.ibc_volume_in_usd),
+    ibc_tx_out_cnt: sumOrUndefined(items, (item) => item.ibc_tx_out_cnt),
+    ibc_volume_out_usd: sumOrUndefined(items, (item) => item.ibc_volume_out_usd),
+    ibc_tx_cnt: sumOrUndefined(items, (item) => item.ibc_tx_cnt),
+    ibc_volume_usd: sumOrUndefined(items, (item) => item.ibc_volume_usd),
+    net_ibc_flow_usd: sumOrUndefined(items, (item) => item.net_ibc_flow_usd)
+  }
+}
+
+const aggregateStakeOverview = (
+  items: BinodesStakeOverview[]
+): BinodesStakeOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    staking_delegate_cnt: sumOrUndefined(items, (item) => item.staking_delegate_cnt),
+    staking_delegate_actual: sumOrUndefined(
+      items,
+      (item) => item.staking_delegate_actual
+    ),
+    staking_delegate_usd: sumOrUndefined(items, (item) => item.staking_delegate_usd),
+    staking_undelegate_cnt: sumOrUndefined(
+      items,
+      (item) => item.staking_undelegate_cnt
+    ),
+    staking_undelegate_actual: sumOrUndefined(
+      items,
+      (item) => item.staking_undelegate_actual
+    ),
+    staking_undelegate_usd: sumOrUndefined(
+      items,
+      (item) => item.staking_undelegate_usd
+    ),
+    staking_redelegate_cnt: sumOrUndefined(
+      items,
+      (item) => item.staking_redelegate_cnt
+    ),
+    staking_redelegate_actual: sumOrUndefined(
+      items,
+      (item) => item.staking_redelegate_actual
+    ),
+    staking_redelegate_usd: sumOrUndefined(
+      items,
+      (item) => item.staking_redelegate_usd
+    )
+  }
+}
+
+const aggregateFeesOverview = (
+  items: BinodesFeesOverview[]
+): BinodesFeesOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    gas_wanted: sumOrUndefined(items, (item) => item.gas_wanted),
+    gas_used: sumOrUndefined(items, (item) => item.gas_used),
+    fee_gas_usd: sumOrUndefined(items, (item) => item.fee_gas_usd),
+    fee_cp_usd: sumOrUndefined(items, (item) => item.fee_cp_usd),
+    fee_op_usd: sumOrUndefined(items, (item) => item.fee_op_usd)
+  }
+}
+
+const aggregateGovernanceOverview = (
+  items: BinodesGovernanceOverview[]
+): BinodesGovernanceOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    gov_deposit_cnt: sumOrUndefined(items, (item) => item.gov_deposit_cnt),
+    gov_deposit_actual: sumOrUndefined(items, (item) => item.gov_deposit_actual),
+    gov_deposit_usd: sumOrUndefined(items, (item) => item.gov_deposit_usd),
+    gov_proposal_submit_cnt: sumOrUndefined(
+      items,
+      (item) => item.gov_proposal_submit_cnt
+    ),
+    gov_vote_cnt: sumOrUndefined(items, (item) => item.gov_vote_cnt),
+    gov_vote_yes_cnt: sumOrUndefined(items, (item) => item.gov_vote_yes_cnt),
+    gov_vote_no_cnt: sumOrUndefined(items, (item) => item.gov_vote_no_cnt),
+    gov_vote_veto_cnt: sumOrUndefined(items, (item) => item.gov_vote_veto_cnt),
+    gov_vote_abstain_cnt: sumOrUndefined(
+      items,
+      (item) => item.gov_vote_abstain_cnt
+    )
+  }
+}
+
+const buildDashboardSeries = (
+  networkItems: BinodesNetworkOverview[],
+  burnsItems: BinodesBurnOverview[],
+  feesItems: BinodesFeesOverview[]
+): BinodesDashboardSeriesPoint[] => {
+  const byDate = new Map<string, BinodesDashboardSeriesPoint>()
+
+  const ensurePoint = (dt?: string) => {
+    if (!dt) return undefined
+    const existing = byDate.get(dt)
+    if (existing) return existing
+    const next: BinodesDashboardSeriesPoint = { dt }
+    byDate.set(dt, next)
+    return next
+  }
+
+  const setFinite = (
+    point: BinodesDashboardSeriesPoint | undefined,
+    key: keyof Omit<BinodesDashboardSeriesPoint, "dt">,
+    value?: number
+  ) => {
+    if (!point || !Number.isFinite(value)) return
+    point[key] = Number(value)
+  }
+
+  networkItems.forEach((item) => {
+    const point = ensurePoint(item.dt)
+    setFinite(point, "txTotalCnt", item.tx_total_cnt)
+    setFinite(point, "feeGasUsd", item.fee_gas_usd)
+    setFinite(point, "feeCpUsd", item.fee_cp_usd)
+    setFinite(point, "feeOpUsd", item.fee_op_usd)
+    setFinite(point, "feeBurnUsd", item.fee_burn_usd)
+  })
+
+  feesItems.forEach((item) => {
+    const point = ensurePoint(item.dt)
+    setFinite(point, "feeGasUsd", item.fee_gas_usd)
+    setFinite(point, "feeCpUsd", item.fee_cp_usd)
+    setFinite(point, "feeOpUsd", item.fee_op_usd)
+  })
+
+  burnsItems.forEach((item) => {
+    const point = ensurePoint(item.dt)
+    setFinite(point, "feeBurnUsd", item.fee_burn_usd)
+    setFinite(point, "voluntaryBurnUsd", item.voluntary_burn_usd)
+  })
+
+  return Array.from(byDate.values())
+    .map((point) => {
+      const totalFeeUsd =
+        (point.feeGasUsd ?? 0) +
+        (point.feeCpUsd ?? 0) +
+        (point.feeOpUsd ?? 0) +
+        (point.feeBurnUsd ?? 0)
+      const burnUsd = (point.feeBurnUsd ?? 0) + (point.voluntaryBurnUsd ?? 0)
+      return {
+        ...point,
+        totalFeeUsd: totalFeeUsd || undefined,
+        burnUsd: burnUsd || undefined
+      }
+    })
+    .sort((a, b) => a.dt.localeCompare(b.dt))
+}
+
+const settleList = async <T>(
   path: string,
   params?: Record<string, string>
 ) => {
   try {
-    return firstOrUndefined(await fetchBinodesList<T>(path, params))
+    return await fetchBinodesList<T>(path, params)
   } catch {
-    return undefined
+    return []
   }
 }
 
-export const fetchBinodesDashboardActivity =
-  async (): Promise<BinodesDashboardActivity> => {
-    const [
-      network,
-      dex,
-      burns,
-      ibc,
-      stake,
-      fees,
-      governance
-    ] = await Promise.all([
-      settleFirst<BinodesNetworkOverview>("/v1/network/overview"),
-      settleFirst<BinodesDexOverview>("/v1/dex/overview"),
-      settleFirst<BinodesBurnOverview>("/v1/burns/overview"),
-      settleFirst<BinodesIbcOverview>("/v1/ibc/overview"),
-      settleFirst<BinodesStakeOverview>("/v1/stake/overview"),
-      settleFirst<BinodesFeesOverview>("/v1/fees/overview"),
-      settleFirst<BinodesGovernanceOverview>("/v1/governance/overview")
-    ])
-
-    return {
-      fetchedAt: new Date().toISOString(),
-      network,
-      dex,
-      burns,
-      ibc,
-      stake,
-      fees,
-      governance
-    }
+export const fetchBinodesDashboardActivity = async (
+  frequency: BinodesDashboardFrequency = "HOUR",
+  bucketLimit = 50
+): Promise<BinodesDashboardActivity> => {
+  const limit = Math.max(1, Math.min(Math.ceil(bucketLimit), 5000))
+  const params = {
+    limit: String(limit),
+    freq: frequency
   }
+  const [
+    networkItems,
+    dexItems,
+    burnsItems,
+    ibcItems,
+    stakeItems,
+    feesItems,
+    governanceItems
+  ] = await Promise.all([
+    settleList<BinodesNetworkOverview>("/v1/network/overview", params),
+    settleList<BinodesDexOverview>("/v1/dex/overview", params),
+    settleList<BinodesBurnOverview>("/v1/burns/overview", params),
+    settleList<BinodesIbcOverview>("/v1/ibc/overview", params),
+    settleList<BinodesStakeOverview>("/v1/stake/overview", params),
+    settleList<BinodesFeesOverview>("/v1/fees/overview", params),
+    settleList<BinodesGovernanceOverview>("/v1/governance/overview", params)
+  ])
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    bucketCount: Math.max(
+      networkItems.length,
+      dexItems.length,
+      burnsItems.length,
+      ibcItems.length,
+      stakeItems.length,
+      feesItems.length,
+      governanceItems.length
+    ),
+    frequency,
+    series: buildDashboardSeries(networkItems, burnsItems, feesItems),
+    network: aggregateNetworkOverview(networkItems),
+    dex: aggregateDexOverview(dexItems),
+    burns: aggregateBurnOverview(burnsItems),
+    ibc: aggregateIbcOverview(ibcItems),
+    stake: aggregateStakeOverview(stakeItems),
+    fees: aggregateFeesOverview(feesItems),
+    governance: aggregateGovernanceOverview(governanceItems)
+  }
+}

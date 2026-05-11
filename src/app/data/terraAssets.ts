@@ -35,6 +35,9 @@ export type NativeToken = {
 
 const LOCAL_CW20_TOKEN_OVERRIDES: Record<string, Partial<Cw20Token>> = {
   terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt: {
+    symbol: "DO",
+    name: "DO",
+    protocol: "DO",
     icon: "/system/do-cookie.jpg"
   }
 }
@@ -304,23 +307,28 @@ const mergeCw20TokenMetadata = ({
   fallback?: Cw20Token
   onChain?: { name?: string; symbol?: string; decimals?: number; icon?: string }
 }): Cw20Token => {
-  const symbol = onChain?.symbol?.trim() || fallback?.symbol || contract.slice(0, 6).toUpperCase()
-  const name =
-    onChain?.name?.trim() ||
-    fallback?.name?.trim() ||
-    onChain?.symbol?.trim() ||
-    fallback?.symbol ||
-    contract
   const localOverride = LOCAL_CW20_TOKEN_OVERRIDES[contract]
+  const symbol =
+    localOverride?.symbol?.trim() ||
+    fallback?.symbol?.trim() ||
+    onChain?.symbol?.trim() ||
+    contract.slice(0, 6).toUpperCase()
+  const name =
+    localOverride?.name?.trim() ||
+    fallback?.name?.trim() ||
+    fallback?.symbol?.trim() ||
+    onChain?.name?.trim() ||
+    onChain?.symbol?.trim() ||
+    contract
   return {
     token: contract,
     symbol,
     name,
-    protocol: localOverride?.protocol ?? fallback?.protocol,
-    icon: sanitizeAssetIconUrl(localOverride?.icon ?? onChain?.icon ?? fallback?.icon),
-    decimals: Number.isFinite(onChain?.decimals)
-      ? onChain?.decimals
-      : (localOverride?.decimals ?? fallback?.decimals ?? 6)
+    protocol: localOverride?.protocol?.trim() || fallback?.protocol?.trim(),
+    icon: sanitizeAssetIconUrl(localOverride?.icon ?? fallback?.icon ?? onChain?.icon),
+    decimals:
+      localOverride?.decimals ??
+      (Number.isFinite(onChain?.decimals) ? onChain?.decimals : (fallback?.decimals ?? 6))
   }
 }
 

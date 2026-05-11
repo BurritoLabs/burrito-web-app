@@ -92,6 +92,7 @@ export type ClassicSwapDex = {
   label: string
   factory: string
   mode?: "terraswap" | "garuda"
+  pairCodeIds?: readonly number[]
 }
 
 /**
@@ -132,12 +133,14 @@ export const CLASSIC_SWAP_DEXES: readonly ClassicSwapDex[] = [
     id: "garuda-v1",
     label: "Garuda DeFi V1",
     factory: "terra18srpvety7xz28lw5g0f6cx9sw50hyvk3xk7up80ul4pdpauvq7jq5zcm98",
-    mode: "garuda"
+    mode: "garuda",
+    pairCodeIds: [9789]
   },
   {
     id: "garuda-v2",
     label: "Garuda DeFi V2",
     factory: "terra1ypwj6sw25g0qcykv7mzmcvsndvx56r3yrgkaw3fds7yzwl7fwwcsnxkeh7",
-    mode: "garuda"
+    mode: "garuda",
+    pairCodeIds: [10907]
   }
 ]

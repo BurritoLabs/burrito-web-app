@@ -1,12 +1,17 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Dashboard.module.css"
 import {
   fetchCurrentDashboardSnapshot,
+  fetchHistoricalDashboardSnapshot,
   type DashboardSnapshot
 } from "../app/data/dashboard"
-import { fetchBinodesDashboardActivity } from "../app/data/binodes"
+import {
+  fetchBinodesDashboardActivity,
+  type BinodesDashboardFrequency,
+  type BinodesDashboardSeriesPoint
+} from "../app/data/binodes"
 import { fetchPrices } from "../app/data/classic"
 import { formatNumber, formatPercent } from "../app/utils/format"
 
@@ -41,14 +46,6 @@ const formatUsdCompact = (value?: number, signed = false) => {
     notation: "compact",
     maximumFractionDigits: 2
   }).format(value)}`
-}
-
-const formatCompactValue = (value?: number, decimals = 2) => {
-  if (value === undefined || value === null || Number.isNaN(value)) return "--"
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: decimals
-  }).format(value)
 }
 
 const formatUtcHour = (value?: string) => {
@@ -114,7 +111,243 @@ type MetricItem = {
   layout?: MetricLayout
 }
 
+type DashboardRange = "1h" | "24h" | "7d"
+
+const dashboardRanges: Record<
+  DashboardRange,
+  {
+    label: string
+    rangeMs: number
+    ttlMs: number
+    activityFrequency: BinodesDashboardFrequency
+  }
+> = {
+  "1h": {
+    label: "1h",
+    rangeMs: 60 * 60 * 1000,
+    ttlMs: 5 * 60 * 1000,
+    activityFrequency: "HOUR"
+  },
+  "24h": {
+    label: "24h",
+    rangeMs: 24 * 60 * 60 * 1000,
+    ttlMs: 15 * 60 * 1000,
+    activityFrequency: "DAY"
+  },
+  "7d": {
+    label: "7d",
+    rangeMs: 7 * 24 * 60 * 60 * 1000,
+    ttlMs: 60 * 60 * 1000,
+    activityFrequency: "WEEK"
+  }
+}
+
+const dashboardRangeOptions = Object.keys(dashboardRanges) as DashboardRange[]
+
+type ChartPoint = {
+  key: string
+  label: string
+  value: number
+}
+
+const formatChartTick = (value: string, range: DashboardRange) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  if (range !== "1h") {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      timeZone: "UTC"
+    })
+  }
+  const options: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    timeZone: "UTC"
+  }
+  if (range === "1h") options.minute = "2-digit"
+  return date.toLocaleTimeString("en-US", options)
+}
+
+const buildActivityChartPoints = (
+  series: BinodesDashboardSeriesPoint[],
+  range: DashboardRange,
+  maxPoints: number,
+  getter: (point: BinodesDashboardSeriesPoint) => number | undefined
+): ChartPoint[] => {
+  return series
+    .slice(-maxPoints)
+    .map((point) => ({
+      key: point.dt,
+      label: formatChartTick(point.dt, range),
+      value: Number.isFinite(getter(point)) ? Number(getter(point)) : 0
+    }))
+}
+
+const getResponsiveChartPointCount = () => {
+  if (typeof window === "undefined") return 50
+  const width = window.innerWidth
+  if (width >= 1280) return 50
+  if (width >= 1024) return 42
+  if (width >= 768) return 34
+  if (width >= 540) return 26
+  return 18
+}
+
+const useResponsiveChartPointCount = () => {
+  const [pointCount, setPointCount] = useState(getResponsiveChartPointCount)
+
+  useEffect(() => {
+    const updatePointCount = () => {
+      setPointCount(getResponsiveChartPointCount())
+    }
+    updatePointCount()
+    window.addEventListener("resize", updatePointCount)
+    return () => window.removeEventListener("resize", updatePointCount)
+  }, [])
+
+  return pointCount
+}
+
+const PoolChartRow = ({
+  symbol,
+  current,
+  previous
+}: {
+  symbol: "LUNC" | "USTC"
+  current?: number
+  previous?: number
+}) => {
+  const max = Math.max(current ?? 0, previous ?? 0)
+  const currentWidth =
+    max > 0 && current !== undefined ? Math.max(3, (current / max) * 100) : 0
+  const previousWidth =
+    max > 0 && previous !== undefined ? Math.max(3, (previous / max) * 100) : 0
+  const delta =
+    current === undefined || previous === undefined ? undefined : current - previous
+
+  return (
+    <div className={styles.poolChartRow}>
+      <div className={styles.poolChartMeta}>
+        <span>{symbol}</span>
+        <strong>{formatValue(current, 2)}</strong>
+      </div>
+      <div className={styles.poolChartTrack} aria-hidden="true">
+        <i
+          className={styles.poolChartPrevious}
+          style={{ width: `${previousWidth}%` }}
+        />
+        <i
+          className={styles.poolChartCurrent}
+          style={{ width: `${currentWidth}%` }}
+        />
+      </div>
+      <div
+        className={`${styles.poolChartDelta} ${
+          delta === undefined
+            ? styles.neutral
+            : delta >= 0
+              ? styles.up
+              : styles.down
+        }`}
+      >
+        {delta === undefined ? "No range delta" : formatDelta(delta, 2, symbol)}
+      </div>
+    </div>
+  )
+}
+
+const TreasuryChartCard = ({
+  title,
+  subtitle,
+  luncCurrent,
+  luncPrevious,
+  ustcCurrent,
+  ustcPrevious
+}: {
+  title: string
+  subtitle: string
+  luncCurrent?: number
+  luncPrevious?: number
+  ustcCurrent?: number
+  ustcPrevious?: number
+}) => (
+  <article className={`card ${styles.treasuryChartCard}`}>
+    <div>
+      <div className={styles.chartEyebrow}>Treasury</div>
+      <h3 className={styles.chartTitle}>{title}</h3>
+      <p className={styles.chartSubtitle}>{subtitle}</p>
+    </div>
+    <div className={styles.poolChartRows}>
+      <PoolChartRow symbol="LUNC" current={luncCurrent} previous={luncPrevious} />
+      <PoolChartRow symbol="USTC" current={ustcCurrent} previous={ustcPrevious} />
+    </div>
+  </article>
+)
+
+const ActivityChartCard = ({
+  title,
+  subtitle,
+  summaryLabel,
+  points,
+  valueFormatter
+}: {
+  title: string
+  subtitle: string
+  summaryLabel: string
+  points: ChartPoint[]
+  valueFormatter: (value?: number) => string
+}) => {
+  const max = Math.max(...points.map((point) => point.value), 0)
+  const latest = points.at(-1)
+
+  return (
+    <article className={`card ${styles.activityChartCard}`}>
+      <div className={styles.chartHeader}>
+        <div>
+          <div className={styles.chartEyebrow}>{subtitle}</div>
+          <h3 className={styles.chartTitle}>{title}</h3>
+        </div>
+        <div className={styles.chartLatest}>
+          <span>{summaryLabel}</span>
+          {valueFormatter(latest?.value)}
+        </div>
+      </div>
+      {points.length ? (
+        <div className={styles.chart}>
+          <div className={styles.chartBars}>
+            {points.map((point) => {
+              const height =
+                max > 0 && point.value > 0
+                  ? Math.max(4, (point.value / max) * 100)
+                  : 0
+              return (
+                <i
+                  key={point.key}
+                  className={styles.chartBar}
+                  style={{ height: `${height}%` }}
+                  title={`${point.label}: ${valueFormatter(point.value)}`}
+                />
+              )
+            })}
+          </div>
+          <div className={styles.chartAxis}>
+            <span>{points[0]?.label}</span>
+            <span>{latest?.label}</span>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.chartEmpty}>No chart data available.</div>
+      )}
+    </article>
+  )
+}
+
 const Dashboard = () => {
+  const [dashboardRange, setDashboardRange] =
+    useState<DashboardRange>("24h")
+  const activeRange = dashboardRanges[dashboardRange]
+  const chartPointCount = useResponsiveChartPointCount()
+
   const { data: currentSnapshot } = useQuery({
     queryKey: ["dashboard", "snapshot", "current"],
     queryFn: fetchCurrentDashboardSnapshot,
@@ -129,121 +362,36 @@ const Dashboard = () => {
     refetchInterval: 5 * 60 * 1000
   })
 
+  const { data: previousSnapshot, isFetching: previousSnapshotLoading } =
+    useQuery({
+      queryKey: ["dashboard", "snapshot", "historical", dashboardRange],
+      queryFn: () =>
+        fetchHistoricalDashboardSnapshot(
+          dashboardRange,
+          activeRange.rangeMs,
+          activeRange.ttlMs
+        ),
+      enabled: Boolean(currentSnapshot),
+      staleTime: activeRange.ttlMs
+    })
+
   const {
     data: activity,
     isLoading: activityLoading,
     isError: activityError
   } = useQuery({
-    queryKey: ["binodes", "dashboard", "activity"],
-    queryFn: fetchBinodesDashboardActivity,
-    staleTime: 5 * 60 * 1000,
+    queryKey: [
+      "binodes",
+      "dashboard",
+      "activity",
+      activeRange.activityFrequency,
+      chartPointCount
+    ],
+    queryFn: () =>
+      fetchBinodesDashboardActivity(activeRange.activityFrequency, chartPointCount),
+    staleTime: activeRange.ttlMs,
     refetchInterval: 10 * 60 * 1000
   })
-
-  const activityMetrics = useMemo<MetricItem[]>(() => {
-    if (!activity) return []
-    const network = activity.network
-    const dex = activity.dex
-    const burns = activity.burns
-    const ibc = activity.ibc
-    const stake = activity.stake
-    const fees = activity.fees
-    const governance = activity.governance
-    const burnUsd =
-      (burns?.fee_burn_usd ?? 0) + (burns?.voluntary_burn_usd ?? 0)
-
-    return [
-      {
-        key: "activityTx",
-        label: "Tx this hour",
-        value: formatValue(network?.tx_total_cnt, 0)
-      },
-      {
-        key: "activityAddresses",
-        label: "Active addresses",
-        value: formatValue(network?.active_addr_cnt, 0),
-        delta:
-          network?.new_addr_cnt === undefined
-            ? undefined
-            : `${formatNumber(network.new_addr_cnt, 0)} new`
-      },
-      {
-        key: "activityDexVolume",
-        label: "DEX volume",
-        value: formatUsdCompact(dex?.dex_volume_usd ?? network?.dex_volume_usd),
-        delta:
-          dex?.dex_tx_cnt === undefined
-            ? undefined
-            : `${formatNumber(dex.dex_tx_cnt, 0)} swaps`
-      },
-      {
-        key: "activityTransfer",
-        label: "Transfer volume",
-        value: formatUsdCompact(network?.transfer_amt_usd),
-        delta:
-          network?.transfer_cnt === undefined
-            ? undefined
-            : `${formatNumber(network.transfer_cnt, 0)} transfers`
-      },
-      {
-        key: "activityBurn",
-        label: "Burned value",
-        value: formatUsdCompact(burnUsd || undefined),
-        delta:
-          burns?.voluntary_burn_cnt === undefined
-            ? undefined
-            : `${formatNumber(burns.voluntary_burn_cnt, 0)} voluntary burns`
-      },
-      {
-        key: "activityIbc",
-        label: "IBC net flow",
-        value: formatUsdCompact(ibc?.net_ibc_flow_usd, true),
-        delta:
-          ibc?.ibc_tx_cnt === undefined
-            ? undefined
-            : `${formatNumber(ibc.ibc_tx_cnt, 0)} IBC txs`,
-        deltaRaw: ibc?.net_ibc_flow_usd
-      },
-      {
-        key: "activityDelegated",
-        label: "Delegated",
-        value: formatCompactValue(stake?.staking_delegate_actual),
-        unit: "LUNC",
-        delta:
-          stake?.staking_delegate_cnt === undefined
-            ? undefined
-            : `${formatNumber(stake.staking_delegate_cnt, 0)} delegations`
-      },
-      {
-        key: "activityUndelegated",
-        label: "Undelegated",
-        value: formatCompactValue(stake?.staking_undelegate_actual),
-        unit: "LUNC",
-        delta:
-          stake?.staking_undelegate_cnt === undefined
-            ? undefined
-            : `${formatNumber(stake.staking_undelegate_cnt, 0)} undelegations`
-      },
-      {
-        key: "activityGasFees",
-        label: "Gas fees",
-        value: formatUsdCompact(fees?.fee_gas_usd),
-        delta:
-          fees?.gas_used === undefined
-            ? undefined
-            : `${formatCompactValue(fees.gas_used, 1)} gas used`
-      },
-      {
-        key: "activityGovernance",
-        label: "Governance votes",
-        value: formatValue(governance?.gov_vote_cnt, 0),
-        delta:
-          governance?.gov_proposal_submit_cnt === undefined
-            ? undefined
-            : `${formatNumber(governance.gov_proposal_submit_cnt, 0)} proposals`
-      }
-    ]
-  }, [activity])
 
   const activityTimestamp =
     activity?.network?.dt ??
@@ -254,16 +402,58 @@ const Dashboard = () => {
     activity?.fees?.dt ??
     activity?.governance?.dt
 
+  const activitySeries = useMemo(() => activity?.series ?? [], [activity?.series])
+  const totalFeeChartPoints = useMemo(
+    () =>
+      buildActivityChartPoints(
+        activitySeries,
+        dashboardRange,
+        chartPointCount,
+        (point) => point.totalFeeUsd
+      ),
+    [activitySeries, chartPointCount, dashboardRange]
+  )
+  const transactionChartPoints = useMemo(
+    () =>
+      buildActivityChartPoints(
+        activitySeries,
+        dashboardRange,
+        chartPointCount,
+        (point) => point.txTotalCnt
+      ),
+    [activitySeries, chartPointCount, dashboardRange]
+  )
+  const burnChartPoints = useMemo(
+    () =>
+      buildActivityChartPoints(
+        activitySeries,
+        dashboardRange,
+        chartPointCount,
+        (point) => point.burnUsd
+      ),
+    [activitySeries, chartPointCount, dashboardRange]
+  )
+
   const metrics = useMemo<MetricItem[]>(() => {
     if (!currentSnapshot) return []
-    let prev: DashboardSnapshot | undefined
+    const prev: DashboardSnapshot | undefined = previousSnapshot
     const deltaFromPrev = (current: number, previous?: number) =>
       previous === undefined ? undefined : current - previous
 
     const luncPrice = prices?.lunc?.usd
     const ustcPrice = prices?.ustc?.usd
-    const luncChange = prices?.lunc?.usd_24h_change
-    const ustcChange = prices?.ustc?.usd_24h_change
+    const luncChange =
+      dashboardRange === "1h"
+        ? prices?.lunc?.usd_1h_change
+        : dashboardRange === "7d"
+          ? prices?.lunc?.usd_7d_change
+          : prices?.lunc?.usd_24h_change
+    const ustcChange =
+      dashboardRange === "1h"
+        ? prices?.ustc?.usd_1h_change
+        : dashboardRange === "7d"
+          ? prices?.ustc?.usd_7d_change
+          : prices?.ustc?.usd_24h_change
     const luncMarketCap =
       luncPrice && currentSnapshot.circulatingLunc
         ? luncPrice * currentSnapshot.circulatingLunc
@@ -439,69 +629,49 @@ const Dashboard = () => {
     ]
   }, [
     currentSnapshot,
+    dashboardRange,
+    previousSnapshot,
     prices?.lunc?.usd,
+    prices?.lunc?.usd_1h_change,
     prices?.lunc?.usd_24h_change,
+    prices?.lunc?.usd_7d_change,
     prices?.ustc?.usd,
-    prices?.ustc?.usd_24h_change
+    prices?.ustc?.usd_1h_change,
+    prices?.ustc?.usd_24h_change,
+    prices?.ustc?.usd_7d_change
   ])
 
   return (
-    <PageShell title="Dashboard">
+    <PageShell
+      title="Dashboard"
+      extra={
+        <div className={styles.rangeSwitch} aria-label="Dashboard range">
+          {dashboardRangeOptions.map((range) => (
+            <button
+              key={range}
+              type="button"
+              className={`${styles.rangeButton} ${
+                dashboardRange === range ? styles.rangeButtonActive : ""
+              }`}
+              onClick={() => setDashboardRange(range)}
+            >
+              {dashboardRanges[range].label}
+            </button>
+          ))}
+        </div>
+      }
+    >
       <div className={styles.page}>
         <section className={styles.section}>
           <div className={styles.sectionTitleRow}>
             <div>
-              <div className={styles.sectionHeader}>Network Activity</div>
+              <div className={styles.sectionHeader}>Market</div>
               <p className={styles.sectionSubtext}>
-                Live indexed Terra Classic activity from BiNodes. Current bucket:
-                {" "}
-                {formatUtcHour(activityTimestamp)}
+                Showing {activeRange.label} price changes and chain deltas
+                {previousSnapshotLoading ? "..." : "."}
               </p>
             </div>
-            <span className={styles.sourcePill}>
-              {activityLoading
-                ? "Loading BiNodes"
-                : activityError
-                  ? "BiNodes fallback inactive"
-                  : "Powered by BiNodes"}
-            </span>
           </div>
-          {activityMetrics.length ? (
-            <div className={styles.metricsActivity}>
-              {activityMetrics.map((item) => (
-                <div key={item.key} className={`card ${styles.metricCard}`}>
-                  <div className={styles.metricLabel}>{item.label}</div>
-                  <div className={styles.metricValue}>
-                    {item.value}
-                    {item.unit ? <span>{item.unit}</span> : null}
-                  </div>
-                  {item.delta !== undefined && item.delta !== "--" ? (
-                    <div
-                      className={`${styles.delta} ${
-                        item.deltaRaw === undefined
-                          ? styles.neutral
-                          : item.deltaRaw >= 0
-                            ? styles.up
-                            : styles.down
-                      }`}
-                    >
-                      {item.delta}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className={`card ${styles.activityEmpty}`}>
-              {activityLoading
-                ? "Loading BiNodes activity..."
-                : "BiNodes activity is unavailable. Existing dashboard data remains active."}
-            </div>
-          )}
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>Market</div>
           <div className={styles.metricsTop}>
             {metrics
               .filter(
@@ -595,53 +765,23 @@ const Dashboard = () => {
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Treasury</div>
-          <div className={styles.metricsTwo}>
-            {metrics
-              .filter(
-                (item) =>
-                  item.key === "communityPoolLunc" ||
-                  item.key === "communityPoolUstc" ||
-                  item.key === "oraclePoolLunc" ||
-                  item.key === "oraclePoolUstc"
-              )
-              .map((item) => (
-                <div
-                  key={item.key}
-                  className={`card ${styles.metricCard} ${
-                    item.size === "large" ? styles.metricCardLarge : ""
-                  } ${
-                    item.layout === "wide"
-                      ? styles.metricWide
-                      : item.layout === "tall"
-                        ? styles.metricTall
-                        : ""
-                  }`}
-                >
-                  <div className={styles.metricLabel}>{item.label}</div>
-                  <div className={styles.metricValue}>
-                    {item.value}
-                    {item.unit ? <span>{item.unit}</span> : null}
-                  </div>
-                  {item.delta !== undefined && item.delta !== "--" ? (
-                    <div
-                      className={`${styles.delta} ${
-                        item.deltaRaw === undefined
-                          ? styles.neutral
-                          : item.deltaRaw >= 0
-                            ? styles.up
-                            : styles.down
-                      }`}
-                    >
-                      {item.deltaRaw === undefined ? null : item.deltaRaw >= 0 ? (
-                        <DeltaUpIcon />
-                      ) : (
-                        <DeltaDownIcon />
-                      )}
-                      {item.delta}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+          <div className={styles.treasuryCharts}>
+            <TreasuryChartCard
+              title="Community Pool"
+              subtitle={`Current balance and ${activeRange.label} delta`}
+              luncCurrent={currentSnapshot?.luncCommunity}
+              luncPrevious={previousSnapshot?.luncCommunity}
+              ustcCurrent={currentSnapshot?.ustcCommunity}
+              ustcPrevious={previousSnapshot?.ustcCommunity}
+            />
+            <TreasuryChartCard
+              title="Oracle Pool"
+              subtitle={`Current balance and ${activeRange.label} delta`}
+              luncCurrent={currentSnapshot?.luncOracle}
+              luncPrevious={previousSnapshot?.luncOracle}
+              ustcCurrent={currentSnapshot?.ustcOracle}
+              ustcPrevious={previousSnapshot?.ustcOracle}
+            />
           </div>
         </section>
 
@@ -753,6 +893,49 @@ const Dashboard = () => {
                   ) : null}
                 </div>
               ))}
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <div className={styles.sectionTitleRow}>
+            <div>
+              <div className={styles.sectionHeader}>Network Activity</div>
+              <p className={styles.sectionSubtext}>
+                Last {chartPointCount} {activeRange.label} buckets from BiNodes
+                {activity?.bucketCount ? `, ${activity.bucketCount} returned` : ""}
+                . Latest bucket: {formatUtcHour(activityTimestamp)}
+              </p>
+            </div>
+            <div className={styles.poweredByLine}>
+              {activityLoading
+                ? "Loading BiNodes"
+                : activityError
+                  ? "BiNodes unavailable"
+                  : "Powered by BiNodes"}
+            </div>
+          </div>
+          <div className={styles.activityCharts}>
+            <ActivityChartCard
+              title="Total Fee Accrued"
+              subtitle="Includes gas, pool fees, and burn tax"
+              summaryLabel={`Latest ${activeRange.label}`}
+              points={totalFeeChartPoints}
+              valueFormatter={formatUsdCompact}
+            />
+            <ActivityChartCard
+              title="Total Transactions"
+              subtitle="Transaction count"
+              summaryLabel={`Latest ${activeRange.label}`}
+              points={transactionChartPoints}
+              valueFormatter={(value) => formatValue(value, 0)}
+            />
+            <ActivityChartCard
+              title="Burn"
+              subtitle="Fee burn and voluntary burn"
+              summaryLabel={`Latest ${activeRange.label}`}
+              points={burnChartPoints}
+              valueFormatter={formatUsdCompact}
+            />
           </div>
         </section>
 

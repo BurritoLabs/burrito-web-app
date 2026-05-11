@@ -140,6 +140,13 @@ type FactoryPairsResponse = {
   pairs?: FactoryPairEntry[]
 }
 
+type CodeContractsResponse = {
+  contracts?: string[]
+  pagination?: {
+    next_key?: string | null
+  }
+}
+
 const FACTORY_PAIR_CACHE_TTL = 30 * 60 * 1000
 const LOCAL_INDEX_CACHE_TTL = 5 * 60 * 1000
 let factoryPairDexCache:
@@ -930,7 +937,31 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
   const pairContracts = new Set<string>()
   const limit = 30
 
-  // Garuda pair query schema is different and currently small enough for a single page.
+  const loadContractsByCodeId = async (codeId: number) => {
+    let nextKey = ""
+
+    for (let page = 0; page < 120; page += 1) {
+      try {
+        const url = new URL(`${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/code/${codeId}/contracts`)
+        url.searchParams.set("pagination.limit", "200")
+        if (nextKey) url.searchParams.set("pagination.key", nextKey)
+
+        const response = await fetch(url.toString())
+        if (!response.ok) break
+        const data = (await response.json()) as CodeContractsResponse
+        ;(data.contracts ?? []).forEach((contract) => {
+          if (contract?.startsWith("terra1")) pairContracts.add(contract.toLowerCase())
+        })
+
+        const rawNext = data.pagination?.next_key
+        if (!rawNext) break
+        nextKey = rawNext
+      } catch {
+        break
+      }
+    }
+  }
+
   if (dex.mode === "garuda") {
     try {
       const data = await queryContractSmart<FactoryPairsResponse>(dex.factory, {
@@ -943,6 +974,7 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
     } catch {
       // Ignore single dex failures.
     }
+    await Promise.all((dex.pairCodeIds ?? []).map((codeId) => loadContractsByCodeId(codeId)))
     return pairContracts
   }
 

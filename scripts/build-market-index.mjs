@@ -52,6 +52,7 @@ const DEXES = [
     factory:
       "terra18srpvety7xz28lw5g0f6cx9sw50hyvk3xk7up80ul4pdpauvq7jq5zcm98",
     mode: "garuda",
+    pairCodeIds: [9789],
   },
   {
     id: "garuda-v2",
@@ -59,6 +60,7 @@ const DEXES = [
     factory:
       "terra1ypwj6sw25g0qcykv7mzmcvsndvx56r3yrgkaw3fds7yzwl7fwwcsnxkeh7",
     mode: "garuda",
+    pairCodeIds: [10907],
   },
 ];
 
@@ -238,19 +240,23 @@ const loadPairsFromTerraswapFactory = async (factory) => {
   return mergePairEntries(pairEntries);
 };
 
-const loadPairsFromGarudaFactory = async (factory) => {
+const loadPairsFromGarudaFactory = async (dex) => {
   const pairEntries = [];
-  let data;
   try {
-    data = await querySmart(factory, { pairs: { limit: 2000 } });
+    const data = await querySmart(dex.factory, { pairs: { limit: 2000 } });
+    const pairs = Array.isArray(data?.pairs) ? data.pairs : [];
+    for (const pair of pairs) {
+      const entry = toPairEntry(pair);
+      if (entry) pairEntries.push(entry);
+    }
   } catch {
-    return [];
+    // Garuda factory lists are not complete on-chain, so keep code-id fallback below.
   }
-  const pairs = Array.isArray(data?.pairs) ? data.pairs : [];
-  for (const pair of pairs) {
-    const entry = toPairEntry(pair);
-    if (entry) pairEntries.push(entry);
-  }
+
+  const codeIds = Array.isArray(dex.pairCodeIds) ? dex.pairCodeIds : [];
+  const byCode = await mapWithConcurrency(codeIds, 3, (codeId) => loadContractsByCodeId(codeId));
+  byCode.forEach((contracts) => pairEntries.push(...(contracts ?? [])));
+
   return mergePairEntries(pairEntries);
 };
 
@@ -265,6 +271,44 @@ const loadPairsFromAstroportFactory = async (dex) => {
   byCode.forEach((contracts) => merged.push(...(contracts ?? [])));
 
   return mergePairEntries(merged);
+};
+
+const resolvePoolSnapshots = async (pairEntries, dex) => {
+  const firstPass = await mapWithConcurrency(pairEntries, 14, async (pairEntry) => ({
+    pairEntry,
+    snapshot: await resolvePoolSnapshot(pairEntry, dex),
+  }));
+
+  const snapshots = [];
+  const unresolved = [];
+
+  firstPass.forEach(({ pairEntry, snapshot }) => {
+    if (snapshot) {
+      snapshots.push(snapshot);
+    } else {
+      unresolved.push(pairEntry);
+    }
+  });
+
+  if (!unresolved.length) return snapshots;
+
+  // Public LCDs occasionally drop smart queries under burst load. Retry unresolved
+  // pools slowly before deciding a discovered pair has no readable pool state.
+  const retryPass = await mapWithConcurrency(unresolved, 3, async (pairEntry) => ({
+    pairEntry,
+    snapshot: await resolvePoolSnapshot(pairEntry, dex),
+  }));
+
+  retryPass.forEach(({ snapshot }) => {
+    if (snapshot) snapshots.push(snapshot);
+  });
+
+  const recovered = retryPass.filter(({ snapshot }) => Boolean(snapshot)).length;
+  if (recovered) {
+    console.log(`${dex.label}: recovered ${recovered} pool snapshots on retry`);
+  }
+
+  return snapshots;
 };
 
 const resolvePoolSnapshot = async (pairEntry, dex) => {
@@ -351,16 +395,14 @@ const run = async () => {
   for (const dex of DEXES) {
     const pairEntries =
       dex.mode === "garuda"
-        ? await loadPairsFromGarudaFactory(dex.factory)
+        ? await loadPairsFromGarudaFactory(dex)
         : dex.mode === "astroport"
         ? await loadPairsFromAstroportFactory(dex)
         : await loadPairsFromTerraswapFactory(dex.factory);
 
     console.log(`${dex.label}: discovered ${pairEntries.length} pairs`);
 
-    const snapshots = await mapWithConcurrency(pairEntries, 14, (pairEntry) =>
-      resolvePoolSnapshot(pairEntry, dex)
-    );
+    const snapshots = await resolvePoolSnapshots(pairEntries, dex);
 
     console.log(`${dex.label}: resolved ${snapshots.length} pool snapshots`);
     records.push(...snapshots);
