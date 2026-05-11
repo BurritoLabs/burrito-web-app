@@ -43,6 +43,7 @@ const FALLBACK_GAS_BY_TAB = {
 } as const
 
 const GAS_ADJUSTMENT = 1.2
+const MAX_DELEGATE_BUFFER_MICRO = 2_000_000n
 
 const estimateFallbackFeeMicro = (
   tab: "Delegate" | "Redelegate" | "Undelegate"
@@ -134,6 +135,33 @@ const StakeManageModal = ({
     if (tab === "Redelegate") return sourceValidator?.amount ?? 0n
     return activeValidator?.amount ?? 0n
   }, [activeValidator?.amount, available, sourceValidator?.amount, tab])
+
+  const amountMicroValue = useMemo(() => BigInt(toMicroAmount(amount)), [amount])
+  const effectiveFeeMicro = useMemo(
+    () => (feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab)),
+    [feeMicro, tab]
+  )
+  const maxDelegateReserveMicro = effectiveFeeMicro + MAX_DELEGATE_BUFFER_MICRO
+  const maxAmount = useMemo(() => {
+    if (tab !== "Delegate") return availableAmount
+    return available > maxDelegateReserveMicro
+      ? available - maxDelegateReserveMicro
+      : 0n
+  }, [available, availableAmount, maxDelegateReserveMicro, tab])
+  const amountWarning = useMemo(() => {
+    if (amountMicroValue <= 0n) return undefined
+    if (amountMicroValue > availableAmount) {
+      return `Amount exceeds available ${tab === "Delegate" ? "wallet balance" : "stake"}.`
+    }
+    const requiredLunc =
+      tab === "Delegate" ? amountMicroValue + effectiveFeeMicro : effectiveFeeMicro
+    if (requiredLunc > available) {
+      return tab === "Delegate"
+        ? "Insufficient funds after network fee. Use Max or reduce the amount."
+        : "Insufficient LUNC for network fee."
+    }
+    return undefined
+  }, [amountMicroValue, available, availableAmount, effectiveFeeMicro, tab])
 
   useEffect(() => {
     if (!open) return
@@ -262,12 +290,15 @@ const StakeManageModal = ({
   ])
 
   const balanceAfter = useMemo(() => {
-    const amountMicro = BigInt(toMicroAmount(amount))
     const spend =
-      tab === "Delegate" ? amountMicro + feeMicro : feeMicro
+      amountMicroValue > 0n
+        ? tab === "Delegate"
+          ? amountMicroValue + effectiveFeeMicro
+          : effectiveFeeMicro
+        : 0n
     if (available <= spend) return 0n
     return available - spend
-  }, [amount, available, feeMicro, tab])
+  }, [amountMicroValue, available, effectiveFeeMicro, tab])
 
   const submit = async () => {
     if (!accountAddress) {
@@ -282,6 +313,25 @@ const StakeManageModal = ({
     const microAmount = toMicroAmount(amount)
     if (microAmount === "0") {
       setSubmitError("Enter amount.")
+      return
+    }
+    const microAmountValue = BigInt(microAmount)
+    if (microAmountValue > availableAmount) {
+      setSubmitError(
+        `Amount exceeds available ${tab === "Delegate" ? "wallet balance" : "stake"}.`
+      )
+      return
+    }
+    const txFeeMicro = feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab)
+    const txGasWanted = feeMicro > 0n ? gasWanted : FALLBACK_GAS_BY_TAB[tab]
+    const requiredLunc =
+      tab === "Delegate" ? microAmountValue + txFeeMicro : txFeeMicro
+    if (requiredLunc > available) {
+      setSubmitError(
+        tab === "Delegate"
+          ? "Insufficient funds after network fee. Use Max or reduce the amount."
+          : "Insufficient LUNC for network fee."
+      )
       return
     }
     if (tab === "Redelegate" && !source) {
@@ -337,11 +387,11 @@ const StakeManageModal = ({
       const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [
           {
-            amount: feeMicro.toString(),
+            amount: txFeeMicro.toString(),
             denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
           }
         ],
-        gas: String(gasWanted)
+        gas: String(txGasWanted)
       })
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
@@ -451,7 +501,7 @@ const StakeManageModal = ({
                 onClick={() => {
                   setAmount(
                     formatTokenAmount(
-                      availableAmount.toString(),
+                      maxAmount.toString(),
                       CLASSIC_DENOMS.lunc.coinDecimals,
                       6
                     ).replace(/,/g, "")
@@ -470,12 +520,23 @@ const StakeManageModal = ({
               <span className={styles.amountDenom}>LUNC</span>
             </div>
             <div className={styles.amountHint}>
-              Available:{" "}
+              {tab === "Delegate" ? "Max delegate: " : "Available: "}
               {`${formatTokenAmount(
-                availableAmount.toString(),
+                maxAmount.toString(),
                 CLASSIC_DENOMS.lunc.coinDecimals,
                 2
               )} LUNC`}
+              {tab === "Delegate" ? (
+                <span>
+                  Fee reserve:{" "}
+                  {formatTokenAmount(
+                    maxDelegateReserveMicro.toString(),
+                    CLASSIC_DENOMS.lunc.coinDecimals,
+                    2
+                  )}{" "}
+                  LUNC
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -510,6 +571,9 @@ const StakeManageModal = ({
             </span>
           </div>
           {feeError ? <div className={styles.feeError}>{feeError}</div> : null}
+          {amountWarning ? (
+            <div className={styles.feeError}>{amountWarning}</div>
+          ) : null}
           {submitError ? (
             <div className={styles.feeError}>{submitError}</div>
           ) : null}
@@ -517,7 +581,7 @@ const StakeManageModal = ({
             className={styles.submit}
             type="button"
             onClick={submit}
-            disabled={submitting}
+            disabled={submitting || Boolean(amountWarning)}
           >
             {submitting ? "Submitting..." : tab}
           </button>

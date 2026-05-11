@@ -248,6 +248,12 @@
   margin-top: 6px;
 }
 
+.amountHint span {
+  display: block;
+  margin-top: 3px;
+  color: rgba(234, 245, 235, 0.45);
+}
+
 .footer {
   display: grid;
   gap: 12px;
