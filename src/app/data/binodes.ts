@@ -476,23 +476,15 @@ export const fetchBinodesDashboardActivity = async (
     limit: String(limit),
     freq: frequency
   }
-  const [
-    networkItems,
-    dexItems,
-    burnsItems,
-    ibcItems,
-    stakeItems,
-    feesItems,
-    governanceItems
-  ] = await Promise.all([
+  const [networkItems, burnsItems, feesItems] = await Promise.all([
     settleList<BinodesNetworkOverview>("/v1/network/overview", params),
-    settleList<BinodesDexOverview>("/v1/dex/overview", params),
     settleList<BinodesBurnOverview>("/v1/burns/overview", params),
-    settleList<BinodesIbcOverview>("/v1/ibc/overview", params),
-    settleList<BinodesStakeOverview>("/v1/stake/overview", params),
-    settleList<BinodesFeesOverview>("/v1/fees/overview", params),
-    settleList<BinodesGovernanceOverview>("/v1/governance/overview", params)
+    settleList<BinodesFeesOverview>("/v1/fees/overview", params)
   ])
+  const dexItems: BinodesDexOverview[] = []
+  const ibcItems: BinodesIbcOverview[] = []
+  const stakeItems: BinodesStakeOverview[] = []
+  const governanceItems: BinodesGovernanceOverview[] = []
 
   return {
     fetchedAt: new Date().toISOString(),

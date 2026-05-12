@@ -1,5 +1,6 @@
 import { Suspense, lazy, type ComponentType } from "react"
 import { useRoutes } from "react-router-dom"
+import Dashboard from "../pages/Dashboard"
 import {
   ContractIcon,
   GovIcon,
@@ -14,7 +15,6 @@ import RouteFallback from "./layout/RouteFallback"
 
 const ICON_SIZE = { width: 18, height: 18 }
 
-const Dashboard = lazy(() => import("../pages/Dashboard"))
 const Wallet = lazy(() => import("../pages/Wallet"))
 const Market = lazy(() => import("../pages/Market"))
 const MarketPairDetails = lazy(() => import("../pages/MarketPairDetails"))

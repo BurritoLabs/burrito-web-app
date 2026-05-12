@@ -41,9 +41,172 @@
     <meta name="twitter:image" content="https://app.burrito.money/social-preview.png" />
     <meta name="twitter:image:alt" content="Burrito Terra Classic web app" />
     <title>Burrito</title>
+    <style>
+      :root {
+        --boot-bg: #101b17;
+        --boot-card: rgba(16, 29, 24, 0.72);
+        --boot-border: rgba(255, 255, 255, 0.12);
+        --boot-green: #68d83f;
+      }
+
+      .boot-shell {
+        min-height: 100vh;
+        background:
+          radial-gradient(900px 520px at 70% 12%, rgba(104, 216, 63, 0.1), transparent 64%),
+          linear-gradient(180deg, #14231d 0%, var(--boot-bg) 58%, #0d1815 100%);
+        color: #f0faf1;
+        font-family: Montserrat, system-ui, sans-serif;
+      }
+
+      .boot-top {
+        height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--boot-border);
+        background: rgba(15, 27, 22, 0.76);
+      }
+
+      .boot-brand,
+      .boot-pill {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .boot-brand {
+        width: 118px;
+        height: 24px;
+      }
+
+      .boot-pill {
+        width: 126px;
+        height: 34px;
+        border: 1px solid rgba(104, 216, 63, 0.35);
+      }
+
+      .boot-main {
+        width: min(1080px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0;
+        display: grid;
+        gap: 18px;
+      }
+
+      .boot-title {
+        width: 220px;
+        height: 42px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .boot-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .boot-card {
+        min-height: 118px;
+        border-radius: 8px;
+        border: 1px solid var(--boot-border);
+        background: var(--boot-card);
+        padding: 20px;
+        display: grid;
+        align-content: start;
+        gap: 12px;
+      }
+
+      .boot-line,
+      .boot-value {
+        position: relative;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .boot-line {
+        width: 46%;
+        height: 12px;
+      }
+
+      .boot-value {
+        width: 78%;
+        height: 24px;
+      }
+
+      .boot-line::after,
+      .boot-value::after,
+      .boot-brand::after,
+      .boot-title::after,
+      .boot-pill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+        animation: boot-shimmer 1.5s ease-in-out infinite;
+      }
+
+      .boot-brand,
+      .boot-title,
+      .boot-pill {
+        position: relative;
+        overflow: hidden;
+      }
+
+      @keyframes boot-shimmer {
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .boot-top {
+          padding: 0 18px;
+        }
+
+        .boot-main {
+          width: calc(100% - 32px);
+          padding: 28px 0;
+        }
+
+        .boot-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-shell" aria-label="Loading Burrito">
+        <div class="boot-top">
+          <div class="boot-brand"></div>
+          <div class="boot-pill"></div>
+        </div>
+        <main class="boot-main">
+          <div class="boot-title"></div>
+          <section class="boot-grid">
+            <div class="boot-card">
+              <span class="boot-line"></span>
+              <span class="boot-value"></span>
+            </div>
+            <div class="boot-card">
+              <span class="boot-line"></span>
+              <span class="boot-value"></span>
+            </div>
+            <div class="boot-card">
+              <span class="boot-line"></span>
+              <span class="boot-value"></span>
+            </div>
+            <div class="boot-card">
+              <span class="boot-line"></span>
+              <span class="boot-value"></span>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

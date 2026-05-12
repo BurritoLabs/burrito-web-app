@@ -122,11 +122,15 @@ const WalletFallbackProvider = ({
 
 const WalletBoot = ({ children }: { children: ReactNode }) => {
   const [hasStoredConnector] = useState(() => Boolean(getStoredWalletConnectorId()))
+  const [shouldAutoLoadRuntime] = useState(() => {
+    if (!getStoredWalletConnectorId()) return false
+    return !isLikelyMobileBrowser() && !isTouchWalletCapableBrowser()
+  })
   const [runtimeRequested, setRuntimeRequested] = useState(false)
   const requestRuntime = useCallback(() => setRuntimeRequested(true), [])
 
   useEffect(() => {
-    if (!hasStoredConnector || runtimeRequested) return
+    if (!hasStoredConnector || !shouldAutoLoadRuntime || runtimeRequested) return
 
     const loadRuntime = () => setRuntimeRequested(true)
     const walletWindow = window as Window & {
@@ -146,7 +150,7 @@ const WalletBoot = ({ children }: { children: ReactNode }) => {
 
     const timer = window.setTimeout(loadRuntime, 900)
     return () => window.clearTimeout(timer)
-  }, [hasStoredConnector, runtimeRequested])
+  }, [hasStoredConnector, runtimeRequested, shouldAutoLoadRuntime])
 
   if (!runtimeRequested) {
     return (

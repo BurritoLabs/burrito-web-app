@@ -620,6 +620,9 @@ export const fetchCirculatingSnapshot = async (): Promise<CirculatingSnapshot> =
 }
 
 export const fetchCurrentDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
+  const cached = getCachedSnapshot("current", 60 * 1000)
+  if (cached) return cached
+
   const [
     data,
     latestBlock,
@@ -659,7 +662,7 @@ export const fetchCurrentDashboardSnapshot = async (): Promise<DashboardSnapshot
   const circulatingUstc =
     circulatingUstcRaw > 0 ? circulatingUstcRaw : circulatingUstcFallback
 
-  return {
+  const snapshot = {
     timestamp: Date.now(),
     luncSupply,
     ustcSupply,
@@ -679,6 +682,9 @@ export const fetchCurrentDashboardSnapshot = async (): Promise<DashboardSnapshot
     blockHeight: latestBlock.height,
     blockTimeMs: blockIntervalMs
   }
+
+  setCachedSnapshot("current", snapshot)
+  return snapshot
 }
 
 export const fetchHistoricalDashboardSnapshot = async (

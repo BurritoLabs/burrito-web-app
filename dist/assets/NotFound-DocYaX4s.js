@@ -1,0 +1,1 @@
+import{j as r}from"./react-vendor-PzuM9aFB.js";import{P as s}from"./index-BqGXpBxD.js";import"./query-Bvda2In8.js";const e=()=>r.jsx(s,{title:"404",children:r.jsx("div",{className:"card",children:r.jsx("div",{className:"cardText",children:"Not found"})})});export{e as default};

@@ -124,6 +124,51 @@
   color: rgba(234, 245, 235, 0.55);
 }
 
+.metricSkeleton {
+  align-content: start;
+}
+
+.skeletonLabel,
+.skeletonValue,
+.skeletonDelta {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.skeletonLabel::after,
+.skeletonValue::after,
+.skeletonDelta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.13) 48%,
+    transparent 100%
+  );
+  animation: dashboardShimmer 1.5s ease-in-out infinite;
+}
+
+.skeletonLabel {
+  width: 46%;
+  height: 12px;
+}
+
+.skeletonValue {
+  width: 72%;
+  height: 24px;
+}
+
+.skeletonDelta {
+  width: 38%;
+  height: 12px;
+}
+
 .rangeSwitch {
   display: flex;
   align-items: center;
@@ -153,6 +198,12 @@
 .rangeButtonActive {
   background: rgba(82, 196, 26, 0.2);
   color: #ffffff;
+}
+
+@keyframes dashboardShimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @media (max-width: 991.98px) {

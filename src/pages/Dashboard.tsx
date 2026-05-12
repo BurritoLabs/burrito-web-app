@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Dashboard.module.css"
@@ -13,6 +13,7 @@ import {
 } from "../app/data/binodes"
 import { fetchPrices } from "../app/data/classic"
 import { formatNumber, formatPercent } from "../app/utils/format"
+import { isLikelyMobileBrowser } from "../app/wallet/walletPlatform"
 
 const formatValue = (value?: number, decimals = 2) => {
   if (value === undefined || value === null || Number.isNaN(value)) return "--"
@@ -112,6 +113,24 @@ type MetricItem = {
 
 type DashboardRange = "1h" | "24h" | "7d"
 
+const MetricSkeletonCard = ({ large = false }: { large?: boolean }) => (
+  <div
+    className={`card ${styles.metricCard} ${
+      large ? styles.metricCardLarge : ""
+    } ${styles.metricSkeleton}`}
+    aria-hidden="true"
+  >
+    <span className={styles.skeletonLabel} />
+    <span className={styles.skeletonValue} />
+    <span className={styles.skeletonDelta} />
+  </div>
+)
+
+const renderMetricSkeletons = (count: number, large = false) =>
+  Array.from({ length: count }, (_, index) => (
+    <MetricSkeletonCard key={`metric-skeleton-${index}`} large={large} />
+  ))
+
 const dashboardRanges: Record<
   DashboardRange,
   {
@@ -143,10 +162,43 @@ const dashboardRanges: Record<
 
 const dashboardRangeOptions = Object.keys(dashboardRanges) as DashboardRange[]
 
+const getIsMobileDashboard = () => {
+  if (typeof window === "undefined") return false
+  return isLikelyMobileBrowser() || window.innerWidth <= 640
+}
+
+const useDeferredHistoryEnabled = () => {
+  const [enabled, setEnabled] = useState(() => !getIsMobileDashboard())
+
+  useEffect(() => {
+    if (enabled) return
+
+    const run = () => setEnabled(true)
+    const walletWindow = window as Window & {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout?: number }
+      ) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    if (walletWindow.requestIdleCallback) {
+      const handle = walletWindow.requestIdleCallback(run, { timeout: 6000 })
+      return () => walletWindow.cancelIdleCallback?.(handle)
+    }
+
+    const timer = window.setTimeout(run, 4500)
+    return () => window.clearTimeout(timer)
+  }, [enabled])
+
+  return enabled
+}
+
 const Dashboard = () => {
   const [dashboardRange, setDashboardRange] =
     useState<DashboardRange>("24h")
   const activeRange = dashboardRanges[dashboardRange]
+  const historyEnabled = useDeferredHistoryEnabled()
 
   const { data: currentSnapshot } = useQuery({
     queryKey: ["dashboard", "snapshot", "current"],
@@ -171,7 +223,7 @@ const Dashboard = () => {
           activeRange.rangeMs,
           activeRange.ttlMs
         ),
-      enabled: Boolean(currentSnapshot),
+      enabled: Boolean(currentSnapshot) && historyEnabled,
       staleTime: activeRange.ttlMs
     })
 
@@ -411,6 +463,8 @@ const Dashboard = () => {
     prices?.ustc?.usd_7d_change
   ])
 
+  const hasMetrics = metrics.length > 0
+
   return (
     <PageShell
       title="Dashboard"
@@ -443,7 +497,8 @@ const Dashboard = () => {
             </div>
           </div>
           <div className={styles.metricsTop}>
-            {metrics
+            {hasMetrics
+              ? metrics
               .filter(
                 (item) =>
                   item.key === "luncPrice" ||
@@ -477,14 +532,16 @@ const Dashboard = () => {
                     </div>
                   ) : null}
                 </div>
-              ))}
+              ))
+              : renderMetricSkeletons(4, true)}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Supply</div>
           <div className={styles.metricsSupply}>
-            {metrics
+            {hasMetrics
+              ? metrics
               .filter(
                 (item) =>
                   item.key === "luncCirc" ||
@@ -529,14 +586,16 @@ const Dashboard = () => {
                     </div>
                   ) : null}
                 </div>
-              ))}
+              ))
+              : renderMetricSkeletons(4, true)}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Treasury</div>
           <div className={styles.metricsSupply}>
-            {metrics
+            {hasMetrics
+              ? metrics
               .filter(
                 (item) =>
                   item.key === "communityPoolLunc" ||
@@ -570,14 +629,16 @@ const Dashboard = () => {
                     </div>
                   ) : null}
                 </div>
-              ))}
+              ))
+              : renderMetricSkeletons(4)}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Staking</div>
           <div className={styles.metrics}>
-            {metrics
+            {hasMetrics
+              ? metrics
               .filter(
                 (item) =>
                   item.key === "stakedLunc" ||
@@ -630,14 +691,16 @@ const Dashboard = () => {
                     </div>
                   ) : null}
                 </div>
-              ))}
+              ))
+              : renderMetricSkeletons(3)}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Chain</div>
           <div className={styles.metrics}>
-            {metrics
+            {hasMetrics
+              ? metrics
               .filter(
                 (item) =>
                   item.key === "blockHeight" ||
@@ -681,7 +744,8 @@ const Dashboard = () => {
                     </div>
                   ) : null}
                 </div>
-              ))}
+              ))
+              : renderMetricSkeletons(3)}
           </div>
         </section>
 
