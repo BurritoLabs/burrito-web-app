@@ -23,8 +23,9 @@ const BlockStatus = () => {
   const { data: height, isError } = useQuery({
     queryKey: ["latest-block-height"],
     queryFn: fetchLatestHeight,
-    refetchInterval: 1000,
-    staleTime: 0,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+    staleTime: 8_000,
     retry: false
   })
 

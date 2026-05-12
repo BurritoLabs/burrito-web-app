@@ -125,6 +125,31 @@ export type BinodesDashboardSeriesPoint = {
   burnUsd?: number
 }
 
+export type BinodesDexTxDetail = {
+  timestamp_utc?: string
+  code?: number
+  pair_addr?: string
+  sender_addr?: string
+  receiver_addr?: string
+  ask_denom?: string
+  ask_symbol?: string
+  ask_amt_raw?: string
+  ask_amt_actual?: number
+  ask_amt_usd?: number
+  offer_denom?: string
+  offer_symbol?: string
+  offer_amt_raw?: string
+  offer_amt_actual?: number
+  offer_amt_usd?: number
+  spread_amt_raw?: string
+  spread_amt_actual?: number
+  spread_amt_usd?: number
+  commission_amt_raw?: string
+  commission_amt_actual?: number
+  commission_amt_usd?: number
+  tx_hash?: string
+}
+
 const buildBinodesUrl = (path: string, params?: Record<string, string>) => {
   const url = new URL(path, BINODES_BASE)
   if (params) {
@@ -410,6 +435,36 @@ const settleList = async <T>(
   } catch {
     return []
   }
+}
+
+export const fetchBinodesDexTxDetails = async ({
+  pairAddress,
+  limit = 25
+}: {
+  pairAddress: string
+  limit?: number
+}) => {
+  const safeLimit = Math.max(1, Math.min(Math.ceil(limit), 500))
+  const pageSize = Math.min(safeLimit, 100)
+  const pages = Math.ceil(safeLimit / pageSize)
+  const items: BinodesDexTxDetail[] = []
+
+  for (let page = 1; page <= pages; page += 1) {
+    const remaining = safeLimit - items.length
+    if (remaining <= 0) break
+
+    const pageItems = await fetchBinodesList<BinodesDexTxDetail>("/v1/dex/tx_details", {
+      address: pairAddress.toLowerCase(),
+      limit: String(Math.min(pageSize, remaining)),
+      page_size: String(Math.min(pageSize, remaining)),
+      page: String(page)
+    })
+
+    items.push(...pageItems)
+    if (pageItems.length < pageSize) break
+  }
+
+  return items.slice(0, safeLimit)
 }
 
 export const fetchBinodesDashboardActivity = async (

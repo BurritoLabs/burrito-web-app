@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
-import { toBase64, toUtf8 } from "@cosmjs/encoding"
-import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
-import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
 import styles from "../Swap.module.css"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import { fetchBalances, fetchPrices } from "../../app/data/classic"
@@ -11,12 +8,9 @@ import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
 import { fetchCw20Balance, useCw20Balances } from "../../app/data/cw20"
 import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
+import { formatTxError } from "../../app/utils/txError"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
 import { useWallet } from "../../app/wallet/WalletContext"
-import {
-  connectClassicSigningClientForConnector,
-  getSignerAddressForConnector
-} from "../../app/wallet/walletAdapters"
 
 type AssetType = "native" | "cw20"
 type DexId = string
@@ -145,6 +139,23 @@ const SLIPPAGE_OPTIONS = [
   { label: "1.0%", bps: 100n }
 ] as const
 const FACTORY_PAIR_CACHE = new Map<string, string>()
+
+const encodeJsonBytes = (value: unknown) =>
+  new TextEncoder().encode(JSON.stringify(value))
+
+const bytesToBase64 = (bytes: Uint8Array) => {
+  let binary = ""
+  const chunkSize = 0x8000
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+  return window.btoa(binary)
+}
+
+const encodeSmartQueryPayload = (value: unknown) =>
+  encodeURIComponent(bytesToBase64(encodeJsonBytes(value)))
+
+const encodeBase64Json = (value: unknown) => bytesToBase64(encodeJsonBytes(value))
 
 const parseBigInt = (value: string | undefined) => {
   if (!value) return 0n
@@ -284,7 +295,7 @@ const resolveFactoryPair = async (
           }
         }
 
-  const payload = encodeURIComponent(toBase64(toUtf8(JSON.stringify(query))))
+  const payload = encodeSmartQueryPayload(query)
   const url = `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${dex.factory}/smart/${payload}`
   const response = await fetch(url)
   if (!response.ok) {
@@ -323,7 +334,7 @@ const simulateSwapQuote = async (
           }
         }
 
-  const payload = encodeURIComponent(toBase64(toUtf8(JSON.stringify(query))))
+  const payload = encodeSmartQueryPayload(query)
   const url = `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${pair}/smart/${payload}`
   const response = await fetch(url)
   if (!response.ok) {
@@ -347,15 +358,24 @@ const simulateSwapQuote = async (
   } satisfies DexQuote
 }
 
-const buildSwapMessage = (
+const usesMinReceiveExecute = (dexId: string, mode: DexQueryMode = "terraswap") =>
+  mode === "garuda" || dexId.startsWith("terraport")
+
+const buildSwapMessage = async (
   sender: string,
   pair: string,
   offerAsset: SwapAsset,
   amountMicro: bigint,
   maxSpread: string,
+  minReceiveMicro: bigint,
+  dexId: string,
   mode: DexQueryMode = "terraswap",
   beliefPrice?: string
 ) => {
+  const { MsgExecuteContract } = await import("cosmjs-types/cosmwasm/wasm/v1/tx")
+  const minReceive = minReceiveMicro.toString()
+  const useMinReceive = usesMinReceiveExecute(dexId, mode)
+
   if (offerAsset.type === "native" && offerAsset.denom) {
     const msg =
       mode === "garuda"
@@ -363,7 +383,17 @@ const buildSwapMessage = (
             swap: {
               offer_asset: toGarudaAsset(offerAsset),
               offer_amount: amountMicro.toString(),
-              max_spread: maxSpread
+              min_receive: minReceive
+            }
+          }
+        : useMinReceive
+        ? {
+            swap: {
+              offer_asset: {
+                info: toAssetInfo(offerAsset),
+                amount: amountMicro.toString()
+              },
+              min_receive: minReceive
             }
           }
         : {
@@ -382,7 +412,7 @@ const buildSwapMessage = (
       value: MsgExecuteContract.fromPartial({
         sender,
         contract: pair,
-        msg: toUtf8(JSON.stringify(msg)),
+        msg: encodeJsonBytes(msg),
         funds: [
           {
             denom: offerAsset.denom,
@@ -394,30 +424,32 @@ const buildSwapMessage = (
   }
 
   if (offerAsset.type === "cw20" && offerAsset.contract) {
-    const hookMsg = toBase64(
-      toUtf8(
-        JSON.stringify({
-          swap: {
-            ...(beliefPrice ? { belief_price: beliefPrice } : {}),
-            max_spread: maxSpread
+    const hookMsg = encodeBase64Json(
+      useMinReceive
+        ? {
+            swap: {
+              min_receive: minReceive
+            }
           }
-        })
-      )
+        : {
+            swap: {
+              ...(beliefPrice ? { belief_price: beliefPrice } : {}),
+              max_spread: maxSpread
+            }
+          }
     )
     return {
       typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
       value: MsgExecuteContract.fromPartial({
         sender,
         contract: offerAsset.contract,
-        msg: toUtf8(
-          JSON.stringify({
-            send: {
-              contract: pair,
-              amount: amountMicro.toString(),
-              msg: hookMsg
-            }
-          })
-        ),
+        msg: encodeJsonBytes({
+          send: {
+            contract: pair,
+            amount: amountMicro.toString(),
+            msg: hookMsg
+          }
+        }),
         funds: []
       })
     }
@@ -426,7 +458,7 @@ const buildSwapMessage = (
   throw new Error("unsupported swap asset")
 }
 
-const buildPlatformFeeMessage = (
+const buildPlatformFeeMessage = async (
   sender: string,
   offerAsset: SwapAsset,
   feeAmountMicro: bigint
@@ -434,6 +466,7 @@ const buildPlatformFeeMessage = (
   if (feeAmountMicro <= 0n) return undefined
 
   if (offerAsset.type === "native" && offerAsset.denom) {
+    const { MsgSend } = await import("cosmjs-types/cosmos/bank/v1beta1/tx")
     return {
       typeUrl: "/cosmos.bank.v1beta1.MsgSend",
       value: MsgSend.fromPartial({
@@ -450,19 +483,18 @@ const buildPlatformFeeMessage = (
   }
 
   if (offerAsset.type === "cw20" && offerAsset.contract) {
+    const { MsgExecuteContract } = await import("cosmjs-types/cosmwasm/wasm/v1/tx")
     return {
       typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
       value: MsgExecuteContract.fromPartial({
         sender,
         contract: offerAsset.contract,
-        msg: toUtf8(
-          JSON.stringify({
-            transfer: {
-              recipient: PLATFORM_FEE_RECIPIENT,
-              amount: feeAmountMicro.toString()
-            }
-          })
-        ),
+        msg: encodeJsonBytes({
+          transfer: {
+            recipient: PLATFORM_FEE_RECIPIENT,
+            amount: feeAmountMicro.toString()
+          }
+        }),
         funds: []
       })
     }
@@ -486,8 +518,8 @@ const getAmountDensity = (value?: string) => {
   const text = String(value ?? "").trim()
   if (!text || text === "--") return "default" as const
   const digits = text.replace(/\D/g, "").length
-  if (text.length >= 16 || digits >= 13) return "tiny" as const
-  if (text.length >= 12 || digits >= 10) return "compact" as const
+  if (text.length >= 14 || digits >= 12) return "tiny" as const
+  if (text.length >= 10 || digits >= 8) return "compact" as const
   return "default" as const
 }
 
@@ -891,7 +923,6 @@ const SwapPanel = ({
     return quotes.find((item) => item.id === selectedDexId) ?? bestQuote
   }, [bestQuote, quotes, selectedDexId])
 
-  const selectedQuoteId = selectedQuote?.id ?? ""
   const selectedQuotePair = selectedQuote?.pair ?? ""
   const selectedQuoteMode = selectedQuote?.mode ?? "terraswap"
 
@@ -906,10 +937,6 @@ const SwapPanel = ({
         : undefined,
     [selectedQuote?.beliefPrice, selectedQuoteMode, selectedQuotePair]
   )
-
-  const selectedQuoteSignature = selectedQuoteId
-    ? `${selectedQuoteId}:${selectedQuotePair}:${selectedQuoteMode}:${selectedQuote?.beliefPrice ?? ""}`
-    : ""
 
   const hasAmountInput = amountInMicro > 0n
   const hasQuotePreview = hasAmountInput && Boolean(selectedQuote)
@@ -1110,8 +1137,6 @@ const SwapPanel = ({
   }, [quoteFromAsset, quoteToAsset, swapAmountMicro])
 
   useEffect(() => {
-    let cancelled = false
-
     if (!feeQuote || swapAmountMicro <= 0n) {
       setFeeDisplay((current) => (current === "--" ? current : "--"))
       setFeeLoading(false)
@@ -1124,56 +1149,12 @@ const SwapPanel = ({
       6
     )} LUNC`
 
-    if (!accountAddress) {
-      setFeeDisplay((current) => (current === fallbackFee ? current : fallbackFee))
-      setFeeLoading(false)
-      return undefined
-    }
-
-    const timer = window.setTimeout(async () => {
-      setFeeLoading(true)
-      try {
-        if (!connectorId) throw new Error("Wallet not connected")
-        const signerAddress = await getSignerAddressForConnector(connectorId)
-        const client = await connectClassicSigningClientForConnector(connectorId)
-        const feeMsg = buildPlatformFeeMessage(signerAddress, quoteFromAsset, platformFeeMicro)
-        const msg = buildSwapMessage(
-          signerAddress,
-          feeQuote?.pair ?? "",
-          quoteFromAsset,
-          swapAmountMicro,
-          maxSpread,
-          feeQuote?.mode ?? "terraswap",
-          feeQuote?.beliefPrice
-        )
-        const gasUsed = await client.simulate(
-          signerAddress,
-          feeMsg ? [feeMsg, msg] : [msg],
-          ""
-        )
-        const feeMicro = BigInt(Math.ceil(gasUsed * GAS_PRICE_MICRO_LUNC))
-        if (!cancelled) {
-          setFeeDisplay(`${formatTokenAmount(feeMicro.toString(), 6, 6)} LUNC`)
-        }
-      } catch {
-        if (!cancelled) setFeeDisplay(fallbackFee)
-      } finally {
-        if (!cancelled) setFeeLoading(false)
-      }
-    }, 280)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
+    setFeeDisplay((current) => (current === fallbackFee ? current : fallbackFee))
+    setFeeLoading(false)
   }, [
-    accountAddress,
-    connectorId,
     feeQuote,
-    maxSpread,
     platformFeeMicro,
     quoteFromAsset,
-    selectedQuoteSignature,
     swapAmountMicro
   ])
 
@@ -1237,16 +1218,22 @@ const SwapPanel = ({
     try {
       startTx("Swap")
       if (!connectorId) throw new Error("Wallet not connected")
+      const {
+        connectClassicSigningClientForConnector,
+        getSignerAddressForConnector
+      } = await import("../../app/wallet/walletAdapters")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
 
-      const feeMsg = buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
-      const msg = buildSwapMessage(
+      const feeMsg = await buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
+      const msg = await buildSwapMessage(
         signerAddress,
         selectedQuote.pair,
         fromAsset,
         swapAmountMicro,
         maxSpread,
+        minReceiveMicro,
+        selectedQuote.id,
         selectedQuote.mode ?? "terraswap",
         selectedQuote.beliefPrice
       )
@@ -1259,7 +1246,7 @@ const SwapPanel = ({
       finishTx(hash)
       setLastTxHash(hash)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Swap failed"
+      const message = formatTxError(error, "Swap failed")
       failTx(message)
       setSubmitError(message)
     } finally {

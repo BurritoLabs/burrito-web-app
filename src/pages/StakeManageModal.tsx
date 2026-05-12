@@ -1,17 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import {
-  MsgDelegate,
-  MsgBeginRedelegate,
-  MsgUndelegate
-} from "cosmjs-types/cosmos/staking/v1beta1/tx"
 import { useWallet } from "../app/wallet/WalletContext"
 import styles from "./StakeManageModal.module.css"
 import { CLASSIC_DENOMS } from "../app/chain"
-import {
-  connectClassicStargateClientForConnector,
-  getSignerAddressForConnector
-} from "../app/wallet/walletAdapters"
 import { formatTokenAmount } from "../app/utils/format"
+import { formatTxError } from "../app/utils/txError"
 
 type DelegationItem = {
   validator: string
@@ -37,12 +29,12 @@ const toMicroAmount = (value: string) => {
 const GAS_PRICE_MICRO_LUNC = 28.325
 
 const FALLBACK_GAS_BY_TAB = {
-  Delegate: 500_000,
-  Redelegate: 560_000,
-  Undelegate: 500_000
+  Delegate: 900_000,
+  Redelegate: 1_100_000,
+  Undelegate: 900_000
 } as const
 
-const GAS_ADJUSTMENT = 1.2
+const SUBMIT_GAS_ADJUSTMENT = 1.4
 const MAX_DELEGATE_BUFFER_MICRO = 2_000_000n
 
 const estimateFallbackFeeMicro = (
@@ -165,11 +157,10 @@ const StakeManageModal = ({
 
   useEffect(() => {
     if (!open) return
-    let cancelled = false
-
     if (!accountAddress) {
       setFee("--")
       setFeeMicro(0n)
+      setFeeLoading(false)
       setFeeError(undefined)
       return undefined
     }
@@ -180,6 +171,7 @@ const StakeManageModal = ({
     if (!validator || microAmount === "0") {
       setFee("--")
       setFeeMicro(0n)
+      setFeeLoading(false)
       setFeeError(undefined)
       return undefined
     }
@@ -187,103 +179,27 @@ const StakeManageModal = ({
     if (tab === "Redelegate" && !sourceValidatorAddress) {
       setFee("--")
       setFeeMicro(0n)
+      setFeeLoading(false)
       setFeeError(undefined)
       return undefined
     }
 
-    const timer = window.setTimeout(async () => {
-      setFeeLoading(true)
-      setFeeError(undefined)
-      const fallbackFeeMicro = estimateFallbackFeeMicro(tab)
-      const fallbackFee = formatTokenAmount(
-        fallbackFeeMicro.toString(),
-        CLASSIC_DENOMS.lunc.coinDecimals,
-        6
-      )
-      if (!cancelled) {
-        setGasWanted(FALLBACK_GAS_BY_TAB[tab])
-        setFee(fallbackFee === "--" ? "--" : fallbackFee)
-        setFeeMicro(fallbackFeeMicro)
-      }
-      try {
-        if (!connectorId) throw new Error("Wallet not connected")
-        const signerAddress = await getSignerAddressForConnector(connectorId)
-        const client = await connectClassicStargateClientForConnector(connectorId)
-
-        const msg =
-          tab === "Redelegate"
-            ? {
-                typeUrl: "/cosmos.staking.v1beta1.MsgBeginRedelegate",
-                value: MsgBeginRedelegate.fromPartial({
-                  delegatorAddress: signerAddress,
-                  validatorSrcAddress: sourceValidatorAddress,
-                  validatorDstAddress: validator,
-                  amount: {
-                    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-                    amount: microAmount
-                  }
-                })
-              }
-            : tab === "Undelegate"
-            ? {
-                typeUrl: "/cosmos.staking.v1beta1.MsgUndelegate",
-                value: MsgUndelegate.fromPartial({
-                  delegatorAddress: signerAddress,
-                  validatorAddress: validator,
-                  amount: {
-                    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-                    amount: microAmount
-                  }
-                })
-              }
-            : {
-                typeUrl: "/cosmos.staking.v1beta1.MsgDelegate",
-                value: MsgDelegate.fromPartial({
-                  delegatorAddress: signerAddress,
-                  validatorAddress: validator,
-                  amount: {
-                    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-                    amount: microAmount
-                  }
-                })
-              }
-
-        const gasUsed = await client.simulate(signerAddress, [msg], "")
-        const nextGasWanted = Math.max(
-          FALLBACK_GAS_BY_TAB[tab],
-          Math.ceil(gasUsed * GAS_ADJUSTMENT)
-        )
-        const feeMicro = Math.ceil(nextGasWanted * GAS_PRICE_MICRO_LUNC).toString()
-        const feeDisplay = formatTokenAmount(
-          feeMicro,
-          CLASSIC_DENOMS.lunc.coinDecimals,
-          6
-        )
-        if (!cancelled) {
-          setGasWanted(nextGasWanted)
-          setFee(feeDisplay === "--" ? "--" : feeDisplay)
-          setFeeMicro(BigInt(feeMicro))
-        }
-      } catch {
-        if (!cancelled) {
-          // Keep fallback fee when simulation fails to avoid blank fee UI.
-          setGasWanted(FALLBACK_GAS_BY_TAB[tab])
-          setFeeError(undefined)
-        }
-      } finally {
-        if (!cancelled) setFeeLoading(false)
-      }
-    }, 400)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
+    const fallbackFeeMicro = estimateFallbackFeeMicro(tab)
+    const fallbackFee = formatTokenAmount(
+      fallbackFeeMicro.toString(),
+      CLASSIC_DENOMS.lunc.coinDecimals,
+      6
+    )
+    setGasWanted(FALLBACK_GAS_BY_TAB[tab])
+    setFee(fallbackFee === "--" ? "--" : fallbackFee)
+    setFeeMicro(fallbackFeeMicro)
+    setFeeLoading(false)
+    setFeeError(undefined)
+    return undefined
   }, [
     accountAddress,
     activeValidator?.validator,
     amount,
-    connectorId,
     open,
     source,
     tab
@@ -322,8 +238,8 @@ const StakeManageModal = ({
       )
       return
     }
-    const txFeeMicro = feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab)
-    const txGasWanted = feeMicro > 0n ? gasWanted : FALLBACK_GAS_BY_TAB[tab]
+    let txGasWanted = feeMicro > 0n ? gasWanted : FALLBACK_GAS_BY_TAB[tab]
+    let txFeeMicro = feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab)
     const requiredLunc =
       tab === "Delegate" ? microAmountValue + txFeeMicro : txFeeMicro
     if (requiredLunc > available) {
@@ -343,6 +259,16 @@ const StakeManageModal = ({
       setSubmitError(undefined)
       startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
+      const [
+        {
+          connectClassicStargateClientForConnector,
+          getSignerAddressForConnector
+        },
+        { MsgDelegate, MsgBeginRedelegate, MsgUndelegate }
+      ] = await Promise.all([
+        import("../app/wallet/walletAdapters"),
+        import("cosmjs-types/cosmos/staking/v1beta1/tx")
+      ])
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicStargateClientForConnector(connectorId)
 
@@ -384,6 +310,18 @@ const StakeManageModal = ({
               })
             }
 
+      try {
+        const simulatedGas = await client.simulate(signerAddress, [msg], "")
+        txGasWanted = Math.max(
+          FALLBACK_GAS_BY_TAB[tab],
+          Math.ceil(simulatedGas * SUBMIT_GAS_ADJUSTMENT)
+        )
+        txFeeMicro = BigInt(Math.ceil(txGasWanted * GAS_PRICE_MICRO_LUNC))
+      } catch {
+        txGasWanted = FALLBACK_GAS_BY_TAB[tab]
+        txFeeMicro = estimateFallbackFeeMicro(tab)
+      }
+
       const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [
           {
@@ -399,10 +337,9 @@ const StakeManageModal = ({
       finishTx(result.transactionHash)
       onClose()
     } catch (err) {
-      failTx(err instanceof Error ? err.message : "Transaction failed")
-      setSubmitError(
-        err instanceof Error ? err.message : "Transaction failed"
-      )
+      const message = formatTxError(err, "Transaction failed")
+      failTx(message)
+      setSubmitError(message)
     } finally {
       setSubmitting(false)
     }

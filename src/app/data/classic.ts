@@ -135,8 +135,10 @@ export type ContractHistoryEntry = {
 type ProposalMetadata = Record<string, unknown>
 
 type GovWeightedVoteOption = {
-  option?: string
+  option?: string | number
+  Option?: string | number
   weight?: string
+  Weight?: string
 }
 
 type GovVoteTxMessage = {
@@ -144,7 +146,7 @@ type GovVoteTxMessage = {
   type?: string
   proposal_id?: string | number
   voter?: string
-  option?: string
+  option?: string | number
   weight?: string
   options?: GovWeightedVoteOption[]
 }
@@ -190,7 +192,7 @@ type GovProposal = {
 type GovVoteRecord = {
   voter?: string
   voter_address?: string
-  option?: string
+  option?: string | number
   weight?: string
   options?: GovWeightedVoteOption[]
 }
@@ -746,6 +748,81 @@ const fetchGovV1ByStatus = async (status: string) => {
   })
 }
 
+const normalizeGovVoteOption = (raw?: unknown): string | undefined => {
+  if (raw === undefined || raw === null) return undefined
+  if (typeof raw === "number") {
+    if (raw === 1) return "VOTE_OPTION_YES"
+    if (raw === 2) return "VOTE_OPTION_ABSTAIN"
+    if (raw === 3) return "VOTE_OPTION_NO"
+    if (raw === 4) return "VOTE_OPTION_NO_WITH_VETO"
+    return undefined
+  }
+  if (Array.isArray(raw)) {
+    const sorted = [...raw].sort((a, b) => {
+      const aWeight = Number(
+        typeof a === "object" && a !== null
+          ? ((a as GovWeightedVoteOption).weight ?? (a as GovWeightedVoteOption).Weight ?? 0)
+          : 0
+      )
+      const bWeight = Number(
+        typeof b === "object" && b !== null
+          ? ((b as GovWeightedVoteOption).weight ?? (b as GovWeightedVoteOption).Weight ?? 0)
+          : 0
+      )
+      return bWeight - aWeight
+    })
+    return normalizeGovVoteOption(sorted[0])
+  }
+  if (typeof raw === "object") {
+    const option = (raw as GovWeightedVoteOption).option ?? (raw as GovWeightedVoteOption).Option
+    return normalizeGovVoteOption(option)
+  }
+
+  const value = String(raw).trim()
+  if (!value || value === "--") return undefined
+  const normalizedValue = value.includes('\\"') ? value.replace(/\\"/g, '"') : value
+  if (/^\d+$/.test(value)) return normalizeGovVoteOption(Number(value))
+  if (normalizedValue.startsWith("[") || normalizedValue.startsWith("{")) {
+    try {
+      return normalizeGovVoteOption(JSON.parse(normalizedValue) as unknown)
+    } catch {
+      // Fall through to event-log string parsing.
+    }
+  }
+  if (normalizedValue.includes("Option") || normalizedValue.includes("option")) {
+    const numericOption = normalizedValue.match(/"?[Oo]ption"?\s*[:=]\s*"?(\d+)"?/)
+    if (numericOption?.[1]) return normalizeGovVoteOption(Number(numericOption[1]))
+    const textOption = normalizedValue.match(/"?[Oo]ption"?\s*[:=]\s*"?([A-Z0-9_]+)"?/)
+    if (textOption?.[1]) return normalizeGovVoteOption(textOption[1])
+  }
+
+  const upper = normalizedValue.toUpperCase()
+  if (upper.includes("NO_WITH_VETO")) return "VOTE_OPTION_NO_WITH_VETO"
+  if (upper.includes("ABSTAIN")) return "VOTE_OPTION_ABSTAIN"
+  if (upper.includes("YES")) return "VOTE_OPTION_YES"
+  if (upper.includes("NO")) return "VOTE_OPTION_NO"
+  return value
+}
+
+const selectGovWeightedVoteOption = (
+  options?: GovWeightedVoteOption[],
+  fallbackOption?: unknown,
+  fallbackWeight?: string
+) => {
+  let option = normalizeGovVoteOption(fallbackOption)
+  let weight = fallbackWeight
+  if (Array.isArray(options) && options.length) {
+    const sorted = [...options].sort((a, b) => {
+      const aWeight = Number(a?.weight ?? a?.Weight ?? 0)
+      const bWeight = Number(b?.weight ?? b?.Weight ?? 0)
+      return bWeight - aWeight
+    })
+    option = normalizeGovVoteOption(sorted[0]?.option ?? sorted[0]?.Option) ?? option
+    weight = sorted[0]?.weight ?? sorted[0]?.Weight ?? weight
+  }
+  return { option, weight }
+}
+
 const fetchProposalVotesFromTxs = async (
   id: string,
   txQuery: string
@@ -759,19 +836,6 @@ const fetchProposalVotesFromTxs = async (
   let total = Number.POSITIVE_INFINITY
   let guard = 0
   const maxPages = 200
-
-  const parseOptionValue = (raw?: string) => {
-    if (!raw) return { option: undefined as string | undefined, weight: undefined as string | undefined }
-    if (raw.includes("option:")) {
-      const optionMatch = raw.match(/option:([A-Z0-9_]+)/)
-      const weightMatch = raw.match(/weight:"([0-9.]+)"/)
-      return {
-        option: optionMatch?.[1],
-        weight: weightMatch?.[1]
-      }
-    }
-    return { option: raw, weight: undefined }
-  }
 
   while ((page - 1) * limit < total && guard < maxPages) {
     type VoteTxsResponse = {
@@ -837,7 +901,12 @@ const fetchProposalVotesFromTxs = async (
         if (String(proposalId ?? "") !== String(id)) return
         const voter = getAttr("voter")
         const rawOption = getAttr("option")
-        const parsed = parseOptionValue(rawOption)
+        const parsed = {
+          option: normalizeGovVoteOption(rawOption),
+          weight:
+            rawOption?.match(/"?[Ww]eight"?\s*[:=]\s*"?([0-9.]+)"?/)?.[1] ??
+            undefined
+        }
         if (!voter || !parsed.option) return
         eventVotes.push({
           voter,
@@ -863,15 +932,11 @@ const fetchProposalVotesFromTxs = async (
           const voter = message?.voter
           if (!voter) return
 
-          let option = message?.option
-          let weight = message?.weight
-          if (Array.isArray(message?.options) && message.options.length) {
-            const sorted = [...message.options].sort(
-              (a, b) => Number(b?.weight ?? 0) - Number(a?.weight ?? 0)
-            )
-            option = sorted[0]?.option ?? option
-            weight = sorted[0]?.weight ?? weight
-          }
+          const { option, weight } = selectGovWeightedVoteOption(
+            message?.options,
+            message?.option,
+            message?.weight
+          )
           if (!option) return
 
           eventVotes.push({ voter, option, weight, txhash })
@@ -1038,15 +1103,11 @@ export const fetchProposalVotes = async (
     )
   }
   const normalized = votes.map((vote) => {
-    let option = vote?.option ?? "--"
-    let weight = vote?.weight ?? undefined
-    if (Array.isArray(vote?.options) && vote.options.length) {
-      const sorted = [...vote.options].sort((a, b) =>
-        Number(b?.weight ?? 0) - Number(a?.weight ?? 0)
-      )
-      option = sorted[0]?.option ?? option
-      weight = sorted[0]?.weight ?? weight
-    }
+    const { option = "--", weight } = selectGovWeightedVoteOption(
+      vote?.options,
+      vote?.option,
+      vote?.weight
+    )
     return {
       voter: vote?.voter ?? vote?.voter_address ?? "--",
       option,

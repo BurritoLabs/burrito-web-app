@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { MsgWithdrawValidatorCommission } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./WithdrawCommission.module.css"
 import { useWallet } from "../app/wallet/WalletContext"
@@ -13,10 +12,7 @@ import {
 import { formatTokenAmount } from "../app/utils/format"
 import { buildClassicNativeIconCandidates, buildIbcAssetIconCandidates } from "../app/utils/assetIcons"
 import { convertBech32Prefix } from "../app/utils/bech32"
-import {
-  connectClassicStargateClientForConnector,
-  getSignerAddressForConnector
-} from "../app/wallet/walletAdapters"
+import { formatTxError } from "../app/utils/txError"
 
 const FEE_DENOM_OPTIONS = [
   CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -24,7 +20,7 @@ const FEE_DENOM_OPTIONS = [
 ] as const
 
 const DEFAULT_FEE_GAS = 220_000
-const GAS_ADJUSTMENT = 1.2
+const GAS_PRICE_MICRO_LUNC = 28.325
 
 const toSymbol = (denom: string) => {
   if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
@@ -188,72 +184,26 @@ const WithdrawCommission = () => {
   }, [feeOpen])
 
   useEffect(() => {
-    let cancelled = false
-    const timer =
-      !account?.address || !valoperAddress || !validator
-        ? undefined
-        : window.setTimeout(async () => {
-            setFeeLoading(true)
-            setFeeError(undefined)
-            try {
-              if (!connectorId) throw new Error("Wallet not connected")
-              const signerAddress = await getSignerAddressForConnector(connectorId)
-              const signerValoperAddress = convertBech32Prefix(
-                signerAddress,
-                `${CLASSIC_CHAIN.bech32Prefix}valoper`
-              )
-              if (!signerValoperAddress) {
-                throw new Error("Validator account not connected.")
-              }
-              const client = await connectClassicStargateClientForConnector(
-                connectorId,
-                feeDenom
-              )
-              const msg = {
-                typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
-                value: MsgWithdrawValidatorCommission.fromPartial({
-                  validatorAddress: signerValoperAddress
-                })
-              }
-              const gasUsed = await client.simulate(signerAddress, [msg], "")
-              const gasWanted = Math.max(
-                DEFAULT_FEE_GAS,
-                Math.ceil(gasUsed * GAS_ADJUSTMENT)
-              )
-              const feeMicro = Math.ceil(gasWanted * 28.325).toString()
-              const feeDisplay = formatTokenAmount(
-                feeMicro,
-                CLASSIC_DENOMS.lunc.coinDecimals,
-                6
-              )
-              if (!cancelled) {
-                setFeeGas(gasWanted)
-                setFee(feeDisplay === "--" ? "--" : feeDisplay)
-              }
-            } catch (error) {
-              if (!cancelled) {
-                setFee("--")
-                setFeeGas(DEFAULT_FEE_GAS)
-                setFeeError(
-                  error instanceof Error ? error.message : "Fee estimation failed"
-                )
-              }
-            } finally {
-              if (!cancelled) setFeeLoading(false)
-            }
-          }, 350)
     if (!account?.address || !valoperAddress || !validator) {
       setFee("--")
       setFeeGas(DEFAULT_FEE_GAS)
+      setFeeLoading(false)
       setFeeError(undefined)
       return undefined
     }
 
-    return () => {
-      cancelled = true
-      if (timer !== undefined) window.clearTimeout(timer)
-    }
-  }, [account?.address, connectorId, valoperAddress, validator, feeDenom])
+    const feeMicro = Math.ceil(DEFAULT_FEE_GAS * GAS_PRICE_MICRO_LUNC).toString()
+    const feeDisplay = formatTokenAmount(
+      feeMicro,
+      CLASSIC_DENOMS.lunc.coinDecimals,
+      6
+    )
+    setFeeGas(DEFAULT_FEE_GAS)
+    setFee(feeDisplay === "--" ? "--" : feeDisplay)
+    setFeeLoading(false)
+    setFeeError(undefined)
+    return undefined
+  }, [account?.address, valoperAddress, validator])
 
   const submit = async () => {
     setSubmitError(undefined)
@@ -270,6 +220,16 @@ const WithdrawCommission = () => {
       setSubmitting(true)
       startTx("Withdraw commission")
       if (!connectorId) throw new Error("Wallet not connected")
+      const [
+        {
+          connectClassicStargateClientForConnector,
+          getSignerAddressForConnector
+        },
+        { MsgWithdrawValidatorCommission }
+      ] = await Promise.all([
+        import("../app/wallet/walletAdapters"),
+        import("cosmjs-types/cosmos/distribution/v1beta1/tx")
+      ])
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const signerValoperAddress = convertBech32Prefix(
         signerAddress,
@@ -302,8 +262,7 @@ const WithdrawCommission = () => {
       }
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Broadcast failed"
+      const message = formatTxError(error, "Broadcast failed")
       setSubmitError(message)
       failTx(message)
     } finally {

@@ -1,1 +1,0 @@
-class n{client;registry;constructor(r,t){this.client=r,this.registry=t}async resolveName(r){try{const{contract:t,getQueryMsg:e}=this.registry;return await this.client.queryContractSmart(t,e(r))}catch(t){console?.error(t);return}}}export{n as NameService};

@@ -35,6 +35,7 @@ import {
   formatTokenAmount,
   truncateHash
 } from "../app/utils/format"
+import { formatTxError } from "../app/utils/txError"
 import { convertBech32Prefix } from "../app/utils/bech32"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
 import { useWallet } from "../app/wallet/WalletContext"
@@ -127,7 +128,7 @@ const ProposalDetails = () => {
     queryFn: () => fetchProposalById(proposalId),
     enabled: Boolean(proposalId),
     refetchInterval: 15_000,
-    refetchIntervalInBackground: true
+    refetchIntervalInBackground: false
   })
 
   const { data: tally } = useQuery<GovTally>({
@@ -136,7 +137,7 @@ const ProposalDetails = () => {
     enabled: Boolean(proposalId),
     staleTime: 10_000,
     refetchInterval: 15_000,
-    refetchIntervalInBackground: true
+    refetchIntervalInBackground: false
   })
 
   const { data: votes = [] } = useQuery<ProposalVote[]>({
@@ -144,7 +145,7 @@ const ProposalDetails = () => {
     queryFn: () => fetchProposalVotes(proposalId, proposal?.status),
     enabled: Boolean(proposalId),
     refetchInterval: 15_000,
-    refetchIntervalInBackground: true
+    refetchIntervalInBackground: false
   })
 
   const { data: deposits = [] } = useQuery<ProposalDeposit[]>({
@@ -152,7 +153,7 @@ const ProposalDetails = () => {
     queryFn: () => fetchProposalDeposits(proposalId),
     enabled: Boolean(proposalId),
     refetchInterval: 30_000,
-    refetchIntervalInBackground: true
+    refetchIntervalInBackground: false
   })
 
   const { data: depositParams } = useQuery<GovDepositParams>({
@@ -379,12 +380,7 @@ const ProposalDetails = () => {
   }, [proposalId, votesByValidator.length, voteFilter])
 
   const normalizeVoteOption = (value: string) => {
-    const upper = value.toUpperCase()
-    if (upper.includes("YES")) return "YES"
-    if (upper.includes("NO_WITH_VETO")) return "NO_WITH_VETO"
-    if (upper.includes("NO")) return "NO"
-    if (upper.includes("ABSTAIN")) return "ABSTAIN"
-    return upper
+    return normalizeRenderedVoteOption(value)
   }
 
   const filteredVotesByValidator = useMemo(() => {
@@ -915,7 +911,7 @@ const ProposalDetails = () => {
         queryClient.invalidateQueries({ queryKey: ["proposalVotes", proposalId] })
       ])
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Vote failed"
+      const message = formatTxError(err, "Vote failed")
       failTx(message)
       setVoteError(message)
     } finally {
@@ -1051,7 +1047,7 @@ const ProposalDetails = () => {
         })
       ])
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Deposit failed"
+      const message = formatTxError(err, "Deposit failed")
       failTx(message)
       setDepositError(message)
     } finally {
@@ -1818,21 +1814,54 @@ const formatAmountInput = (microAmount: string) => {
   return value.toFixed(6).replace(/\.?0+$/, "")
 }
 
+const normalizeRenderedVoteOption = (value: string) => {
+  const text = String(value ?? "").trim()
+  if (!text || text === "--") return "--"
+  const normalizedText = text.includes('\\"') ? text.replace(/\\"/g, '"') : text
+  if (/^\d+$/.test(text)) {
+    if (text === "1") return "YES"
+    if (text === "2") return "ABSTAIN"
+    if (text === "3") return "NO"
+    if (text === "4") return "NO_WITH_VETO"
+  }
+  if (normalizedText.startsWith("[") || normalizedText.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(normalizedText) as unknown
+      const first = Array.isArray(parsed) ? parsed[0] : parsed
+      if (typeof first === "object" && first !== null) {
+        const option = (first as { option?: unknown; Option?: unknown }).option ??
+          (first as { option?: unknown; Option?: unknown }).Option
+        if (option !== undefined) return normalizeRenderedVoteOption(String(option))
+      }
+    } catch {
+      // Fall through to log-style parsing.
+    }
+  }
+  const logOption = normalizedText.match(/"?[Oo]ption"?\s*[:=]\s*"?([A-Z0-9_]+)"?/)
+  if (logOption?.[1]) return normalizeRenderedVoteOption(logOption[1])
+  const upper = normalizedText.toUpperCase()
+  if (upper.includes("NO_WITH_VETO")) return "NO_WITH_VETO"
+  if (upper.includes("ABSTAIN")) return "ABSTAIN"
+  if (upper.includes("YES")) return "YES"
+  if (upper.includes("NO")) return "NO"
+  return upper
+}
+
 const formatVoteOption = (value: string) => {
-  const upper = value.toUpperCase()
-  if (upper.includes("YES")) return "Yes"
-  if (upper.includes("NO_WITH_VETO")) return "No with veto"
-  if (upper.includes("NO")) return "No"
-  if (upper.includes("ABSTAIN")) return "Abstain"
+  const upper = normalizeRenderedVoteOption(value)
+  if (upper === "YES") return "Yes"
+  if (upper === "NO_WITH_VETO") return "No with veto"
+  if (upper === "NO") return "No"
+  if (upper === "ABSTAIN") return "Abstain"
   return value
 }
 
 const getVoteColor = (value: string) => {
-  const upper = value.toUpperCase()
-  if (upper.includes("YES")) return "#52c41a"
-  if (upper.includes("NO_WITH_VETO")) return "#ff4d4f"
-  if (upper.includes("NO")) return "#ff7aa2"
-  if (upper.includes("ABSTAIN")) return "#f6c343"
+  const upper = normalizeRenderedVoteOption(value)
+  if (upper === "YES") return "#52c41a"
+  if (upper === "NO_WITH_VETO") return "#ff4d4f"
+  if (upper === "NO") return "#ff7aa2"
+  if (upper === "ABSTAIN") return "#f6c343"
   return "rgba(255,255,255,0.12)"
 }
 

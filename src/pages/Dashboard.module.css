@@ -44,17 +44,6 @@
   grid-auto-flow: dense;
 }
 
-.treasuryCharts,
-.activityCharts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.activityCharts {
-  grid-template-columns: 1fr;
-}
-
 .metricsTop {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -135,59 +124,6 @@
   color: rgba(234, 245, 235, 0.55);
 }
 
-.treasuryChartCard,
-.activityChartCard {
-  display: grid;
-  gap: 18px;
-  padding: 22px;
-}
-
-.chartHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.chartTitle {
-  margin: 0;
-  font-size: var(--font-size-title-lg);
-  font-weight: var(--bold);
-  color: #ffffff;
-}
-
-.chartEyebrow {
-  margin-bottom: 6px;
-  color: rgba(234, 245, 235, 0.55);
-  font-size: var(--font-size-small);
-  font-weight: var(--bold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.chartSubtitle {
-  margin: 6px 0 0;
-  color: rgba(234, 245, 235, 0.52);
-  font-size: var(--font-size-small);
-}
-
-.chartLatest {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
-  color: #ffffff;
-  font-size: clamp(22px, 4vw, 34px);
-  font-weight: var(--bold);
-  white-space: nowrap;
-}
-
-.chartLatest span {
-  color: rgba(234, 245, 235, 0.5);
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .rangeSwitch {
   display: flex;
   align-items: center;
@@ -219,114 +155,12 @@
   color: #ffffff;
 }
 
-.chart {
-  display: grid;
-  gap: 12px;
-}
-
-.chartBars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: stretch;
-  gap: 6px;
-  height: 180px;
-  padding: 12px 10px 6px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.chartBar {
-  flex: 1 1 0;
-  min-width: 4px;
-  border-radius: 5px 5px 3px 3px;
-  background: linear-gradient(180deg, rgba(82, 196, 26, 0.9) 0%, rgba(82, 196, 26, 0.4) 100%);
-}
-
-.chartAxis {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--font-size-xs);
-  color: rgba(234, 245, 235, 0.45);
-}
-
-.chartEmpty {
-  display: grid;
-  place-items: center;
-  min-height: 160px;
-  color: rgba(234, 245, 235, 0.5);
-  font-size: var(--font-size-small);
-}
-
-.poolChartRows {
-  display: grid;
-  gap: 18px;
-}
-
-.poolChartRow {
-  display: grid;
-  gap: 8px;
-}
-
-.poolChartMeta,
-.poolChartDelta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--font-size-small);
-}
-
-.poolChartMeta span {
-  color: rgba(234, 245, 235, 0.58);
-  font-weight: var(--bold);
-}
-
-.poolChartMeta strong {
-  color: #ffffff;
-  font-size: 18px;
-  overflow-wrap: anywhere;
-}
-
-.poolChartDelta {
-  justify-content: flex-end;
-  font-weight: var(--bold);
-}
-
-.poolChartTrack {
-  position: relative;
-  height: 12px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(234, 245, 235, 0.08);
-}
-
-.poolChartPrevious,
-.poolChartCurrent {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
-}
-
-.poolChartPrevious {
-  background: rgba(234, 245, 235, 0.16);
-}
-
-.poolChartCurrent {
-  background: linear-gradient(90deg, rgba(82, 196, 26, 0.95), rgba(120, 245, 72, 0.85));
-}
-
 @media (max-width: 991.98px) {
   .metricsTop {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .metricsSupply {
-    grid-template-columns: 1fr;
-  }
-
-  .treasuryCharts,
-  .activityCharts {
     grid-template-columns: 1fr;
   }
 
@@ -340,11 +174,6 @@
 
   .metricTall {
     grid-row: span 1;
-  }
-
-  .chartHeader {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 
@@ -380,9 +209,7 @@
   }
 
   .metricCard,
-  .metricCardLarge,
-  .treasuryChartCard,
-  .activityChartCard {
+  .metricCardLarge {
     padding: 14px 14px;
     min-height: 108px;
   }

@@ -19,6 +19,7 @@ import {
 } from "../app/data/classic"
 import { CLASSIC_DENOMS } from "../app/chain"
 import { truncateHash } from "../app/utils/format"
+import { formatTxError } from "../app/utils/txError"
 import { useWallet } from "../app/wallet/WalletContext"
 import {
   connectClassicSigningClientForConnector,
@@ -343,7 +344,7 @@ const Contract = () => {
       setUploadCodeId(codeId)
       finishTx(result.transactionHash)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Upload failed"
+      const message = formatTxError(error, "Upload failed")
       setUploadError(message)
       failTx(message)
     } finally {
@@ -425,8 +426,7 @@ const Contract = () => {
       if (contractAddress) setAddress(contractAddress)
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Instantiate failed"
+      const message = formatTxError(error, "Instantiate failed")
       setInstantiateError(message)
       failTx(message)
     } finally {
@@ -490,7 +490,7 @@ const Contract = () => {
       finishTx(result.transactionHash)
       await invalidateContract()
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Execute failed"
+      const message = formatTxError(error, "Execute failed")
       setExecuteError(message)
       failTx(message)
     } finally {
@@ -561,7 +561,7 @@ const Contract = () => {
       finishTx(result.transactionHash)
       await invalidateContract()
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Migrate failed"
+      const message = formatTxError(error, "Migrate failed")
       setMigrateError(message)
       failTx(message)
     } finally {
@@ -627,8 +627,7 @@ const Contract = () => {
       finishTx(result.transactionHash)
       await invalidateContract()
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Update admin failed"
+      const message = formatTxError(error, "Update admin failed")
       setAdminError(message)
       failTx(message)
     } finally {

@@ -2,6 +2,7 @@ import {
   Suspense,
   lazy,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ReactNode
@@ -120,10 +121,32 @@ const WalletFallbackProvider = ({
 }
 
 const WalletBoot = ({ children }: { children: ReactNode }) => {
-  const [runtimeRequested, setRuntimeRequested] = useState(
-    () => Boolean(getStoredWalletConnectorId())
-  )
+  const [hasStoredConnector] = useState(() => Boolean(getStoredWalletConnectorId()))
+  const [runtimeRequested, setRuntimeRequested] = useState(false)
   const requestRuntime = useCallback(() => setRuntimeRequested(true), [])
+
+  useEffect(() => {
+    if (!hasStoredConnector || runtimeRequested) return
+
+    const loadRuntime = () => setRuntimeRequested(true)
+    const walletWindow = window as Window & {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout?: number }
+      ) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    if (walletWindow.requestIdleCallback) {
+      const handle = walletWindow.requestIdleCallback(loadRuntime, {
+        timeout: 1800
+      })
+      return () => walletWindow.cancelIdleCallback?.(handle)
+    }
+
+    const timer = window.setTimeout(loadRuntime, 900)
+    return () => window.clearTimeout(timer)
+  }, [hasStoredConnector, runtimeRequested])
 
   if (!runtimeRequested) {
     return (

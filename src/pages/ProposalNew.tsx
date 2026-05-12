@@ -28,6 +28,7 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../app/chain"
 import { fetchDepositParams } from "../app/data/classic"
 import { fetchBalances } from "../app/data/classic"
 import { getOfflineSignerForConnector } from "../app/wallet/walletAdapters"
+import { formatTxError } from "../app/utils/txError"
 
 type ProposalType = "TEXT" | "SPEND" | "PARAMS" | "EXECUTE"
 
@@ -467,8 +468,9 @@ const ProposalNew = () => {
       setTxHash(result.transactionHash)
       finishTx(result.transactionHash)
     } catch (err) {
-      failTx(err instanceof Error ? err.message : "Submission failed")
-      setError(err instanceof Error ? err.message : "Submission failed")
+      const message = formatTxError(err, "Submission failed")
+      failTx(message)
+      setError(message)
     } finally {
       setSubmitting(false)
     }

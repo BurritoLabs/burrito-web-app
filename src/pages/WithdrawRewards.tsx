@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { MsgWithdrawDelegatorReward } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
 import PageShell from "./PageShell"
 import styles from "./WithdrawRewards.module.css"
 import { useWallet } from "../app/wallet/WalletContext"
@@ -16,13 +15,10 @@ import {
   buildClassicNativeIconCandidates,
   buildIbcAssetIconCandidates
 } from "../app/utils/assetIcons"
-import {
-  connectClassicStargateClientForConnector,
-  getSignerAddressForConnector
-} from "../app/wallet/walletAdapters"
+import { formatTxError } from "../app/utils/txError"
 
-const GAS_ADJUSTMENT = 1.2
 const DEFAULT_FEE_GAS = 180_000
+const GAS_PRICE_MICRO_LUNC = 28.325
 
 const sumRewards = (rewards: RewardsByValidator[], selected: string[]) => {
   const totals = new Map<string, bigint>()
@@ -245,64 +241,27 @@ const WithdrawRewards = () => {
   }, [feeOpen])
 
   useEffect(() => {
-    let cancelled = false
     if (!accountAddress || !selected.length) {
       setFee("--")
       setFeeGas(DEFAULT_FEE_GAS)
+      setFeeLoading(false)
       setFeeError(undefined)
       return undefined
     }
 
-    const timer = window.setTimeout(async () => {
-      setFeeLoading(true)
-      setFeeError(undefined)
-      try {
-        if (!connectorId) throw new Error("Wallet not connected")
-        const signerAddress = await getSignerAddressForConnector(connectorId)
-        const client = await connectClassicStargateClientForConnector(
-          connectorId,
-          feeDenom
-        )
-        const msgs = selected.map((validator) => ({
-          typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
-          value: MsgWithdrawDelegatorReward.fromPartial({
-            delegatorAddress: signerAddress,
-            validatorAddress: validator
-          })
-        }))
-        const gasUsed = await client.simulate(signerAddress, msgs, "")
-        const gasWanted = Math.max(
-          DEFAULT_FEE_GAS + selected.length * 45_000,
-          Math.ceil(gasUsed * GAS_ADJUSTMENT)
-        )
-        const feeMicro = Math.ceil(gasWanted * 28.325).toString()
-        const feeDisplay = formatTokenAmount(
-          feeMicro,
-          CLASSIC_DENOMS.lunc.coinDecimals,
-          6
-        )
-        if (!cancelled) {
-          setFeeGas(gasWanted)
-          setFee(feeDisplay === "--" ? "--" : feeDisplay)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setFee("--")
-          setFeeGas(DEFAULT_FEE_GAS + selected.length * 45_000)
-          setFeeError(
-            err instanceof Error ? err.message : "Fee estimation failed"
-          )
-        }
-      } finally {
-        if (!cancelled) setFeeLoading(false)
-      }
-    }, 500)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [accountAddress, connectorId, selected, feeDenom])
+    const gasWanted = DEFAULT_FEE_GAS + selected.length * 45_000
+    const feeMicro = Math.ceil(gasWanted * GAS_PRICE_MICRO_LUNC).toString()
+    const feeDisplay = formatTokenAmount(
+      feeMicro,
+      CLASSIC_DENOMS.lunc.coinDecimals,
+      6
+    )
+    setFeeGas(gasWanted)
+    setFee(feeDisplay === "--" ? "--" : feeDisplay)
+    setFeeLoading(false)
+    setFeeError(undefined)
+    return undefined
+  }, [accountAddress, selected])
 
   const toggleAll = (value: boolean) => {
     setSelected(value ? rewards.map((item) => item.validator_address) : [])
@@ -327,6 +286,16 @@ const WithdrawRewards = () => {
       setSubmitting(true)
       startTx("Withdraw rewards")
       if (!connectorId) throw new Error("Wallet not connected")
+      const [
+        {
+          connectClassicStargateClientForConnector,
+          getSignerAddressForConnector
+        },
+        { MsgWithdrawDelegatorReward }
+      ] = await Promise.all([
+        import("../app/wallet/walletAdapters"),
+        import("cosmjs-types/cosmos/distribution/v1beta1/tx")
+      ])
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicStargateClientForConnector(
         connectorId,
@@ -353,8 +322,9 @@ const WithdrawRewards = () => {
       }
       finishTx(result.transactionHash)
     } catch (err) {
-      failTx(err instanceof Error ? err.message : "Submit failed")
-      setSubmitError(err instanceof Error ? err.message : "Submit failed")
+      const message = formatTxError(err, "Submit failed")
+      failTx(message)
+      setSubmitError(message)
     } finally {
       setSubmitting(false)
     }

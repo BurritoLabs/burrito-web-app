@@ -4,6 +4,7 @@ import {
   WALLET_PANEL_NAVIGATION_EVENT,
   type WalletPanelNavigationDetail
 } from "./panelNavigation"
+import { isLikelyMobileBrowser } from "./walletPlatform"
 
 const WalletPanel = lazy(() => import("./WalletPanel"))
 
@@ -44,7 +45,10 @@ const WalletPanelHandle = ({
 const DeferredWalletPanel = () => {
   const [requested, setRequested] = useState(() => {
     if (typeof window === "undefined") return false
-    return window.localStorage.getItem("burritoWalletOpen") === "true"
+    return (
+      window.localStorage.getItem("burritoWalletOpen") === "true" &&
+      !isLikelyMobileBrowser()
+    )
   })
   const pendingDetailRef = useRef<WalletPanelNavigationDetail | null>(null)
 

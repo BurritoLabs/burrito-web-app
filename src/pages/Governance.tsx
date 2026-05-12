@@ -25,7 +25,7 @@ const Governance = () => {
     queryFn: fetchProposals,
     staleTime: 15_000,
     refetchInterval: 15_000,
-    refetchIntervalInBackground: true
+    refetchIntervalInBackground: false
   })
 
   const { data: stakingPool } = useQuery({
@@ -190,7 +190,7 @@ const Governance = () => {
       enabled: Boolean(proposal.id) && enableLiveTally,
       staleTime: 10_000,
       refetchInterval: enableLiveTally ? 15_000 : false,
-      refetchIntervalInBackground: true
+      refetchIntervalInBackground: false
     })
 
     const tally = liveTally ?? proposal.finalTally

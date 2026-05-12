@@ -62,6 +62,7 @@ import {
   sanitizeAssetIconUrl
 } from "../app/utils/assetIcons"
 import { truncateHash } from "../app/utils/format"
+import { formatTxError } from "../app/utils/txError"
 import { fetchContractInfo, queryContractSmart } from "../app/data/classic"
 
 type LaunchTab = "create" | "explore" | "manage"
@@ -1168,8 +1169,7 @@ const Launchpad = () => {
       handleSelectTab("manage")
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Create token failed"
+      const message = formatTxError(error, "Create token failed")
       setCreateError(message)
       failTx(message)
     } finally {
@@ -2106,8 +2106,7 @@ const Launchpad = () => {
       }
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Create pair failed."
+      const message = formatTxError(error, "Create pair failed.")
       setCreatePairError(message)
       failTx(message)
     } finally {
@@ -2196,8 +2195,7 @@ const Launchpad = () => {
       )
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Provide liquidity failed."
+      const message = formatTxError(error, "Provide liquidity failed.")
       setProvideLiquidityError(message)
       failTx(message)
     } finally {
@@ -2260,8 +2258,7 @@ const Launchpad = () => {
       )
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Withdraw liquidity failed."
+      const message = formatTxError(error, "Withdraw liquidity failed.")
       setWithdrawLiquidityError(message)
       failTx(message)
     } finally {
@@ -2338,7 +2335,7 @@ const Launchpad = () => {
       )
       finishTx(result.transactionHash)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Lock LP failed."
+      const message = formatTxError(error, "Lock LP failed.")
       setLockLpError(message)
       failTx(message)
     } finally {
@@ -2407,8 +2404,7 @@ const Launchpad = () => {
       await refreshRegistryLaunches()
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Update public LP lock failed."
+      const message = formatTxError(error, "Update public LP lock failed.")
       setLockRegistryError(message)
       failTx(message)
     } finally {
@@ -2472,8 +2468,7 @@ const Launchpad = () => {
       )
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Withdraw locked LP failed."
+      const message = formatTxError(error, "Withdraw locked LP failed.")
       setWithdrawLpError(message)
       failTx(message)
     } finally {
@@ -2539,8 +2534,7 @@ const Launchpad = () => {
       )
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Distribute tokens failed."
+      const message = formatTxError(error, "Distribute tokens failed.")
       setDistributionError(message)
       failTx(message)
     } finally {
@@ -2691,8 +2685,7 @@ const Launchpad = () => {
       await refreshRegistryLaunches()
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Publish listing failed."
+      const message = formatTxError(error, "Publish listing failed.")
       setPublishError(message)
       failTx(message)
     } finally {
@@ -2762,10 +2755,7 @@ const Launchpad = () => {
       await refreshRegistryLaunches()
       finishTx(result.transactionHash)
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Update listing visibility failed."
+      const message = formatTxError(error, "Update listing visibility failed.")
       setListingStatusError(message)
       failTx(message)
     } finally {

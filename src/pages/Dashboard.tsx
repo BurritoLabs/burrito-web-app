@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Dashboard.module.css"
@@ -9,8 +9,7 @@ import {
 } from "../app/data/dashboard"
 import {
   fetchBinodesDashboardActivity,
-  type BinodesDashboardFrequency,
-  type BinodesDashboardSeriesPoint
+  type BinodesDashboardFrequency
 } from "../app/data/binodes"
 import { fetchPrices } from "../app/data/classic"
 import { formatNumber, formatPercent } from "../app/utils/format"
@@ -144,209 +143,10 @@ const dashboardRanges: Record<
 
 const dashboardRangeOptions = Object.keys(dashboardRanges) as DashboardRange[]
 
-type ChartPoint = {
-  key: string
-  label: string
-  value: number
-}
-
-const formatChartTick = (value: string, range: DashboardRange) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  if (range !== "1h") {
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "2-digit",
-      timeZone: "UTC"
-    })
-  }
-  const options: Intl.DateTimeFormatOptions = {
-    hour: "2-digit",
-    timeZone: "UTC"
-  }
-  if (range === "1h") options.minute = "2-digit"
-  return date.toLocaleTimeString("en-US", options)
-}
-
-const buildActivityChartPoints = (
-  series: BinodesDashboardSeriesPoint[],
-  range: DashboardRange,
-  maxPoints: number,
-  getter: (point: BinodesDashboardSeriesPoint) => number | undefined
-): ChartPoint[] => {
-  return series
-    .slice(-maxPoints)
-    .map((point) => ({
-      key: point.dt,
-      label: formatChartTick(point.dt, range),
-      value: Number.isFinite(getter(point)) ? Number(getter(point)) : 0
-    }))
-}
-
-const getResponsiveChartPointCount = () => {
-  if (typeof window === "undefined") return 50
-  const width = window.innerWidth
-  if (width >= 1280) return 50
-  if (width >= 1024) return 42
-  if (width >= 768) return 34
-  if (width >= 540) return 26
-  return 18
-}
-
-const useResponsiveChartPointCount = () => {
-  const [pointCount, setPointCount] = useState(getResponsiveChartPointCount)
-
-  useEffect(() => {
-    const updatePointCount = () => {
-      setPointCount(getResponsiveChartPointCount())
-    }
-    updatePointCount()
-    window.addEventListener("resize", updatePointCount)
-    return () => window.removeEventListener("resize", updatePointCount)
-  }, [])
-
-  return pointCount
-}
-
-const PoolChartRow = ({
-  symbol,
-  current,
-  previous
-}: {
-  symbol: "LUNC" | "USTC"
-  current?: number
-  previous?: number
-}) => {
-  const max = Math.max(current ?? 0, previous ?? 0)
-  const currentWidth =
-    max > 0 && current !== undefined ? Math.max(3, (current / max) * 100) : 0
-  const previousWidth =
-    max > 0 && previous !== undefined ? Math.max(3, (previous / max) * 100) : 0
-  const delta =
-    current === undefined || previous === undefined ? undefined : current - previous
-
-  return (
-    <div className={styles.poolChartRow}>
-      <div className={styles.poolChartMeta}>
-        <span>{symbol}</span>
-        <strong>{formatValue(current, 2)}</strong>
-      </div>
-      <div className={styles.poolChartTrack} aria-hidden="true">
-        <i
-          className={styles.poolChartPrevious}
-          style={{ width: `${previousWidth}%` }}
-        />
-        <i
-          className={styles.poolChartCurrent}
-          style={{ width: `${currentWidth}%` }}
-        />
-      </div>
-      <div
-        className={`${styles.poolChartDelta} ${
-          delta === undefined
-            ? styles.neutral
-            : delta >= 0
-              ? styles.up
-              : styles.down
-        }`}
-      >
-        {delta === undefined ? "No range delta" : formatDelta(delta, 2, symbol)}
-      </div>
-    </div>
-  )
-}
-
-const TreasuryChartCard = ({
-  title,
-  subtitle,
-  luncCurrent,
-  luncPrevious,
-  ustcCurrent,
-  ustcPrevious
-}: {
-  title: string
-  subtitle: string
-  luncCurrent?: number
-  luncPrevious?: number
-  ustcCurrent?: number
-  ustcPrevious?: number
-}) => (
-  <article className={`card ${styles.treasuryChartCard}`}>
-    <div>
-      <div className={styles.chartEyebrow}>Treasury</div>
-      <h3 className={styles.chartTitle}>{title}</h3>
-      <p className={styles.chartSubtitle}>{subtitle}</p>
-    </div>
-    <div className={styles.poolChartRows}>
-      <PoolChartRow symbol="LUNC" current={luncCurrent} previous={luncPrevious} />
-      <PoolChartRow symbol="USTC" current={ustcCurrent} previous={ustcPrevious} />
-    </div>
-  </article>
-)
-
-const ActivityChartCard = ({
-  title,
-  subtitle,
-  summaryLabel,
-  points,
-  valueFormatter
-}: {
-  title: string
-  subtitle: string
-  summaryLabel: string
-  points: ChartPoint[]
-  valueFormatter: (value?: number) => string
-}) => {
-  const max = Math.max(...points.map((point) => point.value), 0)
-  const latest = points.at(-1)
-
-  return (
-    <article className={`card ${styles.activityChartCard}`}>
-      <div className={styles.chartHeader}>
-        <div>
-          <div className={styles.chartEyebrow}>{subtitle}</div>
-          <h3 className={styles.chartTitle}>{title}</h3>
-        </div>
-        <div className={styles.chartLatest}>
-          <span>{summaryLabel}</span>
-          {valueFormatter(latest?.value)}
-        </div>
-      </div>
-      {points.length ? (
-        <div className={styles.chart}>
-          <div className={styles.chartBars}>
-            {points.map((point) => {
-              const height =
-                max > 0 && point.value > 0
-                  ? Math.max(4, (point.value / max) * 100)
-                  : 0
-              return (
-                <i
-                  key={point.key}
-                  className={styles.chartBar}
-                  style={{ height: `${height}%` }}
-                  title={`${point.label}: ${valueFormatter(point.value)}`}
-                />
-              )
-            })}
-          </div>
-          <div className={styles.chartAxis}>
-            <span>{points[0]?.label}</span>
-            <span>{latest?.label}</span>
-          </div>
-        </div>
-      ) : (
-        <div className={styles.chartEmpty}>No chart data available.</div>
-      )}
-    </article>
-  )
-}
-
 const Dashboard = () => {
   const [dashboardRange, setDashboardRange] =
     useState<DashboardRange>("24h")
   const activeRange = dashboardRanges[dashboardRange]
-  const chartPointCount = useResponsiveChartPointCount()
 
   const { data: currentSnapshot } = useQuery({
     queryKey: ["dashboard", "snapshot", "current"],
@@ -384,11 +184,10 @@ const Dashboard = () => {
       "binodes",
       "dashboard",
       "activity",
-      activeRange.activityFrequency,
-      chartPointCount
+      activeRange.activityFrequency
     ],
     queryFn: () =>
-      fetchBinodesDashboardActivity(activeRange.activityFrequency, chartPointCount),
+      fetchBinodesDashboardActivity(activeRange.activityFrequency, 1),
     staleTime: activeRange.ttlMs,
     refetchInterval: 10 * 60 * 1000
   })
@@ -403,36 +202,7 @@ const Dashboard = () => {
     activity?.governance?.dt
 
   const activitySeries = useMemo(() => activity?.series ?? [], [activity?.series])
-  const totalFeeChartPoints = useMemo(
-    () =>
-      buildActivityChartPoints(
-        activitySeries,
-        dashboardRange,
-        chartPointCount,
-        (point) => point.totalFeeUsd
-      ),
-    [activitySeries, chartPointCount, dashboardRange]
-  )
-  const transactionChartPoints = useMemo(
-    () =>
-      buildActivityChartPoints(
-        activitySeries,
-        dashboardRange,
-        chartPointCount,
-        (point) => point.txTotalCnt
-      ),
-    [activitySeries, chartPointCount, dashboardRange]
-  )
-  const burnChartPoints = useMemo(
-    () =>
-      buildActivityChartPoints(
-        activitySeries,
-        dashboardRange,
-        chartPointCount,
-        (point) => point.burnUsd
-      ),
-    [activitySeries, chartPointCount, dashboardRange]
-  )
+  const activityLatest = activitySeries.at(-1)
 
   const metrics = useMemo<MetricItem[]>(() => {
     if (!currentSnapshot) return []
@@ -765,23 +535,42 @@ const Dashboard = () => {
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Treasury</div>
-          <div className={styles.treasuryCharts}>
-            <TreasuryChartCard
-              title="Community Pool"
-              subtitle={`Current balance and ${activeRange.label} delta`}
-              luncCurrent={currentSnapshot?.luncCommunity}
-              luncPrevious={previousSnapshot?.luncCommunity}
-              ustcCurrent={currentSnapshot?.ustcCommunity}
-              ustcPrevious={previousSnapshot?.ustcCommunity}
-            />
-            <TreasuryChartCard
-              title="Oracle Pool"
-              subtitle={`Current balance and ${activeRange.label} delta`}
-              luncCurrent={currentSnapshot?.luncOracle}
-              luncPrevious={previousSnapshot?.luncOracle}
-              ustcCurrent={currentSnapshot?.ustcOracle}
-              ustcPrevious={previousSnapshot?.ustcOracle}
-            />
+          <div className={styles.metricsSupply}>
+            {metrics
+              .filter(
+                (item) =>
+                  item.key === "communityPoolLunc" ||
+                  item.key === "communityPoolUstc" ||
+                  item.key === "oraclePoolLunc" ||
+                  item.key === "oraclePoolUstc"
+              )
+              .map((item) => (
+                <div key={item.key} className={`card ${styles.metricCard}`}>
+                  <div className={styles.metricLabel}>{item.label}</div>
+                  <div className={styles.metricValue}>
+                    {item.value}
+                    {item.unit ? <span>{item.unit}</span> : null}
+                  </div>
+                  {item.delta !== undefined && item.delta !== "--" ? (
+                    <div
+                      className={`${styles.delta} ${
+                        item.deltaRaw === undefined
+                          ? styles.neutral
+                          : item.deltaRaw >= 0
+                            ? styles.up
+                            : styles.down
+                      }`}
+                    >
+                      {item.deltaRaw === undefined ? null : item.deltaRaw >= 0 ? (
+                        <DeltaUpIcon />
+                      ) : (
+                        <DeltaDownIcon />
+                      )}
+                      {item.delta}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
           </div>
         </section>
 
@@ -901,9 +690,8 @@ const Dashboard = () => {
             <div>
               <div className={styles.sectionHeader}>Network Activity</div>
               <p className={styles.sectionSubtext}>
-                Last {chartPointCount} {activeRange.label} buckets from BiNodes
-                {activity?.bucketCount ? `, ${activity.bucketCount} returned` : ""}
-                . Latest bucket: {formatUtcHour(activityTimestamp)}
+                Latest {activeRange.label} bucket from BiNodes. Updated:{" "}
+                {formatUtcHour(activityTimestamp)}
               </p>
             </div>
             <div className={styles.poweredByLine}>
@@ -911,31 +699,37 @@ const Dashboard = () => {
                 ? "Loading BiNodes"
                 : activityError
                   ? "BiNodes unavailable"
-                  : "Powered by BiNodes"}
+                : "Powered by BiNodes"}
             </div>
           </div>
-          <div className={styles.activityCharts}>
-            <ActivityChartCard
-              title="Total Fee Accrued"
-              subtitle="Includes gas, pool fees, and burn tax"
-              summaryLabel={`Latest ${activeRange.label}`}
-              points={totalFeeChartPoints}
-              valueFormatter={formatUsdCompact}
-            />
-            <ActivityChartCard
-              title="Total Transactions"
-              subtitle="Transaction count"
-              summaryLabel={`Latest ${activeRange.label}`}
-              points={transactionChartPoints}
-              valueFormatter={(value) => formatValue(value, 0)}
-            />
-            <ActivityChartCard
-              title="Burn"
-              subtitle="Fee burn and voluntary burn"
-              summaryLabel={`Latest ${activeRange.label}`}
-              points={burnChartPoints}
-              valueFormatter={formatUsdCompact}
-            />
+          <div className={styles.metrics}>
+            <div className={`card ${styles.metricCard}`}>
+              <div className={styles.metricLabel}>Total Fee Accrued</div>
+              <div className={styles.metricValue}>
+                {formatUsdCompact(activityLatest?.totalFeeUsd)}
+              </div>
+              <div className={`${styles.delta} ${styles.neutral}`}>
+                Includes gas, pool fees, and burn tax
+              </div>
+            </div>
+            <div className={`card ${styles.metricCard}`}>
+              <div className={styles.metricLabel}>Total Transactions</div>
+              <div className={styles.metricValue}>
+                {formatValue(activityLatest?.txTotalCnt, 0)}
+              </div>
+              <div className={`${styles.delta} ${styles.neutral}`}>
+                Latest {activeRange.label} transaction count
+              </div>
+            </div>
+            <div className={`card ${styles.metricCard}`}>
+              <div className={styles.metricLabel}>Burn</div>
+              <div className={styles.metricValue}>
+                {formatUsdCompact(activityLatest?.burnUsd)}
+              </div>
+              <div className={`${styles.delta} ${styles.neutral}`}>
+                Fee burn and voluntary burn
+              </div>
+            </div>
           </div>
         </section>
 

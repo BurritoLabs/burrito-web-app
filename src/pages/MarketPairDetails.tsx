@@ -1,17 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import {
-  CandlestickSeries,
-  ColorType,
-  HistogramSeries,
-  LineStyle,
-  TickMarkType,
-  createChart,
-  type MouseEventHandler,
-  type Time,
-  type UTCTimestamp
-} from "lightweight-charts"
+import type { MouseEventHandler, Time, UTCTimestamp } from "lightweight-charts"
 import PageShell from "./PageShell"
 import SwapPanel from "./components/SwapPanel"
 import styles from "./MarketPairDetails.module.css"
@@ -65,19 +55,19 @@ type MarketDetailLocationState = {
 const LAUNCHPAD_EXPLORE_PATH = "/launchpad?tab=explore"
 
 const TIMEFRAME_BUCKET_MS: Record<Timeframe, number> = {
-  "1h": 5 * 60 * 1000,
+  "1h": 60 * 1000,
   "24h": 30 * 60 * 1000,
   "7d": 2 * 60 * 60 * 1000
 }
 
 const TIMEFRAME_LOOKBACK_BUCKETS: Record<Timeframe, number> = {
-  "1h": 12,
+  "1h": 60,
   "24h": 48,
   "7d": 84
 }
 
 const MIN_CANDLES_FOR_CHART: Record<Timeframe, number> = {
-  "1h": 6,
+  "1h": 20,
   "24h": 12,
   "7d": 18
 }
@@ -258,7 +248,12 @@ const formatChartTime = (timestampMs: number, tf: Timeframe) =>
 const formatChartTickTime = (
   timestampSeconds: number,
   tf: Timeframe,
-  tickMarkType: TickMarkType
+  tickMarkType: number,
+  tickMarkTypeEnum: {
+    DayOfMonth: number
+    Month: number
+    Year: number
+  }
 ) => {
   const date = new Date(timestampSeconds * 1000)
   if (Number.isNaN(date.getTime())) return ""
@@ -272,16 +267,16 @@ const formatChartTickTime = (
 
   if (tf === "24h") {
     if (
-      tickMarkType === TickMarkType.DayOfMonth ||
-      tickMarkType === TickMarkType.Month ||
-      tickMarkType === TickMarkType.Year
+      tickMarkType === tickMarkTypeEnum.DayOfMonth ||
+      tickMarkType === tickMarkTypeEnum.Month ||
+      tickMarkType === tickMarkTypeEnum.Year
     ) {
       return `${month} ${day}`
     }
     return `${hours}:${minutes}`
   }
 
-  if (tickMarkType === TickMarkType.Year) {
+  if (tickMarkType === tickMarkTypeEnum.Year) {
     return `${month} ${day}, ${date.getFullYear()}`
   }
 
@@ -867,6 +862,20 @@ const MarketPairDetails = () => {
     const lastCandle = candles[candles.length - 1]
     const trendLineColor = "rgba(108, 236, 61, 0.98)"
     const trendLineSoft = "rgba(108, 236, 61, 0.36)"
+    let cancelled = false
+    let cleanupChart: (() => void) | undefined
+
+    void (async () => {
+      const {
+        CandlestickSeries,
+        ColorType,
+        HistogramSeries,
+        LineStyle,
+        TickMarkType,
+        createChart
+      } = await import("lightweight-charts")
+
+      if (cancelled) return
 
     const chart = createChart(host, {
       autoSize: true,
@@ -906,9 +915,9 @@ const MarketPairDetails = () => {
         rightOffset: 6,
         timeVisible: true,
         secondsVisible: false,
-        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) => {
+        tickMarkFormatter: (time: Time, tickMarkType: number) => {
           if (typeof time !== "number") return null
-          return formatChartTickTime(time, timeframe, tickMarkType)
+          return formatChartTickTime(time, timeframe, tickMarkType, TickMarkType)
         }
       },
       localization: {
@@ -963,9 +972,10 @@ const MarketPairDetails = () => {
     priceSeries.setData(
       candles.map((candle) => {
         const time = Math.floor(candle.bucketStart / 1000) as UTCTimestamp
+        const shouldPadFlatCandle = candle.volumeQuote > 0 && candle.high === candle.low
         const minMove = Math.max(Math.abs(candle.close) * 1e-8, 1e-12)
-        const high = candle.high === candle.low ? candle.high + minMove : candle.high
-        const low = candle.high === candle.low ? Math.max(candle.low - minMove, 0) : candle.low
+        const high = shouldPadFlatCandle ? candle.high + minMove : candle.high
+        const low = shouldPadFlatCandle ? Math.max(candle.low - minMove, 0) : candle.low
         candleByTimestamp.set(Number(time), candle)
         return {
           time,
@@ -1108,7 +1118,7 @@ const MarketPairDetails = () => {
 
     chart.timeScale().fitContent()
 
-    return () => {
+    cleanupChart = () => {
       hideTooltip()
       try {
         chart.unsubscribeCrosshairMove(handleCrosshairMove)
@@ -1120,6 +1130,12 @@ const MarketPairDetails = () => {
       } catch {
         // ignore chart teardown race during route changes
       }
+    }
+    })()
+
+    return () => {
+      cancelled = true
+      cleanupChart?.()
     }
   }, [baseSymbol, candles, chartQuoteUsd, quoteSymbol, timeframe])
 

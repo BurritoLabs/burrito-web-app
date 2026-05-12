@@ -10,13 +10,13 @@ const HEXXAGON_TOKENS_URL =
   "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main/cw20/tokens/mainnet/terra.js";
 
 const BUCKET_MS = {
-  "1h": 5 * 60 * 1000,
+  "1h": 60 * 1000,
   "24h": 30 * 60 * 1000,
   "7d": 2 * 60 * 60 * 1000,
 };
 
 const LOOKBACK_BUCKETS = {
-  "1h": 12,
+  "1h": 60,
   "24h": 48,
   "7d": 84,
 };

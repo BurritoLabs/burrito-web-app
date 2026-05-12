@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { SVGProps } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { toUtf8 } from "@cosmjs/encoding"
-import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
-import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
-import QRCode from "qrcode"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletContext"
 import { CLASSIC_DENOMS } from "../chain"
@@ -27,10 +23,6 @@ import {
   useWalletHiddenTokensPreference,
   useWalletHideLowBalancePreference
 } from "./useWalletVisibilityPreferences"
-import {
-  connectClassicSigningClientForConnector,
-  getSignerAddressForConnector
-} from "./walletAdapters"
 import { useWalletAssets, type WalletAssetRow } from "./useWalletAssets"
 import {
   formatPercent,
@@ -38,6 +30,7 @@ import {
   formatUsd,
   toUnitAmount
 } from "../utils/format"
+import { formatTxError } from "../utils/txError"
 
 type IconProps = SVGProps<SVGSVGElement>
 
@@ -181,6 +174,9 @@ const DEFAULT_SEND_ASSET: SelectedAsset = {
   decimals: CLASSIC_DENOMS.lunc.coinDecimals
 }
 const TERRA_ADDRESS_PATTERN = /^terra1[0-9a-z]{38}$/
+
+const encodeJsonBytes = (value: unknown) =>
+  new TextEncoder().encode(JSON.stringify(value))
 
 const sanitizeAmount = (value: string) => {
   let next = value.replace(/,/g, "").replace(/[^\d.]/g, "")
@@ -408,6 +404,7 @@ const WalletPanel = () => {
       }
 
       try {
+        const { default: QRCode } = await import("qrcode")
         const dataUrl = await QRCode.toDataURL(address, {
           width: 220,
           margin: 0,
@@ -956,6 +953,15 @@ const WalletPanel = () => {
     try {
       startTx(`Send ${sendAsset.symbol}`)
       if (!connectorId) throw new Error("Wallet not connected")
+      const [
+        { connectClassicSigningClientForConnector, getSignerAddressForConnector },
+        { MsgExecuteContract },
+        { MsgSend }
+      ] = await Promise.all([
+        import("./walletAdapters"),
+        import("cosmjs-types/cosmwasm/wasm/v1/tx"),
+        import("cosmjs-types/cosmos/bank/v1beta1/tx")
+      ])
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const msg =
@@ -965,14 +971,12 @@ const WalletPanel = () => {
               value: MsgExecuteContract.fromPartial({
                 sender: signerAddress,
                 contract: sendAsset.denom,
-                msg: toUtf8(
-                  JSON.stringify({
-                    transfer: {
-                      recipient,
-                      amount: sendAmountMicro.toString()
-                    }
-                  })
-                ),
+                msg: encodeJsonBytes({
+                  transfer: {
+                    recipient,
+                    amount: sendAmountMicro.toString()
+                  }
+                }),
                 funds: []
               })
             }
@@ -1026,7 +1030,7 @@ const WalletPanel = () => {
       resetSendForm()
       setView("wallet")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Send failed"
+      const message = formatTxError(error, "Send failed")
       setSendError(message)
       failTx(message)
     } finally {

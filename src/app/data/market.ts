@@ -3,6 +3,10 @@ import {
   fetchLaunchRegistryLaunches,
   isLaunchRegistryConfigured
 } from "../launchpad/registry"
+import {
+  fetchBinodesDexTxDetails,
+  type BinodesDexTxDetail
+} from "./binodes"
 import { queryContractSmart } from "./classic"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
 
@@ -195,6 +199,8 @@ const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
 
 const normalizeAssetKey = (value: string) => {
   if (!value) return value
+  if (value.startsWith("native:")) return normalizeAssetKey(value.slice(7))
+  if (value.startsWith("cw20:")) return normalizeAssetKey(value.slice(5))
   if (value.startsWith("ibc/")) return `ibc/${value.slice(4).toUpperCase()}`
   if (value.startsWith("terra1")) return value.toLowerCase()
   return value.toLowerCase()
@@ -220,6 +226,7 @@ const getPairTxQueryVariants = (pairAddress: string) => [
 
 const resolveTimeframeFromBucketMs = (bucketMs: number) => {
   // Pair details page uses finer buckets for better intra-window granularity.
+  if (bucketMs === 60 * 1000) return "1h"
   if (bucketMs === 5 * 60 * 1000) return "1h"
   if (bucketMs === 30 * 60 * 1000) return "24h"
   if (bucketMs === 2 * 60 * 60 * 1000) return "7d"
@@ -518,6 +525,56 @@ const buildCandlesFromTrades = ({
   return Array.from(buckets.values())
     .sort((a, b) => a.bucketStart - b.bucketStart)
     .slice(-maxCandles)
+}
+
+const fillCandleGaps = ({
+  candles,
+  bucketMs,
+  lookbackBuckets,
+  maxCandles
+}: {
+  candles: PairCandle[]
+  bucketMs: number
+  lookbackBuckets: number
+  maxCandles: number
+}) => {
+  if (!candles.length || bucketMs <= 0 || lookbackBuckets <= 0) return candles
+
+  const sorted = [...candles].sort((a, b) => a.bucketStart - b.bucketStart)
+  const byBucket = new Map(sorted.map((candle) => [candle.bucketStart, candle]))
+  const nowBucket = Math.floor(Date.now() / bucketMs) * bucketMs
+  const firstBucket = nowBucket - bucketMs * (lookbackBuckets - 1)
+  const filled: PairCandle[] = []
+
+  let previousClose =
+    sorted.find((candle) => candle.bucketStart <= firstBucket)?.close ??
+    sorted[0]?.open ??
+    sorted[0]?.close
+
+  for (
+    let bucketStart = firstBucket;
+    bucketStart <= nowBucket;
+    bucketStart += bucketMs
+  ) {
+    const candle = byBucket.get(bucketStart)
+    if (candle) {
+      filled.push(candle)
+      previousClose = candle.close
+      continue
+    }
+
+    if (!Number.isFinite(previousClose) || previousClose <= 0) continue
+    filled.push({
+      bucketStart,
+      open: previousClose,
+      high: previousClose,
+      low: previousClose,
+      close: previousClose,
+      volumeQuote: 0
+    })
+  }
+
+  return filled.slice(-maxCandles)
 }
 
 const sanitizeSwapTicks = (ticks: SwapTick[]) => {
@@ -1271,7 +1328,14 @@ export const fetchPairCandles = async ({
   // Prioritize on-chain tx-derived candles when they already have enough bars.
   const txCandles = await fetchFromTx(lookbackBuckets)
   const txCandlesValid = candlesMatchExpectedPrice(txCandles, expectedPrice)
-  if (txCandlesValid && txCandles.length >= minCandles) return txCandles
+  if (txCandlesValid && txCandles.length >= minCandles) {
+    return fillCandleGaps({
+      candles: txCandles,
+      bucketMs,
+      lookbackBuckets,
+      maxCandles
+    })
+  }
 
   const candidates: PairCandle[][] = []
   if (txCandlesValid && txCandles.length > 0) candidates.push(txCandles)
@@ -1352,7 +1416,145 @@ export const fetchPairCandles = async ({
 
   const acceptable = rankedCandidates.filter((candidate) => candidate.quality.isAcceptable)
   const selection = acceptable.length ? acceptable : rankedCandidates
-  return selection[0]?.candles ?? []
+  return fillCandleGaps({
+    candles: selection[0]?.candles ?? [],
+    bucketMs,
+    lookbackBuckets,
+    maxCandles
+  })
+}
+
+const amountFromBinodes = ({
+  actual,
+  raw,
+  decimals
+}: {
+  actual?: number
+  raw?: string
+  decimals: number
+}) => {
+  if (Number.isFinite(actual) && Number(actual) > 0) return Number(actual)
+  const rawAmount = Number(raw ?? NaN)
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) return 0
+  return rawAmount / 10 ** decimals
+}
+
+const normalizeBinodesPairTrade = ({
+  item,
+  pairAddress,
+  leftKey,
+  rightKey,
+  leftDecimals,
+  rightDecimals
+}: {
+  item: BinodesDexTxDetail
+  pairAddress: string
+  leftKey: string
+  rightKey: string
+  leftDecimals: number
+  rightDecimals: number
+}): PairTrade | null => {
+  if (item.code !== undefined && item.code !== 0) return null
+  if (item.pair_addr?.toLowerCase() !== pairAddress.toLowerCase()) return null
+
+  const timestamp = Date.parse(item.timestamp_utc ?? "")
+  if (!Number.isFinite(timestamp)) return null
+
+  const txhash = item.tx_hash ?? ""
+  if (!txhash) return null
+
+  const offerKey = normalizeAssetKey(item.offer_denom ?? "")
+  const askKey = normalizeAssetKey(item.ask_denom ?? "")
+  const trader = (item.sender_addr || item.receiver_addr || "").toLowerCase()
+
+  if (offerKey === leftKey && askKey === rightKey) {
+    const offerAmount = amountFromBinodes({
+      actual: item.offer_amt_actual,
+      raw: item.offer_amt_raw,
+      decimals: leftDecimals
+    })
+    const askAmount = amountFromBinodes({
+      actual: item.ask_amt_actual,
+      raw: item.ask_amt_raw,
+      decimals: rightDecimals
+    })
+    if (offerAmount <= 0 || askAmount <= 0) return null
+    return {
+      txhash,
+      timestamp,
+      side: "sell",
+      price: askAmount / offerAmount,
+      amountBase: offerAmount,
+      amountQuote: askAmount,
+      trader
+    }
+  }
+
+  if (offerKey === rightKey && askKey === leftKey) {
+    const offerAmount = amountFromBinodes({
+      actual: item.offer_amt_actual,
+      raw: item.offer_amt_raw,
+      decimals: rightDecimals
+    })
+    const askAmount = amountFromBinodes({
+      actual: item.ask_amt_actual,
+      raw: item.ask_amt_raw,
+      decimals: leftDecimals
+    })
+    if (offerAmount <= 0 || askAmount <= 0) return null
+    return {
+      txhash,
+      timestamp,
+      side: "buy",
+      price: offerAmount / askAmount,
+      amountBase: askAmount,
+      amountQuote: offerAmount,
+      trader
+    }
+  }
+
+  return null
+}
+
+const fetchPairTradesFromBinodes = async ({
+  pairAddress,
+  leftKey,
+  rightKey,
+  leftDecimals,
+  rightDecimals,
+  targetCount
+}: {
+  pairAddress: string
+  leftKey: string
+  rightKey: string
+  leftDecimals: number
+  rightDecimals: number
+  targetCount: number
+}) => {
+  const items = await fetchBinodesDexTxDetails({
+    pairAddress,
+    limit: targetCount
+  })
+
+  const trades = items
+    .map((item) =>
+      normalizeBinodesPairTrade({
+        item,
+        pairAddress,
+        leftKey,
+        rightKey,
+        leftDecimals,
+        rightDecimals
+      })
+    )
+    .filter((trade): trade is PairTrade => trade !== null)
+
+  trades.sort((a, b) => {
+    if (a.timestamp === b.timestamp) return b.txhash.localeCompare(a.txhash)
+    return b.timestamp - a.timestamp
+  })
+
+  return trades
 }
 
 export const fetchPairTrades = async ({
@@ -1377,6 +1579,28 @@ export const fetchPairTrades = async ({
   const targetCount = Math.max(0, offset) + Math.max(1, limit) + 1
   const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
   const normalizedRightKey = normalizeAssetKey(rightAssetKey)
+
+  try {
+    const binodesTrades = await fetchPairTradesFromBinodes({
+      pairAddress,
+      leftKey: normalizedLeftKey,
+      rightKey: normalizedRightKey,
+      leftDecimals,
+      rightDecimals,
+      targetCount
+    })
+
+    if (binodesTrades.length > 0) {
+      const start = Math.max(0, offset)
+      const end = start + Math.max(1, limit)
+      return {
+        trades: binodesTrades.slice(start, end),
+        hasMore: binodesTrades.length > end
+      }
+    }
+  } catch {
+    // Fall back to LCD event parsing if Binode is unavailable or blocked by the browser.
+  }
 
   let bestTrades: PairTrade[] = []
   let bestReachedEnd = false

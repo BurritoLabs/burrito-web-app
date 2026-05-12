@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useLocation } from "react-router-dom"
 import styles from "./ScrollTopButton.module.css"
 
@@ -23,14 +23,26 @@ const getCurrentScrollTop = () => {
 const ScrollTopButton = () => {
   const location = useLocation()
   const [visible, setVisible] = useState(() => getCurrentScrollTop() > SCROLL_THRESHOLD)
+  const visibleRef = useRef(visible)
+  const frameRef = useRef<number | undefined>(undefined)
 
   const syncVisibility = useCallback(() => {
-    setVisible(getCurrentScrollTop() > SCROLL_THRESHOLD)
+    const nextVisible = getCurrentScrollTop() > SCROLL_THRESHOLD
+    if (visibleRef.current !== nextVisible) {
+      visibleRef.current = nextVisible
+      setVisible(nextVisible)
+    }
   }, [])
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(syncVisibility)
-    const handleScroll = () => syncVisibility()
+    const handleScroll = () => {
+      if (frameRef.current !== undefined) return
+      frameRef.current = window.requestAnimationFrame(() => {
+        frameRef.current = undefined
+        syncVisibility()
+      })
+    }
 
     window.addEventListener("scroll", handleScroll, { passive: true })
     document.addEventListener("scroll", handleScroll, true)
@@ -38,6 +50,10 @@ const ScrollTopButton = () => {
 
     return () => {
       window.cancelAnimationFrame(frame)
+      if (frameRef.current !== undefined) {
+        window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = undefined
+      }
       window.removeEventListener("scroll", handleScroll)
       document.removeEventListener("scroll", handleScroll, true)
       window.removeEventListener("resize", handleScroll)

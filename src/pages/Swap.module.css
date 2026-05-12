@@ -65,6 +65,18 @@
   font-size: clamp(22px, 2.2vw, 28px);
 }
 
+.swapCardEmbedded .amountInputCompact,
+.swapCardEmbedded .readonlyAmountCompact {
+  font-size: clamp(18px, 1.8vw, 23px);
+  letter-spacing: -0.02em;
+}
+
+.swapCardEmbedded .amountInputTiny,
+.swapCardEmbedded .readonlyAmountTiny {
+  font-size: clamp(14px, 1.35vw, 18px);
+  letter-spacing: -0.035em;
+}
+
 .swapCardEmbedded .assetPickerButton {
   min-width: 128px;
   height: 40px;
