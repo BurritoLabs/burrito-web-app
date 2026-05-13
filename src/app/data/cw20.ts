@@ -13,6 +13,14 @@ type Cw20BalanceOptions = {
 
 const CACHE_TTL = 5 * 60 * 1000
 const SUPPLY_CACHE_TTL = 15 * 60 * 1000
+const BALANCE_CACHE_VERSION = "v2"
+const BALANCE_FETCH_ATTEMPTS = 2
+const BALANCE_FETCH_RETRY_DELAY_MS = 200
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, ms)
+  })
 
 const loadCache = (key: string) => {
   if (typeof window === "undefined") return undefined
@@ -29,7 +37,11 @@ const loadCache = (key: string) => {
 
 const saveCache = (key: string, data: Record<string, string>) => {
   if (typeof window === "undefined") return
-  window.localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+  } catch {
+    // Ignore storage failures in private browsing or low-storage mobile contexts.
+  }
 }
 
 const buildWhitelistSignature = (whitelist: Record<string, Cw20Token>) => {
@@ -48,6 +60,45 @@ const buildWhitelistSignature = (whitelist: Record<string, Cw20Token>) => {
   return `${keys.length}:${hash.toString(16)}`
 }
 
+const fetchCw20BalanceResult = async (
+  address: string,
+  contract: string
+): Promise<{ balance: string; invalid?: boolean } | undefined> => {
+  const query = btoa(JSON.stringify({ balance: { address } }))
+
+  for (let attempt = 0; attempt < BALANCE_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await fetch(
+        `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+      )
+
+      if (!res.ok) {
+        const message = await res.text()
+        if (message.includes("no such contract")) {
+          return { balance: "0", invalid: true }
+        }
+      } else {
+        const data = (await res.json()) as { data?: { balance?: string } }
+        return { balance: data?.data?.balance ?? "0" }
+      }
+
+      if (attempt < BALANCE_FETCH_ATTEMPTS - 1) {
+        await delay(BALANCE_FETCH_RETRY_DELAY_MS)
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error ?? "")
+      if (message.includes("no such contract")) {
+        return { balance: "0", invalid: true }
+      }
+      if (attempt < BALANCE_FETCH_ATTEMPTS - 1) {
+        await delay(BALANCE_FETCH_RETRY_DELAY_MS)
+      }
+    }
+  }
+
+  return undefined
+}
+
 export const fetchCw20Balances = async (
   address: string,
   whitelist: Record<string, Cw20Token>,
@@ -61,7 +112,7 @@ export const fetchCw20Balances = async (
       .filter(Boolean)
   )
   const whitelistSignature = buildWhitelistSignature(whitelist)
-  const cacheKey = `cw20balance:${address}:classic:${whitelistSignature}`
+  const cacheKey = `cw20balance:${BALANCE_CACHE_VERSION}:${address}:classic:${whitelistSignature}`
   const invalidKey = "cw20invalid:classic"
   const cached = loadCache(cacheKey)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
@@ -71,14 +122,6 @@ export const fetchCw20Balances = async (
     Object.keys(invalidCached).forEach((key) => {
       invalidContracts[key] = true
     })
-  }
-
-  if (cached && forceContracts.size === 0) {
-    return Object.entries(cached).map(([token, balance]) => ({
-      ...whitelist[token],
-      address: token,
-      balance
-    }))
   }
 
   const results: Record<string, string> = cached ? { ...cached } : {}
@@ -97,29 +140,12 @@ export const fetchCw20Balances = async (
       index += 1
       const [contractRaw] = entries[current]
       const contract = contractRaw.toLowerCase()
-      try {
-        const query = btoa(JSON.stringify({ balance: { address } }))
-        const res = await fetch(
-          `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
-        )
-        if (!res.ok) {
-          const message = await res.text()
-          if (message.includes("no such contract") && !forceContracts.has(contract)) {
-            invalidContracts[contract] = true
-          }
-          results[contract] = "0"
-          continue
-        }
-        const data = (await res.json()) as { data?: { balance?: string } }
-        results[contract] = data?.data?.balance ?? "0"
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : String(error ?? "")
-        if (message.includes("no such contract") && !forceContracts.has(contract)) {
-          invalidContracts[contract] = true
-        }
-        results[contract] = "0"
+      const result = await fetchCw20BalanceResult(address, contract)
+      if (!result) continue
+      if (result.invalid && !forceContracts.has(contract)) {
+        invalidContracts[contract] = true
       }
+      results[contract] = result.balance
     }
   })
 
@@ -140,13 +166,11 @@ export const fetchCw20Balance = async (address: string, contract: string) => {
   const normalizedContract = contract.trim().toLowerCase()
   if (!normalizedAddress || !normalizedContract) return "0"
 
-  const query = btoa(JSON.stringify({ balance: { address: normalizedAddress } }))
-  const res = await fetch(
-    `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${normalizedContract}/smart/${query}`
-  )
-  if (!res.ok) return "0"
-  const data = (await res.json()) as { data?: { balance?: string } }
-  return data?.data?.balance ?? "0"
+  const result = await fetchCw20BalanceResult(normalizedAddress, normalizedContract)
+  if (!result) {
+    throw new Error(`Failed to fetch CW20 balance for ${normalizedContract}`)
+  }
+  return result.balance
 }
 
 export const useCw20Balances = (
