@@ -322,8 +322,11 @@
 .marketLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  grid-template-areas:
+    "chart swap"
+    "trades swap";
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .marketLeft {
@@ -333,11 +336,21 @@
 }
 
 .marketRight {
+  grid-area: swap;
   min-width: 0;
   position: sticky;
   top: 12px;
-  align-self: stretch;
+  align-self: start;
   display: flex;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.marketRight::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .marketRight > * {
@@ -345,6 +358,7 @@
 }
 
 .chartSection {
+  grid-area: chart;
   min-width: 0;
   padding: 0;
   overflow: hidden;
@@ -545,7 +559,7 @@
 }
 
 .tradesSection {
-  grid-column: 1 / -1;
+  grid-area: trades;
   min-width: 0;
   padding: 0;
   overflow: hidden;
@@ -698,12 +712,18 @@
 
   .marketLayout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "chart"
+      "swap"
+      "trades";
     align-items: start;
   }
 
   .marketRight {
     position: static;
     display: block;
+    max-height: none;
+    overflow: visible;
   }
 }
 

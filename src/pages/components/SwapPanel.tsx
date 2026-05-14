@@ -555,9 +555,7 @@ const AssetIconInner = ({
       aria-hidden="true"
       className={styles.assetIconFallback}
       style={{ inset: 0, position: "absolute", width: "100%", height: "100%" }}
-    >
-      {symbol.slice(0, 1) || "?"}
-    </span>
+    />
   )
 
   return (

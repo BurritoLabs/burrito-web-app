@@ -33,9 +33,7 @@ const WalletAssetIconInner = ({
         alignItems: "center",
         justifyContent: "center"
       }}
-    >
-      {symbol.slice(0, 1) || "?"}
-    </span>
+    />
   )
 
   return (
