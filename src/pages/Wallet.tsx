@@ -84,6 +84,8 @@ const SwapIcon = () => (
 
 type CoinsSectionProps = {
   hasAccount: boolean
+  isError: boolean
+  isLoading: boolean
   onBuyAsset: (asset: WalletAsset) => void
   hideLowBalance: boolean
   onSendAsset: (asset: WalletAsset) => void
@@ -96,6 +98,8 @@ type CoinsSectionProps = {
 const CoinsSection = memo(
   ({
     hasAccount,
+    isError,
+    isLoading,
     onBuyAsset,
     hideLowBalance,
     onSendAsset,
@@ -129,6 +133,10 @@ const CoinsSection = memo(
           ) : null}
           {!hasAccount ? (
             <div className={styles.emptyState}>Connect a wallet to view coins.</div>
+          ) : isLoading ? (
+            <div className={styles.emptyState}>Loading balances...</div>
+          ) : isError ? (
+            <div className={styles.emptyState}>Balance data unavailable.</div>
           ) : rows.length === 0 ? (
             <div className={styles.emptyState}>No coins found.</div>
           ) : (
@@ -196,6 +204,8 @@ CoinsSection.displayName = "CoinsSection"
 
 type TokensSectionProps = {
   hasAccount: boolean
+  isError: boolean
+  isLoading: boolean
   hideLowBalance: boolean
   onSendAsset: (asset: WalletAsset) => void
   onToggle: () => void
@@ -206,6 +216,8 @@ type TokensSectionProps = {
 const TokensSection = memo(
   ({
     hasAccount,
+    isError,
+    isLoading,
     hideLowBalance,
     onSendAsset,
     onToggle,
@@ -231,6 +243,10 @@ const TokensSection = memo(
         <div className={styles.sectionBody}>
           {!hasAccount ? (
             <div className={styles.emptyState}>Connect a wallet to view tokens.</div>
+          ) : isLoading ? (
+            <div className={styles.emptyState}>Loading balances...</div>
+          ) : isError ? (
+            <div className={styles.emptyState}>Balance data unavailable.</div>
           ) : rows.length === 0 ? (
             <div className={styles.emptyState}>No tokens found.</div>
           ) : (
@@ -292,7 +308,8 @@ const Wallet = () => {
   const [buyAsset, setBuyAsset] = useState<WalletBuyAsset>("LUNC")
   const [buyModalOpen, setBuyModalOpen] = useState(false)
 
-  const { assetRows, balances } = useWalletAssets(account?.address)
+  const { assetRows, balances, isBalanceError, isBalanceLoading } =
+    useWalletAssets(account?.address)
   const hiddenTokenSet = useMemo(() => new Set(hiddenTokens), [hiddenTokens])
   const { visibleCoinRows: filteredCoinRows, visibleTokenRows: filteredTokenRows } =
     useWalletAssetVisibility({
@@ -305,7 +322,10 @@ const Wallet = () => {
     (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
   )
   const showCoinsWarning =
-    Boolean(account?.address) && Number(luncBalance?.amount ?? 0) === 0
+    Boolean(account?.address) &&
+    !isBalanceLoading &&
+    !isBalanceError &&
+    Number(luncBalance?.amount ?? 0) === 0
 
   const handleToggleLowBalance = useCallback(() => {
     setHideLowBalance((prev) => !prev)
@@ -360,6 +380,8 @@ const Wallet = () => {
         <div className={styles.leftColumn}>
           <CoinsSection
             hasAccount={Boolean(account)}
+            isError={isBalanceError}
+            isLoading={isBalanceLoading}
             onBuyAsset={handleBuyAsset}
             hideLowBalance={hideLowBalance}
             onSendAsset={handleSendAsset}
@@ -371,6 +393,8 @@ const Wallet = () => {
 
           <TokensSection
             hasAccount={Boolean(account)}
+            isError={isBalanceError}
+            isLoading={isBalanceLoading}
             hideLowBalance={hideLowBalance}
             onSendAsset={handleSendAsset}
             onToggle={handleToggleLowBalance}

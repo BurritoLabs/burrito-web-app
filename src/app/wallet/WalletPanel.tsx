@@ -265,9 +265,14 @@ const WalletPanel = () => {
   const [receiveQrError, setReceiveQrError] = useState(false)
   const [buyModalOpen, setBuyModalOpen] = useState(false)
 
-  const { assetRows, getBalance, netWorth, tokenCatalog } = useWalletAssets(
-    account?.address
-  )
+  const {
+    assetRows,
+    getBalance,
+    isBalanceError,
+    isBalanceLoading,
+    netWorth,
+    tokenCatalog
+  } = useWalletAssets(account?.address)
   const { data: burnTaxRate = 0 } = useQuery({
     queryKey: ["burn-tax-rate"],
     queryFn: fetchBurnTaxRate,
@@ -470,10 +475,11 @@ const WalletPanel = () => {
     }))
   }, [hiddenTokenSet, tokenCatalog])
 
-  const netWorthDisplay = account ? formatUsd(netWorth) : "$0.00"
+  const netWorthDisplay =
+    account && isBalanceLoading ? "--" : account ? formatUsd(netWorth) : "$0.00"
   const netWorthValue =
     netWorthDisplay === "--" || netWorthDisplay === "$0"
-      ? "$0.00"
+      ? netWorthDisplay
       : netWorthDisplay
 
   const selectedAssetRow = assetRows.find(
@@ -1546,7 +1552,13 @@ const WalletPanel = () => {
         </div>
 
         <div className={styles.assetRows}>
-          {filteredAssetRows.length === 0 ? (
+          {isBalanceLoading ? (
+            <div className={styles.assetEmpty}>Loading balances...</div>
+          ) : isBalanceError ? (
+            <div className={styles.assetEmpty}>
+              Balance data unavailable. Reopen the wallet to retry.
+            </div>
+          ) : filteredAssetRows.length === 0 ? (
             <div className={styles.assetEmpty}>
               {account ? "No assets found" : "Connect a wallet to view assets"}
             </div>

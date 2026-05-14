@@ -7,7 +7,8 @@ import {
   fetchPrices,
   fetchSwapRates,
   getCachedFxRates,
-  getCachedPrices
+  getCachedPrices,
+  type CoinBalance
 } from "../data/classic"
 import { useCw20Balances } from "../data/cw20"
 import { useDexEstimatedPrices, useDirectAnchorDexPrices } from "../data/dexPrices"
@@ -153,6 +154,8 @@ const normalizeWalletAssetKey = (assetKey: string) => {
   return assetKey.toLowerCase()
 }
 
+const EMPTY_BALANCES: CoinBalance[] = []
+
 export const useWalletAssets = (accountAddress?: string) => {
   const { data: marketPairs = [] } = useQuery({
     queryKey: ["market", "pairs"],
@@ -169,12 +172,18 @@ export const useWalletAssets = (accountAddress?: string) => {
     refetchInterval: 4 * 60 * 1000
   })
 
-  const { data: balances = [] } = useQuery({
+  const balancesQuery = useQuery({
     queryKey: ["wallet", "balances", accountAddress],
     queryFn: () => fetchBalances(accountAddress ?? ""),
     enabled: Boolean(accountAddress),
     staleTime: 60_000
   })
+  const balances = balancesQuery.data ?? EMPTY_BALANCES
+  const hasBalanceSnapshot = balancesQuery.data !== undefined
+  const isBalanceLoading =
+    Boolean(accountAddress) && !hasBalanceSnapshot && balancesQuery.isFetching
+  const isBalanceError =
+    Boolean(accountAddress) && !hasBalanceSnapshot && balancesQuery.isError
 
   const cachedPrices = useMemo(() => getCachedPrices(), [])
   const { data: prices } = useQuery({
@@ -619,6 +628,8 @@ export const useWalletAssets = (accountAddress?: string) => {
   ])
 
   const assetRows = useMemo<WalletAssetRow[]>(() => {
+    if (isBalanceLoading || isBalanceError) return []
+
     const calcValueFromSwaprate = (
       amount: string,
       swaprate?: number,
@@ -904,6 +915,8 @@ export const useWalletAssets = (accountAddress?: string) => {
     fxRates?.TWD,
     getBalance,
     ibcWhitelist,
+    isBalanceError,
+    isBalanceLoading,
     luncChange,
     luncPrice,
     marketStyleChangeByAsset,
@@ -988,6 +1001,8 @@ export const useWalletAssets = (accountAddress?: string) => {
     assetRows,
     balances,
     getBalance,
+    isBalanceError,
+    isBalanceLoading,
     luncPrice,
     netWorth,
     pageCoinRows,
