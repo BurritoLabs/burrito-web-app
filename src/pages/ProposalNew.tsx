@@ -47,8 +47,9 @@ const FEE_DENOM_OPTIONS = [
 ] as const
 
 const GAS_PRICE_MICRO = 28.325
-const PROPOSAL_GAS_ADJUSTMENT = 1
-const FALLBACK_GAS = 200000
+const PROPOSAL_GAS_ADJUSTMENT = 1.6
+const FALLBACK_GAS = 350_000
+const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
 
 const getGasPriceMicro = (denom: string) => {
   const feeCurrency = KEPLR_CHAIN_CONFIG.feeCurrencies.find(
@@ -65,6 +66,23 @@ const buildEstimatedFee = (gasUsed: number, gasPriceMicro: number) => {
 
 const estimateFallbackFee = (gasPriceMicro: number) =>
   buildEstimatedFee(FALLBACK_GAS, gasPriceMicro)
+
+const estimateSubmitFee = async (
+  client: SigningStargateClient,
+  signerAddress: string,
+  messages: Parameters<SigningStargateClient["simulate"]>[1],
+  gasPriceMicro: number
+) => {
+  try {
+    const simulatedGas = await client.simulate(signerAddress, messages, "")
+    return buildEstimatedFee(Math.max(simulatedGas, FALLBACK_GAS), gasPriceMicro)
+  } catch {
+    return buildEstimatedFee(
+      Math.ceil(FALLBACK_GAS * SIMULATION_FALLBACK_GAS_MULTIPLIER),
+      gasPriceMicro
+    )
+  }
+}
 
 const toMicroAmount = (value: string) => {
   const num = Number(value)
@@ -457,7 +475,12 @@ const ProposalNew = () => {
           gasPrice: GasPrice.fromString(`${getGasPriceMicro(feeDenom)}${feeDenom}`)
         }
       )
-      const finalFee = feeEstimate
+      const finalFee = await estimateSubmitFee(
+        client,
+        signerAddress,
+        [msg],
+        getGasPriceMicro(feeDenom)
+      )
       const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [{ amount: finalFee.feeAmount, denom: feeDenom }],
         gas: String(finalFee.gasWanted)

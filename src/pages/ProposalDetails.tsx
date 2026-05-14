@@ -10,7 +10,6 @@ import {
 import { createPortal } from "react-dom"
 import { useLocation, useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { SigningStargateClient } from "@cosmjs/stargate"
 import { MsgDeposit, MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import PageShell from "./PageShell"
@@ -41,7 +40,8 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../app/chain"
 import { useWallet } from "../app/wallet/WalletContext"
 import {
   connectClassicStargateClientForConnector,
-  getSignerAddressForConnector
+  getSignerAddressForConnector,
+  type ClassicStargateClient
 } from "../app/wallet/walletAdapters"
 import type {
   CoinBalance,
@@ -58,9 +58,41 @@ import type {
 const GAS_PRICE_MICRO = 28.325
 const VOTE_GAS_LIMIT = 220000
 const DEPOSIT_GAS_LIMIT = 220000
+const GOV_GAS_ADJUSTMENT = 1.6
+const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
 const KEYBASE_PROXY_URL = import.meta.env.DEV
   ? "/keybase"
   : "https://keybase.burrito.money"
+
+const buildGovFee = (gasLimit: number) => ({
+  amount: [
+    {
+      amount: Math.max(1, Math.ceil(gasLimit * GAS_PRICE_MICRO)).toString(),
+      denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+    }
+  ],
+  gas: String(gasLimit)
+})
+
+const estimateGovFee = async (
+  client: ClassicStargateClient,
+  signerAddress: string,
+  messages: Parameters<ClassicStargateClient["simulate"]>[1],
+  fallbackGas: number
+) => {
+  let gasLimit = fallbackGas
+  try {
+    const simulatedGas = await client.simulate(signerAddress, messages, "")
+    gasLimit = Math.max(
+      fallbackGas,
+      Math.ceil(simulatedGas * GOV_GAS_ADJUSTMENT)
+    )
+  } catch {
+    gasLimit = Math.ceil(fallbackGas * SIMULATION_FALLBACK_GAS_MULTIPLIER)
+  }
+
+  return buildGovFee(gasLimit)
+}
 
 type SummaryMap = Record<string, unknown>
 type SummaryCoin = { denom: string; amount: string | number | bigint }
@@ -841,29 +873,22 @@ const ProposalDetails = () => {
           option: VOTE_OPTION_VALUES[voteChoice]
         })
       }
-      const feeAmount = Math.max(
-        1,
-        Math.ceil(VOTE_GAS_LIMIT * GAS_PRICE_MICRO)
-      ).toString()
-      const fee = {
-        amount: [
-          {
-            amount: feeAmount,
-            denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
-          }
-        ],
-        gas: String(VOTE_GAS_LIMIT)
-      }
 
       let sequenceHint: number | undefined
       let result:
-        | Awaited<ReturnType<SigningStargateClient["broadcastTxSync"]>>
+        | Awaited<ReturnType<ClassicStargateClient["broadcastTxSync"]>>
         | undefined
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           const client = await connectClassicStargateClientForConnector(
             connectorId
+          )
+          const fee = await estimateGovFee(
+            client,
+            signerAddress,
+            [msg],
+            VOTE_GAS_LIMIT
           )
           const signerState = await client.getSequence(signerAddress)
           const sequenceToUse = sequenceHint ?? signerState.sequence
@@ -971,29 +996,21 @@ const ProposalDetails = () => {
         })
       }
 
-      const feeAmount = Math.max(
-        1,
-        Math.ceil(DEPOSIT_GAS_LIMIT * GAS_PRICE_MICRO)
-      ).toString()
-      const fee = {
-        amount: [
-          {
-            amount: feeAmount,
-            denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
-          }
-        ],
-        gas: String(DEPOSIT_GAS_LIMIT)
-      }
-
       let sequenceHint: number | undefined
       let result:
-        | Awaited<ReturnType<SigningStargateClient["broadcastTxSync"]>>
+        | Awaited<ReturnType<ClassicStargateClient["broadcastTxSync"]>>
         | undefined
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           const client = await connectClassicStargateClientForConnector(
             connectorId
+          )
+          const fee = await estimateGovFee(
+            client,
+            signerAddress,
+            [msg],
+            DEPOSIT_GAS_LIMIT
           )
           const signerState = await client.getSequence(signerAddress)
           const sequenceToUse = sequenceHint ?? signerState.sequence

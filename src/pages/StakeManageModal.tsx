@@ -34,7 +34,7 @@ const FALLBACK_GAS_BY_TAB = {
   Undelegate: 900_000
 } as const
 
-const SUBMIT_GAS_ADJUSTMENT = 1.4
+const SUBMIT_GAS_ADJUSTMENT = 1.6
 const MAX_DELEGATE_BUFFER_MICRO = 2_000_000n
 
 const estimateFallbackFeeMicro = (
