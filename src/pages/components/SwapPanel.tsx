@@ -550,6 +550,7 @@ const AssetIconInner = ({
   const [failed, setFailed] = useState(false)
   const src = candidates[index]
 
+  const showFallback = failed || !src || !loaded
   const fallback = (
     <span
       aria-hidden="true"
@@ -568,7 +569,7 @@ const AssetIconInner = ({
         flex: "0 0 auto"
       }}
     >
-      {fallback}
+      {showFallback ? fallback : null}
       {!failed && src ? (
         <img
           src={src}

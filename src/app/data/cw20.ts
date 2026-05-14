@@ -11,29 +11,32 @@ type Cw20BalanceOptions = {
   forceContracts?: string[]
 }
 
-const CACHE_TTL = 5 * 60 * 1000
+const CACHE_TTL = 30 * 60 * 1000
 const SUPPLY_CACHE_TTL = 15 * 60 * 1000
 const BALANCE_CACHE_VERSION = "v2"
 const BALANCE_FETCH_ATTEMPTS = 2
 const BALANCE_FETCH_RETRY_DELAY_MS = 200
+const BALANCE_FETCH_CONCURRENCY = 8
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => {
     globalThis.setTimeout(resolve, ms)
   })
 
-const loadCache = (key: string) => {
+const loadCachePayload = (key: string, ttl = CACHE_TTL) => {
   if (typeof window === "undefined") return undefined
   const cached = window.localStorage.getItem(key)
   if (!cached) return undefined
   try {
     const parsed = JSON.parse(cached) as { ts: number; data: Record<string, string> }
-    if (!parsed?.ts || Date.now() - parsed.ts > CACHE_TTL) return undefined
-    return parsed.data
+    if (!parsed?.ts || Date.now() - parsed.ts > ttl) return undefined
+    return parsed
   } catch {
     return undefined
   }
 }
+
+const loadCache = (key: string, ttl = CACHE_TTL) => loadCachePayload(key, ttl)?.data
 
 const saveCache = (key: string, data: Record<string, string>) => {
   if (typeof window === "undefined") return
@@ -59,6 +62,24 @@ const buildWhitelistSignature = (whitelist: Record<string, Cw20Token>) => {
 
   return `${keys.length}:${hash.toString(16)}`
 }
+
+const buildBalanceCacheKey = (
+  address: string,
+  whitelist: Record<string, Cw20Token>
+) =>
+  `cw20balance:${BALANCE_CACHE_VERSION}:${address}:classic:${buildWhitelistSignature(
+    whitelist
+  )}`
+
+const mapCw20BalanceResults = (
+  results: Record<string, string>,
+  whitelist: Record<string, Cw20Token>
+) =>
+  Object.entries(results).map(([token, balance]) => ({
+    ...whitelist[token],
+    address: token,
+    balance
+  }))
 
 const fetchCw20BalanceResult = async (
   address: string,
@@ -111,8 +132,7 @@ export const fetchCw20Balances = async (
       .map((contract) => contract.trim().toLowerCase())
       .filter(Boolean)
   )
-  const whitelistSignature = buildWhitelistSignature(whitelist)
-  const cacheKey = `cw20balance:${BALANCE_CACHE_VERSION}:${address}:classic:${whitelistSignature}`
+  const cacheKey = buildBalanceCacheKey(address, whitelist)
   const invalidKey = "cw20invalid:classic"
   const cached = loadCache(cacheKey)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
@@ -131,7 +151,7 @@ export const fetchCw20Balances = async (
     if (invalidContracts[normalized]) return false
     return !(normalized in results)
   })
-  const limit = 4
+  const limit = BALANCE_FETCH_CONCURRENCY
   let index = 0
 
   const workers = Array.from({ length: Math.min(limit, entries.length) }, async () => {
@@ -154,11 +174,20 @@ export const fetchCw20Balances = async (
   saveCache(cacheKey, results)
   saveCache(invalidKey, Object.fromEntries(Object.keys(invalidContracts).map((k) => [k, "1"])))
 
-  return Object.entries(results).map(([token, balance]) => ({
-    ...whitelist[token],
-    address: token,
-    balance
-  }))
+  return mapCw20BalanceResults(results, whitelist)
+}
+
+export const getCachedCw20Balances = (
+  address: string | undefined,
+  whitelist: Record<string, Cw20Token>
+) => {
+  if (!address || !Object.keys(whitelist).length) return undefined
+  const payload = loadCachePayload(buildBalanceCacheKey(address, whitelist))
+  if (!payload) return undefined
+  return {
+    data: mapCw20BalanceResults(payload.data, whitelist),
+    updatedAt: payload.ts
+  }
 }
 
 export const fetchCw20Balance = async (address: string, contract: string) => {
@@ -184,13 +213,18 @@ export const useCw20Balances = (
     .filter(Boolean)
     .sort()
     .join(",")
+  const cachedBalances = getCachedCw20Balances(address, whitelist ?? {})
 
   return useQuery({
     queryKey: ["cw20-balances", address, whitelistSignature, forceSignature],
     queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}, options),
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
-    staleTime: forceSignature ? 0 : 60_000,
-    refetchOnMount: forceSignature ? "always" : true
+    initialData: cachedBalances?.data,
+    initialDataUpdatedAt: cachedBalances?.updatedAt,
+    placeholderData: (previousData) => previousData,
+    staleTime: forceSignature ? 30_000 : 2 * 60_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false
   })
 }
 
@@ -227,7 +261,7 @@ export const fetchCw20Supplies = async (
   if (!unique.length) return {}
 
   const cacheKey = `cw20supply:classic:${unique.join(",")}`
-  const cached = loadCache(cacheKey) as Record<string, string> | undefined
+  const cached = loadCache(cacheKey, SUPPLY_CACHE_TTL) as Record<string, string> | undefined
   if (cached) {
     const restored: Record<string, Cw20SupplyInfo> = {}
     Object.entries(cached).forEach(([contract, payload]) => {

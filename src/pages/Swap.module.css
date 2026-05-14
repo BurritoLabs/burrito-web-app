@@ -81,6 +81,7 @@
   min-width: 128px;
   height: 40px;
   font-size: 14px;
+  border-radius: 12px;
 }
 
 .swapCardEmbedded .fieldFooter {
@@ -323,18 +324,21 @@
 .assetPickerButton {
   min-width: 144px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.03);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.03);
   color: #f4f8ff;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 10px 0 9px;
   font-size: 16px;
   font-weight: var(--bold);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .assetPickerButton:hover {
@@ -346,6 +350,15 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.assetPickerValue span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .assetPickerValue img,
@@ -370,6 +383,8 @@
   color: rgba(234, 245, 235, 0.78);
   font-size: 13px;
   line-height: 1;
+  flex: 0 0 auto;
+  margin-left: 2px;
 }
 
 .fieldFooter {
