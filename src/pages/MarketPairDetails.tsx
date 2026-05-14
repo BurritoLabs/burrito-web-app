@@ -327,30 +327,56 @@ const AssetIconInner = ({
   size: number
 }) => {
   const [index, setIndex] = useState(0)
+  const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
+  const src = candidates[index]
 
-  if (failed || !candidates.length) {
-    return (
-      <span className={styles.assetIconFallback} style={{ width: size, height: size }}>
-        {symbol.slice(0, 1)}
-      </span>
-    )
-  }
+  const fallback = (
+    <span
+      aria-hidden="true"
+      className={styles.assetIconFallback}
+      style={{ inset: 0, position: "absolute", width: "100%", height: "100%" }}
+    >
+      {symbol.slice(0, 1) || "?"}
+    </span>
+  )
 
   return (
-    <img
-      src={candidates[index]}
-      alt={symbol}
-      width={size}
-      height={size}
-      onError={() => {
-        if (index < candidates.length - 1) {
-          setIndex((prev) => prev + 1)
-        } else {
-          setFailed(true)
-        }
+    <span
+      style={{
+        width: size,
+        height: size,
+        position: "relative",
+        display: "inline-flex",
+        flex: "0 0 auto"
       }}
-    />
+    >
+      {fallback}
+      {!failed && src ? (
+        <img
+          src={src}
+          alt={symbol}
+          width={size}
+          height={size}
+          decoding="async"
+          style={{
+            inset: 0,
+            position: "absolute",
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 120ms ease"
+          }}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setLoaded(false)
+            if (index < candidates.length - 1) {
+              setIndex((prev) => prev + 1)
+            } else {
+              setFailed(true)
+            }
+          }}
+        />
+      ) : null}
+    </span>
   )
 }
 

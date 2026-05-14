@@ -299,30 +299,56 @@ const AssetIconInner = ({
   size: number
 }) => {
   const [index, setIndex] = useState(0)
+  const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
+  const src = candidates[index]
 
-  if (failed || !candidates.length) {
-    return (
-      <span className={styles.assetIconFallback} style={{ width: size, height: size }}>
-        {symbol.slice(0, 1)}
-      </span>
-    )
-  }
+  const fallback = (
+    <span
+      aria-hidden="true"
+      className={styles.assetIconFallback}
+      style={{ inset: 0, position: "absolute", width: "100%", height: "100%" }}
+    >
+      {symbol.slice(0, 1) || "?"}
+    </span>
+  )
 
   return (
-    <img
-      src={candidates[index]}
-      alt={symbol}
-      width={size}
-      height={size}
-      onError={() => {
-        if (index < candidates.length - 1) {
-          setIndex((prev) => prev + 1)
-        } else {
-          setFailed(true)
-        }
+    <span
+      style={{
+        width: size,
+        height: size,
+        position: "relative",
+        display: "inline-flex",
+        flex: "0 0 auto"
       }}
-    />
+    >
+      {fallback}
+      {!failed && src ? (
+        <img
+          src={src}
+          alt={symbol}
+          width={size}
+          height={size}
+          decoding="async"
+          style={{
+            inset: 0,
+            position: "absolute",
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 120ms ease"
+          }}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setLoaded(false)
+            if (index < candidates.length - 1) {
+              setIndex((prev) => prev + 1)
+            } else {
+              setFailed(true)
+            }
+          }}
+        />
+      ) : null}
+    </span>
   )
 }
 
@@ -351,16 +377,6 @@ const Market = () => {
     refetchInterval: 4 * 60 * 1000
   })
 
-  const cw20Contracts = useMemo(() => {
-    const set = new Set<string>()
-    pools.forEach((pool) => {
-      pool.poolAssets.forEach((asset) => {
-        if (!asset.id.startsWith("cw20:")) return
-        set.add(asset.id.slice(5).toLowerCase())
-      })
-    })
-    return Array.from(set)
-  }, [pools])
   const nativeDenoms = useMemo(() => {
     const set = new Set<string>()
     pools.forEach((pool) => {
@@ -385,7 +401,7 @@ const Market = () => {
   }, [pools])
   const { data: nativeWhitelist = {} } = useResolvedNativeWhitelist(nativeDenoms)
   const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
-  const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(cw20Contracts)
+  const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist()
 
   const { data: prices } = useQuery({
     queryKey: ["prices"],
@@ -722,7 +738,10 @@ const Market = () => {
         card.left.symbol,
         card.right.symbol,
         card.left.name,
-        card.right.name
+        card.right.name,
+        card.pairAddress,
+        card.left.id,
+        card.right.id
       ]
         .join(" ")
         .toLowerCase()
@@ -761,6 +780,21 @@ const Market = () => {
 
   const visible = filteredAndSorted.slice(0, visibleCount)
   const hasMore = filteredAndSorted.length > visible.length
+  const visibleCw20Contracts = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          visible.flatMap((card) =>
+            [card.left.id, card.right.id, card.priceBase.id, card.priceQuote.id]
+              .filter((id) => id.startsWith("cw20:"))
+              .map((id) => id.slice(5).toLowerCase())
+          )
+        )
+      ).sort(),
+    [visible]
+  )
+  const { data: visibleCw20Whitelist = {} } =
+    useResolvedCw20Whitelist(visibleCw20Contracts)
   const liveRefreshCards = visible.slice(0, LIVE_POOL_REFRESH_LIMIT)
   const liveRefreshKey = liveRefreshCards
     .map((card) => `${card.dexId}:${card.pairAddress}`)
@@ -796,9 +830,62 @@ const Market = () => {
     return map
   }, [buildMarketCard, liveVisiblePools])
 
+  const hydrateVisibleCw20Asset = useCallback(
+    (asset: ResolvedAsset): ResolvedAsset => {
+      if (!asset.id.startsWith("cw20:")) return asset
+
+      const contract = asset.id.slice(5).toLowerCase()
+      const token = visibleCw20Whitelist[contract]
+      if (!token) return asset
+
+      const symbol = token.symbol || asset.symbol
+      return {
+        ...asset,
+        symbol,
+        name: token.name || symbol,
+        decimals: token.decimals ?? asset.decimals,
+        iconCandidates: buildCw20IconCandidates(token.icon, symbol)
+      }
+    },
+    [visibleCw20Whitelist]
+  )
+
+  const hydrateVisibleCard = useCallback(
+    (card: MarketCard): MarketCard => {
+      const left = hydrateVisibleCw20Asset(card.left)
+      const right = hydrateVisibleCw20Asset(card.right)
+      const priceBase =
+        card.priceBase.id === card.left.id
+          ? left
+          : card.priceBase.id === card.right.id
+            ? right
+            : hydrateVisibleCw20Asset(card.priceBase)
+      const priceQuote =
+        card.priceQuote.id === card.left.id
+          ? left
+          : card.priceQuote.id === card.right.id
+            ? right
+            : hydrateVisibleCw20Asset(card.priceQuote)
+
+      return {
+        ...card,
+        left,
+        right,
+        priceBase,
+        priceQuote,
+        pairLabel: `${left.symbol}/${right.symbol}`,
+        priceLabel:
+          card.priceValue !== undefined
+            ? `1 ${priceBase.symbol} ≈ ${formatNumber(card.priceValue, card.priceValue < 1 ? 6 : 4)} ${priceQuote.symbol}`
+            : card.priceLabel
+      }
+    },
+    [hydrateVisibleCw20Asset]
+  )
+
   const displayVisible = useMemo(
-    () => visible.map((card) => liveCardById.get(card.id) ?? card),
-    [liveCardById, visible]
+    () => visible.map((card) => hydrateVisibleCard(liveCardById.get(card.id) ?? card)),
+    [hydrateVisibleCard, liveCardById, visible]
   )
   const isLoading = isPairsLoading || isPoolsLoading
   const selectedSortMetric =

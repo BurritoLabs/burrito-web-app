@@ -19,25 +19,65 @@ const WalletAssetIconInner = ({
   candidates: string[]
 }) => {
   const [index, setIndex] = useState(0)
+  const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
+  const src = candidates[index]
 
-  if (failed || !candidates.length) {
-    return <span>{symbol.slice(0, 1)}</span>
-  }
+  const fallback = (
+    <span
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}
+    >
+      {symbol.slice(0, 1) || "?"}
+    </span>
+  )
 
   return (
-    <img
-      src={candidates[index]}
-      alt={symbol}
-      style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
-      onError={() => {
-        if (index < candidates.length - 1) {
-          setIndex(index + 1)
-        } else {
-          setFailed(true)
-        }
+    <span
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        width: "100%",
+        height: "100%",
+        borderRadius: "50%",
+        overflow: "hidden"
       }}
-    />
+    >
+      {fallback}
+      {!failed && src ? (
+        <img
+          src={src}
+          alt={symbol}
+          decoding="async"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            borderRadius: "50%",
+            objectFit: "cover",
+            display: "block",
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 120ms ease"
+          }}
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            setLoaded(false)
+            if (index < candidates.length - 1) {
+              setIndex(index + 1)
+            } else {
+              setFailed(true)
+            }
+          }}
+        />
+      ) : null}
+    </span>
   )
 }
 
