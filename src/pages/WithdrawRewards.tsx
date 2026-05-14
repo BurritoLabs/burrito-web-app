@@ -18,7 +18,23 @@ import {
 import { formatTxError } from "../app/utils/txError"
 
 const DEFAULT_FEE_GAS = 180_000
+const REWARD_MSG_GAS = 70_000
 const GAS_PRICE_MICRO_LUNC = 28.325
+const SUBMIT_GAS_ADJUSTMENT = 1.6
+const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
+
+const getRewardsFallbackGas = (validatorCount: number) =>
+  DEFAULT_FEE_GAS + validatorCount * REWARD_MSG_GAS
+
+const buildTxFee = (gas: number, denom: string) => ({
+  amount: [
+    {
+      amount: Math.ceil(gas * GAS_PRICE_MICRO_LUNC).toString(),
+      denom
+    }
+  ],
+  gas: String(gas)
+})
 
 const sumRewards = (rewards: RewardsByValidator[], selected: string[]) => {
   const totals = new Map<string, bigint>()
@@ -249,7 +265,7 @@ const WithdrawRewards = () => {
       return undefined
     }
 
-    const gasWanted = DEFAULT_FEE_GAS + selected.length * 45_000
+    const gasWanted = getRewardsFallbackGas(selected.length)
     const feeMicro = Math.ceil(gasWanted * GAS_PRICE_MICRO_LUNC).toString()
     const feeDisplay = formatTokenAmount(
       feeMicro,
@@ -308,15 +324,22 @@ const WithdrawRewards = () => {
           validatorAddress: validator
         })
       }))
-      const result = await client.signAndBroadcast(signerAddress, msgs, {
-        amount: [
-          {
-            amount: Math.ceil(feeGas * 28.325).toString(),
-            denom: feeDenom
-          }
-        ],
-        gas: String(feeGas)
-      })
+      const fallbackGas = Math.max(feeGas, getRewardsFallbackGas(selected.length))
+      let txGas = fallbackGas
+      try {
+        const simulatedGas = await client.simulate(signerAddress, msgs, "")
+        txGas = Math.max(
+          fallbackGas,
+          Math.ceil(simulatedGas * SUBMIT_GAS_ADJUSTMENT)
+        )
+      } catch {
+        txGas = Math.ceil(fallbackGas * SIMULATION_FALLBACK_GAS_MULTIPLIER)
+      }
+      const result = await client.signAndBroadcast(
+        signerAddress,
+        msgs,
+        buildTxFee(txGas, feeDenom)
+      )
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }

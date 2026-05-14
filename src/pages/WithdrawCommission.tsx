@@ -21,6 +21,18 @@ const FEE_DENOM_OPTIONS = [
 
 const DEFAULT_FEE_GAS = 220_000
 const GAS_PRICE_MICRO_LUNC = 28.325
+const SUBMIT_GAS_ADJUSTMENT = 1.6
+const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
+
+const buildTxFee = (gas: number, denom: string) => ({
+  amount: [
+    {
+      amount: Math.ceil(gas * GAS_PRICE_MICRO_LUNC).toString(),
+      denom
+    }
+  ],
+  gas: String(gas)
+})
 
 const toSymbol = (denom: string) => {
   if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
@@ -248,15 +260,22 @@ const WithdrawCommission = () => {
           validatorAddress: signerValoperAddress
         })
       }
-      const result = await client.signAndBroadcast(signerAddress, [msg], {
-        amount: [
-          {
-            amount: Math.ceil(feeGas * 28.325).toString(),
-            denom: feeDenom
-          }
-        ],
-        gas: String(feeGas)
-      })
+      const fallbackGas = Math.max(feeGas, DEFAULT_FEE_GAS)
+      let txGas = fallbackGas
+      try {
+        const simulatedGas = await client.simulate(signerAddress, [msg], "")
+        txGas = Math.max(
+          fallbackGas,
+          Math.ceil(simulatedGas * SUBMIT_GAS_ADJUSTMENT)
+        )
+      } catch {
+        txGas = Math.ceil(fallbackGas * SIMULATION_FALLBACK_GAS_MULTIPLIER)
+      }
+      const result = await client.signAndBroadcast(
+        signerAddress,
+        [msg],
+        buildTxFee(txGas, feeDenom)
+      )
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
       }
