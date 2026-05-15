@@ -22,6 +22,14 @@ import {
   getTxCanonicalMsgs
 } from "@terra-money/log-finder-ruleset"
 
+const HISTORY_TX_LIMIT = 50
+const CONTRACT_LABEL_LOOKUP_LIMIT = 36
+const CONTRACT_ADDRESS_EVENT_KEYS = new Set([
+  "_contract_address",
+  "contract_address",
+  "contract"
+])
+
 type LogFinderTransaction = Parameters<typeof getTxCanonicalMsgs>[0]
 type LogFinderTxLog = NonNullable<LogFinderTransaction["logs"]>[number]
 type LogFinderTxEvent = LogFinderTxLog["events"][number]
@@ -682,6 +690,34 @@ const getSignMode = (tx: TxItem) => {
   return null
 }
 
+const normalizeContractCandidate = (value?: unknown) => {
+  if (typeof value !== "string") return undefined
+  const normalized = value.trim().toLowerCase()
+  return normalized.startsWith("terra1") ? normalized : undefined
+}
+
+const collectContractCandidates = (txs: TxItem[]) => {
+  const addresses = new Set<string>()
+  txs.forEach((tx) => {
+    getRawMessages(tx).forEach((message) => {
+      const candidate = normalizeContractCandidate(
+        message?.contract ?? message?.contract_address
+      )
+      if (candidate) addresses.add(candidate)
+    })
+
+    ;(tx.events ?? []).forEach((event) => {
+      event.attributes?.forEach((attr) => {
+        const key = decodeEventValue(attr?.key)
+        if (!CONTRACT_ADDRESS_EVENT_KEYS.has(key)) return
+        const candidate = normalizeContractCandidate(decodeEventValue(attr?.value))
+        if (candidate) addresses.add(candidate)
+      })
+    })
+  })
+  return Array.from(addresses)
+}
+
 const History = () => {
   const { account } = useWallet()
   const actionRuleSet = useMemo(() => createActionRuleSet("mainnet"), [])
@@ -691,36 +727,18 @@ const History = () => {
   )
   const { data: txs = [], isLoading } = useQuery({
     queryKey: ["txs", account?.address],
-    queryFn: () => fetchTxs(account?.address ?? "", 75),
-    enabled: Boolean(account?.address)
+    queryFn: () => fetchTxs(account?.address ?? "", HISTORY_TX_LIMIT),
+    enabled: Boolean(account?.address),
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false
   })
 
-  const relevantCw20Contracts = useMemo(() => {
-    const addresses = new Set<string>()
-    txs.forEach((tx) => {
-      const messages = getRawMessages(tx)
-      messages.forEach((message) => {
-        const candidate =
-          message?.contract ??
-          message?.contract_address ??
-          (message?.sender && message?.contract ? message.contract : undefined)
-        if (typeof candidate === "string" && candidate.startsWith("terra1")) {
-          addresses.add(candidate.toLowerCase())
-        }
-      })
-
-      const events = tx.events ?? []
-      events.forEach((event) => {
-        event.attributes?.forEach((attr) => {
-          const value = decodeEventValue(attr?.value)
-          if (value?.startsWith("terra1")) {
-            addresses.add(value.toLowerCase())
-          }
-        })
-      })
-    })
-    return Array.from(addresses)
-  }, [txs])
+  const contractCandidates = useMemo(() => collectContractCandidates(txs), [txs])
+  const relevantCw20Contracts = useMemo(
+    () => contractCandidates.slice(0, CONTRACT_LABEL_LOOKUP_LIMIT),
+    [contractCandidates]
+  )
 
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(relevantCw20Contracts)
   const { data: cw20Contracts = {} } = useCw20Contracts()
@@ -746,7 +764,10 @@ const History = () => {
   const { data: validators = [] } = useQuery<ValidatorItem[]>({
     queryKey: ["validators"],
     queryFn: () => fetchValidators(),
-    staleTime: 1000 * 60 * 5
+    enabled: Boolean(account?.address) && txs.length > 0,
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false
   })
 
   const validatorNameMap = useMemo(() => {
@@ -772,34 +793,9 @@ const History = () => {
   }, [validators])
 
   const { data: contractLabels = {} } = useQuery<Record<string, string>>({
-    queryKey: ["contract-labels", account?.address, txs.map((tx) => tx.txhash).join(",")],
+    queryKey: ["contract-labels", account?.address, relevantCw20Contracts.join(",")],
     queryFn: async () => {
-      const addresses = new Set<string>()
-      txs.forEach((tx) => {
-        const messages = getRawMessages(tx)
-        messages.forEach((message) => {
-          const candidate =
-            message?.contract ??
-            message?.contract_address ??
-            (message?.["@type"]?.includes("MsgExecuteContract")
-              ? message?.contract
-              : undefined)
-          if (candidate) addresses.add(candidate)
-        })
-
-        const events = tx.events ?? []
-        events.forEach((event) => {
-          if (!event?.attributes) return
-          event.attributes.forEach((attr) => {
-            const key = decodeEventValue(attr?.key)
-            const value = decodeEventValue(attr?.value)
-            if (key === "contract_address" && value) {
-              addresses.add(value)
-            }
-          })
-        })
-      })
-      const entries = Array.from(addresses)
+      const entries = relevantCw20Contracts
       if (!entries.length) return {}
       const results: Record<string, string> = {}
       for (let i = 0; i < entries.length; i += 6) {
@@ -821,8 +817,10 @@ const History = () => {
       }
       return results
     },
-    enabled: txs.length > 0,
-    staleTime: 1000 * 60 * 30
+    enabled: relevantCw20Contracts.length > 0,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false
   })
 
   const contractNameMap = useMemo(() => {
