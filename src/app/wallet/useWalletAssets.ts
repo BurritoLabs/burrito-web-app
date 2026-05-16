@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_DENOMS } from "../chain"
 import {
@@ -155,6 +155,50 @@ const normalizeWalletAssetKey = (assetKey: string) => {
 }
 
 const EMPTY_BALANCES: CoinBalance[] = []
+const NATIVE_BALANCE_CACHE_TTL = 10 * 60 * 1000
+
+type NativeBalanceCache = {
+  data: CoinBalance[]
+  updatedAt: number
+}
+
+const getNativeBalanceCacheKey = (address: string) =>
+  `burrito:native-balances:classic:${address.trim().toLowerCase()}`
+
+const getCachedNativeBalances = (
+  address: string | undefined
+): NativeBalanceCache | undefined => {
+  if (!address || typeof window === "undefined") return undefined
+  try {
+    const raw = window.localStorage.getItem(getNativeBalanceCacheKey(address))
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as NativeBalanceCache
+    if (!Array.isArray(parsed.data) || typeof parsed.updatedAt !== "number") {
+      return undefined
+    }
+    if (Date.now() - parsed.updatedAt > NATIVE_BALANCE_CACHE_TTL) {
+      return undefined
+    }
+    return parsed
+  } catch {
+    return undefined
+  }
+}
+
+const cacheNativeBalances = (
+  address: string | undefined,
+  balances: CoinBalance[] | undefined
+) => {
+  if (!address || !balances || typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      getNativeBalanceCacheKey(address),
+      JSON.stringify({ data: balances, updatedAt: Date.now() })
+    )
+  } catch {
+    // Ignore storage failures; live balance fetching still works.
+  }
+}
 
 export const useWalletAssets = (accountAddress?: string) => {
   const { data: marketPairs = [] } = useQuery({
@@ -172,10 +216,17 @@ export const useWalletAssets = (accountAddress?: string) => {
     refetchInterval: 4 * 60 * 1000
   })
 
+  const cachedNativeBalances = useMemo(
+    () => getCachedNativeBalances(accountAddress),
+    [accountAddress]
+  )
   const balancesQuery = useQuery({
     queryKey: ["wallet", "balances", accountAddress],
     queryFn: () => fetchBalances(accountAddress ?? ""),
     enabled: Boolean(accountAddress),
+    initialData: cachedNativeBalances?.data,
+    initialDataUpdatedAt: cachedNativeBalances?.updatedAt,
+    placeholderData: (previousData) => previousData,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 6000),
     staleTime: 60_000,
@@ -189,6 +240,10 @@ export const useWalletAssets = (accountAddress?: string) => {
     Boolean(accountAddress) && !hasBalanceSnapshot && balancesQuery.isFetching
   const isBalanceError =
     Boolean(accountAddress) && !hasBalanceSnapshot && balancesQuery.isError
+
+  useEffect(() => {
+    cacheNativeBalances(accountAddress, balancesQuery.data)
+  }, [accountAddress, balancesQuery.data])
 
   const cachedPrices = useMemo(() => getCachedPrices(), [])
   const { data: prices } = useQuery({
@@ -1006,6 +1061,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     assetRows,
     balances,
     getBalance,
+    hasBalanceSnapshot,
     isBalanceError,
     isBalanceLoading,
     luncPrice,

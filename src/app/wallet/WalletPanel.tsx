@@ -268,6 +268,7 @@ const WalletPanel = () => {
   const {
     assetRows,
     getBalance,
+    hasBalanceSnapshot,
     isBalanceError,
     isBalanceLoading,
     netWorth,
@@ -485,12 +486,12 @@ const WalletPanel = () => {
     }))
   }, [hiddenTokenSet, tokenCatalog])
 
-  const netWorthDisplay =
-    account && isBalanceLoading ? "--" : account ? formatUsd(netWorth) : "$0.00"
   const netWorthValue =
-    netWorthDisplay === "--" || netWorthDisplay === "$0"
-      ? netWorthDisplay
-      : netWorthDisplay
+    !account || !account.address
+      ? "$0.00"
+      : isBalanceLoading || (!hasBalanceSnapshot && isBalanceError)
+      ? "--"
+      : formatUsd(netWorth)
 
   const selectedAssetRow = assetRows.find(
     (asset) => asset.denom === selectedAsset.denom

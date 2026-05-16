@@ -198,9 +198,27 @@
 }
 
 .emptyState {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
   font-size: var(--font-size-small);
   color: rgba(234, 245, 235, 0.6);
   padding: 6px 2px;
+}
+
+.retryButton {
+  border: 1px solid rgba(82, 196, 26, 0.7);
+  border-radius: 999px;
+  background: rgba(82, 196, 26, 0.14);
+  color: var(--green);
+  font: inherit;
+  font-weight: var(--bold);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  background: rgba(82, 196, 26, 0.22);
 }
 
 .sideCard {

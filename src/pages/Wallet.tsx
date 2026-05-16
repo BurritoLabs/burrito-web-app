@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useQueryClient } from "@tanstack/react-query"
 import PageShell from "./PageShell"
 import styles from "./Wallet.module.css"
 import { useWallet } from "../app/wallet/WalletContext"
@@ -87,6 +88,7 @@ type CoinsSectionProps = {
   isError: boolean
   isLoading: boolean
   onBuyAsset: (asset: WalletAsset) => void
+  onRetry: () => void
   hideLowBalance: boolean
   onSendAsset: (asset: WalletAsset) => void
   onToggle: () => void
@@ -101,6 +103,7 @@ const CoinsSection = memo(
     isError,
     isLoading,
     onBuyAsset,
+    onRetry,
     hideLowBalance,
     onSendAsset,
     onToggle,
@@ -136,7 +139,12 @@ const CoinsSection = memo(
           ) : isLoading ? (
             <div className={styles.emptyState}>Loading balances...</div>
           ) : isError ? (
-            <div className={styles.emptyState}>Balance data unavailable.</div>
+            <div className={styles.emptyState}>
+              <span>Balance data unavailable.</span>
+              <button className={styles.retryButton} type="button" onClick={onRetry}>
+                Retry balances
+              </button>
+            </div>
           ) : rows.length === 0 ? (
             <div className={styles.emptyState}>No coins found.</div>
           ) : (
@@ -207,6 +215,7 @@ type TokensSectionProps = {
   isError: boolean
   isLoading: boolean
   hideLowBalance: boolean
+  onRetry: () => void
   onSendAsset: (asset: WalletAsset) => void
   onToggle: () => void
   onSwapAsset: (asset: WalletAsset) => void
@@ -219,6 +228,7 @@ const TokensSection = memo(
     isError,
     isLoading,
     hideLowBalance,
+    onRetry,
     onSendAsset,
     onToggle,
     onSwapAsset,
@@ -246,7 +256,12 @@ const TokensSection = memo(
           ) : isLoading ? (
             <div className={styles.emptyState}>Loading balances...</div>
           ) : isError ? (
-            <div className={styles.emptyState}>Balance data unavailable.</div>
+            <div className={styles.emptyState}>
+              <span>Balance data unavailable.</span>
+              <button className={styles.retryButton} type="button" onClick={onRetry}>
+                Retry balances
+              </button>
+            </div>
           ) : rows.length === 0 ? (
             <div className={styles.emptyState}>No tokens found.</div>
           ) : (
@@ -302,6 +317,7 @@ TokensSection.displayName = "TokensSection"
 const Wallet = () => {
   const { account } = useWallet()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [hideLowBalance, setHideLowBalance] =
     useWalletHideLowBalancePreference()
   const [hiddenTokens] = useWalletHiddenTokensPreference()
@@ -330,6 +346,16 @@ const Wallet = () => {
   const handleToggleLowBalance = useCallback(() => {
     setHideLowBalance((prev) => !prev)
   }, [setHideLowBalance])
+
+  const handleRetryBalances = useCallback(() => {
+    if (!account?.address) return
+    void queryClient.invalidateQueries({
+      queryKey: ["wallet", "balances", account.address]
+    })
+    void queryClient.invalidateQueries({
+      queryKey: ["cw20-balances", account.address]
+    })
+  }, [account?.address, queryClient])
 
   const handleSendAsset = useCallback((asset: WalletAsset) => {
     openWalletPanel({
@@ -383,6 +409,7 @@ const Wallet = () => {
             isError={isBalanceError}
             isLoading={isBalanceLoading}
             onBuyAsset={handleBuyAsset}
+            onRetry={handleRetryBalances}
             hideLowBalance={hideLowBalance}
             onSendAsset={handleSendAsset}
             onToggle={handleToggleLowBalance}
@@ -396,6 +423,7 @@ const Wallet = () => {
             isError={isBalanceError}
             isLoading={isBalanceLoading}
             hideLowBalance={hideLowBalance}
+            onRetry={handleRetryBalances}
             onSendAsset={handleSendAsset}
             onToggle={handleToggleLowBalance}
             onSwapAsset={handleSwapAsset}
