@@ -30,6 +30,8 @@ const CONTRACT_ADDRESS_EVENT_KEYS = new Set([
   "contract"
 ])
 
+const retryBackoff = (attempt: number) => Math.min(1000 * 2 ** attempt, 6000)
+
 type LogFinderTransaction = Parameters<typeof getTxCanonicalMsgs>[0]
 type LogFinderTxLog = NonNullable<LogFinderTransaction["logs"]>[number]
 type LogFinderTxEvent = LogFinderTxLog["events"][number]
@@ -725,10 +727,17 @@ const History = () => {
     () => createLogMatcherForActions(actionRuleSet),
     [actionRuleSet]
   )
-  const { data: txs = [], isLoading } = useQuery({
+  const {
+    data: txs = [],
+    isError: isTxError,
+    isLoading,
+    refetch: refetchTxs
+  } = useQuery({
     queryKey: ["txs", account?.address],
     queryFn: () => fetchTxs(account?.address ?? "", HISTORY_TX_LIMIT),
     enabled: Boolean(account?.address),
+    retry: 3,
+    retryDelay: retryBackoff,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false
@@ -955,6 +964,24 @@ const History = () => {
                   <div className={styles.messageBody}>
                     <strong>Loading transactions...</strong>
                     <span>Please wait</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : isTxError ? (
+            <div className={`card ${styles.card}`}>
+              <div className={styles.messages}>
+                <div className={styles.message}>
+                  <div className={styles.messageBody}>
+                    <strong>History temporarily unavailable</strong>
+                    <span>The chain API did not return transaction data. Try again in a moment.</span>
+                    <button
+                      className={styles.retryButton}
+                      type="button"
+                      onClick={() => void refetchTxs()}
+                    >
+                      Retry
+                    </button>
                   </div>
                 </div>
               </div>

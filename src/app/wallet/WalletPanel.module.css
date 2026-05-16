@@ -1473,9 +1473,28 @@
 }
 
 .assetEmpty {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
   padding: 20px 10px 30px;
   font-size: var(--font-size-small);
   color: var(--text-muted);
+}
+
+.assetRetryButton {
+  border: 1px solid rgba(82, 196, 26, 0.7);
+  border-radius: 999px;
+  background: rgba(82, 196, 26, 0.14);
+  color: var(--green);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.assetRetryButton:hover {
+  background: rgba(82, 196, 26, 0.22);
 }
 
 .assetRow {

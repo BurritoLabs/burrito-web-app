@@ -288,6 +288,16 @@ const WalletPanel = () => {
     setSendSubmitting(false)
   }, [])
 
+  const handleRetryBalances = useCallback(() => {
+    if (!account?.address) return
+    void queryClient.invalidateQueries({
+      queryKey: ["wallet", "balances", account.address]
+    })
+    void queryClient.invalidateQueries({
+      queryKey: ["cw20-balances", account.address]
+    })
+  }, [account?.address, queryClient])
+
   const openSendView = useCallback(
     (asset?: WalletAssetRow | WalletPanelAssetSnapshot | SelectedAsset) => {
       if (asset) {
@@ -1556,7 +1566,14 @@ const WalletPanel = () => {
             <div className={styles.assetEmpty}>Loading balances...</div>
           ) : isBalanceError ? (
             <div className={styles.assetEmpty}>
-              Balance data unavailable. Reopen the wallet to retry.
+              <span>Balance data unavailable.</span>
+              <button
+                className={styles.assetRetryButton}
+                type="button"
+                onClick={handleRetryBalances}
+              >
+                Retry balances
+              </button>
             </div>
           ) : filteredAssetRows.length === 0 ? (
             <div className={styles.assetEmpty}>

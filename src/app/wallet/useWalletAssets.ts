@@ -176,7 +176,12 @@ export const useWalletAssets = (accountAddress?: string) => {
     queryKey: ["wallet", "balances", accountAddress],
     queryFn: () => fetchBalances(accountAddress ?? ""),
     enabled: Boolean(accountAddress),
-    staleTime: 60_000
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 6000),
+    staleTime: 60_000,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true
   })
   const balances = balancesQuery.data ?? EMPTY_BALANCES
   const hasBalanceSnapshot = balancesQuery.data !== undefined

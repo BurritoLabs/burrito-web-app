@@ -1412,6 +1412,10 @@ export const fetchTxs = async (address: string, limit = 75) => {
     })
   )
 
+  if (requests.every((data) => data === undefined)) {
+    throw new Error("Transaction history unavailable")
+  }
+
   const merged = new Map<string, TxItem>()
   requests.forEach((data) => {
     if (!data) return

@@ -188,6 +188,24 @@
   gap: 4px;
 }
 
+.retryButton {
+  width: fit-content;
+  margin-top: 8px;
+  border: 1px solid rgba(82, 196, 26, 0.7);
+  border-radius: 999px;
+  background: rgba(82, 196, 26, 0.14);
+  color: var(--green);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  background: rgba(82, 196, 26, 0.22);
+}
+
 .messagePrimary {
   display: inline-flex;
   font-size: var(--font-size);

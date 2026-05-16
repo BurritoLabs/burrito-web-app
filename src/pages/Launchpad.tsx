@@ -1391,9 +1391,11 @@ const Launchpad = () => {
             lock: unlockDays > 0 ? `${unlockDays} days` : "Unlocked",
             creator: truncateHash(launch.creator),
             risk: lpWithdrawn
-              ? "LP no longer locked"
+              ? "LP withdrawn"
+              : unlockDays <= 0
+              ? "LP unlocked"
               : hasPublicInfo
-              ? `LP lock #${launch.lp_lock_id}`
+              ? "LP locked"
               : "Public info incomplete",
             progress: lpWithdrawn ? 20 : 100,
             tokenContract: launch.token_contract,
@@ -3321,9 +3323,10 @@ const Launchpad = () => {
                         : "uiButton uiButtonOutline"
                     }
                     type="button"
+                    aria-pressed={selectedLaunch?.id === item.id}
                     onClick={() => handleSelectLaunch(item.id)}
                   >
-                    {selectedLaunch?.id === item.id ? "Selected" : "Details"}
+                    Details
                   </button>
                   {item.pairContract ? (
                     <Link
