@@ -1110,18 +1110,17 @@
 
 .launchCard,
 .emptyState {
-  min-height: 164px;
+  min-height: 176px;
   display: grid;
   gap: 10px;
   align-content: space-between;
 }
 
 .launchCardSelected {
-  border-color: rgba(104, 216, 63, 0.44);
+  border-color: rgba(104, 216, 63, 0.28);
   background:
-    linear-gradient(135deg, rgba(104, 216, 63, 0.11), transparent 42%),
+    linear-gradient(135deg, rgba(104, 216, 63, 0.07), transparent 42%),
     rgba(13, 26, 21, 0.82);
-  box-shadow: 0 0 0 1px rgba(104, 216, 63, 0.08);
 }
 
 .emptyState {
@@ -1153,6 +1152,26 @@
   color: rgba(240, 250, 241, 0.78);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
+}
+
+.launchCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.launchCardHeader .launchCardTop {
+  flex: 1 1 auto;
+}
+
+.launchCardHeader .riskLine {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  padding: 3px 8px;
+  font-size: var(--font-size-xs);
+  color: rgba(240, 250, 241, 0.72);
 }
 
 .filterBar {
@@ -1288,19 +1307,22 @@
 .launchCardBottom {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
 }
 
 .launchCardBottom :global(.uiButton) {
-  min-width: 92px;
+  min-width: 0;
+  width: 100%;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .launchCardActions {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .launchDetailPanel {

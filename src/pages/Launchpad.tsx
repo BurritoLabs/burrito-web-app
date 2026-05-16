@@ -3289,19 +3289,22 @@ const Launchpad = () => {
               }`}
               key={item.id}
             >
-              <div className={styles.launchCardTop}>
-                <LaunchTokenLogo
-                  symbol={item.symbol}
-                  logoUrl={item.logoUrl}
-                  pairedWithLunc={isLuncPairLabel(item.pair)}
-                />
-                <div>
-                  <span>
-                    {item.sample ? "Sample preview" : item.status}
-                  </span>
-                  <strong>{item.pair}</strong>
-                  <p>{item.name}</p>
+              <div className={styles.launchCardHeader}>
+                <div className={styles.launchCardTop}>
+                  <LaunchTokenLogo
+                    symbol={item.symbol}
+                    logoUrl={item.logoUrl}
+                    pairedWithLunc={isLuncPairLabel(item.pair)}
+                  />
+                  <div>
+                    <span>
+                      {item.sample ? "Sample preview" : item.status}
+                    </span>
+                    <strong>{item.pair}</strong>
+                    <p>{item.name}</p>
+                  </div>
                 </div>
+                <div className={styles.riskLine}>{item.risk}</div>
               </div>
               <div className={styles.launchCardStats}>
                 <div>
@@ -3314,7 +3317,6 @@ const Launchpad = () => {
                 </div>
               </div>
               <div className={styles.launchCardBottom}>
-                <div className={styles.riskLine}>{item.risk}</div>
                 <div className={styles.launchCardActions}>
                   <button
                     className={
@@ -3333,7 +3335,7 @@ const Launchpad = () => {
                       className="uiButton uiButtonOutline"
                       to={getLaunchpadMarketPath(item.pairContract)}
                     >
-                      Market
+                      Open market
                     </Link>
                   ) : item.tokenContract ? (
                     <a
