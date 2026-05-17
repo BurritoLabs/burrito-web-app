@@ -20,11 +20,9 @@ import {
   toUnitAmount
 } from "../app/utils/format"
 import { CLASSIC_DENOMS } from "../app/chain"
+import { KEYBASE_PROXY_URL } from "../app/config/externalServices"
 import StakeManageModal from "./StakeManageModal"
 
-const KEYBASE_PROXY_URL = import.meta.env.DEV
-  ? "/keybase"
-  : "https://keybase.burrito.money"
 const KEYBASE_FETCH_CONCURRENCY = 10
 const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
 const KEYBASE_CACHE_STORAGE_KEY = "burrito:keybase-pictures:v1"

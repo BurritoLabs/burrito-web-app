@@ -2,16 +2,14 @@ import type { AssetList, Chain } from "@chain-registry/types"
 import type { MainWalletBase, WalletConnectOptions } from "@cosmos-kit/core"
 import { wallets as keplrWallets } from "@cosmos-kit/keplr"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
+import {
+  getBurritoAppOrigin,
+  WALLETCONNECT_PROJECT_ID,
+  warnIfDefaultWalletConnectProjectId
+} from "../config/walletConfig"
 import type { WalletConnectorId } from "./WalletContext"
 
 export const COSMOS_KIT_CHAIN_NAME = "terra"
-
-const WALLETCONNECT_PROJECT_ID =
-  import.meta.env.VITE_WALLETCONNECT_PROJECT_ID?.trim() ||
-  "e95bf03729cf2be3b408afc97030b40f"
-
-const getAppOrigin = () =>
-  typeof window !== "undefined" ? window.location.origin : "https://app.burrito.money"
 
 const GAS_PRICE_STEP = {
   low: 28.325,
@@ -166,7 +164,8 @@ export const COSMOS_WALLET_NAME_TO_CONNECTOR_ID = Object.values(
 )
 
 export const getWalletConnectOptions = (): WalletConnectOptions => {
-  const origin = getAppOrigin()
+  warnIfDefaultWalletConnectProjectId()
+  const origin = getBurritoAppOrigin()
   return {
     signClient: {
       projectId: WALLETCONNECT_PROJECT_ID,

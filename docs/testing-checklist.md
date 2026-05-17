@@ -1,0 +1,91 @@
+# Testing Checklist
+
+Run this before a production deployment or after touching wallet, market, swap, stake, governance, or launchpad code.
+
+## Wallet
+
+- Connect Keplr extension on desktop.
+- Connect Galaxy Station on desktop.
+- Connect Keplr mobile from mobile browser.
+- Disconnect and reconnect without refreshing.
+- Open the drawer wallet from at least two routes.
+- Confirm native, CW20, and IBC balances load.
+- Confirm balance values, token logos, and fallback logos display.
+
+## Market
+
+- Open `/market`.
+- Search by symbol, name, contract, and pool address.
+- Switch sort direction and sort field.
+- Open a TerraSwap pair detail page.
+- Open a Terraport pair detail page.
+- Open a Garuda pair detail page.
+- Confirm pair logos, balance display, chart, recent trades, and swap panel load.
+- Use the pair detail back button from a launchpad-opened market page.
+- Refresh a pair detail route directly on Cloudflare.
+
+## Swap
+
+- Load a quote for native to native.
+- Load a quote for native to CW20.
+- Load a quote for CW20 to native.
+- Load a quote for CW20 to CW20 if route exists.
+- Execute a small swap on desktop.
+- Execute a small swap from mobile Keplr.
+- Confirm slippage settings do not reset unexpectedly.
+- Confirm platform fee and route details are displayed consistently.
+
+## Stake
+
+- Delegate a small amount.
+- Redelegate between validators.
+- Undelegate a small amount.
+- Confirm fee estimate is high enough for each transaction.
+- Confirm mobile layout on manage stake.
+
+## Withdrawals
+
+- Withdraw rewards on desktop.
+- Withdraw rewards on mobile.
+- Withdraw commission on desktop.
+- Withdraw commission on mobile.
+- Confirm fee estimate is high enough.
+
+## Governance
+
+- Open voting, deposit, passed, and rejected tabs.
+- Open proposal details directly by route.
+- Submit a vote.
+- Deposit into an active deposit proposal.
+- Confirm vote progress and deposit progress display.
+
+## Launchpad
+
+- Create a CW20-only token.
+- Create a launch-with-pool token.
+- Create the LUNC pair.
+- Provide initial liquidity.
+- Lock LP tokens.
+- Publish to launchpad registry.
+- Confirm the launch appears in Explore.
+- Confirm Manage shows the created launch.
+- Open market from Explore and confirm pair assets are correct.
+
+## Contract Tools
+
+- Query a known contract.
+- Instantiate only with a known valid code ID and init message.
+- Execute only a known safe contract action.
+
+## Mobile
+
+- Open `/`, `/wallet`, `/market`, `/swap`, `/stake`, `/governance`, and `/launchpad`.
+- Confirm no horizontal overflow.
+- Confirm wallet drawer opens on first tap.
+- Confirm browser refresh works on nested routes.
+
+## Cloudflare
+
+- Confirm `public/_redirects` exists.
+- Confirm a direct refresh works on `/wallet`, `/market`, `/swap`, `/proposal/:id`, and `/launchpad`.
+- Confirm production environment variables are configured for optional launchpad contracts.

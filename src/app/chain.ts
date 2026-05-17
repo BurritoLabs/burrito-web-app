@@ -1,34 +1,14 @@
-export const CLASSIC_CHAIN = {
-  name: "Terra Classic",
-  chainId: "columbus-5",
-  rpc: "https://terra-classic-rpc.publicnode.com:443",
-  lcd: "https://terra-classic-lcd.publicnode.com",
-  fcd: "https://terra-classic-public-api.publicnode.com",
-  bech32Prefix: "terra",
-  coinType: 330
-} as const
+import {
+  CLASSIC_CHAIN_CONFIG,
+  CLASSIC_DENOMS_CONFIG,
+  CLASSIC_GAS_PRICE_STEP
+} from "./config/chainConfig"
 
-export const CLASSIC_DENOMS = {
-  lunc: {
-    coinDenom: "LUNC",
-    coinMinimalDenom: "uluna",
-    coinDecimals: 6,
-    coinGeckoId: "terra-luna"
-  },
-  ustc: {
-    coinDenom: "USTC",
-    coinMinimalDenom: "uusd",
-    coinDecimals: 6,
-    coinGeckoId: "terrausd"
-  }
-} as const
+export const CLASSIC_CHAIN = CLASSIC_CHAIN_CONFIG
+export const CLASSIC_DENOMS = CLASSIC_DENOMS_CONFIG
 
 const prefix = CLASSIC_CHAIN.bech32Prefix
-const GAS_PRICE_STEP = {
-  low: 28.325,
-  average: 28.325,
-  high: 50
-}
+const GAS_PRICE_STEP = CLASSIC_GAS_PRICE_STEP
 
 export const KEPLR_CHAIN_CONFIG = {
   chainId: CLASSIC_CHAIN.chainId,

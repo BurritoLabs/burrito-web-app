@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import "./index.css"
 import App from "./App"
+import AppErrorBoundary from "./app/feedback/AppErrorBoundary"
 import WalletBoot from "./app/wallet/WalletBoot"
 
 const shouldRetryQuery = (failureCount: number, error: unknown) => {
@@ -30,11 +31,13 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <WalletBoot>
-        <BrowserRouter>
+      <AppErrorBoundary>
+        <WalletBoot>
+          <BrowserRouter>
             <App />
-        </BrowserRouter>
-      </WalletBoot>
+          </BrowserRouter>
+        </WalletBoot>
+      </AppErrorBoundary>
     </QueryClientProvider>
   </StrictMode>
 )

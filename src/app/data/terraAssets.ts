@@ -2,9 +2,11 @@ import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
-
-const ASSET_URL = "https://assets.terra.dev"
-const HEXXAGON_REGISTRY_URL = "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main"
+import {
+  ASSET_URL,
+  HEXXAGON_REGISTRY_URL
+} from "../config/externalServices"
+import { parseCommonJsArray } from "../utils/cjsRegistry"
 
 export type Cw20Token = {
   protocol?: string
@@ -464,27 +466,11 @@ const fetchNativeMetadataToken = async (
   return token
 }
 
-const parseCommonJsArray = <T,>(source: string): T[] => {
-  const normalized = source.replace(/^\uFEFF/, "").trim()
-  if (!/^module\.exports\s*=/.test(normalized)) {
-    throw new Error("Unsupported hexxagon CJS format")
-  }
-  const expression = normalized
-    .replace(/^module\.exports\s*=\s*/, "")
-    .replace(/;\s*$/, "")
-  // Trusted source payload from hexxagon chain-registry.
-  const parsed = new Function(`return (${expression})`)() as unknown
-  if (!Array.isArray(parsed)) {
-    throw new Error("Unsupported hexxagon CJS payload")
-  }
-  return parsed as T[]
-}
-
 const fetchHexxagonArray = async <T,>(path: string): Promise<T[]> => {
   const res = await fetch(`${HEXXAGON_REGISTRY_URL}/${path}`)
   if (!res.ok) throw new Error(`Failed to load ${path}`)
   const source = await res.text()
-  return parseCommonJsArray<T>(source)
+  return parseCommonJsArray<T>(source, "hexxagon CJS")
 }
 
 export const pickChainAssets = <T,>(

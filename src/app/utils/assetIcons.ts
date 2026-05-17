@@ -1,4 +1,4 @@
-const ASSET_URL = "https://assets.terra.dev"
+import { ASSET_URL } from "../config/externalServices"
 
 const KNOWN_STATIC_NATIVE_ICONS: Record<string, string> = {
   LUNC: "/system/lunc.svg",

@@ -2,21 +2,15 @@ import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { queryContractSmart } from "../data/classic"
 import { parseTokenAmountToBaseUnits } from "./cw20"
+import {
+  LAUNCHPAD_LP_LOCKER_ADDRESS,
+  LP_LOCK_CHAIN_TIME_BUFFER_SECONDS,
+  MAX_LP_LOCK_SECONDS,
+  MIN_LP_LOCK_SECONDS,
+  isLpLockerConfigured
+} from "../config/launchpadConfig"
 
-const MIN_LP_LOCK_SECONDS = 30 * 24 * 60 * 60
-const MAX_LP_LOCK_SECONDS = 3650 * 24 * 60 * 60
-const LP_LOCK_CHAIN_TIME_BUFFER_SECONDS = 10 * 60
-
-const rawLockerAddress =
-  import.meta.env.VITE_LAUNCHPAD_LP_LOCKER_ADDRESS?.trim() ?? ""
-
-export const LAUNCHPAD_LP_LOCKER_ADDRESS = /^terra1[0-9a-z]{38,80}$/.test(
-  rawLockerAddress
-)
-  ? rawLockerAddress
-  : ""
-
-export const isLpLockerConfigured = Boolean(LAUNCHPAD_LP_LOCKER_ADDRESS)
+export { LAUNCHPAD_LP_LOCKER_ADDRESS, isLpLockerConfigured }
 
 export type LpLockResponse = {
   id: number

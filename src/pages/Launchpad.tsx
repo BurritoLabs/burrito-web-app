@@ -64,6 +64,11 @@ import {
 import { truncateHash } from "../app/utils/format"
 import { formatTxError } from "../app/utils/txError"
 import { fetchContractInfo, queryContractSmart } from "../app/data/classic"
+import {
+  LAUNCHPAD_CREATION_FEE_LABEL,
+  LAUNCHPAD_CREATION_FEE_MICRO,
+  LAUNCHPAD_FEE_RECIPIENT
+} from "../app/config/launchpadConfig"
 
 type LaunchTab = "create" | "explore" | "manage"
 type CreateStep = "token" | "launch"
@@ -72,12 +77,6 @@ type LaunchSort = "newest" | "oldest" | "unlockSoon" | "unlockLong" | "risk"
 type LaunchMode = "launchpad" | "cw20"
 type ManageSection = "pool" | "lock" | "listing" | "distribution"
 
-const LAUNCHPAD_CREATION_FEE_LUNC = 30_000
-const LAUNCHPAD_CREATION_FEE_MICRO = BigInt(LAUNCHPAD_CREATION_FEE_LUNC) * 1_000_000n
-const LAUNCHPAD_FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
-const LAUNCHPAD_CREATION_FEE_LABEL = `${new Intl.NumberFormat("en-US").format(
-  LAUNCHPAD_CREATION_FEE_LUNC
-)} LUNC`
 const CW20_SYMBOL_PATTERN = /^[A-Z-]{3,12}$/
 const TERRA_TOKEN_DECIMALS = 6
 const TERRA_TOKEN_DECIMALS_LABEL = String(TERRA_TOKEN_DECIMALS)

@@ -3,9 +3,12 @@ import {
   MsgExecuteContract,
   MsgInstantiateContract
 } from "cosmjs-types/cosmwasm/wasm/v1/tx"
+import {
+  LAUNCHPAD_CW20_CODE_ID,
+  LAUNCHPAD_CW20_CODE_ID_LABEL
+} from "../config/launchpadConfig"
 
-export const LAUNCHPAD_CW20_CODE_ID = 3n
-export const LAUNCHPAD_CW20_CODE_ID_LABEL = "Terra Classic CW20 code ID 3"
+export { LAUNCHPAD_CW20_CODE_ID, LAUNCHPAD_CW20_CODE_ID_LABEL }
 
 export type Cw20InstantiateInput = {
   creatorAddress: string

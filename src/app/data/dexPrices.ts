@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
+import { HEXXAGON_DEX_PAIRS_URL } from "../config/externalServices"
+import { parseCommonJsArray } from "../utils/cjsRegistry"
 
-const HEXXAGON_DEX_PAIRS_URL =
-  "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main/cw20/dex_pairs/mainnet/terra.js"
 const PAIR_INDEX_TTL = 60 * 60 * 1000
 const POOL_TTL = 2 * 60 * 1000
 
@@ -62,22 +62,6 @@ let pairIndexCache: CachedPairIndex | undefined
 const poolCache = new Map<string, CachedPool>()
 const directFactoryPairCache = new Map<string, string | null>()
 
-const parseCommonJsArray = <T,>(source: string): T[] => {
-  const normalized = source.replace(/^\uFEFF/, "").trim()
-  if (!/^module\.exports\s*=/.test(normalized)) {
-    throw new Error("Unsupported hexxagon CJS format")
-  }
-  const expression = normalized
-    .replace(/^module\.exports\s*=\s*/, "")
-    .replace(/;\s*$/, "")
-  // Trusted source payload from hexxagon chain-registry.
-  const parsed = new Function(`return (${expression})`)() as unknown
-  if (!Array.isArray(parsed)) {
-    throw new Error("Unsupported hexxagon CJS payload")
-  }
-  return parsed as T[]
-}
-
 const normalizeAssetKey = (key: string) => {
   if (!key) return key
   const trimmed = key.trim()
@@ -132,7 +116,10 @@ const fetchPairIndex = async () => {
     throw new Error(`Failed to load dex pairs: ${response.status}`)
   }
   const source = await response.text()
-  const parsed = parseCommonJsArray<HexxagonDexPair>(source).filter(
+  const parsed = parseCommonJsArray<HexxagonDexPair>(
+    source,
+    "hexxagon CJS"
+  ).filter(
     (item) =>
       Boolean(item?.token) &&
       Array.isArray(item?.assets) &&

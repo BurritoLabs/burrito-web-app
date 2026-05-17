@@ -10,7 +10,27 @@ import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAs
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
+import { parseCommonJsArray } from "../../app/utils/cjsRegistry"
+import {
+  fromMicroAmount,
+  parseBigInt,
+  sanitizeAmount,
+  toMicroAmount
+} from "../../app/swap/amount"
 import { useWallet } from "../../app/wallet/WalletContext"
+import { HEXXAGON_DEX_PAIRS_URL } from "../../app/config/externalServices"
+import {
+  DEFAULT_SLIPPAGE_BPS,
+  FALLBACK_GAS_CW20_FEE,
+  FALLBACK_GAS_CW20_SWAP,
+  FALLBACK_GAS_NATIVE_FEE,
+  FALLBACK_GAS_NATIVE_SWAP,
+  GAS_PRICE_MICRO_LUNC,
+  PLATFORM_FEE_BPS,
+  PLATFORM_FEE_RECIPIENT,
+  SLIPPAGE_OPTIONS,
+  SWAP_MEMO
+} from "../../app/config/swapConfig"
 
 type AssetType = "native" | "cw20"
 type DexId = string
@@ -114,8 +134,6 @@ type SwapPanelProps = {
 }
 const DEFAULT_FROM_ASSET_ID = NATIVE_ASSETS[0].id
 const DEFAULT_TO_ASSET_ID = NATIVE_ASSETS[1].id
-const HEXXAGON_DEX_PAIRS_URL =
-  "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main/cw20/dex_pairs/mainnet/terra.js"
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
 const ACTIVE_DEX_IDS = new Set(CLASSIC_SWAP_DEXES.map((item) => normalizeDexName(item.id)))
 
@@ -124,20 +142,6 @@ const DEXES: readonly DexConfig[] = CLASSIC_SWAP_DEXES.map((dex) => ({
   mode: dex.mode ?? "terraswap"
 }))
 
-const GAS_PRICE_MICRO_LUNC = 28.325
-const FALLBACK_GAS_NATIVE_SWAP = 220_000
-const FALLBACK_GAS_CW20_SWAP = 300_000
-const FALLBACK_GAS_NATIVE_FEE = 80_000
-const FALLBACK_GAS_CW20_FEE = 120_000
-const SWAP_MEMO = "Swapped via Burrito Swap"
-const PLATFORM_FEE_BPS = 20n // 0.20%
-const PLATFORM_FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
-const DEFAULT_SLIPPAGE_BPS = 50n // 0.5%
-const SLIPPAGE_OPTIONS = [
-  { label: "0.1%", bps: 10n },
-  { label: "0.5%", bps: 50n },
-  { label: "1.0%", bps: 100n }
-] as const
 const FACTORY_PAIR_CACHE = new Map<string, string>()
 
 const encodeJsonBytes = (value: unknown) =>
@@ -156,62 +160,6 @@ const encodeSmartQueryPayload = (value: unknown) =>
   encodeURIComponent(bytesToBase64(encodeJsonBytes(value)))
 
 const encodeBase64Json = (value: unknown) => bytesToBase64(encodeJsonBytes(value))
-
-const parseBigInt = (value: string | undefined) => {
-  if (!value) return 0n
-  try {
-    return BigInt(value)
-  } catch {
-    return 0n
-  }
-}
-
-const parseCommonJsArray = <T,>(source: string): T[] => {
-  const normalized = source.replace(/^\uFEFF/, "").trim()
-  if (!/^module\.exports\s*=/.test(normalized)) {
-    throw new Error("Unsupported CJS format")
-  }
-  const expression = normalized
-    .replace(/^module\.exports\s*=\s*/, "")
-    .replace(/;\s*$/, "")
-  // Trusted source payload from hexxagon chain-registry.
-  const parsed = new Function(`return (${expression})`)() as unknown
-  if (!Array.isArray(parsed)) {
-    throw new Error("Unsupported CJS payload")
-  }
-  return parsed as T[]
-}
-
-const sanitizeAmount = (value: string) => {
-  let next = value.replace(/,/g, "").replace(/[^\d.]/g, "")
-  const firstDot = next.indexOf(".")
-  if (firstDot >= 0) {
-    next = next.slice(0, firstDot + 1) + next.slice(firstDot + 1).replace(/\./g, "")
-  }
-  return next
-}
-
-const toMicroAmount = (value: string, decimals = 6) => {
-  const cleaned = sanitizeAmount(value).trim()
-  if (!cleaned) return 0n
-  const [wholePartRaw, fracPartRaw = ""] = cleaned.split(".")
-  const wholePart = wholePartRaw || "0"
-  if (!/^\d+$/.test(wholePart) || (fracPartRaw && !/^\d+$/.test(fracPartRaw))) {
-    return 0n
-  }
-  const fracPart = fracPartRaw.slice(0, decimals).padEnd(decimals, "0")
-  const merged = `${wholePart}${fracPart}`.replace(/^0+/, "") || "0"
-  return parseBigInt(merged)
-}
-
-const fromMicroAmount = (value: bigint, decimals = 6) => {
-  if (value <= 0n) return "0"
-  if (decimals <= 0) return value.toString()
-  const base = 10n ** BigInt(decimals)
-  const whole = value / base
-  const fraction = (value % base).toString().padStart(decimals, "0").replace(/0+$/, "")
-  return fraction ? `${whole.toString()}.${fraction}` : whole.toString()
-}
 
 const formatAssetUsdText = ({
   asset,

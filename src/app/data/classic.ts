@@ -1,4 +1,8 @@
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
+import {
+  COINPAPRIKA_LUNC_URL,
+  COINPAPRIKA_USTC_URL
+} from "../config/externalServices"
 
 export type CoinBalance = {
   denom: string
@@ -310,9 +314,6 @@ const postJson = async <T>(url: string, body: unknown): Promise<T> => {
 const PRICE_CACHE_KEY = "burritoPriceCache"
 const FX_CACHE_KEY = "burritoFxCache"
 const PRICE_CACHE_TTL_MS = 5 * 60 * 1000
-const COINPAPRIKA_LUNC_URL = "https://api.coinpaprika.com/v1/tickers/luna-terra"
-const COINPAPRIKA_USTC_URL = "https://api.coinpaprika.com/v1/tickers/ust-terrausd"
-
 export const getCachedPrices = () => {
   if (typeof window === "undefined") return undefined
   const raw = window.localStorage.getItem(PRICE_CACHE_KEY)
@@ -1649,7 +1650,7 @@ export const fetchPrices = async (): Promise<PriceMap> => {
           quotes?: {
             USD?: { price?: number; percent_change_24h?: number; market_cap?: number }
           }
-        }>("https://api.coinpaprika.com/v1/tickers/ust-terrausd")
+        }>(COINPAPRIKA_USTC_URL)
         const price = paprika?.quotes?.USD?.price
         if (price) {
           result.ustc = {

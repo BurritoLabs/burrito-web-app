@@ -1,0 +1,47 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(82, 222, 47, 0.12), transparent 38%),
+    #06120d;
+  color: #f4fff3;
+}
+
+.card {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid rgba(209, 255, 211, 0.18);
+  border-radius: 18px;
+  background: rgba(11, 28, 19, 0.92);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.4rem;
+  line-height: 1.15;
+}
+
+.message {
+  margin: 0;
+  color: rgba(244, 255, 243, 0.68);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.button {
+  width: fit-content;
+  min-height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #53dd31;
+  color: #06120d;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}

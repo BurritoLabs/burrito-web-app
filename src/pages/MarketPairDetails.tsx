@@ -34,6 +34,12 @@ import {
   buildCw20IconCandidates,
   buildIbcAssetIconCandidates
 } from "../app/utils/assetIcons"
+import {
+  formatNativeSymbol,
+  normalizeAssetKey
+} from "../app/utils/assetIdentity"
+import { splitDexLabel } from "../app/utils/dexDisplay"
+import { formatUsdCompact } from "../app/utils/numberDisplay"
 
 type Timeframe = "1h" | "24h" | "7d"
 
@@ -83,25 +89,6 @@ type ResolvedAsset = {
   isUstc: boolean
 }
 
-const normalizeAssetKey = (key: string) => {
-  if (!key) return key
-  if (key.startsWith("terra1")) return key.toLowerCase()
-  if (key.startsWith("ibc/")) return `ibc/${key.slice(4).toUpperCase()}`
-  return key.toLowerCase()
-}
-
-const formatNativeSymbol = (denom: string) => {
-  if (!denom) return ""
-  if (denom === "uluna") return "LUNC"
-  if (denom === "uusd") return "USTC"
-  if (denom.startsWith("u")) {
-    const f = denom.slice(1)
-    if (f.length === 3) return `${f.slice(0, 2).toUpperCase()}TC`
-    return f.toUpperCase()
-  }
-  return denom.toUpperCase()
-}
-
 const toPairFallbackAsset = (assetId: string) => {
   if (assetId.startsWith("native:")) return assetId.slice("native:".length)
   if (assetId.startsWith("cw20:")) return assetId.slice("cw20:".length)
@@ -137,40 +124,6 @@ const shouldSwapForDisplay = (left: ResolvedAsset, right: ResolvedAsset) => {
 
   if (left.isUstc && right.isLunc) return true
   return false
-}
-
-const formatUsdCompact = (value: number | undefined) => {
-  if (value === undefined || value === null || Number.isNaN(value)) return "--"
-  const abs = Math.abs(value)
-  const sign = value < 0 ? "-" : ""
-
-  const units: Array<{ threshold: number; suffix: string }> = [
-    { threshold: 1_000_000_000_000, suffix: "t" },
-    { threshold: 1_000_000_000, suffix: "b" },
-    { threshold: 1_000_000, suffix: "m" },
-    { threshold: 1_000, suffix: "k" }
-  ]
-
-  for (const unit of units) {
-    if (abs >= unit.threshold) {
-      const scaled = abs / unit.threshold
-      const decimals = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2
-      return `${sign}$${formatNumber(scaled, decimals)}${unit.suffix}`
-    }
-  }
-
-  const decimals = abs >= 1 ? 2 : 4
-  return `${sign}$${formatNumber(abs, decimals)}`
-}
-
-const splitDexLabel = (label: string) => {
-  const trimmed = label.trim()
-  const match = trimmed.match(/^(.*?)(?:\s+(V\d+|XYK))$/i)
-  if (!match) return { dexName: trimmed, dexVersion: "" }
-  return {
-    dexName: match[1].trim(),
-    dexVersion: match[2].toUpperCase()
-  }
 }
 
 const formatUsdNoRound = (value: number) => {

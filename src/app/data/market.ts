@@ -4,16 +4,17 @@ import {
   isLaunchRegistryConfigured
 } from "../launchpad/registry"
 import {
+  HEXXAGON_DEX_PAIRS_URL,
+  LOCAL_MARKET_CANDLES_BASE_URL,
+  LOCAL_MARKET_INDEX_URL
+} from "../config/externalServices"
+import {
   fetchBinodesDexTxDetails,
   type BinodesDexTxDetail
 } from "./binodes"
 import { queryContractSmart } from "./classic"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
-
-const HEXXAGON_DEX_PAIRS_URL =
-  "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main/cw20/dex_pairs/mainnet/terra.js"
-const LOCAL_MARKET_INDEX_URL = "/market/index.json"
-const LOCAL_MARKET_CANDLES_BASE_URL = "/market/candles"
+import { parseCommonJsArray } from "../utils/cjsRegistry"
 
 type HexxagonDexPair = {
   token?: string
@@ -178,22 +179,6 @@ const localPairCandlesCache = new Map<
   { at: number; payload: LocalPairCandlePayload | null }
 >()
 const localPairCandlesInFlight = new Map<Promise<LocalPairCandlePayload | null>, string>()
-
-const parseCommonJsArray = <T,>(source: string): T[] => {
-  const normalized = source.replace(/^\uFEFF/, "").trim()
-  if (!/^module\.exports\s*=/.test(normalized)) {
-    throw new Error("Unsupported hexxagon CJS format")
-  }
-  const expression = normalized
-    .replace(/^module\.exports\s*=\s*/, "")
-    .replace(/;\s*$/, "")
-  // Trusted source payload from hexxagon chain-registry.
-  const parsed = new Function(`return (${expression})`)() as unknown
-  if (!Array.isArray(parsed)) {
-    throw new Error("Unsupported hexxagon CJS payload")
-  }
-  return parsed as T[]
-}
 
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
 
@@ -1114,7 +1099,7 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
   }
 
   const source = await response.text()
-  const payload = parseCommonJsArray<HexxagonDexPair>(source)
+  const payload = parseCommonJsArray<HexxagonDexPair>(source, "hexxagon CJS")
 
   const externalPairs = payload
     .filter((item) => {

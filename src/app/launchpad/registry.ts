@@ -1,17 +1,12 @@
 import { toUtf8 } from "@cosmjs/encoding"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { queryContractSmart } from "../data/classic"
+import {
+  LAUNCHPAD_REGISTRY_ADDRESS,
+  isLaunchRegistryConfigured
+} from "../config/launchpadConfig"
 
-const rawRegistryAddress =
-  import.meta.env.VITE_LAUNCHPAD_REGISTRY_ADDRESS?.trim() ?? ""
-
-export const LAUNCHPAD_REGISTRY_ADDRESS = /^terra1[0-9a-z]{38,80}$/.test(
-  rawRegistryAddress
-)
-  ? rawRegistryAddress
-  : ""
-
-export const isLaunchRegistryConfigured = Boolean(LAUNCHPAD_REGISTRY_ADDRESS)
+export { LAUNCHPAD_REGISTRY_ADDRESS, isLaunchRegistryConfigured }
 
 export type LaunchRegistryMetadata = {
   name: string

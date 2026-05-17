@@ -323,9 +323,10 @@ const Wallet = () => {
   const [hiddenTokens] = useWalletHiddenTokensPreference()
   const [buyAsset, setBuyAsset] = useState<WalletBuyAsset>("LUNC")
   const [buyModalOpen, setBuyModalOpen] = useState(false)
+  const accountAddress = account?.address
 
   const { assetRows, balances, isBalanceError, isBalanceLoading } =
-    useWalletAssets(account?.address)
+    useWalletAssets(accountAddress)
   const hiddenTokenSet = useMemo(() => new Set(hiddenTokens), [hiddenTokens])
   const { visibleCoinRows: filteredCoinRows, visibleTokenRows: filteredTokenRows } =
     useWalletAssetVisibility({
@@ -348,14 +349,14 @@ const Wallet = () => {
   }, [setHideLowBalance])
 
   const handleRetryBalances = useCallback(() => {
-    if (!account?.address) return
+    if (!accountAddress) return
     void queryClient.invalidateQueries({
-      queryKey: ["wallet", "balances", account.address]
+      queryKey: ["wallet", "balances", accountAddress]
     })
     void queryClient.invalidateQueries({
-      queryKey: ["cw20-balances", account.address]
+      queryKey: ["cw20-balances", accountAddress]
     })
-  }, [account?.address, queryClient])
+  }, [accountAddress, queryClient])
 
   const handleSendAsset = useCallback((asset: WalletAsset) => {
     openWalletPanel({
