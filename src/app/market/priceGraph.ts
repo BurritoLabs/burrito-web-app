@@ -82,6 +82,15 @@ export const deriveUsdPricesFromPools = ({
   })
 
   const maxPasses = Math.max(4, poolEdges.length * 2)
+  const shouldUseCandidate = (
+    current: PriceGraphEntry | undefined,
+    candidate: PriceGraphEntry
+  ) =>
+    Number.isFinite(candidate.price) &&
+    candidate.price > 0 &&
+    Number.isFinite(candidate.liquidity) &&
+    candidate.liquidity > 0 &&
+    (!current || candidate.liquidity > current.liquidity)
 
   for (let pass = 0; pass < maxPasses; pass += 1) {
     let updated = false
@@ -90,20 +99,28 @@ export const deriveUsdPricesFromPools = ({
       const leftResolved = resolved.get(leftKey)
       const rightResolved = resolved.get(rightKey)
 
-      if (leftResolved && !rightResolved) {
+      if (leftResolved) {
         const rightPrice = (leftUnits * leftResolved.price) / rightUnits
-        const liquidity = leftUnits * leftResolved.price * 2
-        if (Number.isFinite(rightPrice) && rightPrice > 0) {
-          resolved.set(rightKey, { price: rightPrice, liquidity })
+        const poolLiquidity = leftUnits * leftResolved.price * 2
+        const candidate = {
+          price: rightPrice,
+          liquidity: Math.min(leftResolved.liquidity, poolLiquidity)
+        }
+        if (shouldUseCandidate(rightResolved, candidate)) {
+          resolved.set(rightKey, candidate)
           updated = true
         }
       }
 
-      if (rightResolved && !leftResolved) {
+      if (rightResolved) {
         const leftPrice = (rightUnits * rightResolved.price) / leftUnits
-        const liquidity = rightUnits * rightResolved.price * 2
-        if (Number.isFinite(leftPrice) && leftPrice > 0) {
-          resolved.set(leftKey, { price: leftPrice, liquidity })
+        const poolLiquidity = rightUnits * rightResolved.price * 2
+        const candidate = {
+          price: leftPrice,
+          liquidity: Math.min(rightResolved.liquidity, poolLiquidity)
+        }
+        if (shouldUseCandidate(leftResolved, candidate)) {
+          resolved.set(leftKey, candidate)
           updated = true
         }
       }
