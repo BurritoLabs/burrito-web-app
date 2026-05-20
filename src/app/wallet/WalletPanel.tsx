@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import type { SVGProps } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletContext"
@@ -13,6 +12,12 @@ import ManageTokensModal from "./ManageTokensModal"
 import type { ManageTokenItem } from "./ManageTokensModal"
 import WalletBuyModal from "./WalletBuyModal"
 import WalletAssetIcon from "./WalletAssetIcon"
+import WalletPanelActions from "./WalletPanelActions"
+import {
+  WalletPanelAssetChains,
+  WalletPanelAssetList
+} from "./WalletPanelAssetList"
+import WalletPanelDetails from "./WalletPanelDetails"
 import { useWalletAssetVisibility } from "./useWalletAssetVisibility"
 import {
   WALLET_PANEL_NAVIGATION_EVENT,
@@ -25,215 +30,37 @@ import {
 } from "./useWalletVisibilityPreferences"
 import { useWalletAssets, type WalletAssetRow } from "./useWalletAssets"
 import {
-  formatPercent,
   formatTokenAmount,
   formatUsd,
   toUnitAmount
 } from "../utils/format"
 import { formatTxError } from "../utils/txError"
-
-type IconProps = SVGProps<SVGSVGElement>
-
-const WalletCloseIcon = (props: IconProps) => (
-  <svg viewBox="0 0 8 20" width="18" height="18" aria-hidden="true" {...props}>
-    <path
-      d="M1.99984 0L0.589844 2.35L5.16984 10L0.589844 17.65L1.99984 20L7.99984 10L1.99984 0Z"
-      fill="currentColor"
-    />
-  </svg>
-)
-
-const WalletCloseIconMobile = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
-    <path
-      d="M6 6l12 12M18 6L6 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const WalletIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" {...props}>
-    <path
-      d="M21 18v1c0 1.1-.9 2-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14c1.1 0 2 .9 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9Zm-9-2h10V8H12v8Zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z"
-      fill="currentColor"
-    />
-  </svg>
-)
-
-const BackIcon = (props: IconProps) => (
-  <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true" {...props}>
-    <path d="M11.7 3.6L6.3 9l5.4 5.4L10.5 15.6 3.9 9l6.6-6.6 1.2 1.2Z" />
-  </svg>
-)
-
-const SendIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...props}>
-    <path
-      d="M4 12h12M12 4l8 8-8 8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const ReceiveIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...props}>
-    <path
-      d="M20 12H8M12 20l-8-8 8-8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const ManageIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" {...props}>
-    <path
-      d="M4 7h10M4 12h16M4 17h8"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const BuyIcon = (props: IconProps) => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
-    <path
-      d="M12 5v14M5 12h14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const PriceUpIcon = (props: IconProps) => (
-  <svg viewBox="0 0 14 8" width="14" height="8" aria-hidden="true" {...props}>
-    <path
-      fillRule="evenodd"
-      clipRule="evenodd"
-      d="M8.60011 1.6C8.15828 1.6 7.80011 1.24183 7.80011 0.8C7.80011 0.358172 8.15828 0 8.60011 0H12.6001C13.0419 0 13.4001 0.358172 13.4001 0.8V4.8C13.4001 5.24183 13.0419 5.6 12.6001 5.6C12.1583 5.6 11.8001 5.24183 11.8001 4.8V2.73137L8.36579 6.16569C8.05337 6.47811 7.54684 6.47811 7.23442 6.16569L5.4001 4.33137L1.96578 7.76569C1.65336 8.0781 1.14683 8.0781 0.834412 7.76569C0.521993 7.45327 0.521993 6.94673 0.834412 6.63432L4.83442 2.63431C5.14684 2.3219 5.65337 2.3219 5.96579 2.63431L7.80011 4.46863L10.6687 1.6H8.60011Z"
-      fill="currentColor"
-    />
-  </svg>
-)
-
-const PriceDownIcon = (props: IconProps) => (
-  <svg viewBox="0 0 14 8" width="14" height="8" aria-hidden="true" {...props}>
-    <path
-      fillRule="evenodd"
-      clipRule="evenodd"
-      d="M8.60011 6.4C8.15828 6.4 7.80011 6.75817 7.80011 7.2C7.80011 7.64183 8.15828 8 8.60011 8H12.6001C13.0419 8 13.4001 7.64183 13.4001 7.2V3.2C13.4001 2.75817 13.0419 2.4 12.6001 2.4C12.1583 2.4 11.8001 2.75817 11.8001 3.2V5.26863L8.36579 1.83431C8.05337 1.52189 7.54684 1.52189 7.23442 1.83431L5.4001 3.66863L1.96578 0.234314C1.65336 -0.078105 1.14683 -0.078105 0.834412 0.234314C0.521993 0.546734 0.521993 1.05327 0.834412 1.36568L4.83442 5.36569C5.14684 5.6781 5.65337 5.6781 5.96579 5.36569L7.80011 3.53137L10.6687 6.4H8.60011Z"
-      fill="currentColor"
-    />
-  </svg>
-)
-
-type SelectedAsset = {
-  symbol: string
-  name: string
-  denom: string
-  decimals: number
-}
-
-type SendAsset = SelectedAsset & {
-  kind: WalletAssetRow["kind"]
-  amount: string
-}
-
-type RecentRecipientEntry = {
-  address: string
-  memoUsed: boolean
-  assetDenom: string
-  assetSymbol: string
-  lastUsedAt: number
-}
-
-const GAS_PRICE_MICRO_LUNC = 28.325
-const FALLBACK_SEND_GAS_NATIVE = 90_000
-const FALLBACK_SEND_GAS_CW20 = 140_000
-const RECENT_RECIPIENT_LIMIT = 4
-const DEFAULT_SEND_ASSET: SelectedAsset = {
-  symbol: "LUNC",
-  name: "Terra Classic",
-  denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-  decimals: CLASSIC_DENOMS.lunc.coinDecimals
-}
-const TERRA_ADDRESS_PATTERN = /^terra1[0-9a-z]{38}$/
-
-const encodeJsonBytes = (value: unknown) =>
-  new TextEncoder().encode(JSON.stringify(value))
-
-const sanitizeAmount = (value: string) => {
-  let next = value.replace(/,/g, "").replace(/[^\d.]/g, "")
-  const firstDot = next.indexOf(".")
-  if (firstDot >= 0) {
-    next = next.slice(0, firstDot + 1) + next.slice(firstDot + 1).replace(/\./g, "")
-  }
-  return next
-}
-
-const parseBigInt = (value?: string) => {
-  if (!value) return 0n
-  try {
-    return BigInt(value)
-  } catch {
-    return 0n
-  }
-}
-
-const toMicroAmount = (value: string, decimals = 6) => {
-  const cleaned = sanitizeAmount(value).trim()
-  if (!cleaned) return 0n
-  const [wholePartRaw, fracPartRaw = ""] = cleaned.split(".")
-  const wholePart = wholePartRaw || "0"
-  if (!/^\d+$/.test(wholePart) || (fracPartRaw && !/^\d+$/.test(fracPartRaw))) {
-    return 0n
-  }
-  const fracPart = fracPartRaw.slice(0, decimals).padEnd(decimals, "0")
-  const merged = `${wholePart}${fracPart}`.replace(/^0+/, "") || "0"
-  return parseBigInt(merged)
-}
-
-const fromMicroAmount = (value: bigint, decimals = 6) => {
-  if (value <= 0n) return "0"
-  if (decimals <= 0) return value.toString()
-  const base = 10n ** BigInt(decimals)
-  const whole = value / base
-  const fraction = (value % base).toString().padStart(decimals, "0").replace(/0+$/, "")
-  return fraction ? `${whole.toString()}.${fraction}` : whole.toString()
-}
-
-const toSelectedAsset = (
-  asset: Pick<WalletAssetRow, "denom" | "symbol" | "name" | "decimals">
-): SelectedAsset => ({
-  symbol: asset.symbol,
-  name: asset.name,
-  denom: asset.denom,
-  decimals: asset.decimals
-})
-
-const formatShortAddress = (value: string) => {
-  if (value.length <= 16) return value
-  return `${value.slice(0, 8)}...${value.slice(-6)}`
-}
-
-const getRecentRecipientsStorageKey = (address: string) =>
-  `burritoRecentRecipients:${address}:classic`
+import {
+  DEFAULT_SEND_ASSET,
+  FALLBACK_SEND_GAS_CW20,
+  FALLBACK_SEND_GAS_NATIVE,
+  GAS_PRICE_MICRO_LUNC,
+  RECENT_RECIPIENT_LIMIT,
+  TERRA_ADDRESS_PATTERN,
+  encodeJsonBytes,
+  formatShortAddress,
+  fromMicroAmount,
+  getRecentRecipientsStorageKey,
+  parseBigInt,
+  sanitizeAmount,
+  toMicroAmount,
+  toSelectedAsset,
+  type RecentRecipientEntry,
+  type SelectedAsset,
+  type SendAsset,
+  type WalletPanelView
+} from "./walletPanelUtils"
+import {
+  BackIcon,
+  WalletCloseIcon,
+  WalletCloseIconMobile,
+  WalletIcon
+} from "./WalletPanelIcons"
 
 const WalletPanel = () => {
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
@@ -242,9 +69,7 @@ const WalletPanel = () => {
     if (typeof window === "undefined") return false
     return window.localStorage.getItem("burritoWalletOpen") === "true"
   })
-  const [view, setView] = useState<"wallet" | "send" | "receive" | "asset">(
-    "wallet"
-  )
+  const [view, setView] = useState<WalletPanelView>("wallet")
   const [manageOpen, setManageOpen] = useState(false)
   const [manageSearch, setManageSearch] = useState("")
   const [hideNonWhitelisted, setHideNonWhitelisted] = useState(false)
@@ -1085,77 +910,6 @@ const WalletPanel = () => {
     setBuyModalOpen(true)
   }, [])
 
-  const renderDetails = () => {
-    if (view === "asset") {
-      return (
-        <div className={styles.details}>
-          <div className={styles.assetDetails}>
-            <div className={styles.assetBadgeLarge}>
-              <WalletAssetIcon
-                symbol={selectedSymbol}
-                candidates={selectedIconCandidates}
-              />
-            </div>
-            <div className={styles.assetDetailValue}>
-              {account ? formatUsd(selectedValue) : "--"}
-            </div>
-            <div className={styles.assetDetailAmount}>
-              {account ? `${selectedAmountDisplay} ${selectedSymbol}` : "--"}
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    if (view !== "wallet") return null
-
-    return (
-      <div className={styles.details}>
-        <div className={styles.networthHeader}>
-          <div>
-            <div className={styles.kicker}>Portfolio value</div>
-            <div className={styles.networthValue}>
-              {netWorthValue}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.networthActions}>
-          <div className={styles.actionItem}>
-            <button
-              className={`${styles.actionButton} ${styles.actionPrimary}`}
-              type="button"
-              onClick={() => openSendView(selectedAssetRow ?? selectedAsset)}
-            >
-              <SendIcon />
-            </button>
-            <span>Send</span>
-          </div>
-          <div className={styles.actionItem}>
-            <button
-              className={styles.actionButton}
-              type="button"
-              onClick={() => openReceiveView(selectedAssetRow ?? selectedAsset)}
-            >
-              <ReceiveIcon />
-            </button>
-            <span>Receive</span>
-          </div>
-          <div className={styles.actionItem}>
-            <button
-              className={styles.actionButton}
-              type="button"
-              onClick={handleOpenBuyModal}
-            >
-              <BuyIcon />
-            </button>
-            <span>Buy</span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const renderBody = () => {
     if (view === "send") {
       return (
@@ -1517,195 +1271,34 @@ const WalletPanel = () => {
 
     if (view === "asset") {
       return (
-        <div className={styles.assetList}>
-          <div className={styles.chainSectionContainer}>
-            <div className={styles.chainSection}>
-              <div className={styles.chainSectionTitle}>
-                <h3>Chains</h3>
-              </div>
-              <div className={styles.chainSectionList}>
-                {[
-                  {
-                    name: "columbus-5",
-                    value: account ? formatUsd(selectedValue) : "--",
-                    amount: account
-                      ? `${selectedAmountDisplay} ${selectedAsset.symbol}`
-                      : "--"
-                  }
-                ].map((row) => (
-                  <div key={row.name} className={styles.chainRowItem}>
-                    <div className={styles.chainRowHeader}>
-                      <span>{row.name}</span>
-                    </div>
-                    <div className={styles.chainRowValue}>{row.value}</div>
-                    <div className={styles.chainRowAmount}>{row.amount}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <WalletPanelAssetChains
+          accountConnected={Boolean(account)}
+          selectedAmountDisplay={selectedAmountDisplay}
+          selectedAsset={selectedAsset}
+          selectedValue={selectedValue}
+        />
       )
     }
 
     return (
-      <div className={styles.assetList}>
-        <div className={styles.assetHeader}>
-          <div className={styles.assetTitle}>Assets</div>
-          <button
-            className={styles.manageButton}
-            type="button"
-            onClick={() => setManageOpen(true)}
-          >
-            Manage
-            <ManageIcon />
-          </button>
-        </div>
-
-        <div className={styles.assetRows}>
-          {isBalanceLoading ? (
-            <div className={styles.assetEmpty}>Loading balances...</div>
-          ) : isBalanceError ? (
-            <div className={styles.assetEmpty}>
-              <span>Balance data unavailable.</span>
-              <button
-                className={styles.assetRetryButton}
-                type="button"
-                onClick={handleRetryBalances}
-              >
-                Retry balances
-              </button>
-            </div>
-          ) : filteredAssetRows.length === 0 ? (
-            <div className={styles.assetEmpty}>
-              {account ? "No assets found" : "Connect a wallet to view assets"}
-            </div>
-          ) : (
-            filteredAssetRows.map((asset) => {
-              const hasChange = asset.change !== undefined
-              const changeValue = asset.change ?? 0
-              return (
-                <div
-                  key={asset.denom}
-                  className={styles.assetRow}
-                  onClick={() => {
-                    setSelectedAsset({
-                      symbol: asset.symbol,
-                      name: asset.name,
-                      denom: asset.denom,
-                      decimals: asset.decimals
-                    })
-                    setView("asset")
-                  }}
-                >
-                  <div className={styles.assetInfo}>
-                    <div
-                      className={styles.assetBadge}
-                      data-chain={asset.chainCount > 1 ? "multi" : "single"}
-                    >
-                      <WalletAssetIcon
-                        symbol={asset.symbol}
-                        candidates={asset.iconCandidates ?? []}
-                      />
-                    </div>
-                    <div className={styles.assetRowDetails}>
-                      <div className={styles.assetTopRow}>
-                        <div className={styles.assetSymbol}>
-                          <span className={styles.assetSymbolName}>
-                            {asset.symbol}
-                          </span>
-                          {asset.chainCount > 1 ? (
-                            <span className={styles.chainCount}>
-                              {asset.chainCount}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className={styles.assetPrice}>
-                          {formatUsd(asset.value)}
-                        </div>
-                      </div>
-                      <div className={styles.assetBottomRow}>
-                        <div
-                          className={`${styles.assetChange} ${
-                            hasChange
-                              ? changeValue >= 0
-                                ? styles.assetChangeUp
-                                : styles.assetChangeDown
-                              : styles.assetChangeMuted
-                          }`}
-                        >
-                          {hasChange ? (
-                            changeValue >= 0 ? (
-                              <PriceUpIcon />
-                            ) : (
-                              <PriceDownIcon />
-                            )
-                          ) : null}
-                          {hasChange ? formatPercent(changeValue) : "--"}
-                        </div>
-                        <div className={styles.assetAmount}>
-                          {account
-                            ? `${formatTokenAmount(
-                                asset.amount,
-                                asset.decimals,
-                                2
-                              )}`
-                            : "--"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </div>
+      <WalletPanelAssetList
+        accountConnected={Boolean(account)}
+        assetRows={filteredAssetRows}
+        isBalanceError={isBalanceError}
+        isBalanceLoading={isBalanceLoading}
+        onAssetSelect={(asset) => {
+          setSelectedAsset({
+            symbol: asset.symbol,
+            name: asset.name,
+            denom: asset.denom,
+            decimals: asset.decimals
+          })
+          setView("asset")
+        }}
+        onManage={() => setManageOpen(true)}
+        onRetryBalances={handleRetryBalances}
+      />
     )
-  }
-
-  const renderActions = () => {
-    if (view === "send") {
-      return (
-        <div className={styles.actions}>
-          <button
-            className="uiButton uiButtonPrimary"
-            type="button"
-            onClick={handleSendSubmit}
-            disabled={!canSubmitSend}
-          >
-            {sendSubmitting ? "Sending..." : `Send ${sendAsset.symbol}`}
-          </button>
-          <div className={styles.actionHint}>
-            {sendSubmitDisabledReason ??
-              `Recipient receives ${sendRecipientReceivesSummaryDisplay}`}
-          </div>
-        </div>
-      )
-    }
-
-    if (view === "asset") {
-      return (
-        <div className={styles.actions}>
-          <button
-            className="uiButton uiButtonPrimary"
-            type="button"
-            onClick={() => openSendView(selectedAssetRow ?? selectedAsset)}
-          >
-            Send
-          </button>
-          <button
-            className="uiButton uiButtonOutline"
-            type="button"
-            onClick={() => openReceiveView(selectedAssetRow ?? selectedAsset)}
-          >
-            Receive
-          </button>
-        </div>
-      )
-    }
-
-    return null
   }
 
   return (
@@ -1739,9 +1332,34 @@ const WalletPanel = () => {
             <BackIcon className={styles.backIcon} />
           </button>
         ) : null}
-        {renderDetails()}
+        <WalletPanelDetails
+          view={view}
+          accountConnected={Boolean(account)}
+          netWorthValue={netWorthValue}
+          selectedSymbol={selectedSymbol}
+          selectedIconCandidates={selectedIconCandidates}
+          selectedValue={selectedValue}
+          selectedAmountDisplay={selectedAmountDisplay}
+          onSend={() => openSendView(selectedAssetRow ?? selectedAsset)}
+          onReceive={() => openReceiveView(selectedAssetRow ?? selectedAsset)}
+          onBuy={handleOpenBuyModal}
+        />
         {renderBody()}
-        {renderActions()}
+        <WalletPanelActions
+          view={view}
+          canSubmitSend={canSubmitSend}
+          sendSubmitting={sendSubmitting}
+          sendSymbol={sendAsset.symbol}
+          sendSubmitDisabledReason={sendSubmitDisabledReason}
+          sendRecipientReceivesSummaryDisplay={
+            sendRecipientReceivesSummaryDisplay
+          }
+          onSendSubmit={handleSendSubmit}
+          onAssetSend={() => openSendView(selectedAssetRow ?? selectedAsset)}
+          onAssetReceive={() =>
+            openReceiveView(selectedAssetRow ?? selectedAsset)
+          }
+        />
       </aside>
       <ManageTokensModal
         open={manageOpen}

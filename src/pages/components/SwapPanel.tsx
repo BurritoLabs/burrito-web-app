@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
 import { useQuery } from "@tanstack/react-query"
 import styles from "../Swap.module.css"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
@@ -31,6 +30,8 @@ import {
   SLIPPAGE_OPTIONS,
   SWAP_MEMO
 } from "../../app/config/swapConfig"
+import SwapAssetPickerModal from "./swap/SwapAssetPickerModal"
+import SwapAssetIcon from "./swap/SwapAssetIcon"
 
 type AssetType = "native" | "cw20"
 type DexId = string
@@ -469,84 +470,6 @@ const getAmountDensity = (value?: string) => {
   if (text.length >= 14 || digits >= 12) return "tiny" as const
   if (text.length >= 10 || digits >= 8) return "compact" as const
   return "default" as const
-}
-
-const AssetIcon = ({
-  symbol,
-  candidates,
-  size = 20
-}: {
-  symbol: string
-  candidates: string[]
-  size?: number
-}) => {
-  const candidateKey = `${symbol}:${candidates.join("|")}`
-  return <AssetIconInner key={candidateKey} symbol={symbol} candidates={candidates} size={size} />
-}
-
-const AssetIconInner = ({
-  symbol,
-  candidates,
-  size
-}: {
-  symbol: string
-  candidates: string[]
-  size: number
-}) => {
-  const [index, setIndex] = useState(0)
-  const [loaded, setLoaded] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const src = candidates[index]
-
-  const showFallback = failed || !src || !loaded
-  const fallback = (
-    <span
-      aria-hidden="true"
-      className={styles.assetIconFallback}
-      style={{ inset: 0, position: "absolute", width: "100%", height: "100%" }}
-    />
-  )
-
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        position: "relative",
-        display: "inline-flex",
-        flex: "0 0 auto"
-      }}
-    >
-      {showFallback ? fallback : null}
-      {!failed && src ? (
-        <img
-          src={src}
-          alt={symbol}
-          width={size}
-          height={size}
-          decoding="async"
-          style={{
-            inset: 0,
-            position: "absolute",
-            borderRadius: "50%",
-            objectFit: "cover",
-            display: "block",
-            opacity: loaded ? 1 : 0,
-            transition: "opacity 120ms ease"
-          }}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setLoaded(false)
-            if (index < candidates.length - 1) {
-              setIndex(index + 1)
-            } else {
-              setFailed(true)
-            }
-          }}
-        />
-      ) : null}
-    </span>
-  )
 }
 
 const SwapPanel = ({
@@ -1277,7 +1200,7 @@ const SwapPanel = ({
                     onClick={() => setPickerTarget("from")}
                   >
                     <span className={styles.assetPickerValue}>
-                      <AssetIcon
+                      <SwapAssetIcon
                         symbol={fromAsset.symbol}
                         candidates={fromAsset.iconCandidates}
                         size={22}
@@ -1378,7 +1301,7 @@ const SwapPanel = ({
                     onClick={() => setPickerTarget("to")}
                   >
                     <span className={styles.assetPickerValue}>
-                      <AssetIcon
+                      <SwapAssetIcon
                         symbol={toAsset.symbol}
                         candidates={toAsset.iconCandidates}
                         size={22}
@@ -1550,78 +1473,17 @@ const SwapPanel = ({
               </p>
             ) : null}
 
-            {pickerTarget && typeof document !== "undefined"
-              ? createPortal(
-                  <div
-                    className={styles.pickerBackdrop}
-                    role="dialog"
-                    aria-modal="true"
-                    onClick={closePicker}
-                  >
-                    <div className={styles.pickerModal} onClick={(event) => event.stopPropagation()}>
-                      <div className={styles.pickerHeader}>
-                        <h3>Select token</h3>
-                        <button type="button" onClick={closePicker} aria-label="Close">
-                          ×
-                        </button>
-                      </div>
-                      <div className={styles.pickerSearchRow}>
-                        <input
-                          type="text"
-                          value={pickerQuery}
-                          onChange={(event) => setPickerQuery(event.target.value)}
-                          placeholder="Search token or address"
-                          autoFocus
-                        />
-                      </div>
-                      <div className={styles.pickerList}>
-                        {pickerAssets.map((asset) => {
-                          const isSelected =
-                            (pickerTarget === "from" && asset.id === fromAsset.id) ||
-                            (pickerTarget === "to" && asset.id === toAsset.id)
-                          return (
-                            <button
-                              key={asset.id}
-                              type="button"
-                              className={`${styles.pickerItem} ${
-                                isSelected ? styles.pickerItemSelected : ""
-                              }`}
-                              onClick={() => handlePickAsset(asset.id)}
-                            >
-                              <div className={styles.pickerItemLeft}>
-                                <span className={styles.pickerItemIcon}>
-                                  <AssetIcon
-                                    symbol={asset.symbol}
-                                    candidates={asset.iconCandidates}
-                                    size={22}
-                                  />
-                                </span>
-                                <span className={styles.pickerItemText}>
-                                  <strong>{asset.symbol}</strong>
-                                  <small>
-                                    {asset.type === "native" ? "Native" : "CW20"} · Balance{" "}
-                                    {formatTokenAmount(
-                                      (assetBalanceMap.get(asset.id) ?? 0n).toString(),
-                                      asset.decimals,
-                                      6
-                                    )}{" "}
-                                    {asset.symbol}
-                                  </small>
-                                </span>
-                              </div>
-                              {isSelected ? <span className={styles.pickerCheck}>✓</span> : null}
-                            </button>
-                          )
-                        })}
-                        {!pickerAssets.length ? (
-                          <div className={styles.pickerEmpty}>No token found.</div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>,
-                  document.body
-                )
-              : null}
+            <SwapAssetPickerModal
+              assetBalanceMap={assetBalanceMap}
+              fromAssetId={fromAsset.id}
+              onClose={closePicker}
+              onPickAsset={handlePickAsset}
+              onQueryChange={setPickerQuery}
+              pickerAssets={pickerAssets}
+              pickerQuery={pickerQuery}
+              pickerTarget={pickerTarget}
+              toAssetId={toAsset.id}
+            />
 
             {!accountAddress ? (
               <button

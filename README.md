@@ -75,6 +75,7 @@ npm run build:market-all
 - Wallet signing is delegated to the connected wallet.
 - Launchpad contract addresses should be verified before enabling production LP lock and registry publishing.
 - Contract tools are advanced-user features and can execute arbitrary contract messages.
+- Production refactors should follow `docs/maintenance-boundaries.md`.
 
 ## Launchpad Configuration
 
@@ -82,6 +83,7 @@ Launchpad V1 documentation:
 
 - `docs/launchpad-v1.md`
 - `docs/launchpad-deploy.md`
+- `docs/maintenance-boundaries.md`
 
 Production launchpad registry and LP locker addresses are configured through:
 

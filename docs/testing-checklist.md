@@ -32,6 +32,7 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Load a quote for CW20 to CW20 if route exists.
 - Execute a small swap on desktop.
 - Execute a small swap from mobile Keplr.
+- Execute one route through each visible DEX route when liquidity exists.
 - Confirm slippage settings do not reset unexpectedly.
 - Confirm platform fee and route details are displayed consistently.
 
@@ -41,6 +42,7 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Redelegate between validators.
 - Undelegate a small amount.
 - Confirm fee estimate is high enough for each transaction.
+- Confirm Galaxy Station and Keplr both broadcast at least one staking transaction after fee changes.
 - Confirm mobile layout on manage stake.
 
 ## Withdrawals
@@ -67,6 +69,7 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Provide initial liquidity.
 - Lock LP tokens.
 - Publish to launchpad registry.
+- Send a small CW20 distribution batch from Manage.
 - Confirm the launch appears in Explore.
 - Confirm Manage shows the created launch.
 - Open market from Explore and confirm pair assets are correct.
@@ -82,7 +85,15 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open `/`, `/wallet`, `/market`, `/swap`, `/stake`, `/governance`, and `/launchpad`.
 - Confirm no horizontal overflow.
 - Confirm wallet drawer opens on first tap.
+- Confirm balance data appears without needing a manual refresh.
 - Confirm browser refresh works on nested routes.
+
+## Refactor Safety
+
+- Confirm no route names changed.
+- Confirm no localStorage key migration is required.
+- Confirm transaction messages were not changed unless intentionally tested.
+- Confirm `docs/production-refactor-notes.md` is updated for the batch.
 
 ## Cloudflare
 
