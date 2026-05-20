@@ -14,6 +14,8 @@ type Cw20BalanceOptions = {
 const CACHE_TTL = 30 * 60 * 1000
 const SUPPLY_CACHE_TTL = 15 * 60 * 1000
 const BALANCE_CACHE_VERSION = "v2"
+const SINGLE_BALANCE_CACHE_VERSION = "v1"
+const ACTIVE_BALANCE_CACHE_VERSION = "v1"
 const BALANCE_FETCH_ATTEMPTS = 2
 const BALANCE_FETCH_RETRY_DELAY_MS = 200
 const BALANCE_FETCH_CONCURRENCY = 8
@@ -44,6 +46,143 @@ const saveCache = (key: string, data: Record<string, string>) => {
     window.localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
   } catch {
     // Ignore storage failures in private browsing or low-storage mobile contexts.
+  }
+}
+
+type SingleBalanceCache = {
+  ts: number
+  balance: string
+}
+
+const normalizeAddress = (address: string | undefined) =>
+  address?.trim().toLowerCase() ?? ""
+
+const normalizeContract = (contract: string | undefined) =>
+  contract?.trim().toLowerCase() ?? ""
+
+const buildSingleBalanceCacheKey = (address: string, contract: string) =>
+  `cw20balance-single:${SINGLE_BALANCE_CACHE_VERSION}:${address
+    .trim()
+    .toLowerCase()}:classic:${contract.trim().toLowerCase()}`
+
+const loadSingleBalanceCache = (
+  address: string | undefined,
+  contract: string
+): SingleBalanceCache | undefined => {
+  if (!address || typeof window === "undefined") return undefined
+  try {
+    const cached = window.localStorage.getItem(
+      buildSingleBalanceCacheKey(address, contract)
+    )
+    if (!cached) return undefined
+    const parsed = JSON.parse(cached) as SingleBalanceCache
+    if (
+      typeof parsed.balance !== "string" ||
+      typeof parsed.ts !== "number" ||
+      Date.now() - parsed.ts > CACHE_TTL
+    ) {
+      return undefined
+    }
+    return parsed
+  } catch {
+    return undefined
+  }
+}
+
+const saveSingleBalanceCache = (
+  address: string | undefined,
+  contract: string,
+  balance: string | undefined
+) => {
+  if (!address || !contract || balance === undefined || typeof window === "undefined") {
+    return
+  }
+  try {
+    window.localStorage.setItem(
+      buildSingleBalanceCacheKey(address, contract),
+      JSON.stringify({ ts: Date.now(), balance })
+    )
+  } catch {
+    // Ignore storage failures; focused live balance fetching still works.
+  }
+}
+
+const buildActiveBalanceCacheKey = (address: string) =>
+  `cw20balance-active:${ACTIVE_BALANCE_CACHE_VERSION}:${address
+    .trim()
+    .toLowerCase()}:classic`
+
+const loadActiveBalanceContracts = (address: string | undefined) => {
+  const normalizedAddress = normalizeAddress(address)
+  if (!normalizedAddress || typeof window === "undefined") return []
+  try {
+    const cached = window.localStorage.getItem(
+      buildActiveBalanceCacheKey(normalizedAddress)
+    )
+    if (!cached) return []
+    const parsed = JSON.parse(cached) as { ts: number; contracts: string[] }
+    if (
+      typeof parsed.ts !== "number" ||
+      !Array.isArray(parsed.contracts) ||
+      Date.now() - parsed.ts > CACHE_TTL
+    ) {
+      return []
+    }
+    return parsed.contracts.map(normalizeContract).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+const saveActiveBalanceContracts = (
+  address: string | undefined,
+  balances: Record<string, string>
+) => {
+  const normalizedAddress = normalizeAddress(address)
+  if (!normalizedAddress || typeof window === "undefined") return
+  const active = new Set(loadActiveBalanceContracts(normalizedAddress))
+  Object.entries(balances).forEach(([contractRaw, balance]) => {
+    const contract = normalizeContract(contractRaw)
+    if (!contract) return
+    if (Number(balance) > 0) {
+      active.add(contract)
+      return
+    }
+    active.delete(contract)
+  })
+  const contracts = Array.from(active)
+  try {
+    window.localStorage.setItem(
+      buildActiveBalanceCacheKey(normalizedAddress),
+      JSON.stringify({ ts: Date.now(), contracts })
+    )
+  } catch {
+    // Ignore storage failures; the full whitelist scan remains the source of truth.
+  }
+}
+
+export const getCachedCw20ContractBalances = (
+  address: string | undefined,
+  contracts: string[]
+) => {
+  const entries = contracts
+    .map((contract) => contract.trim().toLowerCase())
+    .filter(Boolean)
+    .map((contract) => {
+      const cached = loadSingleBalanceCache(address, contract)
+      return cached ? ([contract, cached] as const) : undefined
+    })
+    .filter(
+      (entry): entry is readonly [string, SingleBalanceCache] => Boolean(entry)
+    )
+
+  if (!entries.length) return undefined
+
+  return {
+    data: Object.fromEntries(
+      entries.map(([contract, cached]) => [contract, cached.balance])
+    ) as Record<string, string>,
+    updatedAt: Math.min(...entries.map(([, cached]) => cached.ts))
   }
 }
 
@@ -125,14 +264,15 @@ export const fetchCw20Balances = async (
   whitelist: Record<string, Cw20Token>,
   options: Cw20BalanceOptions = {}
 ) => {
-  if (!address) return []
+  const normalizedAddress = normalizeAddress(address)
+  if (!normalizedAddress) return []
 
   const forceContracts = new Set(
     (options.forceContracts ?? [])
-      .map((contract) => contract.trim().toLowerCase())
+      .map(normalizeContract)
       .filter(Boolean)
   )
-  const cacheKey = buildBalanceCacheKey(address, whitelist)
+  const cacheKey = buildBalanceCacheKey(normalizedAddress, whitelist)
   const invalidKey = "cw20invalid:classic"
   const cached = loadCache(cacheKey)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
@@ -145,11 +285,18 @@ export const fetchCw20Balances = async (
   }
 
   const results: Record<string, string> = cached ? { ...cached } : {}
+  loadActiveBalanceContracts(normalizedAddress).forEach((contract) => {
+    if (!(contract in whitelist) || contract in results) return
+    const cachedSingle = loadSingleBalanceCache(normalizedAddress, contract)
+    if (cachedSingle) {
+      results[contract] = cachedSingle.balance
+    }
+  })
   const entries = Object.entries(whitelist).filter(([contract]) => {
     const normalized = contract.toLowerCase()
     if (forceContracts.has(normalized)) return true
     if (invalidContracts[normalized]) return false
-    return !(normalized in results)
+    return true
   })
   const limit = BALANCE_FETCH_CONCURRENCY
   let index = 0
@@ -160,7 +307,7 @@ export const fetchCw20Balances = async (
       index += 1
       const [contractRaw] = entries[current]
       const contract = contractRaw.toLowerCase()
-      const result = await fetchCw20BalanceResult(address, contract)
+      const result = await fetchCw20BalanceResult(normalizedAddress, contract)
       if (!result) continue
       if (result.invalid && !forceContracts.has(contract)) {
         invalidContracts[contract] = true
@@ -173,6 +320,10 @@ export const fetchCw20Balances = async (
 
   saveCache(cacheKey, results)
   saveCache(invalidKey, Object.fromEntries(Object.keys(invalidContracts).map((k) => [k, "1"])))
+  Object.entries(results).forEach(([contract, balance]) => {
+    saveSingleBalanceCache(normalizedAddress, contract, balance)
+  })
+  saveActiveBalanceContracts(normalizedAddress, results)
 
   return mapCw20BalanceResults(results, whitelist)
 }
@@ -182,11 +333,34 @@ export const getCachedCw20Balances = (
   whitelist: Record<string, Cw20Token>
 ) => {
   if (!address || !Object.keys(whitelist).length) return undefined
-  const payload = loadCachePayload(buildBalanceCacheKey(address, whitelist))
-  if (!payload) return undefined
+  const normalizedAddress = normalizeAddress(address)
+  if (!normalizedAddress) return undefined
+  const payload = loadCachePayload(buildBalanceCacheKey(normalizedAddress, whitelist))
+  const data: Record<string, string> = payload ? { ...payload.data } : {}
+
+  loadActiveBalanceContracts(normalizedAddress).forEach((contract) => {
+    if (!(contract in whitelist) || contract in data) return
+    const cachedSingle = loadSingleBalanceCache(normalizedAddress, contract)
+    if (cachedSingle) {
+      data[contract] = cachedSingle.balance
+    }
+  })
+
+  if (!payload && !Object.keys(data).length) {
+    Object.keys(whitelist).forEach((contractRaw) => {
+      const contract = normalizeContract(contractRaw)
+      if (!contract || contract in data) return
+      const cachedSingle = loadSingleBalanceCache(normalizedAddress, contract)
+      if (cachedSingle) {
+        data[contract] = cachedSingle.balance
+      }
+    })
+  }
+
+  if (!Object.keys(data).length) return undefined
   return {
-    data: mapCw20BalanceResults(payload.data, whitelist),
-    updatedAt: payload.ts
+    data: mapCw20BalanceResults(data, whitelist),
+    updatedAt: payload?.ts ?? Date.now() - 1
   }
 }
 
@@ -199,6 +373,10 @@ export const fetchCw20Balance = async (address: string, contract: string) => {
   if (!result) {
     throw new Error(`Failed to fetch CW20 balance for ${normalizedContract}`)
   }
+  saveSingleBalanceCache(normalizedAddress, normalizedContract, result.balance)
+  saveActiveBalanceContracts(normalizedAddress, {
+    [normalizedContract]: result.balance
+  })
   return result.balance
 }
 

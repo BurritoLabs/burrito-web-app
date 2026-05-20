@@ -2,9 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import styles from "../Swap.module.css"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
-import { fetchBalances, fetchPrices } from "../../app/data/classic"
+import {
+  cacheNativeBalances,
+  fetchBalances,
+  fetchPrices,
+  getCachedNativeBalances
+} from "../../app/data/classic"
 import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
-import { fetchCw20Balance, useCw20Balances } from "../../app/data/cw20"
+import {
+  fetchCw20Balance,
+  getCachedCw20ContractBalances,
+  useCw20Balances
+} from "../../app/data/cw20"
 import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
@@ -47,6 +56,8 @@ type SwapAsset = {
   contract?: string
   iconCandidates: string[]
 }
+
+const EMPTY_BALANCES: Array<{ denom: string; amount: string }> = []
 
 type SwapAssetOverride = {
   id: string
@@ -727,13 +738,25 @@ const SwapPanel = ({
     [amountInMicro, platformFeeMicro]
   )
 
-  const { data: balances = [] } = useQuery({
+  const cachedNativeBalances = useMemo(
+    () => getCachedNativeBalances(accountAddress),
+    [accountAddress]
+  )
+  const balancesQuery = useQuery({
     queryKey: ["swap-balances", accountAddress],
     queryFn: () => fetchBalances(accountAddress ?? ""),
     enabled: Boolean(accountAddress),
+    initialData: cachedNativeBalances?.data,
+    initialDataUpdatedAt: cachedNativeBalances?.updatedAt,
+    placeholderData: (previousData) => previousData,
     staleTime: 15_000,
     refetchInterval: 20_000
   })
+  const balances = balancesQuery.data ?? EMPTY_BALANCES
+
+  useEffect(() => {
+    cacheNativeBalances(accountAddress, balancesQuery.data)
+  }, [accountAddress, balancesQuery.data])
 
   const { data: prices } = useQuery({
     queryKey: ["prices"],
@@ -749,6 +772,10 @@ const SwapPanel = ({
     return Array.from(new Set(contracts))
   }, [fromAsset, toAsset])
 
+  const cachedFocusedCw20Balances = useMemo(
+    () => getCachedCw20ContractBalances(accountAddress, focusedCw20Contracts),
+    [accountAddress, focusedCw20Contracts]
+  )
   const { data: focusedCw20Balances = {} } = useQuery({
     queryKey: [
       "swap-focused-cw20-balances",
@@ -765,8 +792,11 @@ const SwapPanel = ({
       return Object.fromEntries(entries) as Record<string, string>
     },
     enabled: Boolean(accountAddress && focusedCw20Contracts.length),
-    staleTime: 0,
-    refetchOnMount: "always"
+    initialData: cachedFocusedCw20Balances?.data,
+    initialDataUpdatedAt: cachedFocusedCw20Balances?.updatedAt,
+    placeholderData: (previousData) => previousData,
+    staleTime: 15_000,
+    refetchOnMount: true
   })
 
   const assetBalanceMap = useMemo(() => {

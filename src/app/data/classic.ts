@@ -9,6 +9,51 @@ export type CoinBalance = {
   amount: string
 }
 
+const NATIVE_BALANCE_CACHE_TTL = 10 * 60 * 1000
+
+type NativeBalanceCache = {
+  data: CoinBalance[]
+  updatedAt: number
+}
+
+const getNativeBalanceCacheKey = (address: string) =>
+  `burrito:native-balances:classic:${address.trim().toLowerCase()}`
+
+export const getCachedNativeBalances = (
+  address: string | undefined
+): NativeBalanceCache | undefined => {
+  if (!address || typeof window === "undefined") return undefined
+  try {
+    const raw = window.localStorage.getItem(getNativeBalanceCacheKey(address))
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as NativeBalanceCache
+    if (!Array.isArray(parsed.data) || typeof parsed.updatedAt !== "number") {
+      return undefined
+    }
+    if (Date.now() - parsed.updatedAt > NATIVE_BALANCE_CACHE_TTL) {
+      return undefined
+    }
+    return parsed
+  } catch {
+    return undefined
+  }
+}
+
+export const cacheNativeBalances = (
+  address: string | undefined,
+  balances: CoinBalance[] | undefined
+) => {
+  if (!address || !balances || typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      getNativeBalanceCacheKey(address),
+      JSON.stringify({ data: balances, updatedAt: Date.now() })
+    )
+  } catch {
+    // Ignore storage failures; live balance fetching still works.
+  }
+}
+
 export type ValidatorItem = {
   operator_address: string
   description: { moniker: string; identity?: string }

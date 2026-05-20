@@ -1,4 +1,5 @@
 const DEFAULT_PLATFORM_FEE_BPS = 20n
+const MAX_PLATFORM_FEE_BPS = 100n
 const DEFAULT_PLATFORM_FEE_RECIPIENT =
   "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
 
@@ -6,7 +7,9 @@ const parseFeeBps = (value: string | undefined) => {
   const trimmed = value?.trim()
   if (!trimmed || !/^\d+$/.test(trimmed)) return DEFAULT_PLATFORM_FEE_BPS
   const parsed = BigInt(trimmed)
-  if (parsed < 0n || parsed > 10_000n) return DEFAULT_PLATFORM_FEE_BPS
+  if (parsed < 0n || parsed > MAX_PLATFORM_FEE_BPS) {
+    return DEFAULT_PLATFORM_FEE_BPS
+  }
   return parsed
 }
 
