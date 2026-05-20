@@ -148,10 +148,16 @@ const sortByValueDesc = (
 
 const normalizeWalletAssetKey = (assetKey: string) => {
   if (!assetKey) return assetKey
-  if (assetKey.startsWith("ibc/")) {
-    return `ibc/${assetKey.slice(4).toUpperCase()}`
+  const trimmed = assetKey.trim()
+  const raw = trimmed.startsWith("native:")
+    ? trimmed.slice("native:".length)
+    : trimmed.startsWith("cw20:")
+      ? trimmed.slice("cw20:".length)
+      : trimmed
+  if (raw.startsWith("ibc/")) {
+    return `ibc/${raw.slice(4).toUpperCase()}`
   }
-  return assetKey.toLowerCase()
+  return raw.toLowerCase()
 }
 
 const EMPTY_BALANCES: CoinBalance[] = []

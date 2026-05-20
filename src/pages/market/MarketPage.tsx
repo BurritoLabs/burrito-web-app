@@ -35,6 +35,7 @@ import {
   numberToPlainString,
   trimFractionByNonZeroDigits
 } from "../../app/utils/numberDisplay"
+import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
 
 type SortMetric = "change" | "volume" | "liquidity" | "marketCap"
 type SortDirection = "desc" | "asc"
@@ -421,17 +422,34 @@ const Market = () => {
     [cw20Whitelist, ibcWhitelist, nativeWhitelist]
   )
 
+  const poolGraphUsdPrices = useMemo(
+    () =>
+      deriveUsdPricesFromPools({
+        pools,
+        seedAssetIds: ["native:uluna", "native:uusd"],
+        getDecimals: (assetId) => resolveAsset(assetId).decimals,
+        getSeedUsdPrice: (_assetId, normalizedKey) => {
+          if (normalizedKey === "uluna") return prices?.lunc?.usd
+          if (normalizedKey === "uusd") return prices?.ustc?.usd
+          return undefined
+        }
+      }),
+    [pools, prices?.lunc?.usd, prices?.ustc?.usd, resolveAsset]
+  )
+
   const getAssetUsdPrice = useCallback(
     (asset: ResolvedAsset) => {
       if (asset.isLunc) return prices?.lunc?.usd
       if (asset.isUstc) return prices?.ustc?.usd
+      const graphUsdPrice = poolGraphUsdPrices[asset.key]
+      if (graphUsdPrice !== undefined) return graphUsdPrice
       const estimate = dexEstimatedPrices?.[asset.key]
       if (!estimate) return undefined
       const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : prices?.lunc?.usd
       if (quoteUsd === undefined) return undefined
       return estimate.priceInQuote * quoteUsd
     },
-    [dexEstimatedPrices, prices?.lunc?.usd, prices?.ustc?.usd]
+    [dexEstimatedPrices, poolGraphUsdPrices, prices?.lunc?.usd, prices?.ustc?.usd]
   )
 
   const getAssetChange = useCallback(

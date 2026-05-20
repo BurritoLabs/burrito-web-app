@@ -56,6 +56,7 @@ import {
   resolveChartEventTime,
   type Timeframe
 } from "../../app/market/pairChart"
+import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
 
 type MarketDetailLocationState = {
   fromMarket?: boolean
@@ -336,6 +337,37 @@ const MarketPairDetails = () => {
 
   const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
 
+  const poolGraphUsdPrices = useMemo(
+    () =>
+      deriveUsdPricesFromPools({
+        pools,
+        seedAssetIds: ["native:uluna", "native:uusd"],
+        getDecimals: (assetId) => {
+          if (assetId.startsWith("native:")) {
+            const denom = assetId.slice("native:".length)
+            if (denom.startsWith("ibc/")) {
+              return (
+                ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
+                cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
+                6
+              )
+            }
+            return nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6
+          }
+          if (assetId.startsWith("cw20:")) {
+            return cw20Whitelist[assetId.slice("cw20:".length).toLowerCase()]?.decimals ?? 6
+          }
+          return 6
+        },
+        getSeedUsdPrice: (_assetId, normalizedKey) => {
+          if (normalizedKey === "uluna") return prices?.lunc?.usd
+          if (normalizedKey === "uusd") return prices?.ustc?.usd
+          return undefined
+        }
+      }),
+    [cw20Whitelist, ibcWhitelist, nativeWhitelist, pools, prices?.lunc?.usd, prices?.ustc?.usd]
+  )
+
   const resolveAsset = (assetId: string): ResolvedAsset => {
     if (assetId.startsWith("native:")) {
       const denom = assetId.slice(7)
@@ -397,6 +429,8 @@ const MarketPairDetails = () => {
     const upperSymbol = asset.symbol.trim().toUpperCase()
     if (upperSymbol === "LUNC") return prices?.lunc?.usd
     if (upperSymbol === "USTC") return prices?.ustc?.usd
+    const graphUsdPrice = poolGraphUsdPrices[asset.key]
+    if (graphUsdPrice !== undefined) return graphUsdPrice
     const estimate = dexEstimatedPrices?.[asset.key]
     if (!estimate) return undefined
     const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : prices?.lunc?.usd
