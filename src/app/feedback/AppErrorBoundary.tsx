@@ -9,6 +9,13 @@ type AppErrorBoundaryState = {
   error: Error | null
 }
 
+const CHUNK_RELOAD_STORAGE_KEY = "burrito.chunkReloaded"
+
+const isChunkLoadError = (error: Error) =>
+  /dynamically imported module|importing a module script failed|loading chunk|chunkloaderror/i.test(
+    error.message
+  )
+
 class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
   AppErrorBoundaryState
@@ -24,6 +31,14 @@ class AppErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     if (import.meta.env.DEV) {
       console.error(error, errorInfo)
+    }
+
+    if (
+      isChunkLoadError(error) &&
+      window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) !== "1"
+    ) {
+      window.sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, "1")
+      window.location.reload()
     }
   }
 
