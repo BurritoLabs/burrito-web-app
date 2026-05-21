@@ -20,6 +20,10 @@ const passesLowBalanceFilter = (asset: WalletAssetRow) => {
     return asset.value >= LOW_BALANCE_USD_THRESHOLD
   }
 
+  if (asset.kind === "cw20") {
+    return false
+  }
+
   return toUnitAmount(asset.amount, asset.decimals) >= LOW_BALANCE_AMOUNT_THRESHOLD
 }
 

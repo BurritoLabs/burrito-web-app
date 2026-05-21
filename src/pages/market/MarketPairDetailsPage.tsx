@@ -555,7 +555,8 @@ const MarketPairDetails = () => {
         leftDecimals: detail!.left.decimals,
         rightDecimals: detail!.right.decimals,
         offset: 0,
-        limit: tradesLimit
+        limit: tradesLimit,
+        maxPages: 24
       }),
     enabled: Boolean(detail?.pool.pair),
     staleTime: 45_000,

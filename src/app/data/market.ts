@@ -175,11 +175,26 @@ let localMarketIndexInFlight:
     } | null>
   | null = null
 const LOCAL_CANDLES_CACHE_TTL = 5 * 60 * 1000
+const PAIR_TX_LCD_TIMEOUT_MS = 3_500
+const BINODES_PAIR_TRADES_TIMEOUT_MS = 1_800
+const BINODES_PAIR_TRADES_FAILURE_COOLDOWN_MS = 5 * 60 * 1000
 const localPairCandlesCache = new Map<
   string,
   { at: number; payload: LocalPairCandlePayload | null }
 >()
 const localPairCandlesInFlight = new Map<Promise<LocalPairCandlePayload | null>, string>()
+let binodesPairTradesUnavailableUntil = 0
+
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const timeoutId = globalThis.setTimeout(() => {
+      reject(new Error("Timed out waiting for pair trades"))
+    }, timeoutMs)
+
+    promise
+      .then(resolve, reject)
+      .finally(() => globalThis.clearTimeout(timeoutId))
+  })
 
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
 
@@ -1265,7 +1280,9 @@ export const fetchPairCandles = async ({
 
         let data: TxListResponse
         try {
-          const response = await fetchWithEndpointFallback(url)
+          const response = await fetchWithEndpointFallback(url, {
+            timeoutMs: PAIR_TX_LCD_TIMEOUT_MS
+          })
           if (!response.ok) break
           data = (await response.json()) as TxListResponse
         } catch {
@@ -1566,26 +1583,33 @@ export const fetchPairTrades = async ({
   const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
   const normalizedRightKey = normalizeAssetKey(rightAssetKey)
 
-  try {
-    const binodesTrades = await fetchPairTradesFromBinodes({
-      pairAddress,
-      leftKey: normalizedLeftKey,
-      rightKey: normalizedRightKey,
-      leftDecimals,
-      rightDecimals,
-      targetCount
-    })
+  if (Date.now() >= binodesPairTradesUnavailableUntil) {
+    try {
+      const binodesTrades = await withTimeout(
+        fetchPairTradesFromBinodes({
+          pairAddress,
+          leftKey: normalizedLeftKey,
+          rightKey: normalizedRightKey,
+          leftDecimals,
+          rightDecimals,
+          targetCount
+        }),
+        BINODES_PAIR_TRADES_TIMEOUT_MS
+      )
 
-    if (binodesTrades.length > 0) {
-      const start = Math.max(0, offset)
-      const end = start + Math.max(1, limit)
-      return {
-        trades: binodesTrades.slice(start, end),
-        hasMore: binodesTrades.length > end
+      if (binodesTrades.length > 0) {
+        const start = Math.max(0, offset)
+        const end = start + Math.max(1, limit)
+        return {
+          trades: binodesTrades.slice(start, end),
+          hasMore: binodesTrades.length > end
+        }
       }
+    } catch {
+      binodesPairTradesUnavailableUntil =
+        Date.now() + BINODES_PAIR_TRADES_FAILURE_COOLDOWN_MS
+      // Fall back to LCD event parsing if Binode is unavailable or blocked by the browser.
     }
-  } catch {
-    // Fall back to LCD event parsing if Binode is unavailable or blocked by the browser.
   }
 
   let bestTrades: PairTrade[] = []
@@ -1605,7 +1629,9 @@ export const fetchPairTrades = async ({
 
       let data: TxListResponse
       try {
-        const response = await fetchWithEndpointFallback(url)
+        const response = await fetchWithEndpointFallback(url, {
+          timeoutMs: PAIR_TX_LCD_TIMEOUT_MS
+        })
         if (!response.ok) break
         data = (await response.json()) as TxListResponse
       } catch {
