@@ -279,7 +279,7 @@ const parseSwapTicksFromTxResponse = ({
 
     const action = (getAttr("action") ?? "").toLowerCase()
     const offerAsset = getAttr("offer_asset") ?? ""
-    const askAsset = getAttr("ask_asset") ?? ""
+    const askAsset = getAttr("ask_asset") ?? getAttr("return_asset") ?? ""
     const offerAmountRaw = Number(getAttr("offer_amount") ?? NaN)
     const returnAmountRaw = Number(getAttr("return_amount") ?? NaN)
 
@@ -371,7 +371,7 @@ const parseSwapTradesFromTxResponse = ({
 
     const action = (getAttr("action") ?? "").toLowerCase()
     const offerAsset = getAttr("offer_asset") ?? ""
-    const askAsset = getAttr("ask_asset") ?? ""
+    const askAsset = getAttr("ask_asset") ?? getAttr("return_asset") ?? ""
     const offerAmountRaw = Number(getAttr("offer_amount") ?? NaN)
     const returnAmountRaw = Number(getAttr("return_amount") ?? NaN)
     const sender = (getAttr("sender") ?? fallbackSender).toLowerCase()

@@ -431,9 +431,15 @@ const settleList = async <T>(
   params?: Record<string, string>
 ) => {
   try {
-    return await fetchBinodesList<T>(path, params)
+    return {
+      failed: false,
+      items: await fetchBinodesList<T>(path, params)
+    }
   } catch {
-    return []
+    return {
+      failed: true,
+      items: []
+    }
   }
 }
 
@@ -476,11 +482,17 @@ export const fetchBinodesDashboardActivity = async (
     limit: String(limit),
     freq: frequency
   }
-  const [networkItems, burnsItems, feesItems] = await Promise.all([
+  const [networkResult, burnsResult, feesResult] = await Promise.all([
     settleList<BinodesNetworkOverview>("/v1/network/overview", params),
     settleList<BinodesBurnOverview>("/v1/burns/overview", params),
     settleList<BinodesFeesOverview>("/v1/fees/overview", params)
   ])
+  if ([networkResult, burnsResult, feesResult].every((result) => result.failed)) {
+    throw new Error("BiNodes dashboard activity unavailable")
+  }
+  const networkItems = networkResult.items
+  const burnsItems = burnsResult.items
+  const feesItems = feesResult.items
   const dexItems: BinodesDexOverview[] = []
   const ibcItems: BinodesIbcOverview[] = []
   const stakeItems: BinodesStakeOverview[] = []

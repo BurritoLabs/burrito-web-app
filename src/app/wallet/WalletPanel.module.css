@@ -1497,6 +1497,67 @@
   background: rgba(82, 196, 26, 0.22);
 }
 
+.assetLoadingRows {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px 30px;
+}
+
+.assetLoadingRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 10px;
+}
+
+.assetLoadingIcon,
+.assetLoadingText,
+.assetLoadingValue {
+  position: relative;
+  overflow: hidden;
+  background: rgba(234, 245, 235, 0.08);
+}
+
+.assetLoadingIcon::after,
+.assetLoadingText::after,
+.assetLoadingValue::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+  animation: walletLoadingShimmer 1.35s ease-in-out infinite;
+}
+
+.assetLoadingIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+}
+
+.assetLoadingText,
+.assetLoadingValue {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.assetLoadingText {
+  width: 58%;
+}
+
+.assetLoadingValue {
+  width: 100%;
+}
+
 .assetRow {
   display: flex;
   align-items: flex-start;
@@ -1506,6 +1567,12 @@
   transition: 300ms;
   cursor: pointer;
   position: relative;
+}
+
+@keyframes walletLoadingShimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .assetRow:hover {

@@ -195,3 +195,38 @@ export const recordTxDiagnostic = (event: TxDiagnosticEvent) => {
     // Diagnostics must never affect transaction execution.
   }
 }
+
+export const getStoredTxDiagnostics = () => {
+  if (typeof window === "undefined") return []
+
+  try {
+    const raw = window.localStorage.getItem(TX_DIAGNOSTICS_STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed)
+      ? (parsed as StoredTxDiagnosticEvent[]).slice(0, MAX_STORED_TX_DIAGNOSTICS)
+      : []
+  } catch {
+    return []
+  }
+}
+
+export const buildTxDiagnosticsReport = (limit = 8) => {
+  const events = getStoredTxDiagnostics().slice(0, limit)
+  const context =
+    typeof window === "undefined"
+      ? {}
+      : {
+          path: window.location.pathname,
+          userAgent: window.navigator.userAgent
+        }
+
+  return JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      context,
+      events
+    },
+    null,
+    2
+  )
+}

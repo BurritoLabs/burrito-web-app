@@ -221,6 +221,68 @@
   background: rgba(82, 196, 26, 0.22);
 }
 
+.assetLoadingRows {
+  display: grid;
+  gap: 10px;
+}
+
+.assetLoadingRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.035);
+  border: var(--border-width) solid rgba(255, 255, 255, 0.07);
+}
+
+.assetLoadingIcon,
+.assetLoadingText,
+.assetLoadingValue {
+  position: relative;
+  overflow: hidden;
+  background: rgba(234, 245, 235, 0.08);
+}
+
+.assetLoadingIcon::after,
+.assetLoadingText::after,
+.assetLoadingValue::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+  animation: walletLoadingShimmer 1.35s ease-in-out infinite;
+}
+
+.assetLoadingIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.assetLoadingText,
+.assetLoadingValue {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.assetLoadingText {
+  width: 48%;
+}
+
+.assetLoadingValue {
+  justify-self: end;
+  width: 76px;
+}
+
 .sideCard {
   display: grid;
   gap: 10px;
@@ -269,5 +331,11 @@
   .assetTopRow,
   .assetBottomRow {
     align-items: flex-start;
+  }
+}
+
+@keyframes walletLoadingShimmer {
+  to {
+    transform: translateX(100%);
   }
 }

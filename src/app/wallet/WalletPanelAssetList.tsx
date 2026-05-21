@@ -62,6 +62,18 @@ type WalletPanelAssetListProps = {
   onRetryBalances: () => void
 }
 
+const LoadingAssetRows = () => (
+  <div className={styles.assetLoadingRows} aria-label="Loading balances">
+    {[0, 1, 2, 3, 4].map((index) => (
+      <div key={index} className={styles.assetLoadingRow}>
+        <span className={styles.assetLoadingIcon} />
+        <span className={styles.assetLoadingText} />
+        <span className={styles.assetLoadingValue} />
+      </div>
+    ))}
+  </div>
+)
+
 export const WalletPanelAssetList = ({
   accountConnected,
   assetRows,
@@ -82,7 +94,7 @@ export const WalletPanelAssetList = ({
 
     <div className={styles.assetRows}>
       {isBalanceLoading ? (
-        <div className={styles.assetEmpty}>Loading balances...</div>
+        <LoadingAssetRows />
       ) : isBalanceError ? (
         <div className={styles.assetEmpty}>
           <span>Balance data unavailable.</span>

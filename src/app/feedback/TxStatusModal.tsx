@@ -1,13 +1,15 @@
 import { createPortal } from "react-dom"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import styles from "./TxStatusModal.module.css"
 import { useWallet } from "../wallet/WalletContext"
+import { buildTxDiagnosticsReport } from "../tx/txDiagnostics"
 
 const formatHash = (hash: string) =>
   `${hash.slice(0, 10)}...${hash.slice(-8)}`
 
 const TxStatusModal = () => {
   const { txState, clearTx } = useWallet()
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
 
   const status = txState.status
   const isPending = status === "pending"
@@ -21,6 +23,15 @@ const TxStatusModal = () => {
     if (isError) return "Transaction failed"
     return ""
   }, [isError, isPending, isSuccess])
+
+  const copyDiagnostics = async () => {
+    try {
+      await window.navigator.clipboard.writeText(buildTxDiagnosticsReport())
+      setCopyState("copied")
+    } catch {
+      setCopyState("failed")
+    }
+  }
 
   if (!visible || typeof document === "undefined") return null
 
@@ -98,6 +109,23 @@ const TxStatusModal = () => {
           >
             {formatHash(txState.hash)}
           </a>
+        ) : null}
+
+        {isError ? (
+          <div className={styles.diagnostics}>
+            <button
+              type="button"
+              className={styles.diagnosticsButton}
+              onClick={() => void copyDiagnostics()}
+            >
+              {copyState === "copied" ? "Diagnostics copied" : "Copy diagnostics"}
+            </button>
+            {copyState === "failed" ? (
+              <span className={styles.diagnosticsNote}>
+                Copy failed. Browser clipboard access is blocked.
+              </span>
+            ) : null}
+          </div>
         ) : null}
 
         {!isPending ? (

@@ -7,6 +7,18 @@ import styles from "../Wallet.module.css"
 
 type WalletAsset = WalletAssetRow
 
+const LoadingAssetRows = () => (
+  <div className={styles.assetLoadingRows} aria-label="Loading balances">
+    {[0, 1, 2].map((index) => (
+      <div key={index} className={styles.assetLoadingRow}>
+        <span className={styles.assetLoadingIcon} />
+        <span className={styles.assetLoadingText} />
+        <span className={styles.assetLoadingValue} />
+      </div>
+    ))}
+  </div>
+)
+
 const BuyIcon = () => (
   <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
     <circle
@@ -121,7 +133,7 @@ export const CoinsSection = memo(
           {!hasAccount ? (
             <div className={styles.emptyState}>Connect a wallet to view coins.</div>
           ) : isLoading ? (
-            <div className={styles.emptyState}>Loading balances...</div>
+            <LoadingAssetRows />
           ) : isError ? (
             <div className={styles.emptyState}>
               <span>Balance data unavailable.</span>
@@ -238,7 +250,7 @@ export const TokensSection = memo(
           {!hasAccount ? (
             <div className={styles.emptyState}>Connect a wallet to view tokens.</div>
           ) : isLoading ? (
-            <div className={styles.emptyState}>Loading balances...</div>
+            <LoadingAssetRows />
           ) : isError ? (
             <div className={styles.emptyState}>
               <span>Balance data unavailable.</span>

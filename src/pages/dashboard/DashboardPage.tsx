@@ -106,7 +106,8 @@ const Dashboard = () => {
     queryFn: () =>
       fetchBinodesDashboardActivity(activeRange.activityFrequency, 1),
     staleTime: activeRange.ttlMs,
-    refetchInterval: 10 * 60 * 1000
+    refetchInterval: 10 * 60 * 1000,
+    retry: 1
   })
 
   const activityTimestamp =

@@ -133,6 +133,35 @@
   text-decoration: underline;
 }
 
+.diagnostics {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  margin-top: 14px;
+}
+
+.diagnosticsButton {
+  border: 1px solid rgba(234, 245, 235, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(234, 245, 235, 0.78);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 13px;
+  cursor: pointer;
+}
+
+.diagnosticsButton:hover {
+  border-color: rgba(82, 196, 26, 0.55);
+  color: #52c41a;
+}
+
+.diagnosticsNote {
+  font-size: 11px;
+  color: rgba(255, 120, 117, 0.9);
+}
+
 .confirmButton {
   margin-top: 16px;
   width: 100%;
