@@ -13,6 +13,7 @@ import {
   type BinodesDexTxDetail
 } from "./binodes"
 import { queryContractSmart } from "./classic"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
 import { parseCommonJsArray } from "../utils/cjsRegistry"
 
@@ -988,7 +989,7 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
         url.searchParams.set("pagination.limit", "200")
         if (nextKey) url.searchParams.set("pagination.key", nextKey)
 
-        const response = await fetch(url.toString())
+        const response = await fetchWithEndpointFallback(url.toString())
         if (!response.ok) break
         const data = (await response.json()) as CodeContractsResponse
         ;(data.contracts ?? []).forEach((contract) => {
@@ -1264,7 +1265,7 @@ export const fetchPairCandles = async ({
 
         let data: TxListResponse
         try {
-          const response = await fetch(url)
+          const response = await fetchWithEndpointFallback(url)
           if (!response.ok) break
           data = (await response.json()) as TxListResponse
         } catch {
@@ -1604,7 +1605,7 @@ export const fetchPairTrades = async ({
 
       let data: TxListResponse
       try {
-        const response = await fetch(url)
+        const response = await fetchWithEndpointFallback(url)
         if (!response.ok) break
         data = (await response.json()) as TxListResponse
       } catch {

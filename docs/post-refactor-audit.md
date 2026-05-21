@@ -29,6 +29,7 @@ This audit did not change application code. The only file added during this audi
 ## Non-blocking Risks
 
 - The production refactor was large, so future work should stay limited to one feature area per commit.
+- Read-only chain data now uses LCD/FCD endpoint fallback for balances, market pool reads, token metadata, dashboard data, and swap quote simulation. Wallet signing and transaction broadcast paths were intentionally left unchanged.
 - `VITE_SWAP_PLATFORM_FEE_BPS` supports an env override. This has been hardened so missing, invalid, negative, or above-100 bps values fall back to the default 20 bps.
 - Build output still reports Vite warnings from third-party dependencies and large wallet/protobuf chunks. These are not build failures, but they explain some mobile loading cost.
 - Static checks cannot prove every wallet signing path. Real-device checks remain required for Keplr mobile, Galaxy Station, and desktop extensions.

@@ -1,4 +1,5 @@
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 
 export type DashboardSnapshot = {
   timestamp: number
@@ -43,7 +44,7 @@ const ORACLE_POOL_ADDRESS = "terra1jgp27m8fykex4e4jtt0l7ze8q528ux2lh4zh0f"
 const BURN_ADDRESS = "terra1sk06e3dyexuq4shw77y3dsv480xv42mq73anxu"
 
 const fetchJson = async <T>(url: string): Promise<T> => {
-  const response = await fetch(url)
+  const response = await fetchWithEndpointFallback(url)
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`)
   }

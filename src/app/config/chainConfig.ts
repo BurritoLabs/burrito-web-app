@@ -28,3 +28,17 @@ export const CLASSIC_GAS_PRICE_STEP = {
   average: 28.325,
   high: 50
 } as const
+
+export const CLASSIC_READ_ENDPOINTS_CONFIG = {
+  lcd: [
+    CLASSIC_CHAIN_CONFIG.lcd,
+    "https://lcd.terra-classic.hexxagon.io",
+    "https://api-lunc-lcd.binodes.com"
+  ],
+  rpc: [
+    CLASSIC_CHAIN_CONFIG.rpc,
+    "https://rpc.terra-classic.hexxagon.io",
+    "https://api-lunc-rpc.binodes.com"
+  ],
+  fcd: [CLASSIC_CHAIN_CONFIG.fcd, "https://terra-classic-fcd.publicnode.com"]
+} as const

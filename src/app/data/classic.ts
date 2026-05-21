@@ -3,6 +3,7 @@ import {
   COINPAPRIKA_LUNC_URL,
   COINPAPRIKA_USTC_URL
 } from "../config/externalServices"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 
 export type CoinBalance = {
   denom: string
@@ -335,7 +336,7 @@ export type FxRates = {
 }
 
 const fetchJson = async <T>(url: string): Promise<T> => {
-  const response = await fetch(url)
+  const response = await fetchWithEndpointFallback(url)
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`)
   }
@@ -343,7 +344,7 @@ const fetchJson = async <T>(url: string): Promise<T> => {
 }
 
 const postJson = async <T>(url: string, body: unknown): Promise<T> => {
-  const response = await fetch(url, {
+  const response = await fetchWithEndpointFallback(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -1558,7 +1559,7 @@ export const queryContractSmart = async <T = unknown>(
     `/cosmwasm/wasm/v1/contract/${address}/smart/${payload}`
   )
 
-  const response = await fetch(url)
+  const response = await fetchWithEndpointFallback(url)
   const text = await response.text()
   let parsed: unknown
   try {

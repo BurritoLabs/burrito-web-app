@@ -19,6 +19,7 @@ import { useCw20Supplies } from "../../app/data/cw20"
 import { fetchPrices } from "../../app/data/classic"
 import { fetchCirculatingSnapshot } from "../../app/data/dashboard"
 import { useDexEstimatedPrices } from "../../app/data/dexPrices"
+import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
 import { formatNumber, formatPercent, formatUsd, toUnitAmount } from "../../app/utils/format"
 import {
   buildClassicNativeIconCandidates,
@@ -170,7 +171,7 @@ const fetchNativeSupplies = async (
       try {
         const url = new URL(`${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/supply/by_denom`)
         url.searchParams.set("denom", denom)
-        const response = await fetch(url.toString())
+        const response = await fetchWithEndpointFallback(url.toString())
         if (!response.ok) continue
         const data = (await response.json()) as {
           amount?: { amount?: string }

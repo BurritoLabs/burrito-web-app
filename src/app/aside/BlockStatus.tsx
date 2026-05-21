@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
+import { fetchWithEndpointFallback } from "../data/endpointFallback"
 import styles from "./Aside.module.css"
 
 const fetchLatestHeight = async () => {
-  const response = await fetch(
+  const response = await fetchWithEndpointFallback(
     `${CLASSIC_CHAIN.lcd}/cosmos/base/tendermint/v1beta1/blocks/latest`
   )
   if (!response.ok) {

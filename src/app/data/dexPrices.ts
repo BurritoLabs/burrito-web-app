@@ -5,6 +5,7 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
 import { HEXXAGON_DEX_PAIRS_URL } from "../config/externalServices"
 import { parseCommonJsArray } from "../utils/cjsRegistry"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 
 const PAIR_INDEX_TTL = 60 * 60 * 1000
 const POOL_TTL = 2 * 60 * 1000
@@ -138,7 +139,7 @@ const fetchPairPool = async (pair: string) => {
     toBase64(toUtf8(JSON.stringify({ pool: {} })))
   )
   const url = `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${pair}/smart/${payload}`
-  const response = await fetch(url)
+  const response = await fetchWithEndpointFallback(url)
   if (!response.ok) return undefined
   const data = (await response.json()) as PoolResponse
   const assets = data?.data?.assets
@@ -183,7 +184,7 @@ const resolveDirectFactoryPair = async ({
   const url = `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${factory}/smart/${payload}`
 
   try {
-    const response = await fetch(url)
+    const response = await fetchWithEndpointFallback(url)
     if (!response.ok) {
       directFactoryPairCache.set(cacheKey, null)
       return undefined

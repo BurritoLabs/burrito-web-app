@@ -14,6 +14,7 @@ import {
   getCachedCw20ContractBalances,
   useCw20Balances
 } from "../../app/data/cw20"
+import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
 import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
@@ -257,7 +258,7 @@ const resolveFactoryPair = async (
 
   const payload = encodeSmartQueryPayload(query)
   const url = `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${dex.factory}/smart/${payload}`
-  const response = await fetch(url)
+  const response = await fetchWithEndpointFallback(url)
   if (!response.ok) {
     throw new Error(`pair lookup failed: ${response.status}`)
   }
@@ -296,7 +297,7 @@ const simulateSwapQuote = async (
 
   const payload = encodeSmartQueryPayload(query)
   const url = `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${pair}/smart/${payload}`
-  const response = await fetch(url)
+  const response = await fetchWithEndpointFallback(url)
   if (!response.ok) {
     throw new Error(`${dex.label} quote failed: ${response.status}`)
   }

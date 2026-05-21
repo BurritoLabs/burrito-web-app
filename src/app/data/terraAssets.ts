@@ -7,6 +7,7 @@ import {
   HEXXAGON_REGISTRY_URL
 } from "../config/externalServices"
 import { parseCommonJsArray } from "../utils/cjsRegistry"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 
 export type Cw20Token = {
   protocol?: string
@@ -391,7 +392,7 @@ const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> =
   const cached = getCachedIbcToken(hash)
   if (cached) return cached
 
-  const traceRes = await fetch(
+  const traceRes = await fetchWithEndpointFallback(
     `${CLASSIC_CHAIN.lcd}/ibc/apps/transfer/v1/denom_traces/${hash}`
   )
   if (!traceRes.ok) return undefined
@@ -401,7 +402,7 @@ const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> =
 
   let metadata: BankMetadataResponse["metadata"] | undefined
   try {
-    const metadataRes = await fetch(
+    const metadataRes = await fetchWithEndpointFallback(
       `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(
         baseDenom
       )}`
@@ -445,7 +446,7 @@ const fetchNativeMetadataToken = async (
   const cached = getCachedNativeToken(normalized)
   if (cached) return cached
 
-  const response = await fetch(
+  const response = await fetchWithEndpointFallback(
     `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
   )
   if (!response.ok) return undefined
@@ -568,7 +569,7 @@ export const fetchCw20TokenInfos = async (
       const contract = missing[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
-        const response = await fetch(
+        const response = await fetchWithEndpointFallback(
           `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
         )
         if (!response.ok) continue
@@ -580,7 +581,7 @@ export const fetchCw20TokenInfos = async (
         let icon: string | undefined
         try {
           const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
-          const marketingResponse = await fetch(
+          const marketingResponse = await fetchWithEndpointFallback(
             `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
           )
           if (marketingResponse.ok) {

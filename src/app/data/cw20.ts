@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import type { Cw20Token } from "./terraAssets"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 
 export type Cw20Balance = Cw20Token & {
   address: string
@@ -228,7 +229,7 @@ const fetchCw20BalanceResult = async (
 
   for (let attempt = 0; attempt < BALANCE_FETCH_ATTEMPTS; attempt += 1) {
     try {
-      const res = await fetch(
+      const res = await fetchWithEndpointFallback(
         `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
       )
 
@@ -464,7 +465,7 @@ export const fetchCw20Supplies = async (
       const contract = unique[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
-        const res = await fetch(
+        const res = await fetchWithEndpointFallback(
           `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
         )
         if (!res.ok) continue
