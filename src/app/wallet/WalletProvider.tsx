@@ -1,9 +1,10 @@
 import { useChain } from "@cosmos-kit/react"
 import type { ChainWalletBase } from "@cosmos-kit/core"
 import type { OfflineSigner } from "@cosmjs/proto-signing"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { CLASSIC_CHAIN } from "../chain"
+import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import {
   COSMOS_CONNECTOR_CONFIGS,
   COSMOS_KIT_CHAIN_NAME,
@@ -132,6 +133,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [account, setAccount] = useState<WalletAccount>()
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
+  const currentTxLabelRef = useRef<string | undefined>(undefined)
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const [pendingAutoConnectId] = useState<WalletConnectorId | undefined>(
     () => getStoredWalletConnectorId()
@@ -505,16 +507,42 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [connectorId, cosmosChain.walletRepo, desktopKeplrAvailable])
 
   const startTx = useCallback((label?: string) => {
+    currentTxLabelRef.current = label
+    recordTxDiagnostic({
+      phase: "start",
+      label,
+      connectorId,
+      accountAddress: account?.address
+    })
     setTxState({ status: "pending", label, startedAt: Date.now() })
-  }, [])
+  }, [account?.address, connectorId])
 
   const finishTx = useCallback((hash?: string) => {
+    recordTxDiagnostic({
+      phase: "success",
+      label: currentTxLabelRef.current,
+      connectorId,
+      accountAddress: account?.address,
+      txHash: hash
+    })
+    currentTxLabelRef.current = undefined
     setTxState({ status: "success", hash })
-  }, [])
+  }, [account?.address, connectorId])
 
   const failTx = useCallback((err?: string) => {
+    const classified = classifyTxError(err, "Transaction failed")
+    recordTxDiagnostic({
+      phase: "failure",
+      label: currentTxLabelRef.current,
+      connectorId,
+      accountAddress: account?.address,
+      category: classified.category,
+      message: classified.userMessage,
+      rawMessage: classified.rawMessage
+    })
+    currentTxLabelRef.current = undefined
     setTxState({ status: "error", error: err })
-  }, [])
+  }, [account?.address, connectorId])
 
   const clearTx = useCallback(() => {
     setTxState({ status: "idle" })

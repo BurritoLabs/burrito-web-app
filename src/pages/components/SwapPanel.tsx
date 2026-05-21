@@ -320,7 +320,7 @@ const simulateSwapQuote = async (
 }
 
 const usesMinReceiveExecute = (dexId: string, mode: DexQueryMode = "terraswap") =>
-  mode === "garuda" || dexId.startsWith("terraport")
+  mode === "garuda" || dexId === "terraport-v2" || dexId === "terraport-cpmm"
 
 const buildSwapMessage = async (
   sender: string,
