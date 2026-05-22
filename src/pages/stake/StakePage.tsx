@@ -44,31 +44,40 @@ const Stake = () => {
   const { data: delegations = [] } = useQuery({
     queryKey: ["delegations", account?.address],
     queryFn: () => fetchDelegations(account?.address ?? ""),
-    enabled: Boolean(account?.address)
+    enabled: Boolean(account?.address),
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData
   })
 
   const { data: rewards = [] } = useQuery({
     queryKey: ["rewards", account?.address],
     queryFn: () => fetchRewards(account?.address ?? ""),
-    enabled: Boolean(account?.address)
+    enabled: Boolean(account?.address),
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData
   })
 
   const { data: spendable = [] } = useQuery({
     queryKey: ["spendable-balances", account?.address],
     queryFn: () => fetchSpendableBalances(account?.address ?? ""),
-    enabled: Boolean(account?.address)
+    enabled: Boolean(account?.address),
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData
   })
 
   const { data: unbonding = [] } = useQuery({
     queryKey: ["unbonding", account?.address],
     queryFn: () => fetchUnbonding(account?.address ?? ""),
-    enabled: Boolean(account?.address)
+    enabled: Boolean(account?.address),
+    staleTime: 60_000,
+    placeholderData: (previousData) => previousData
   })
 
   const { data: validators = [] } = useQuery({
     queryKey: ["validators"],
     queryFn: fetchValidators,
-    staleTime: 60_000
+    staleTime: 10 * 60_000,
+    placeholderData: (previousData) => previousData
   })
 
 
@@ -141,12 +150,10 @@ const Stake = () => {
         const tokensB = toBigIntOrZero(b.tokens)
         return tokensA === tokensB ? 0 : tokensA > tokensB ? -1 : 1
       })
-      .slice(0, 36)
+      .slice(0, 24)
     topByVotingPower.forEach((validator) =>
       addIdentity(validator.description?.identity)
     )
-
-    validators.forEach((validator) => addIdentity(validator.description?.identity))
 
     return result
   }, [validatorDelegations, validators])

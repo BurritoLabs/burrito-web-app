@@ -6,7 +6,11 @@ import {
 } from "./panelNavigation"
 import { isLikelyMobileBrowser } from "./walletPlatform"
 
-const WalletPanel = lazy(() => import("./WalletPanel"))
+const loadWalletPanel = () => import("./WalletPanel")
+const loadWalletAssetWarmup = () => import("./WalletAssetWarmup")
+
+const WalletPanel = lazy(loadWalletPanel)
+const WalletAssetWarmup = lazy(loadWalletAssetWarmup)
 
 type IconProps = SVGProps<SVGSVGElement>
 
@@ -22,16 +26,21 @@ const WalletIcon = (props: IconProps) => (
 type WalletPanelHandleProps = {
   loading?: boolean
   onOpen?: () => void
+  onPrepare?: () => void
 }
 
 const WalletPanelHandle = ({
   loading = false,
-  onOpen
+  onOpen,
+  onPrepare
 }: WalletPanelHandleProps) => (
   <aside className={`${styles.wallet} ${styles.closed}`} aria-hidden="true">
     <button
       className={styles.close}
       onClick={onOpen}
+      onFocus={onPrepare}
+      onPointerDown={onPrepare}
+      onPointerEnter={onPrepare}
       aria-label={loading ? "Loading wallet" : "Open wallet"}
       disabled={loading || !onOpen}
       type="button"
@@ -42,6 +51,58 @@ const WalletPanelHandle = ({
   </aside>
 )
 
+const LoadingAssetRows = () => (
+  <div className={styles.assetLoadingRows} aria-label="Loading wallet assets">
+    {[0, 1, 2, 3, 4].map((index) => (
+      <div key={index} className={styles.assetLoadingRow}>
+        <span className={styles.assetLoadingIcon} />
+        <span className={styles.assetLoadingText} />
+        <span className={styles.assetLoadingValue} />
+      </div>
+    ))}
+  </div>
+)
+
+const WalletPanelLoadingShell = () => (
+  <aside className={styles.wallet} aria-label="Loading wallet">
+    <button className={styles.close} aria-label="Loading wallet" disabled type="button">
+      <span>Wallet</span>
+      <WalletIcon className={styles.walletIcon} />
+    </button>
+    <div className={styles.details}>
+      <div className={styles.networthHeader}>
+        <span className={styles.kicker}>Portfolio value</span>
+        <span className={styles.networthValue}>--</span>
+        <span className={styles.viewMeta}>Loading wallet assets...</span>
+      </div>
+    </div>
+    <div className={styles.assetList}>
+      <div className={styles.assetHeader}>
+        <div className={styles.assetTitle}>Assets</div>
+      </div>
+      <div className={styles.assetRows}>
+        <LoadingAssetRows />
+      </div>
+    </div>
+  </aside>
+)
+
+const scheduleIdleTask = (task: () => void) => {
+  if (typeof window === "undefined") return undefined
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
+    cancelIdleCallback?: (handle: number) => void
+  }
+
+  if (idleWindow.requestIdleCallback) {
+    const handle = idleWindow.requestIdleCallback(task, { timeout: 1500 })
+    return () => idleWindow.cancelIdleCallback?.(handle)
+  }
+
+  const timer = window.setTimeout(task, 600)
+  return () => window.clearTimeout(timer)
+}
+
 const DeferredWalletPanel = () => {
   const [requested, setRequested] = useState(() => {
     if (typeof window === "undefined") return false
@@ -50,13 +111,28 @@ const DeferredWalletPanel = () => {
       !isLikelyMobileBrowser()
     )
   })
+  const [warmupRequested, setWarmupRequested] = useState(false)
   const pendingDetailRef = useRef<WalletPanelNavigationDetail | null>(null)
+
+  const prepareWalletPanel = () => {
+    void loadWalletPanel()
+  }
+
+  useEffect(() => {
+    const cancel = scheduleIdleTask(() => {
+      void loadWalletPanel()
+      void loadWalletAssetWarmup()
+      setWarmupRequested(true)
+    })
+    return cancel
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
     const handleNavigation = (event: Event) => {
       const detail = (event as CustomEvent<WalletPanelNavigationDetail>).detail
+      void loadWalletPanel()
       pendingDetailRef.current = detail ?? { view: "wallet" }
       window.localStorage.setItem("burritoWalletOpen", "true")
       setRequested(true)
@@ -93,6 +169,7 @@ const DeferredWalletPanel = () => {
   }, [requested])
 
   const handleOpen = () => {
+    prepareWalletPanel()
     pendingDetailRef.current = { view: "wallet" }
     if (typeof window !== "undefined") {
       window.localStorage.setItem("burritoWalletOpen", "true")
@@ -101,13 +178,29 @@ const DeferredWalletPanel = () => {
   }
 
   if (!requested) {
-    return <WalletPanelHandle onOpen={handleOpen} />
+    return (
+      <>
+        {warmupRequested ? (
+          <Suspense fallback={null}>
+            <WalletAssetWarmup />
+          </Suspense>
+        ) : null}
+        <WalletPanelHandle onOpen={handleOpen} onPrepare={prepareWalletPanel} />
+      </>
+    )
   }
 
   return (
-    <Suspense fallback={<WalletPanelHandle loading />}>
-      <WalletPanel />
-    </Suspense>
+    <>
+      {warmupRequested ? (
+        <Suspense fallback={null}>
+          <WalletAssetWarmup />
+        </Suspense>
+      ) : null}
+      <Suspense fallback={<WalletPanelLoadingShell />}>
+        <WalletPanel />
+      </Suspense>
+    </>
   )
 }
 

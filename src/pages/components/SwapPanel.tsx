@@ -629,9 +629,10 @@ const SwapPanel = ({
     return [...NATIVE_ASSETS.map(applyOverride), ...cw20Rows]
   }, [assetOverrideMap, swapCw20Whitelist, tradableCw20Set])
 
+  const shouldLoadPickerBalances = Boolean(pickerTarget)
   const { data: cw20Balances = [] } = useCw20Balances(
     accountAddress,
-    swapCw20Whitelist,
+    shouldLoadPickerBalances ? swapCw20Whitelist : undefined,
     { forceContracts: overrideCw20Contracts }
   )
 
@@ -796,8 +797,8 @@ const SwapPanel = ({
     initialData: cachedFocusedCw20Balances?.data,
     initialDataUpdatedAt: cachedFocusedCw20Balances?.updatedAt,
     placeholderData: (previousData) => previousData,
-    staleTime: 15_000,
-    refetchOnMount: true
+    staleTime: 60_000,
+    refetchOnMount: false
   })
 
   const assetBalanceMap = useMemo(() => {

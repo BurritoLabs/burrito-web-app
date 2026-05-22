@@ -74,6 +74,12 @@ type MarketDetailLocationState = {
 }
 
 const LAUNCHPAD_EXPLORE_PATH = "/launchpad?tab=explore"
+const DETAIL_TRADES_MAX_PAGES = 8
+const DETAIL_CANDLE_TX_MAX_PAGES: Record<Timeframe, number> = {
+  "1h": 6,
+  "24h": 8,
+  "7d": 12
+}
 
 type ResolvedAsset = {
   id: string
@@ -556,7 +562,7 @@ const MarketPairDetails = () => {
         rightDecimals: detail!.right.decimals,
         offset: 0,
         limit: tradesLimit,
-        maxPages: 24
+        maxPages: DETAIL_TRADES_MAX_PAGES
       }),
     enabled: Boolean(detail?.pool.pair),
     staleTime: 45_000,
@@ -588,6 +594,7 @@ const MarketPairDetails = () => {
         bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
         lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
         maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        maxPages: DETAIL_CANDLE_TX_MAX_PAGES[timeframe],
         minCandles: MIN_CANDLES_FOR_CHART[timeframe],
         includeLocalFallback: true
       }),

@@ -1,4 +1,4 @@
-export const KEYBASE_FETCH_CONCURRENCY = 10
+export const KEYBASE_FETCH_CONCURRENCY = 4
 export const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
 
 const KEYBASE_CACHE_STORAGE_KEY = "burrito:keybase-pictures:v1"

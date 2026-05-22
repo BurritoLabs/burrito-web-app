@@ -3,13 +3,19 @@
   inset: 0;
   background: rgba(6, 10, 8, 0.6);
   backdrop-filter: blur(6px);
-  display: grid;
-  place-items: center;
-  z-index: 60;
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 1400;
 }
 
 .modal {
   width: min(520px, 92vw);
+  max-height: calc(100dvh - 36px);
   background: rgba(12, 20, 17, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
@@ -17,6 +23,14 @@
   padding: 18px 18px 20px;
   display: grid;
   gap: 16px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.modal::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .header {
@@ -293,4 +307,36 @@
 .submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .backdrop {
+    align-items: flex-end;
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .modal {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    border-radius: 18px 18px 14px 14px;
+    padding: 16px;
+  }
+
+  .tabs {
+    gap: 6px;
+  }
+
+  .tabButton {
+    height: 34px;
+    font-size: 11px;
+  }
+
+  .amountRow {
+    align-items: stretch;
+  }
+
+  .amountDenom {
+    height: 36px;
+  }
 }

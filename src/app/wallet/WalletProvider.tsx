@@ -33,6 +33,7 @@ import {
   getStoredWalletConnectorId
 } from "./walletMeta"
 const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
+const MOBILE_ACCOUNT_HYDRATION_DELAYS_MS = [250, 1000, 2500, 5000] as const
 
 const connectMobileWallet = async (wallet: ChainWalletBase) => {
   const attemptConnect = async (resetPairings: boolean) => {
@@ -726,6 +727,55 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     effectivePendingAutoConnectId,
     pendingAutoConnectAvailable,
     supportsMobileWallets
+  ])
+
+  useEffect(() => {
+    if (!connectorId || !isCosmosConnectorId(connectorId)) return
+    if (connectorId === "keplr" && desktopKeplrAvailable) return
+    if (account?.address || status === "connected") return
+
+    let cancelled = false
+    const wallet = getCosmosWallet(connectorId, { preferConnected: true }) ?? getCosmosWallet(connectorId)
+    if (!wallet) return
+
+    const tryHydrate = async () => {
+      try {
+        if (!wallet.address) {
+          await wallet.update({ connect: false })
+        }
+        await waitForWalletAddress(wallet, 4, 150)
+        if (cancelled || !wallet.address) return
+
+        const nextAccount = buildWalletAccount(wallet)
+        if (!nextAccount) return
+        setAccount(nextAccount)
+        setStatus("connected")
+        setError(undefined)
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, connectorId)
+        }
+      } catch {
+        // Mobile WalletConnect sessions can hydrate after focus returns; keep
+        // the explicit connect button available if silent hydration fails.
+      }
+    }
+
+    const timers = MOBILE_ACCOUNT_HYDRATION_DELAYS_MS.map((delay) =>
+      window.setTimeout(() => {
+        void tryHydrate()
+      }, delay)
+    )
+
+    return () => {
+      cancelled = true
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [
+    account?.address,
+    connectorId,
+    desktopKeplrAvailable,
+    getCosmosWallet,
+    status
   ])
 
   const value = useMemo<WalletContextValue>(

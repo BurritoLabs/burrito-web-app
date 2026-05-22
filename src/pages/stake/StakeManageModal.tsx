@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useWallet } from "../../app/wallet/WalletContext"
 import styles from "../StakeManageModal.module.css"
 import { CLASSIC_DENOMS } from "../../app/chain"
@@ -57,6 +58,15 @@ const StakeManageModal = ({
     setSource(active?.validator ?? delegations[0]?.validator ?? "")
     setSubmitError(undefined)
   }, [open, active, delegations])
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open])
 
   const activeValidator = useMemo(() => {
     if (!active) return undefined
@@ -327,10 +337,15 @@ const StakeManageModal = ({
     }
   }
 
-  if (!open) return null
+  if (!open || typeof document === "undefined") return null
 
-  return (
-    <div className={styles.backdrop} onClick={onClose} role="dialog">
+  return createPortal(
+    <div
+      className={styles.backdrop}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
           <div className={styles.title}>Manage stake</div>
@@ -506,7 +521,8 @@ const StakeManageModal = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
