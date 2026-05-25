@@ -42,6 +42,13 @@ const LOCAL_CW20_TOKEN_OVERRIDES: Record<string, Partial<Cw20Token>> = {
     name: "DO",
     protocol: "DO",
     icon: "/system/do-cookie.jpg"
+  },
+  terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms: {
+    symbol: "WESO",
+    name: "WESO Token",
+    protocol: "WESO World",
+    icon: "https://i.ibb.co/7kxsP0f/weso-256.png",
+    decimals: 6
   }
 }
 
@@ -628,7 +635,11 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
   const base = useMemo(() => {
     const tokens = tokenQuery.data ?? {}
     const contractMeta = contractsQuery.data ?? {}
-    const addresses = new Set([...Object.keys(tokens), ...Object.keys(contractMeta)])
+    const addresses = new Set([
+      ...Object.keys(tokens),
+      ...Object.keys(contractMeta),
+      ...Object.keys(LOCAL_CW20_TOKEN_OVERRIDES)
+    ])
 
     return Object.fromEntries(
       Array.from(addresses).map((address) => {
