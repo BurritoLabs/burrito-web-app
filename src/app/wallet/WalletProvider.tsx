@@ -30,12 +30,12 @@ import {
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import {
   forgetStoredWalletConnectorId,
-  rememberWalletConnectorId,
-  getStoredWalletConnectorId
+  getStoredWalletConnectorId,
+  rememberWalletConnectorId
 } from "./walletMeta"
 const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
 const MOBILE_ACCOUNT_HYDRATION_DELAYS_MS = [250, 1000, 2500, 5000] as const
-const MOBILE_AUTO_RECONNECT_RETRY_COOLDOWN_MS = 15_000
+const AUTO_RECONNECT_RETRY_COOLDOWN_MS = 15_000
 
 const connectMobileWallet = async (wallet: ChainWalletBase) => {
   const attemptConnect = async (resetPairings: boolean) => {
@@ -138,24 +138,27 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const currentTxLabelRef = useRef<string | undefined>(undefined)
   const accountAddressRef = useRef<string | undefined>(undefined)
+  const connectorIdRef = useRef<WalletConnectorId | undefined>(undefined)
   const walletStatusRef = useRef<WalletStatus>("disconnected")
   const lastAutoConnectRetryAtRef = useRef(0)
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
-  const [pendingAutoConnectId] = useState<WalletConnectorId | undefined>(
+  const [storedAutoConnectId, setStoredAutoConnectId] = useState<
+    WalletConnectorId | undefined
+  >(
     () => getStoredWalletConnectorId()
   )
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(
-    () => !pendingAutoConnectId
+    () => !storedAutoConnectId
   )
 
   const supportsMobileWallets = useMemo(() => isTouchWalletCapableBrowser(), [])
   const currentCosmosWalletName = cosmosChain.walletRepo.current?.walletName
   const currentCosmosWallet = cosmosChain.walletRepo.current
   const desktopKeplrAvailable = hasDesktopKeplrProvider()
-  const effectivePendingAutoConnectId =
-    pendingAutoConnectId === "keplr-mobile" && desktopKeplrAvailable
+  const effectiveAutoConnectId =
+    storedAutoConnectId === "keplr-mobile" && desktopKeplrAvailable
       ? "keplr"
-      : pendingAutoConnectId
+      : storedAutoConnectId
   const activeCosmosConnectorId = currentCosmosWalletName
     ? COSMOS_WALLET_NAME_TO_CONNECTOR_ID[currentCosmosWalletName]
     : undefined
@@ -166,8 +169,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     accountAddressRef.current = account?.address
+    connectorIdRef.current = connectorId
     walletStatusRef.current = status
-  }, [account?.address, status])
+  }, [account?.address, connectorId, status])
 
   const getCosmosWallet = useCallback(
     (
@@ -478,6 +482,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
               : await connectWalletConnector(id)
         setConnectorId(id)
         rememberWalletConnectorId(id)
+        setStoredAutoConnectId(id)
         if (nextAccount) {
           setAccount(nextAccount)
           setStatus("connected")
@@ -495,6 +500,40 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     [connectCosmosConnector, desktopKeplrAvailable]
   )
 
+  useEffect(() => {
+    const requestDesktopWalletReconnect = (id: WalletConnectorId) => {
+      const storedConnectorId = getStoredWalletConnectorId()
+      const activeConnectorId = connectorIdRef.current
+      if (storedConnectorId !== id && activeConnectorId !== id) return
+
+      setStoredAutoConnectId(id)
+      setAccount(undefined)
+      setError(undefined)
+      setStatus("disconnected")
+      setAutoConnectAttempted(false)
+      refreshConnectors()
+    }
+
+    const handleKeplrChange = () => requestDesktopWalletReconnect("keplr")
+    const handleGalaxyChange = () => requestDesktopWalletReconnect("galaxy")
+
+    window.addEventListener("keplr_keystorechange", handleKeplrChange)
+    window.addEventListener("galaxy_station_wallet_change", handleGalaxyChange)
+    window.addEventListener("galaxy_station_network_change", handleGalaxyChange)
+
+    return () => {
+      window.removeEventListener("keplr_keystorechange", handleKeplrChange)
+      window.removeEventListener(
+        "galaxy_station_wallet_change",
+        handleGalaxyChange
+      )
+      window.removeEventListener(
+        "galaxy_station_network_change",
+        handleGalaxyChange
+      )
+    }
+  }, [refreshConnectors])
+
   const disconnect = useCallback(async () => {
     if (
       connectorId &&
@@ -511,6 +550,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     setError(undefined)
     setStatus("disconnected")
     forgetStoredWalletConnectorId()
+    setStoredAutoConnectId(undefined)
   }, [connectorId, cosmosChain.walletRepo, desktopKeplrAvailable])
 
   const startTx = useCallback((label?: string) => {
@@ -589,12 +629,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       const now = Date.now()
       if (
         now - lastAutoConnectRetryAtRef.current <
-        MOBILE_AUTO_RECONNECT_RETRY_COOLDOWN_MS
+        AUTO_RECONNECT_RETRY_COOLDOWN_MS
       ) {
         return
       }
 
       lastAutoConnectRetryAtRef.current = now
+      setStoredAutoConnectId(storedConnectorId)
       setAutoConnectAttempted(false)
     }
     const handleFocus = () => {
@@ -678,6 +719,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       setStatus("connected")
       setError(undefined)
       rememberWalletConnectorId(activeCosmosConnectorId)
+      setStoredAutoConnectId(activeCosmosConnectorId)
       if (!autoConnectAttempted) {
         setAutoConnectAttempted(true)
       }
@@ -713,25 +755,25 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     status
   ])
 
-  const pendingAutoConnectAvailable = useMemo(
+  const autoConnectAvailable = useMemo(
     () =>
       Boolean(
-        effectivePendingAutoConnectId &&
+        effectiveAutoConnectId &&
           connectors.some(
             (connector) =>
-              connector.id === effectivePendingAutoConnectId &&
+              connector.id === effectiveAutoConnectId &&
               connector.available
           )
       ),
-    [connectors, effectivePendingAutoConnectId]
+    [connectors, effectiveAutoConnectId]
   )
 
   useEffect(() => {
-    if (autoConnectAttempted || !effectivePendingAutoConnectId) return
-    if (!pendingAutoConnectAvailable) return
+    if (autoConnectAttempted || !effectiveAutoConnectId) return
+    if (!autoConnectAvailable) return
     let cancelled = false
     const timer = window.setTimeout(() => {
-      void connect(effectivePendingAutoConnectId).finally(() => {
+      void connect(effectiveAutoConnectId).finally(() => {
         if (!cancelled) {
           setAutoConnectAttempted(true)
         }
@@ -744,8 +786,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [
     autoConnectAttempted,
     connect,
-    effectivePendingAutoConnectId,
-    pendingAutoConnectAvailable,
+    effectiveAutoConnectId,
+    autoConnectAvailable,
     supportsMobileWallets
   ])
 
@@ -772,6 +814,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         setStatus("connected")
         setError(undefined)
         rememberWalletConnectorId(connectorId)
+        setStoredAutoConnectId(connectorId)
       } catch {
         // Mobile WalletConnect sessions can hydrate after focus returns; keep
         // the explicit connect button available if silent hydration fails.
