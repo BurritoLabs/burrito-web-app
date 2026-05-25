@@ -46,8 +46,30 @@ export const isKnownWalletConnectorId = (
 
 export const getStoredWalletConnectorId = () => {
   if (typeof window === "undefined") return undefined
-  const stored = window.localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)
-  return isKnownWalletConnectorId(stored) ? stored : undefined
+  try {
+    const stored = window.localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)
+    return isKnownWalletConnectorId(stored) ? stored : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export const rememberWalletConnectorId = (id: WalletConnectorId) => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, id)
+  } catch {
+    // Storage can be unavailable in private or restricted mobile browsers.
+  }
+}
+
+export const forgetStoredWalletConnectorId = () => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
+  } catch {
+    // Storage can be unavailable in private or restricted mobile browsers.
+  }
 }
 
 export const getWalletConnectorMeta = (id: WalletConnectorId) =>
