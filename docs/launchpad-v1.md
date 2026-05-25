@@ -17,12 +17,12 @@ blacklists, hidden owner controls, or a custom DEX contract.
 2. Use `Create` to choose `Launch with pool` or `CW20 only`.
 3. Create the CW20 token contract.
 4. Use `Manage` to create/find the Terraswap LUNC pair.
-5. Provide token + LUNC liquidity.
+5. Open the market page from `Manage` and provide token + LUNC liquidity.
 6. Lock the minted LP token after the locker contract is configured.
 7. Publish the listing after the registry contract is configured.
 8. Use `Explore` to view on-chain registry launches.
-9. Project owners can distribute CW20 tokens, add more liquidity, withdraw
-   unlocked LP from the pool, withdraw locked LP after unlock, update registry
+9. Project owners can distribute CW20 tokens, use the market page to add or
+   remove pool liquidity, withdraw locked LP after unlock, update registry
    metadata, and hide/restore their published listing.
 10. If local browser storage is lost, connect the creator wallet and use
     `Sync my launches` in `Manage` to recover published registry launches.
@@ -51,8 +51,8 @@ VITE_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
 
 Until those are set, the UI keeps LP locking and public publishing disabled.
 That is intentional and prevents users from thinking the launch is complete
-before the contracts exist. Production Explore also shows an empty state instead
-of fake sample launches when the registry is not configured.
+before the contracts exist. Explore shows an empty state when the registry is
+not configured.
 
 ## Manual Test Checklist
 
@@ -61,13 +61,12 @@ of fake sample launches when the registry is not configured.
   connection are ready in the current deploy environment.
 - `CW20 only` creates a token and opens the record in `Manage`.
 - `Launch with pool` creates a token and pre-fills planned liquidity and lock days in `Manage`.
-- Importing an existing CW20 loads name, symbol, decimals, and total supply.
 - Manage can batch CW20 transfers by broadcasting one transfer message per
   recipient line, which makes CW20-only launches usable without forcing a pool.
-- Importing a published CW20 recovers registry metadata, pair contract, LP token,
-  LP lock id, unlock time, and listing visibility.
 - `Sync my launches` loads every registry page, filters by the connected creator
   address, and restores matching launches into `Manage`.
+- Manage only lists launch records tied to the connected creator wallet. Older
+  local records without a creator address are hidden from `My launches`.
 - Explore search filters by symbol, name, pair, creator, token contract, pair
   contract, or registry id.
 - Explore sorting supports newest, oldest, unlock soon, longest lock, and risk
@@ -81,9 +80,10 @@ of fake sample launches when the registry is not configured.
   a public launch link from the detail panel.
 - Pair lookup shows whether a Terraswap LUNC pair exists.
 - Pair creation stores pair contract and LP token after LCD indexing.
-- Liquidity provision broadcasts `increase_allowance` and `provide_liquidity` in one transaction.
-- Liquidity withdrawal sends unlocked LP CW20 tokens to the pair contract with
-  the Terraswap `withdraw_liquidity` hook.
+- Market pair detail liquidity provision broadcasts `increase_allowance` and
+  `provide_liquidity` in one transaction.
+- Market pair detail liquidity withdrawal sends unlocked LP CW20 tokens to the
+  pair contract with the Terraswap `withdraw_liquidity` hook.
 - LP lock panel shows wallet LP balance and can fill the full balance.
 - LP lock stays disabled when `VITE_LAUNCHPAD_LP_LOCKER_ADDRESS` is empty.
 - Public listing stays disabled when `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is empty.
@@ -96,8 +96,9 @@ of fake sample launches when the registry is not configured.
   local-only cleanup action that does not mutate on-chain state.
 - Manage shows a launch readiness checklist for token, pair, liquidity, LP lock,
   registry, and publish status, with a next-action summary for creators.
-- Manage next-action CTAs scroll directly to the import, distribution, pair,
-  LP lock, or listing tool that needs attention.
+- Manage next-action CTAs scroll directly to the distribution, pair, LP lock,
+  or listing tool that needs attention, or link to the market page for
+  liquidity.
 - Create and Publish validate optional public links. Website must be a full
   `http://` or `https://` URL, and X can be `@handle`, `x.com`, or
   `twitter.com`.

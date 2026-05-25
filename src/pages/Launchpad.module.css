@@ -174,7 +174,6 @@
 .rulesCard span,
 .exploreIntro span,
 .ownerIntro span,
-.ownerImport span,
 .launchCardTop span,
 .launchCardStats span,
 .ownerSummaryGrid span,
@@ -335,7 +334,6 @@
 .launchDetailPanel,
 .launchCard,
 .ownerIntro,
-.ownerImport,
 .ownerReadiness,
 .ownerSummary,
 .tokenDistribution,
@@ -371,7 +369,6 @@
 .formHeader h3,
 .exploreIntro h3,
 .ownerIntro h3,
-.ownerImport h3,
 .planHeader h3 {
   color: #ffffff;
   font-size: var(--font-size-title);
@@ -1069,43 +1066,10 @@
 }
 
 .exploreIntro p,
-.ownerIntro p,
-.ownerImport p {
+.ownerIntro p {
   margin: 0;
   max-width: 780px;
   color: var(--text-muted);
-}
-
-.ownerImport {
-  grid-column: 1 / -1;
-  order: 8;
-  display: grid;
-  gap: 10px;
-}
-
-.importRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-}
-
-.importRow input {
-  width: 100%;
-  height: var(--input-height);
-  padding: 0 12px;
-  border-radius: var(--radius-lg);
-  border: var(--border-width) solid var(--card-border);
-  background: rgba(255, 255, 255, 0.055);
-  color: rgba(240, 250, 241, 0.92);
-  font-family: var(--font-ui);
-  font-size: var(--font-size);
-  font-weight: var(--normal);
-  outline: none;
-}
-
-.importRow input:focus {
-  border-color: rgba(104, 216, 63, 0.62);
-  box-shadow: 0 0 0 1px rgba(104, 216, 63, 0.28);
 }
 
 .launchCard,
@@ -2003,7 +1967,6 @@
 
   .exploreIntro,
   .ownerIntro,
-  .ownerImport,
   .ownerReadiness,
   .ownerSummary,
   .poolSetup,
@@ -2185,14 +2148,6 @@
     width: 100%;
   }
 
-  .importRow {
-    grid-template-columns: 1fr;
-  }
-
-  .importRow :global(.uiButton) {
-    width: 100%;
-  }
-
   .launchDetailGrid {
     grid-template-columns: 1fr;
   }
@@ -2209,7 +2164,6 @@
   .ownerIntro,
   .ownerToolNav,
   .manageHero,
-  .ownerImport,
   .ownerReadiness,
   .tokenDistribution,
   .poolSetup,

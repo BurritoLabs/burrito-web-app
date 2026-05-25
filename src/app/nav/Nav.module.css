@@ -74,6 +74,7 @@
   padding: 14px 20px;
   color: var(--menu-text);
   font-size: var(--font-size);
+  line-height: 20px;
   opacity: 0.75;
   transition: opacity 0.2s ease;
   font-weight: var(--normal);
@@ -101,6 +102,13 @@
   width: 18px;
   height: 18px;
   display: block;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  line-height: 20px;
 }
 
 .backgroundBlurPrimary,
@@ -162,7 +170,14 @@
 @media (max-width: 991.98px) {
   .link {
     font-size: 28px;
+    line-height: 34px;
     padding: 6px 20px;
+  }
+
+  .label {
+    min-height: 34px;
+    line-height: 34px;
+    transform: none;
   }
 
   .icon {

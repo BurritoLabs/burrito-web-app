@@ -11,6 +11,7 @@ import {
   MAX_DELEGATE_BUFFER_MICRO,
   SUBMIT_GAS_ADJUSTMENT,
   estimateFallbackFeeMicro,
+  formatMicroAmountForInput,
   toMicroAmount,
   type StakeAction
 } from "../../app/stake/stakeTx"
@@ -146,6 +147,19 @@ const StakeManageModal = ({
     }
     return undefined
   }, [amountMicroValue, available, availableAmount, effectiveFeeMicro, tab])
+
+  const getInsufficientLuncMessage = (feeAmount: bigint) =>
+    tab === "Delegate"
+      ? `Insufficient funds after network fee. Leave at least ${formatTokenAmount(
+          feeAmount.toString(),
+          CLASSIC_DENOMS.lunc.coinDecimals,
+          6
+        )} LUNC for fees or reduce the amount.`
+      : `Insufficient LUNC for network fee. Need at least ${formatTokenAmount(
+          feeAmount.toString(),
+          CLASSIC_DENOMS.lunc.coinDecimals,
+          6
+        )} LUNC.`
 
   useEffect(() => {
     if (!open) return
@@ -314,6 +328,14 @@ const StakeManageModal = ({
         txFeeMicro = estimateFallbackFeeMicro(tab)
       }
 
+      const finalRequiredLunc =
+        tab === "Delegate" ? microAmountValue + txFeeMicro : txFeeMicro
+      if (finalRequiredLunc > available) {
+        setSubmitError(getInsufficientLuncMessage(txFeeMicro))
+        failTx(getInsufficientLuncMessage(txFeeMicro))
+        return
+      }
+
       const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [
           {
@@ -433,13 +455,7 @@ const StakeManageModal = ({
                 type="button"
                 className={styles.maxButton}
                 onClick={() => {
-                  setAmount(
-                    formatTokenAmount(
-                      maxAmount.toString(),
-                      CLASSIC_DENOMS.lunc.coinDecimals,
-                      6
-                    ).replace(/,/g, "")
-                  )
+                  setAmount(formatMicroAmountForInput(maxAmount))
                 }}
               >
                 Max

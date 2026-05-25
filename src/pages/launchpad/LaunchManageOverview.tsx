@@ -1,4 +1,3 @@
-import { type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import {
   getLaunchpadMarketPath,
@@ -26,9 +25,7 @@ type LaunchManageOverviewProps = {
   accountAddress?: string
   copiedValue: string
   copyError: string
-  importAddress: string
-  importError?: string
-  importSubmitting: boolean
+  hiddenLocalRecordCount: number
   isActiveOwnerLocalRecord: boolean
   isLaunchRegistryConfigured: boolean
   localRecordNotice: string
@@ -38,8 +35,6 @@ type LaunchManageOverviewProps = {
   syncResult: string
   syncSubmitting: boolean
   onCopyText: (value: string) => Promise<void>
-  onImportAddressChange: (value: string) => void
-  onImportSubmit: (event: FormEvent<HTMLFormElement>) => void
   onRemoveLocalRecord: () => void
   onScrollToManageSection: (targetId?: string) => void
   onSelectOwnerId: (ownerId: string) => void
@@ -57,9 +52,7 @@ const LaunchManageOverview = ({
   accountAddress,
   copiedValue,
   copyError,
-  importAddress,
-  importError,
-  importSubmitting,
+  hiddenLocalRecordCount,
   isActiveOwnerLocalRecord,
   isLaunchRegistryConfigured,
   localRecordNotice,
@@ -69,8 +62,6 @@ const LaunchManageOverview = ({
   syncResult,
   syncSubmitting,
   onCopyText,
-  onImportAddressChange,
-  onImportSubmit,
   onRemoveLocalRecord,
   onScrollToManageSection,
   onSelectOwnerId,
@@ -111,7 +102,11 @@ const LaunchManageOverview = ({
             ))
           ) : (
             <div className={styles.ownerEmptyHint}>
-              Create a token or import an existing CW20 to unlock owner tools.
+              {!accountAddress
+                ? "Connect a wallet to view your launches."
+                : hiddenLocalRecordCount
+                  ? "Only launches tied to the connected wallet are shown. Use Sync my launches to restore published launches."
+                  : "Create a launch or sync published launches to unlock owner tools."}
             </div>
           )}
         </div>
@@ -135,33 +130,6 @@ const LaunchManageOverview = ({
       </div>
     </article>
 
-    <form
-      id="launchpad-import"
-      className={`card ${styles.ownerImport}`}
-      onSubmit={onImportSubmit}
-    >
-      <div>
-        <span>Import token</span>
-        <h3>Recover an existing CW20</h3>
-      </div>
-      <div className={styles.importRow}>
-        <input
-          value={importAddress}
-          onChange={(event) => onImportAddressChange(event.target.value)}
-          placeholder="terra1..."
-          spellCheck={false}
-        />
-        <button
-          className="uiButton uiButtonPrimary"
-          type="submit"
-          disabled={importSubmitting}
-        >
-          {importSubmitting ? "Importing..." : "Import"}
-        </button>
-      </div>
-      {importError ? <div className={styles.txError}>{importError}</div> : null}
-    </form>
-
     {activeOwnerLaunch ? (
       <article className={`card ${styles.ownerReadiness}`}>
         <div className={styles.planHeader}>
@@ -171,15 +139,24 @@ const LaunchManageOverview = ({
         </div>
         {activeOwnerNextAction.actionLabel ? (
           <div className={styles.ownerNextActions}>
-            <button
-              className="uiButton uiButtonPrimary"
-              type="button"
-              onClick={() =>
-                onScrollToManageSection(activeOwnerNextAction.targetId)
-              }
-            >
-              {activeOwnerNextAction.actionLabel}
-            </button>
+            {activeOwnerNextAction.actionTo ? (
+              <Link
+                className="uiButton uiButtonPrimary"
+                to={activeOwnerNextAction.actionTo}
+              >
+                {activeOwnerNextAction.actionLabel}
+              </Link>
+            ) : (
+              <button
+                className="uiButton uiButtonPrimary"
+                type="button"
+                onClick={() =>
+                  onScrollToManageSection(activeOwnerNextAction.targetId)
+                }
+              >
+                {activeOwnerNextAction.actionLabel}
+              </button>
+            )}
           </div>
         ) : null}
         <div className={styles.ownerReadinessGrid}>

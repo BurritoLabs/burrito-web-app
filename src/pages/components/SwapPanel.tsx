@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import styles from "../Swap.module.css"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import {
@@ -20,6 +21,7 @@ import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/form
 import { formatTxError } from "../../app/utils/txError"
 import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
 import { parseCommonJsArray } from "../../app/utils/cjsRegistry"
+import { parseSequenceMismatchExpected } from "../../app/tx/txDiagnostics"
 import {
   fromMicroAmount,
   parseBigInt,
@@ -40,6 +42,7 @@ import {
   SLIPPAGE_OPTIONS,
   SWAP_MEMO
 } from "../../app/config/swapConfig"
+import type { ClassicStargateClient } from "../../app/wallet/walletAdapters"
 import SwapAssetPickerModal from "./swap/SwapAssetPickerModal"
 import SwapAssetIcon from "./swap/SwapAssetIcon"
 
@@ -68,12 +71,20 @@ type SwapAssetOverride = {
   iconCandidates?: string[]
 }
 
+type PairOnlySwapConfig = {
+  dexId: string
+  dexLabel: string
+  pairAddress: string
+}
+
 type DexConfig = {
   id: DexId
   label: string
   factory: string
   mode?: DexQueryMode
 }
+
+type SwapMessage = Parameters<ClassicStargateClient["simulate"]>[1][number]
 
 type DexQuote = DexConfig & {
   pair: string
@@ -144,15 +155,22 @@ type SwapPanelProps = {
   defaultToAssetId?: string
   embedded?: boolean
   assetOverrides?: SwapAssetOverride[]
+  pairOnly?: PairOnlySwapConfig
 }
 const DEFAULT_FROM_ASSET_ID = NATIVE_ASSETS[0].id
 const DEFAULT_TO_ASSET_ID = NATIVE_ASSETS[1].id
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
-const ACTIVE_DEX_IDS = new Set(CLASSIC_SWAP_DEXES.map((item) => normalizeDexName(item.id)))
+const ROUTED_SWAP_DEXES = CLASSIC_SWAP_DEXES.filter(
+  (item) =>
+    item.factory &&
+    (!item.mode || item.mode === "terraswap" || item.mode === "garuda")
+)
+const ACTIVE_DEX_IDS = new Set(ROUTED_SWAP_DEXES.map((item) => normalizeDexName(item.id)))
 
-const DEXES: readonly DexConfig[] = CLASSIC_SWAP_DEXES.map((dex) => ({
+const DEXES: readonly DexConfig[] = ROUTED_SWAP_DEXES.map((dex) => ({
   ...dex,
-  mode: dex.mode ?? "terraswap"
+  factory: dex.factory ?? "",
+  mode: dex.mode === "garuda" ? "garuda" : "terraswap"
 }))
 
 const FACTORY_PAIR_CACHE = new Map<string, string>()
@@ -278,6 +296,15 @@ const simulateSwapQuote = async (
   amount: bigint
 ) => {
   const pair = await resolveFactoryPair(dex, offerAsset, askAsset)
+  return simulatePairSwapQuote(dex, pair, offerAsset, amount)
+}
+
+const simulatePairSwapQuote = async (
+  dex: DexConfig,
+  pair: string,
+  offerAsset: SwapAsset,
+  amount: bigint
+) => {
   const query =
     dex.mode === "garuda"
       ? {
@@ -464,7 +491,10 @@ const buildPlatformFeeMessage = async (
   throw new Error("unsupported fee asset")
 }
 
-const estimateFallbackFeeMicro = (offerAsset: SwapAsset, includePlatformFee: boolean) => {
+const estimateFallbackGas = (
+  offerAsset: SwapAsset,
+  includePlatformFee: boolean
+) => {
   const swapGas =
     offerAsset.type === "cw20" ? FALLBACK_GAS_CW20_SWAP : FALLBACK_GAS_NATIVE_SWAP
   const feeGas = includePlatformFee
@@ -472,7 +502,100 @@ const estimateFallbackFeeMicro = (offerAsset: SwapAsset, includePlatformFee: boo
       ? FALLBACK_GAS_CW20_FEE
       : FALLBACK_GAS_NATIVE_FEE
     : 0
-  return BigInt(Math.ceil((swapGas + feeGas) * GAS_PRICE_MICRO_LUNC))
+  return swapGas + feeGas
+}
+
+const estimateFallbackFeeMicro = (
+  offerAsset: SwapAsset,
+  includePlatformFee: boolean
+) => {
+  const gas = estimateFallbackGas(offerAsset, includePlatformFee)
+  return BigInt(Math.ceil(gas * GAS_PRICE_MICRO_LUNC))
+}
+
+const buildSwapFee = (gasLimit: number) => ({
+  amount: [
+    {
+      amount: Math.max(1, Math.ceil(gasLimit * GAS_PRICE_MICRO_LUNC)).toString(),
+      denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+    }
+  ],
+  gas: String(gasLimit)
+})
+
+const estimateSwapFee = async ({
+  client,
+  fallbackGas,
+  messages,
+  signerAddress
+}: {
+  client: ClassicStargateClient
+  fallbackGas: number
+  messages: readonly SwapMessage[]
+  signerAddress: string
+}) => {
+  let gasLimit = fallbackGas
+  try {
+    const simulatedGas = await client.simulate(signerAddress, messages, SWAP_MEMO)
+    gasLimit = Math.max(fallbackGas, Math.ceil(simulatedGas * 1.45))
+  } catch {
+    gasLimit = Math.ceil(fallbackGas * 1.15)
+  }
+
+  return buildSwapFee(gasLimit)
+}
+
+const signAndBroadcastSwapFast = async ({
+  client,
+  fallbackGas,
+  messages,
+  signerAddress
+}: {
+  client: ClassicStargateClient
+  fallbackGas: number
+  messages: readonly SwapMessage[]
+  signerAddress: string
+}) => {
+  let sequenceHint: number | undefined
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const fee = await estimateSwapFee({
+        client,
+        fallbackGas,
+        messages,
+        signerAddress
+      })
+      const signerState = await client.getSequence(signerAddress)
+      const signed = await client.sign(
+        signerAddress,
+        messages,
+        fee,
+        SWAP_MEMO,
+        {
+          accountNumber: signerState.accountNumber,
+          sequence: sequenceHint ?? signerState.sequence,
+          chainId: CLASSIC_CHAIN.chainId
+        }
+      )
+      const txHash = await client.broadcastTxSync(TxRaw.encode(signed).finish())
+      if (!txHash) {
+        throw new Error("Swap broadcast failed")
+      }
+      return txHash
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const expectedSequence = parseSequenceMismatchExpected(message)
+      if (expectedSequence !== undefined && attempt < 2) {
+        sequenceHint = expectedSequence
+        await new Promise((resolve) => window.setTimeout(resolve, 220))
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new Error("Swap broadcast failed")
 }
 
 const getAmountDensity = (value?: string) => {
@@ -488,7 +611,8 @@ const SwapPanel = ({
   defaultFromAssetId = DEFAULT_FROM_ASSET_ID,
   defaultToAssetId = DEFAULT_TO_ASSET_ID,
   embedded = false,
-  assetOverrides = []
+  assetOverrides = [],
+  pairOnly
 }: SwapPanelProps) => {
   const {
     account,
@@ -518,6 +642,20 @@ const SwapPanel = ({
   const [pickerTarget, setPickerTarget] = useState<"from" | "to" | null>(null)
   const [pickerQuery, setPickerQuery] = useState("")
   const appliedDefaultPairRef = useRef<string | null>(null)
+  const isPairOnly = Boolean(pairOnly)
+  const pairOnlyDex = useMemo<DexConfig | undefined>(() => {
+    if (!pairOnly) return undefined
+    const dexId = pairOnly.dexId.toLowerCase()
+    const matched = DEXES.find((dex) => dex.id === dexId)
+    return {
+      factory: matched?.factory ?? "",
+      id: dexId,
+      label: pairOnly.dexLabel || matched?.label || dexId,
+      mode:
+        matched?.mode ??
+        (dexId.startsWith("garuda") ? "garuda" : "terraswap")
+    }
+  }, [pairOnly])
 
   const { data: dexPairs = {} } = useQuery({
     queryKey: ["swap-dex-pairs", "classic"],
@@ -538,6 +676,7 @@ const SwapPanel = ({
         return acc
       }, {})
     },
+    enabled: !isPairOnly,
     staleTime: 60 * 60 * 1000
   })
 
@@ -585,6 +724,28 @@ const SwapPanel = ({
     [cw20Whitelist, overrideCw20Whitelist]
   )
 
+  const overrideNativeAssets = useMemo<SwapAsset[]>(() => {
+    return assetOverrides
+      .filter((asset) => asset.id.startsWith("native:"))
+      .map((asset) => {
+        const denom = asset.id.slice("native:".length)
+        const symbol = asset.symbol || denom.split("/").pop()?.toUpperCase() || "NATIVE"
+        return {
+          id: asNativeId(denom),
+          type: "native" as const,
+          symbol,
+          name: asset.name || symbol,
+          denom,
+          decimals: asset.decimals ?? 6,
+          iconCandidates:
+            asset.iconCandidates && asset.iconCandidates.length > 0
+              ? asset.iconCandidates
+              : buildNativeIconCandidates(denom, symbol)
+        }
+      })
+      .filter((asset) => Boolean(asset.denom))
+  }, [assetOverrides])
+
   const assetOverrideMap = useMemo(
     () => new Map(assetOverrides.map((asset) => [asset.id, asset])),
     [assetOverrides]
@@ -606,6 +767,13 @@ const SwapPanel = ({
       }
     }
 
+    const nativeRows = new Map(
+      NATIVE_ASSETS.map((asset) => [asset.id, applyOverride(asset)] as const)
+    )
+    overrideNativeAssets.forEach((asset) => {
+      nativeRows.set(asset.id, applyOverride(asset))
+    })
+
     const cw20Rows = Object.entries(swapCw20Whitelist)
       .map(([contract, token]) => {
         const decimals = Number(token.decimals ?? 6)
@@ -626,8 +794,19 @@ const SwapPanel = ({
         return a.symbol.localeCompare(b.symbol)
       })
 
-    return [...NATIVE_ASSETS.map(applyOverride), ...cw20Rows]
-  }, [assetOverrideMap, swapCw20Whitelist, tradableCw20Set])
+    const rows = [...nativeRows.values(), ...cw20Rows]
+    if (!isPairOnly) return rows
+
+    const allowedIds = new Set(assetOverrides.map((asset) => asset.id))
+    return rows.filter((asset) => allowedIds.has(asset.id))
+  }, [
+    assetOverrideMap,
+    assetOverrides,
+    isPairOnly,
+    overrideNativeAssets,
+    swapCw20Whitelist,
+    tradableCw20Set
+  ])
 
   const shouldLoadPickerBalances = Boolean(pickerTarget)
   const { data: cw20Balances = [] } = useCw20Balances(
@@ -823,6 +1002,9 @@ const SwapPanel = ({
   const fromBalanceMicro = useMemo(() => {
     return assetBalanceMap.get(fromAsset.id) ?? 0n
   }, [assetBalanceMap, fromAsset.id])
+  const toBalanceMicro = useMemo(() => {
+    return assetBalanceMap.get(toAsset.id) ?? 0n
+  }, [assetBalanceMap, toAsset.id])
   const luncUsd = prices?.lunc?.usd
   const ustcUsd = prices?.ustc?.usd
 
@@ -892,10 +1074,20 @@ const SwapPanel = ({
   )
 
   const quotePlaceholderText = useMemo(() => {
-    if (!hasAmountInput) return "Enter amount to preview rate, fee, and route details."
-    if (previewPending) return "Fetching quotes across Classic DEX routes..."
-    return "Route details will appear here once a quote is available."
-  }, [hasAmountInput, previewPending])
+    if (!hasAmountInput) {
+      return isPairOnly
+        ? "Enter amount to preview this pool quote."
+        : "Enter amount to preview rate, fee, and route details."
+    }
+    if (previewPending) {
+      return isPairOnly
+        ? "Fetching quote from this pool..."
+        : "Fetching quotes across Classic DEX routes..."
+    }
+    return isPairOnly
+      ? "Pool quote will appear here once available."
+      : "Route details will appear here once a quote is available."
+  }, [hasAmountInput, isPairOnly, previewPending])
 
   const amountInDensity = useMemo(() => getAmountDensity(amountIn), [amountIn])
   const toAmountDensity = useMemo(() => getAmountDensity(toAmountDisplay), [toAmountDisplay])
@@ -905,14 +1097,6 @@ const SwapPanel = ({
     const basis = 10_000n - slippageBps
     return (selectedQuote.returnAmount * basis) / 10_000n
   }, [selectedQuote, slippageBps])
-
-  const toFooterText = useMemo(() => {
-    if (hasQuotePreview) {
-      return `${formatTokenAmount(minReceiveMicro.toString(), toAsset.decimals, 6)} ${toAsset.symbol}`
-    }
-    if (previewPending) return "Fetching routes..."
-    return "Enter amount to preview"
-  }, [hasQuotePreview, minReceiveMicro, previewPending, toAsset.decimals, toAsset.symbol])
 
   const maxSpread = useMemo(() => bpsToMaxSpread(slippageBps), [slippageBps])
 
@@ -929,6 +1113,7 @@ const SwapPanel = ({
   }, [amountInMicro, fromAsset.symbol, selectedQuote, toAsset.symbol])
 
   const priceImpactDisplay = useMemo(() => {
+    if (isPairOnly && selectedQuote) return "Current pool"
     if (!selectedQuote || !bestQuote || bestQuote.returnAmount === 0n) return "--"
     if (selectedQuote.id === bestQuote.id) return "Best"
     const ratio =
@@ -936,9 +1121,10 @@ const SwapPanel = ({
       Number(bestQuote.returnAmount)
     if (!Number.isFinite(ratio) || ratio <= 0) return "--"
     return `-${(ratio * 100).toFixed(2)}%`
-  }, [bestQuote, selectedQuote])
+  }, [bestQuote, isPairOnly, selectedQuote])
 
   const routeRows = useMemo(() => {
+    if (isPairOnly) return []
     if (!quotes.length || !bestQuote || bestQuote.returnAmount <= 0n) return []
     return quotes.map((quote) => {
       const lossBps =
@@ -953,7 +1139,7 @@ const SwapPanel = ({
         lossBps
       }
     })
-  }, [bestQuote, quotes])
+  }, [bestQuote, isPairOnly, quotes])
 
   const pickerAssets = useMemo(() => {
     if (!pickerTarget) return []
@@ -1024,9 +1210,18 @@ const SwapPanel = ({
       setQuoteError(undefined)
       try {
         const settled = await Promise.allSettled(
-          DEXES.map((dex) =>
-            simulateSwapQuote(dex, quoteFromAsset, quoteToAsset, swapAmountMicro)
-          )
+          isPairOnly && pairOnly && pairOnlyDex
+            ? [
+                simulatePairSwapQuote(
+                  pairOnlyDex,
+                  pairOnly.pairAddress,
+                  quoteFromAsset,
+                  swapAmountMicro
+                )
+              ]
+            : DEXES.map((dex) =>
+                simulateSwapQuote(dex, quoteFromAsset, quoteToAsset, swapAmountMicro)
+              )
         )
         const nextQuotes = settled
           .filter((item): item is PromiseFulfilledResult<DexQuote> => item.status === "fulfilled")
@@ -1038,7 +1233,11 @@ const SwapPanel = ({
         if (cancelled) return
         if (!nextQuotes.length) {
           setQuotes([])
-          setQuoteError("No on-chain quote available from supported DEXes.")
+          setQuoteError(
+            isPairOnly
+              ? "No on-chain quote available from this pool."
+              : "No on-chain quote available from supported DEXes."
+          )
           return
         }
 
@@ -1064,7 +1263,7 @@ const SwapPanel = ({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [quoteFromAsset, quoteToAsset, swapAmountMicro])
+  }, [isPairOnly, pairOnly, pairOnlyDex, quoteFromAsset, quoteToAsset, swapAmountMicro])
 
   useEffect(() => {
     if (!feeQuote || swapAmountMicro <= 0n) {
@@ -1148,11 +1347,10 @@ const SwapPanel = ({
     try {
       startTx("Swap")
       if (!connectorId) throw new Error("Wallet not connected")
-      const {
-        connectClassicSigningClientForConnector,
-        getSignerAddressForConnector
-      } = await import("../../app/wallet/walletAdapters")
-      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const { connectClassicSigningClientForConnector } = await import(
+        "../../app/wallet/walletAdapters"
+      )
+      const signerAddress = accountAddress
       const client = await connectClassicSigningClientForConnector(connectorId)
 
       const feeMsg = await buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
@@ -1168,11 +1366,12 @@ const SwapPanel = ({
         selectedQuote.beliefPrice
       )
       const messages = feeMsg ? [feeMsg, msg] : [msg]
-      const result = await client.signAndBroadcast(signerAddress, messages, "auto", SWAP_MEMO)
-      if (result.code !== 0) {
-        throw new Error(result.rawLog || "Swap failed")
-      }
-      const hash = result.transactionHash
+      const hash = await signAndBroadcastSwapFast({
+        client,
+        fallbackGas: estimateFallbackGas(fromAsset, platformFeeMicro > 0n),
+        messages,
+        signerAddress
+      })
       finishTx(hash)
       setLastTxHash(hash)
     } catch (error) {
@@ -1193,7 +1392,9 @@ const SwapPanel = ({
       <div className={styles.swapCardBody}>
             <div className={styles.topMeta}>
               <p className={styles.formHint}>
-                Aggregated on-chain quotes across Classic DEX routes.
+                {isPairOnly
+                  ? "Swap directly through this pool."
+                  : "Aggregated on-chain quotes across Classic DEX routes."}
               </p>
               <div className={styles.slippageControl}>
                 {SLIPPAGE_OPTIONS.map((item) => (
@@ -1228,7 +1429,10 @@ const SwapPanel = ({
                 <div className={styles.fieldBody}>
                   <button
                     type="button"
-                    className={styles.assetPickerButton}
+                    className={`${styles.assetPickerButton} ${
+                      isPairOnly ? styles.assetPickerButtonStatic : ""
+                    }`}
+                    disabled={isPairOnly}
                     onClick={() => setPickerTarget("from")}
                   >
                     <span className={styles.assetPickerValue}>
@@ -1239,7 +1443,9 @@ const SwapPanel = ({
                       />
                       <span>{fromAsset.symbol}</span>
                     </span>
-                    <span className={styles.assetPickerCaret}>▾</span>
+                    {!isPairOnly ? (
+                      <span className={styles.assetPickerCaret}>▾</span>
+                    ) : null}
                   </button>
                   <input
                     className={[
@@ -1321,15 +1527,24 @@ const SwapPanel = ({
                 <div className={styles.fieldHeader}>
                   <span>To</span>
                   {hasQuotePreview || previewPending ? (
-                    <span className={styles.routeLabel}>
-                      {previewPending ? "Fetching routes..." : `Best: ${bestQuote?.label ?? "--"}`}
+                      <span className={styles.routeLabel}>
+                      {previewPending
+                        ? isPairOnly
+                          ? "Fetching pool..."
+                          : "Fetching routes..."
+                        : isPairOnly
+                          ? `Pool: ${selectedQuote?.label ?? "--"}`
+                          : `Best: ${bestQuote?.label ?? "--"}`}
                     </span>
                   ) : null}
                 </div>
                 <div className={styles.fieldBody}>
                   <button
                     type="button"
-                    className={styles.assetPickerButton}
+                    className={`${styles.assetPickerButton} ${
+                      isPairOnly ? styles.assetPickerButtonStatic : ""
+                    }`}
+                    disabled={isPairOnly}
                     onClick={() => setPickerTarget("to")}
                   >
                     <span className={styles.assetPickerValue}>
@@ -1340,7 +1555,9 @@ const SwapPanel = ({
                       />
                       <span>{toAsset.symbol}</span>
                     </span>
-                    <span className={styles.assetPickerCaret}>▾</span>
+                    {!isPairOnly ? (
+                      <span className={styles.assetPickerCaret}>▾</span>
+                    ) : null}
                   </button>
                   <div
                     className={[
@@ -1359,7 +1576,12 @@ const SwapPanel = ({
                 </div>
                 <div className={styles.fieldFooter}>
                   <span>
-                    Minimum receive: {toFooterText}
+                    Balance:{" "}
+                    {formatTokenAmount(
+                      toBalanceMicro.toString(),
+                      toAsset.decimals,
+                      6
+                    )}
                   </span>
                   {hasQuotePreview ? (
                     <span className={styles.usdHint}>{toAmountUsdText}</span>
@@ -1378,7 +1600,9 @@ const SwapPanel = ({
                 >
                   <span className={styles.quoteAccordionMain}>{rateDisplay}</span>
                   <span className={styles.quoteAccordionMeta}>
-                    {bestQuote?.label ?? "--"} · Impact {priceImpactDisplay}
+                    {isPairOnly
+                      ? `${selectedQuote?.label ?? "--"} pool`
+                      : `${bestQuote?.label ?? "--"} · Impact ${priceImpactDisplay}`}
                   </span>
                   <span className={styles.quoteAccordionMeta}>
                     Fee {feeLoading ? "Estimating..." : feeDisplay}
@@ -1396,13 +1620,19 @@ const SwapPanel = ({
                         <strong>{rateDisplay}</strong>
                       </div>
                       <div>
-                        <label>Best route</label>
-                        <strong>{bestQuote?.label ?? "--"}</strong>
+                        <label>{isPairOnly ? "Pool" : "Best route"}</label>
+                        <strong>
+                          {isPairOnly
+                            ? selectedQuote?.label ?? "--"
+                            : bestQuote?.label ?? "--"}
+                        </strong>
                       </div>
-                      <div>
-                        <label>Price impact</label>
-                        <strong>{priceImpactDisplay}</strong>
-                      </div>
+                      {!isPairOnly ? (
+                        <div>
+                          <label>Price impact</label>
+                          <strong>{priceImpactDisplay}</strong>
+                        </div>
+                      ) : null}
                       <div>
                         <label>Slippage</label>
                         <strong>{(Number(slippageBps) / 100).toFixed(2)}%</strong>
@@ -1429,6 +1659,7 @@ const SwapPanel = ({
                       </div>
                     </div>
 
+                    {!isPairOnly ? (
                     <div className={styles.routesCard}>
                       <div className={styles.routesHeader}>
                         <h3>Liquidity routes</h3>
@@ -1475,6 +1706,7 @@ const SwapPanel = ({
                         ) : null}
                       </div>
                     </div>
+                    ) : null}
                   </div>
                 ) : null}
               </section>
@@ -1524,7 +1756,11 @@ const SwapPanel = ({
                 onClick={handleConnect}
                 disabled={!selectedConnector}
               >
-                {selectedConnector ? `Connect ${selectedConnector.label}` : "Wallet unavailable"}
+                {selectedConnector
+                  ? `Connect ${selectedConnector.label}`
+                  : embedded
+                    ? "Connect wallet first"
+                    : "Wallet unavailable"}
               </button>
             ) : (
               <button

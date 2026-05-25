@@ -41,6 +41,16 @@ import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
 type SortMetric = "change" | "volume" | "liquidity" | "marketCap"
 type SortDirection = "desc" | "asc"
 type Timeframe = "1h" | "24h" | "7d"
+type DexFilter =
+  | "all"
+  | "terraswap"
+  | "terraport"
+  | "astroport"
+  | "garuda"
+  | "white-whale"
+  | "luncswap"
+  | "terra-pump"
+  | "luncpump"
 
 type NativeSupplyInfo = {
   denom: string
@@ -61,9 +71,11 @@ type ResolvedAsset = {
 }
 
 type MarketCard = {
+  bonding?: MarketPoolSnapshot["bonding"]
   id: string
   pairAddress: string
   pairLabel: string
+  poolType: string
   dexLabel: string
   dexId: string
   left: ResolvedAsset
@@ -88,6 +100,19 @@ const SORT_METRIC_OPTIONS: Array<{ value: SortMetric; label: string }> = [
   { value: "liquidity", label: "Liquidity" },
   { value: "marketCap", label: "Market Cap" }
 ]
+const DEX_FILTER_OPTIONS: Array<{ value: DexFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "terraport", label: "Terraport" },
+  { value: "terraswap", label: "Terraswap" },
+  { value: "astroport", label: "Astroport" },
+  { value: "garuda", label: "Garuda" },
+  { value: "white-whale", label: "White Whale" },
+  { value: "luncswap", label: "LUNCSwap" },
+  { value: "terra-pump", label: "Terra.pump" },
+  { value: "luncpump", label: "LUNCPump" }
+]
+const MAIN_DEX_FILTER_OPTIONS = DEX_FILTER_OPTIONS.slice(0, 5)
+const SECONDARY_DEX_FILTER_OPTIONS = DEX_FILTER_OPTIONS.slice(5)
 
 const buildNativeIconCandidates = (denom: string, symbol: string) =>
   buildClassicNativeIconCandidates({ denom, symbol })
@@ -121,6 +146,23 @@ const shouldSwapForDisplay = (left: ResolvedAsset, right: ResolvedAsset) => {
   if (left.isUstc && right.isLunc) return true
 
   return false
+}
+
+const getDexFilterBucket = (card: Pick<MarketCard, "dexId" | "dexLabel">): DexFilter => {
+  const value = `${card.dexId} ${card.dexLabel}`.toLowerCase()
+  if (value.includes("terraport")) return "terraport"
+  if (value.includes("terraswap")) return "terraswap"
+  if (value.includes("astroport")) return "astroport"
+  if (value.includes("garuda")) return "garuda"
+  if (value.includes("white whale") || value.includes("white-whale")) {
+    return "white-whale"
+  }
+  if (value.includes("luncswap")) return "luncswap"
+  if (value.includes("terra.pump") || value.includes("terra-pump")) {
+    return "terra-pump"
+  }
+  if (value.includes("luncpump")) return "luncpump"
+  return "all"
 }
 
 const formatUsdSmart = (value?: number) => {
@@ -273,9 +315,12 @@ const Market = () => {
   const [search, setSearch] = useState("")
   const [sortMetric, setSortMetric] = useState<SortMetric>("liquidity")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
+  const [dexFilter, setDexFilter] = useState<DexFilter>("all")
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const [dexMenuOpen, setDexMenuOpen] = useState(false)
   const [timeframe, setTimeframe] = useState<Timeframe>("24h")
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const dexMenuRef = useRef<HTMLDivElement | null>(null)
   const sortMenuRef = useRef<HTMLDivElement | null>(null)
 
   const { data: pairs = [], isLoading: isPairsLoading } = useQuery({
@@ -491,10 +536,27 @@ const Market = () => {
 
       const leftUsd = getAssetUsdPrice(left)
       const rightUsd = getAssetUsdPrice(right)
+      const bondingLiquidityUsd =
+        pool.bonding?.liquidityAssetId && pool.bonding?.liquidityAmount
+          ? (() => {
+              const liquidityAsset = resolveAsset(pool.bonding!.liquidityAssetId!)
+              const liquidityAssetUsd = getAssetUsdPrice(liquidityAsset)
+              if (liquidityAssetUsd === undefined) return undefined
+              const liquidityAmount = toUnitAmount(
+                pool.bonding!.liquidityAmount!,
+                liquidityAsset.decimals
+              )
+              return Number.isFinite(liquidityAmount)
+                ? liquidityAmount * liquidityAssetUsd
+                : undefined
+            })()
+          : undefined
       const leftValue = leftUsd !== undefined ? leftUsd * leftAmount : undefined
       const rightValue = rightUsd !== undefined ? rightUsd * rightAmount : undefined
       const liquidityUsd =
-        leftValue !== undefined && rightValue !== undefined
+        bondingLiquidityUsd !== undefined
+          ? bondingLiquidityUsd
+          : leftValue !== undefined && rightValue !== undefined
           ? leftValue + rightValue
           : leftValue !== undefined
             ? leftValue * 2
@@ -518,9 +580,11 @@ const Market = () => {
             : undefined
 
       return {
+        bonding: pool.bonding,
         id: `${pool.dexId}:${pool.pair}`,
         pairAddress: pool.pair,
         pairLabel: `${left.symbol}/${right.symbol}`,
+        poolType: pool.type,
         dexId: pool.dexId,
         dexLabel: pool.dexLabel,
         volumes: pool.volumes,
@@ -550,6 +614,21 @@ const Market = () => {
     () => pools.map((pool) => buildMarketCard(pool)).filter((card): card is MarketCard => Boolean(card)),
     [buildMarketCard, pools]
   )
+
+  const dexFilterCounts = useMemo(() => {
+    const counts = DEX_FILTER_OPTIONS.reduce(
+      (acc, option) => ({ ...acc, [option.value]: 0 }),
+      {} as Record<DexFilter, number>
+    )
+
+    cards.forEach((card) => {
+      counts.all += 1
+      const bucket = getDexFilterBucket(card)
+      if (bucket !== "all") counts[bucket] += 1
+    })
+
+    return counts
+  }, [cards])
 
   const cw20SupplyContracts = useMemo(
     () =>
@@ -664,6 +743,9 @@ const Market = () => {
   const filteredAndSorted = useMemo(() => {
     const keyword = search.trim().toLowerCase()
     const filtered = cards.filter((card) => {
+      if (dexFilter !== "all" && getDexFilterBucket(card) !== dexFilter) {
+        return false
+      }
       if (!keyword) return true
       const haystack = [
         card.pairLabel,
@@ -702,6 +784,7 @@ const Market = () => {
     return filtered
   }, [
     cards,
+    dexFilter,
     getCardMarketCapUsd,
     getCardVolumeUsd,
     getPairChange,
@@ -742,7 +825,7 @@ const Market = () => {
             pair: card.pairAddress,
             dexId: card.dexId,
             dexLabel: card.dexLabel,
-            type: "xyk",
+            type: card.poolType,
             assets: [card.left.key, card.right.key]
           })
         )
@@ -756,12 +839,18 @@ const Market = () => {
 
   const liveCardById = useMemo(() => {
     const map = new Map<string, MarketCard>()
+    const baseCardById = new Map(visible.map((card) => [card.id, card]))
     liveVisiblePools.forEach((pool) => {
       const card = buildMarketCard(pool)
-      if (card) map.set(card.id, card)
+      if (!card) return
+      const baseCard = baseCardById.get(card.id)
+      map.set(
+        card.id,
+        baseCard && !card.volumes ? { ...card, volumes: baseCard.volumes } : card
+      )
     })
     return map
-  }, [buildMarketCard, liveVisiblePools])
+  }, [buildMarketCard, liveVisiblePools, visible])
 
   const hydrateVisibleCw20Asset = useCallback(
     (asset: ResolvedAsset): ResolvedAsset => {
@@ -823,6 +912,15 @@ const Market = () => {
   const isLoading = isPairsLoading || isPoolsLoading
   const selectedSortMetric =
     SORT_METRIC_OPTIONS.find((option) => option.value === sortMetric) ?? SORT_METRIC_OPTIONS[0]
+  const selectedDexFilter =
+    DEX_FILTER_OPTIONS.find((option) => option.value === dexFilter) ?? DEX_FILTER_OPTIONS[0]
+  const selectedSecondaryDexFilter = SECONDARY_DEX_FILTER_OPTIONS.find(
+    (option) => option.value === dexFilter
+  )
+  const secondaryDexCount = SECONDARY_DEX_FILTER_OPTIONS.reduce(
+    (total, option) => total + (dexFilterCounts[option.value] ?? 0),
+    0
+  )
 
   useEffect(() => {
     if (!sortMenuOpen) return
@@ -846,6 +944,29 @@ const Market = () => {
       document.removeEventListener("keydown", handleKeyDown)
     }
   }, [sortMenuOpen])
+
+  useEffect(() => {
+    if (!dexMenuOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!dexMenuRef.current?.contains(event.target as Node)) {
+        setDexMenuOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDexMenuOpen(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [dexMenuOpen])
 
 
   return (
@@ -930,7 +1051,13 @@ const Market = () => {
             </div>
           </div>
           <div className={styles.toolbarFooter}>
-            <div className={styles.meta}>{isLoading ? "Loading pools..." : `${filteredAndSorted.length} pools`}</div>
+            <div className={styles.meta}>
+              {isLoading
+                ? "Loading pools..."
+                : dexFilter === "all"
+                  ? `${filteredAndSorted.length} pools`
+                  : `${filteredAndSorted.length} ${selectedDexFilter.label} pools`}
+            </div>
             <div className={styles.timeframe}>
               {(["1h", "24h", "7d"] as Timeframe[]).map((tf) => (
                 <button
@@ -942,6 +1069,79 @@ const Market = () => {
                   {tf}
                 </button>
               ))}
+            </div>
+          </div>
+          <div className={styles.dexFilters} aria-label="Filter market pools by DEX">
+            {MAIN_DEX_FILTER_OPTIONS.map((option) => {
+              const active = dexFilter === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.dexFilterButton} ${
+                    active ? styles.dexFilterButtonActive : ""
+                  }`}
+                  onClick={() => {
+                    setDexFilter(option.value)
+                    setVisibleCount(PAGE_SIZE)
+                  }}
+                  aria-pressed={active}
+                >
+                  <span>{option.label}</span>
+                  <strong>{dexFilterCounts[option.value] ?? 0}</strong>
+                </button>
+              )
+            })}
+            <div className={styles.dexMoreWrap} ref={dexMenuRef}>
+              <button
+                type="button"
+                className={`${styles.dexFilterButton} ${
+                  selectedSecondaryDexFilter ? styles.dexFilterButtonActive : ""
+                } ${dexMenuOpen ? styles.dexFilterButtonOpen : ""}`}
+                onClick={() => setDexMenuOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={dexMenuOpen}
+                aria-pressed={Boolean(selectedSecondaryDexFilter)}
+              >
+                <span>{selectedSecondaryDexFilter?.label ?? "More"}</span>
+                <strong>
+                  {selectedSecondaryDexFilter
+                    ? dexFilterCounts[selectedSecondaryDexFilter.value] ?? 0
+                    : secondaryDexCount}
+                </strong>
+                <span
+                  className={`${styles.dexMoreChevron} ${
+                    dexMenuOpen ? styles.dexMoreChevronOpen : ""
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+              {dexMenuOpen ? (
+                <div className={styles.dexMoreMenu} role="listbox" aria-label="More DEX filters">
+                  {SECONDARY_DEX_FILTER_OPTIONS.map((option) => {
+                    const active = dexFilter === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        className={`${styles.dexMoreOption} ${
+                          active ? styles.dexMoreOptionActive : ""
+                        }`}
+                        onClick={() => {
+                          setDexFilter(option.value)
+                          setVisibleCount(PAGE_SIZE)
+                          setDexMenuOpen(false)
+                        }}
+                      >
+                        <span>{option.label}</span>
+                        <strong>{dexFilterCounts[option.value] ?? 0}</strong>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
           </div>
         </section>
@@ -958,6 +1158,16 @@ const Market = () => {
               {displayVisible.map((card, index) => {
                 const pairChange = getPairChange(card, timeframe)
                 const marketCapUsd = getCardMarketCapUsd(card)
+                const secondaryMetric =
+                  sortMetric === "volume"
+                    ? {
+                        label: `${timeframe} Vol`,
+                        value: getCardVolumeUsd(card, timeframe)
+                      }
+                    : {
+                        label: "Liquidity",
+                        value: card.liquidityUsd
+                      }
                 const { dexName, dexVersion } = splitDexLabel(card.dexLabel)
                 return (
                   <Link
@@ -1018,8 +1228,8 @@ const Market = () => {
                             <strong>{formatUsdCompact(marketCapUsd)}</strong>
                           </div>
                           <div className={styles.metricLine}>
-                            <span>Liquidity</span>
-                            <strong>{card.liquidityUsd !== undefined ? formatUsd(card.liquidityUsd) : "--"}</strong>
+                            <span>{secondaryMetric.label}</span>
+                            <strong>{secondaryMetric.value !== undefined ? formatUsd(secondaryMetric.value) : "--"}</strong>
                           </div>
                         </div>
 

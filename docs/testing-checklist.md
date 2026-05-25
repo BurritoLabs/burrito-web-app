@@ -17,10 +17,13 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open `/market`.
 - Search by symbol, name, contract, and pool address.
 - Switch sort direction and sort field.
+- Switch each DEX filter: All, Terraport, Terraswap, Astroport, and Garuda.
 - Open a TerraSwap pair detail page.
 - Open a Terraport pair detail page.
 - Open a Garuda pair detail page.
-- Confirm pair logos, balance display, chart, recent trades, and swap panel load.
+- Confirm pair logos, balance display, chart, recent trades, swap panel, liquidity panel, and top metrics load.
+- Copy pool, base token, and quote token addresses from a pair detail page.
+- Provide and withdraw liquidity from a small test pair when balances are available.
 - Use the pair detail back button from a launchpad-opened market page.
 - Refresh a pair detail route directly on Cloudflare.
 
@@ -66,7 +69,7 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Create a CW20-only token.
 - Create a launch-with-pool token.
 - Create the LUNC pair.
-- Provide initial liquidity.
+- Open market from Manage and provide initial liquidity.
 - Lock LP tokens.
 - Publish to launchpad registry.
 - Send a small CW20 distribution batch from Manage.

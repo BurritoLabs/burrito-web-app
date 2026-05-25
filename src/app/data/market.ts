@@ -39,7 +39,11 @@ type PoolAsset = {
 }
 
 type PoolResponse = {
+  asset1?: PoolAssetInfo
+  asset2?: PoolAssetInfo
   assets?: PoolAsset[]
+  reserve1?: string
+  reserve2?: string
 }
 
 export type MarketDexPair = {
@@ -52,7 +56,19 @@ export type MarketDexPair = {
 
 export type MarketVolumeSummary = Partial<Record<"1h" | "24h" | "7d", Record<string, number>>>
 
+export type MarketBondingSnapshot = {
+  factory?: string
+  liquidityAmount?: string
+  liquidityAssetId?: string
+  nativeDenom?: string
+  protocol?: "terrapump" | "luncpump" | string
+  status?: string
+  tokenAddress?: string
+  virtualQuoteAmount?: string
+}
+
 export type MarketPoolSnapshot = {
+  bonding?: MarketBondingSnapshot
   pair: string
   dexId: string
   dexLabel: string
@@ -745,6 +761,7 @@ type MarketIndexPayload = {
     type?: string
     volumes?: Partial<Record<"1h" | "24h" | "7d", Record<string, number>>>
     assets?: string[]
+    bonding?: MarketBondingSnapshot
     poolAssets?: Array<{ id?: string; amount?: string }>
   }>
 }
@@ -774,6 +791,22 @@ const parseMarketVolumeSummary = (
   return Object.keys(parsed).length ? parsed : undefined
 }
 
+const hasMarketVolume = (volumes: MarketVolumeSummary | undefined) =>
+  Boolean(
+    volumes &&
+      Object.values(volumes).some((entry) =>
+        Object.values(entry ?? {}).some((amount) => amount > 0)
+      )
+  )
+
+const shouldRefreshLocalPoolSnapshot = (pool: MarketPoolSnapshot) => {
+  const bothSidesEmpty = pool.poolAssets.every((asset) => {
+    const amount = Number(asset.amount)
+    return !Number.isFinite(amount) || amount <= 0
+  })
+  return bothSidesEmpty && hasMarketVolume(pool.volumes)
+}
+
 const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
   const entries = payload?.pairs ?? []
   const pairs: MarketDexPair[] = []
@@ -795,6 +828,40 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
     const dexLabel = entry.dexLabel ?? pickDexLabel(dexId)
     const type = entry.type ?? "xyk"
     const volumes = parseMarketVolumeSummary(entry.volumes)
+    const bonding =
+      entry.bonding && typeof entry.bonding === "object"
+        ? ({
+            ...entry.bonding,
+            factory:
+              typeof entry.bonding.factory === "string"
+                ? entry.bonding.factory.toLowerCase()
+                : undefined,
+            liquidityAmount:
+              typeof entry.bonding.liquidityAmount === "string"
+                ? entry.bonding.liquidityAmount
+                : undefined,
+            liquidityAssetId:
+              typeof entry.bonding.liquidityAssetId === "string"
+                ? normalizeMarketAssetId(entry.bonding.liquidityAssetId)
+                : undefined,
+            nativeDenom:
+              typeof entry.bonding.nativeDenom === "string"
+                ? entry.bonding.nativeDenom
+                : undefined,
+            status:
+              typeof entry.bonding.status === "string"
+                ? entry.bonding.status
+                : undefined,
+            tokenAddress:
+              typeof entry.bonding.tokenAddress === "string"
+                ? entry.bonding.tokenAddress.toLowerCase()
+                : undefined,
+            virtualQuoteAmount:
+              typeof entry.bonding.virtualQuoteAmount === "string"
+                ? entry.bonding.virtualQuoteAmount
+                : undefined
+          } satisfies MarketBondingSnapshot)
+        : undefined
     const fallbackAssets =
       Array.isArray(entry.assets) && entry.assets.length >= 2
         ? [entry.assets[0], entry.assets[1]]
@@ -809,6 +876,7 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
     }
     const poolRecord: MarketPoolSnapshot = {
       pair,
+      bonding,
       dexId,
       dexLabel,
       type,
@@ -1020,21 +1088,34 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
     }
   }
 
+  if (
+    dex.mode === "code-id" ||
+    dex.mode === "terrapump" ||
+    dex.mode === "luncpump"
+  ) {
+    await Promise.all((dex.pairCodeIds ?? []).map((codeId) => loadContractsByCodeId(codeId)))
+    return pairContracts
+  }
+
   if (dex.mode === "garuda") {
-    try {
-      const data = await queryContractSmart<FactoryPairsResponse>(dex.factory, {
-        pairs: { limit: 1000 }
-      })
-      ;(data?.pairs ?? []).forEach((pair) => {
-        const contract = "contract" in pair ? pair.contract : undefined
-        if (contract) pairContracts.add(contract.toLowerCase())
-      })
-    } catch {
-      // Ignore single dex failures.
+    if (dex.factory) {
+      try {
+        const data = await queryContractSmart<FactoryPairsResponse>(dex.factory, {
+          pairs: { limit: 1000 }
+        })
+        ;(data?.pairs ?? []).forEach((pair) => {
+          const contract = "contract" in pair ? pair.contract : undefined
+          if (contract) pairContracts.add(contract.toLowerCase())
+        })
+      } catch {
+        // Ignore single dex failures.
+      }
     }
     await Promise.all((dex.pairCodeIds ?? []).map((codeId) => loadContractsByCodeId(codeId)))
     return pairContracts
   }
+
+  if (!dex.factory) return pairContracts
 
   let startAfter: unknown[] | undefined
   const seenCursors = new Set<string>()
@@ -1143,7 +1224,27 @@ const fetchPoolForPair = async (
   try {
     const data = await queryContractSmart<PoolResponse>(pair.pair, { pool: {} })
     const assets = data?.assets
-    if (!Array.isArray(assets) || assets.length < 2) return null
+    if (!Array.isArray(assets) || assets.length < 2) {
+      if (!data?.asset1 || !data?.asset2) return null
+
+      const matchedDex = pairDexMap.get(pair.pair.toLowerCase())
+      return {
+        pair: pair.pair,
+        dexId: matchedDex?.dexId ?? pair.dexId,
+        dexLabel: matchedDex?.dexLabel ?? pair.dexLabel,
+        type: pair.type,
+        poolAssets: [
+          {
+            id: resolveAssetId(data.asset1, pair.assets[0]),
+            amount: data.reserve1 ?? "0"
+          },
+          {
+            id: resolveAssetId(data.asset2, pair.assets[1]),
+            amount: data.reserve2 ?? "0"
+          }
+        ]
+      }
+    }
 
     const left = assets[0]
     const right = assets[1]
@@ -1184,15 +1285,19 @@ export const fetchMarketPoolLive = async (pair: MarketDexPair) =>
 export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
   const local = await fetchLocalMarketIndex()
   const snapshots: MarketPoolSnapshot[] = []
+  const staleLocalVolumes = new Map<string, MarketVolumeSummary | undefined>()
   let pairsToFetch = pairs
 
   if (local?.pools.size) {
     pairsToFetch = []
     pairs.forEach((pair) => {
       const localPool = local.pools.get(pair.pair.toLowerCase())
-      if (localPool) {
+      if (localPool && !shouldRefreshLocalPoolSnapshot(localPool)) {
         snapshots.push(localPool)
       } else {
+        if (localPool) {
+          staleLocalVolumes.set(pair.pair.toLowerCase(), localPool.volumes)
+        }
         pairsToFetch.push(pair)
       }
     })
@@ -1206,7 +1311,9 @@ export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
     const chunk = pairsToFetch.slice(index, index + chunkSize)
     const resolved = await Promise.all(chunk.map((pair) => fetchPoolForPair(pair, pairDexMap)))
     resolved.forEach((item) => {
-      if (item) snapshots.push(item)
+      if (!item) return
+      const volumes = staleLocalVolumes.get(item.pair.toLowerCase())
+      snapshots.push(volumes && !item.volumes ? { ...item, volumes } : item)
     })
   }
 

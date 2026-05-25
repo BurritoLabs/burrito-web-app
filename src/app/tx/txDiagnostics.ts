@@ -49,6 +49,13 @@ export const cleanTxErrorMessage = (message: string) =>
     .replace(/\s+/g, " ")
     .trim()
 
+export const parseSequenceMismatchExpected = (message: string) => {
+  const matched = message.match(/expected\s+(\d+)\s*,\s*got\s+\d+/i)
+  if (!matched) return undefined
+  const value = Number(matched[1])
+  return Number.isFinite(value) ? value : undefined
+}
+
 const createDiagnosticId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID()

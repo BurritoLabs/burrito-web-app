@@ -112,10 +112,10 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: clamp(24px, 2vw, 32px);
+  font-size: 30px;
   line-height: 1;
   font-weight: var(--bold);
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -133,7 +133,7 @@
 
 .heroMeta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 8px;
   width: 100%;
 }
@@ -151,14 +151,14 @@
 
 .heroMetaItem em {
   font-style: normal;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(234, 245, 235, 0.56);
+  font-size: 12px;
+  font-weight: var(--semibold);
+  letter-spacing: 0;
+  color: rgba(234, 245, 235, 0.62);
 }
 
 .heroMetaItem strong {
-  font-size: clamp(16px, 1.1vw, 19px);
+  font-size: 18px;
   line-height: 1.05;
   color: #ffffff;
   min-width: 0;
@@ -185,10 +185,10 @@
 .heroInfoItem em {
   flex: 0 0 auto;
   font-style: normal;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(234, 245, 235, 0.5);
+  font-size: 12px;
+  font-weight: var(--semibold);
+  letter-spacing: 0;
+  color: rgba(234, 245, 235, 0.58);
 }
 
 .heroInfoItem strong {
@@ -227,6 +227,58 @@
   text-underline-offset: 2px;
 }
 
+.heroAddressRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.heroAddressButton {
+  min-width: 0;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(234, 245, 235, 0.78);
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.heroAddressButton:hover {
+  border-color: rgba(104, 216, 63, 0.38);
+  background: rgba(104, 216, 63, 0.09);
+}
+
+.heroAddressButton em {
+  font-style: normal;
+  color: rgba(234, 245, 235, 0.6);
+  font-size: 12px;
+  font-weight: var(--semibold);
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.heroAddressButton strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(244, 255, 244, 0.88);
+  font-size: 12px;
+  font-weight: var(--bold);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.heroAddressButton span {
+  color: rgba(133, 230, 91, 0.92);
+  font-size: 11px;
+  font-weight: var(--semibold);
+}
+
 .reserveValue {
   display: block;
   white-space: nowrap;
@@ -236,7 +288,6 @@
 
 .poolValue {
   display: block;
-  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Consolas, monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -275,10 +326,10 @@
 }
 
 .priceMain {
-  font-size: clamp(24px, 2.2vw, 32px);
+  font-size: 30px;
   line-height: 1;
   font-weight: var(--bold);
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
   color: #ffffff;
   white-space: nowrap;
 }
@@ -365,9 +416,9 @@
 }
 
 .sectionTitle {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: var(--bold);
+  letter-spacing: 0;
   color: rgba(234, 245, 235, 0.62);
 }
 
@@ -498,7 +549,7 @@
   padding: 2px 8px;
   font-size: 11px;
   font-weight: var(--bold);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .chartTooltipChangeUp {
@@ -601,11 +652,10 @@
 
 .tradesTable thead th {
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--bold);
   color: rgba(234, 245, 235, 0.62);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   padding: 12px 16px;
   border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.1);
   white-space: nowrap;
@@ -629,7 +679,6 @@
   border: var(--border-width) solid transparent;
   font-size: 11px;
   font-weight: var(--bold);
-  text-transform: uppercase;
 }
 
 .sideBuy {
@@ -685,12 +734,492 @@
 
 .swapEmbed {
   width: 100%;
-  height: 100%;
   min-height: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.sidePanelTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(8, 16, 13, 0.72);
+}
+
+.sidePanelTabsSingle {
+  grid-template-columns: 1fr;
+}
+
+.sidePanelTabs button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(234, 245, 235, 0.66);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: var(--semibold);
+  cursor: pointer;
+}
+
+.sidePanelTabs button:hover,
+.sidePanelTabActive {
+  color: #f4fff4 !important;
+  background: rgba(104, 216, 63, 0.16) !important;
+}
+
+.liquidityCard {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.liquidityTopMeta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.liquidityFormHint {
+  margin: 0;
+  min-width: 0;
+  color: rgba(234, 245, 235, 0.58);
+  font-size: 11px;
+}
+
+.liquiditySlippageControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: end;
+  padding: 3px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.liquiditySlippageControlPlaceholder {
+  width: 146px;
+  min-height: 34px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.liquiditySlippageButton {
+  height: 26px;
+  min-width: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(234, 245, 235, 0.7);
+  font-size: 11px;
+  font-weight: var(--bold);
+  line-height: 1;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.liquiditySlippageButtonActive {
+  color: #0e1a12;
+  background: var(--green);
+}
+
+.liquidityHeader {
+  display: grid;
+  gap: 3px;
+}
+
+.liquidityHeader span,
+.liquidityAssetTop,
+.liquidityReceiveBox span {
+  color: rgba(234, 245, 235, 0.54);
+  font-size: 12px;
+  font-weight: var(--semibold);
+}
+
+.liquidityHeader span,
+.liquidityReceiveBox span {
+  letter-spacing: 0;
+}
+
+.liquidityHeader strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.liquidityForm {
+  display: grid;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.liquidityAssetBox,
+.liquidityReceiveBox {
+  display: grid;
+  gap: 6px;
+  height: 123px;
+  min-height: 123px;
+  padding: 11px 12px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(9, 22, 16, 0.95), rgba(8, 18, 13, 0.92));
+}
+
+.liquidityAssetBox {
+  grid-template-rows: auto minmax(40px, 1fr) auto;
+}
+
+.liquidityReceiveBox {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.liquidityAssetTop {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: rgba(234, 245, 235, 0.64);
+}
+
+.liquidityAssetTop span:first-child {
+  color: rgba(234, 245, 235, 0.88);
+  font-weight: var(--bold);
+}
+
+.liquidityAssetTop button {
+  border: 0;
+  border-radius: 999px;
+  background: rgba(82, 196, 26, 0.14);
+  color: var(--green);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: var(--bold);
+  line-height: 1;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.liquidityAssetTop button:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(234, 245, 235, 0.32);
+  cursor: not-allowed;
+}
+
+.liquidityAssetInputRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.liquidityAssetInputRow input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #f8fbff;
+  font-family: var(--font-ui);
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: var(--bold);
+  line-height: 1.1;
+  outline: none;
+  text-align: right;
+}
+
+.liquidityAssetInputRow input::placeholder {
+  color: rgba(234, 245, 235, 0.3);
+}
+
+.liquidityAssetPill {
+  min-width: 96px;
+  height: 36px;
+  border-radius: 12px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.03);
+  color: #f4f8ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: var(--bold);
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.liquidityAssetPillValue {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.liquidityAssetPillValue span:last-child {
+  min-width: 0;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.liquidityLpIconStack {
+  position: relative;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 24px;
+}
+
+.liquidityLpIconPrimary,
+.liquidityLpIconSecondary {
+  position: absolute;
+  top: 1px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(8, 18, 13, 0.94);
+  box-shadow: 0 0 0 2px rgba(9, 22, 16, 0.96);
+}
+
+.liquidityLpIconPrimary {
+  left: 0;
+  z-index: 2;
+}
+
+.liquidityLpIconSecondary {
+  right: 0;
+  z-index: 1;
+}
+
+.liquidityAssetFooter {
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(234, 245, 235, 0.74);
+  font-size: 11px;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  padding-top: 6px;
+}
+
+.liquidityAssetFooter span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liquidityReceiveTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.liquidityReceiveRows {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+}
+
+.liquidityReceiveRow {
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.liquidityReceiveAsset {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 255, 244, 0.88);
+  font-size: 14px;
+  font-weight: var(--bold);
+}
+
+.liquidityReceiveAsset span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liquidityOperator {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  justify-self: center;
+  margin: -3px 0;
+  border-radius: 999px;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--green);
+  line-height: 1;
+  font-weight: var(--bold);
+}
+
+.liquidityOperator svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.liquidityDetails {
+  display: grid;
+  overflow: hidden;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.liquidityDetailsHeader {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-ui);
+  padding: 9px 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.liquidityDetailsTitle {
+  color: rgba(244, 255, 244, 0.88);
+  font-size: 12px;
+  font-weight: var(--bold);
+}
+
+.liquidityDetailsToggle {
+  flex: 0 0 auto;
+  color: rgba(82, 196, 26, 0.95);
+  font-size: 11px;
+  font-weight: var(--bold);
+  white-space: nowrap;
+}
+
+.liquidityDetailsBody {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.liquidityEstimateRows {
+  display: grid;
+  gap: 0;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.liquidityEstimateRows div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+}
+
+.liquidityEstimateRows div:last-child {
+  border-bottom: 0;
+}
+
+.liquidityEstimateRows span {
+  flex: 0 0 auto;
+  color: rgba(234, 245, 235, 0.56);
+  font-size: 12px;
+  font-weight: var(--semibold);
+}
+
+.liquidityEstimateRows strong {
+  min-width: 0;
+  color: rgba(244, 255, 244, 0.86);
+  font-size: 12px;
+  font-weight: var(--semibold);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.liquidityReceiveBox strong {
+  color: rgba(244, 255, 244, 0.82);
+  font-size: clamp(18px, 1.8vw, 23px);
+  line-height: 1.1;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.liquidityNotice {
+  margin: 0;
+  color: rgba(234, 245, 235, 0.58);
+  font-size: 12px;
+  line-height: 1.45;
+  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+}
+
+.liquidityError {
+  padding: 10px;
+  border: var(--border-width) solid rgba(255, 105, 105, 0.24);
+  border-radius: 10px;
+  background: rgba(255, 105, 105, 0.1);
+  color: rgba(255, 190, 190, 0.94);
+  font-size: 12px;
+}
+
+.liquidityTxLink {
+  color: rgba(104, 216, 63, 0.94);
+  font-size: 12px;
+  font-weight: var(--semibold);
+}
+
+.liquiditySubmitButton {
+  width: 100%;
+  height: 40px;
+  font-size: 13px;
 }
 
 @media (max-width: 991.98px) {
+  .liquidityTopMeta {
+    grid-template-columns: 1fr;
+  }
+
+  .liquiditySlippageControl {
+    justify-self: start;
+  }
+
   .heroTop {
     flex-direction: column;
     align-items: flex-start;
@@ -743,6 +1272,10 @@
     gap: 6px;
   }
 
+  .heroAddressRow {
+    grid-template-columns: 1fr;
+  }
+
   .heroMetaItem {
     min-height: 52px;
     padding: 9px 11px;
@@ -782,5 +1315,10 @@
 
   .swapEmbed {
     height: auto;
+  }
+
+  .liquidityEstimateRows div {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

@@ -24,10 +24,24 @@ export type TerraswapPairInfo = {
   contract_addr: string
   liquidity_token?: string
   asset_decimals?: number[]
+  pair_type?: Record<string, unknown>
 }
 
 type TerraswapLiquidityAsset = {
   info: NativeAssetInfo | TokenAssetInfo
+  amount: string
+}
+
+type GarudaNativeAssetInfo = {
+  native: string
+}
+
+type GarudaCw20AssetInfo = {
+  cw20: string
+}
+
+type GarudaLiquidityAsset = {
+  info: GarudaNativeAssetInfo | GarudaCw20AssetInfo
   amount: string
 }
 
@@ -83,6 +97,9 @@ export const fetchTerraswapLuncPair = async (tokenAddress: string) => {
     throw error
   }
 }
+
+export const fetchTerraswapPairInfo = async (pairAddress: string) =>
+  queryContractSmart<TerraswapPairInfo>(pairAddress, { pair: {} })
 
 export const waitForTerraswapLuncPair = async (
   tokenAddress: string,
@@ -223,6 +240,90 @@ export const buildProvideTerraswapLiquidityMessage = ({
   }
 }
 
+export const buildProvideStandardLiquidityMessage = ({
+  sender,
+  pairAddress,
+  assets,
+  slippageTolerance
+}: {
+  sender: string
+  pairAddress: string
+  assets: TerraswapLiquidityAsset[]
+  slippageTolerance?: string
+}) => {
+  const msg: TerraswapProvideLiquidityMsg = {
+    provide_liquidity: {
+      assets
+    }
+  }
+
+  if (slippageTolerance) {
+    msg.provide_liquidity.slippage_tolerance = slippageTolerance
+  }
+
+  return {
+    typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+    value: MsgExecuteContract.fromPartial({
+      sender,
+      contract: pairAddress,
+      msg: toUtf8(JSON.stringify(msg)),
+      funds: assets
+        .flatMap((asset) =>
+          "native_token" in asset.info
+            ? [
+                {
+                  denom: asset.info.native_token.denom,
+                  amount: asset.amount
+                }
+              ]
+            : []
+        )
+        .sort((first, second) => first.denom.localeCompare(second.denom))
+    })
+  }
+}
+
+export const buildProvideGarudaLiquidityMessage = ({
+  sender,
+  pairAddress,
+  asset1,
+  asset2,
+  minLiquidity = "0"
+}: {
+  sender: string
+  pairAddress: string
+  asset1: GarudaLiquidityAsset
+  asset2: GarudaLiquidityAsset
+  minLiquidity?: string
+}) => ({
+  typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+  value: MsgExecuteContract.fromPartial({
+    sender,
+    contract: pairAddress,
+    msg: toUtf8(
+      JSON.stringify({
+        provide_liquidity: {
+          min_liquidity: minLiquidity,
+          asset1_amount: asset1.amount,
+          asset2_amount: asset2.amount
+        }
+      })
+    ),
+    funds: [asset1, asset2]
+      .flatMap((asset) =>
+        "native" in asset.info
+          ? [
+              {
+                denom: asset.info.native,
+                amount: asset.amount
+              }
+            ]
+          : []
+      )
+      .sort((first, second) => first.denom.localeCompare(second.denom))
+  })
+})
+
 export const buildWithdrawTerraswapLiquidityMessage = ({
   sender,
   pairAddress,
@@ -250,6 +351,32 @@ export const buildWithdrawTerraswapLiquidityMessage = ({
               })
             )
           )
+        }
+      })
+    ),
+    funds: []
+  })
+})
+
+export const buildWithdrawGarudaLiquidityMessage = ({
+  sender,
+  pairAddress,
+  lpAmount
+}: {
+  sender: string
+  pairAddress: string
+  lpAmount: string
+}) => ({
+  typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+  value: MsgExecuteContract.fromPartial({
+    sender,
+    contract: pairAddress,
+    msg: toUtf8(
+      JSON.stringify({
+        withdraw_liquidity: {
+          lp_amount: lpAmount,
+          min_asset1: "0",
+          min_asset2: "0"
         }
       })
     ),

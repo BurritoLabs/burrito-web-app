@@ -52,12 +52,23 @@
 }
 
 .swapCardEmbedded .fieldCard {
+  height: 123px;
+  min-height: 123px;
   padding: 11px 12px;
   gap: 6px;
+  grid-template-rows: auto minmax(40px, 1fr) auto;
+}
+
+.swapCardEmbedded .fieldHeader {
+  min-height: 23px;
 }
 
 .swapCardEmbedded .fieldBody {
   gap: 8px;
+}
+
+.swapCardEmbedded .switchRow {
+  margin: -1px 0;
 }
 
 .swapCardEmbedded .amountInput,
@@ -78,9 +89,9 @@
 }
 
 .swapCardEmbedded .assetPickerButton {
-  min-width: 128px;
-  height: 40px;
-  font-size: 14px;
+  min-width: 96px;
+  height: 36px;
+  font-size: 13px;
   border-radius: 12px;
 }
 
@@ -120,6 +131,11 @@
   min-height: 0;
   overflow: auto;
   padding: 0 10px 10px;
+}
+
+.swapCardEmbedded .quotePlaceholder {
+  min-height: 40px;
+  padding: 10px 12px;
 }
 
 .swapCardEmbedded .detailsGrid {
@@ -335,14 +351,33 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 10px 0 9px;
+  padding: 0 10px;
   font-size: 16px;
   font-weight: var(--bold);
+  line-height: 1;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .assetPickerButton:hover {
   border-color: rgba(82, 196, 26, 0.55);
+}
+
+.assetPickerButton:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.assetPickerButtonStatic {
+  justify-content: flex-start;
+}
+
+.assetPickerButtonStatic:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.assetPickerButtonStatic .assetPickerValue {
+  flex: 0 1 auto;
+  justify-content: flex-start;
 }
 
 .assetPickerValue {
@@ -351,14 +386,19 @@
   gap: 8px;
   min-width: 0;
   flex: 1 1 auto;
+  line-height: 1;
   overflow: hidden;
 }
 
 .assetPickerValue span:last-child {
   min-width: 0;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1;
 }
 
 .assetPickerValue img,
@@ -399,9 +439,18 @@
   padding-top: 8px;
 }
 
+.fieldFooter span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .usdHint {
   color: rgba(234, 245, 235, 0.92);
+  flex: 0 1 auto;
   font-weight: 600;
+  text-align: right;
 }
 
 .maxButton {
@@ -427,7 +476,7 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.04);
-  color: rgba(234, 245, 235, 0.84);
+  color: var(--green);
   font-size: 17px;
   display: inline-flex;
   align-items: center;

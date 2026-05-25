@@ -33,6 +33,7 @@ export type OwnerLaunchRecord = {
   infoStatus: string
   ownerStatus: string
   mode: string
+  creatorAddress?: string
   contractAddress?: string
   txHash?: string
   decimals?: number
@@ -138,13 +139,13 @@ export type LaunchCardItem = {
   unlockTime?: number
   lockedLpAmount?: string
   lpWithdrawn?: boolean
-  sample?: boolean
 }
 
 export type OwnerNextAction = {
   title: string
   text: string
   actionLabel?: string
+  actionTo?: string
   targetId?: string
 }
 
@@ -243,65 +244,6 @@ export const getManageSectionFromTarget = (
   if (targetId === "launchpad-pool") return "pool"
   return null
 }
-
-export const sampleLaunches: LaunchCardItem[] = [
-  {
-    id: "sample-taco",
-    symbol: "TACO",
-    name: "Taco Protocol",
-    pair: "TACO / LUNC",
-    state: "live",
-    status: "Trading live",
-    liquidity: "$42,000",
-    lock: "90 days",
-    creator: "terra1...8q5m",
-    risk: "Open launch",
-    progress: 100,
-    sample: true
-  },
-  {
-    id: "sample-salsa",
-    symbol: "SALSA",
-    name: "Salsa Finance",
-    pair: "SALSA / LUNC",
-    state: "pending",
-    status: "Pending launch",
-    liquidity: "$18,400",
-    lock: "180 days",
-    creator: "terra1...p9dz",
-    risk: "Waiting for initial LP",
-    progress: 72,
-    sample: true
-  },
-  {
-    id: "sample-bean",
-    symbol: "BEAN",
-    name: "Bean Market",
-    pair: "BEAN / LUNC",
-    state: "ended",
-    status: "Initial launch ended",
-    liquidity: "$76,200",
-    lock: "365 days",
-    creator: "terra1...m2qh",
-    risk: "Long LP lock",
-    progress: 100,
-    sample: true
-  },
-  {
-    id: "sample-churro",
-    symbol: "CHURRO",
-    name: "Churro Labs",
-    pair: "CHURRO / LUNC",
-    state: "risk",
-    status: "Needs review",
-    liquidity: "$9,300",
-    lock: "45 days",
-    creator: "terra1...0v7k",
-    risk: "Low liquidity",
-    progress: 38,
-    sample: true
-  }
-]
 
 export const ownerLaunches: OwnerLaunchRecord[] = []
 
@@ -517,6 +459,7 @@ export const buildOwnerRecordFromRegistryLaunch = (
     ownerStatus:
       launch.status === "hidden" ? "Listing hidden" : "Launch published",
     mode: "Published launch",
+    creatorAddress: launch.creator,
     contractAddress: launch.token_contract,
     decimals: tokenInfo?.decimals,
     totalSupply: tokenInfo?.total_supply,

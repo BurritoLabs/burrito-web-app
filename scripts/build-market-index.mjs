@@ -5,6 +5,7 @@ const LCD =
   process.env.LCD_URL?.trim() || "https://terra-classic-lcd.publicnode.com";
 const CHAIN_ID = "columbus-5";
 const DEFAULT_OUT = path.resolve(process.cwd(), "public", "market", "index.json");
+const MIN_PAIR_COUNT = Number.parseInt(process.env.MARKET_INDEX_MIN_PAIRS ?? "1000", 10);
 
 const DEXES = [
   {
@@ -61,6 +62,31 @@ const DEXES = [
       "terra1ypwj6sw25g0qcykv7mzmcvsndvx56r3yrgkaw3fds7yzwl7fwwcsnxkeh7",
     mode: "garuda",
     pairCodeIds: [10907],
+  },
+  {
+    id: "white-whale",
+    label: "White Whale",
+    mode: "code-id",
+    pairCodeIds: [8710],
+  },
+  {
+    id: "luncswap",
+    label: "LUNCSwap.fun",
+    mode: "code-id",
+    pairCodeIds: [9913],
+  },
+  {
+    id: "terra-pump",
+    label: "Terra.pump",
+    mode: "terrapump",
+    pairCodeIds: [9882, 10495],
+  },
+  {
+    id: "luncpump",
+    label: "LUNCPump.fun",
+    factory: "terra1szpen6r7eqstv3qlyvgzkx9d54gzl03a70asdctnp2uz8wqzaymsrpq8ag",
+    mode: "luncpump",
+    pairCodeIds: [9912],
   },
 ];
 
@@ -154,6 +180,21 @@ const toFallbackAsset = (assetId) => {
   if (assetId.startsWith("cw20:")) return assetId.slice("cw20:".length);
   return assetId;
 };
+
+const parseBaseUnits = (value) => {
+  if (!value || !/^\d+$/.test(String(value))) return 0n;
+  try {
+    return BigInt(value);
+  } catch {
+    return 0n;
+  }
+};
+
+const addBaseUnits = (...values) =>
+  values.reduce((sum, value) => sum + parseBaseUnits(value), 0n).toString();
+
+const multiplyBaseUnits = (value, multiplier) =>
+  (parseBaseUnits(value) * BigInt(multiplier)).toString();
 
 const mapWithConcurrency = async (items, limit, mapper) => {
   const results = [];
@@ -273,10 +314,20 @@ const loadPairsFromAstroportFactory = async (dex) => {
   return mergePairEntries(merged);
 };
 
+const loadPairsFromCodeIds = async (dex) => {
+  const codeIds = Array.isArray(dex.pairCodeIds) ? dex.pairCodeIds : [];
+  const byCode = await mapWithConcurrency(codeIds, 3, (codeId) => loadContractsByCodeId(codeId));
+  const entries = [];
+  byCode.forEach((contracts) => entries.push(...(contracts ?? [])));
+  return mergePairEntries(entries);
+};
+
 const resolvePoolSnapshots = async (pairEntries, dex) => {
   const firstPass = await mapWithConcurrency(pairEntries, 14, async (pairEntry) => ({
     pairEntry,
-    snapshot: await resolvePoolSnapshot(pairEntry, dex),
+    snapshot: await resolvePoolSnapshot(pairEntry, dex, {
+      allowAssetInfoFallback: false,
+    }),
   }));
 
   const snapshots = [];
@@ -296,7 +347,9 @@ const resolvePoolSnapshots = async (pairEntries, dex) => {
   // pools slowly before deciding a discovered pair has no readable pool state.
   const retryPass = await mapWithConcurrency(unresolved, 3, async (pairEntry) => ({
     pairEntry,
-    snapshot: await resolvePoolSnapshot(pairEntry, dex),
+    snapshot: await resolvePoolSnapshot(pairEntry, dex, {
+      allowAssetInfoFallback: true,
+    }),
   }));
 
   retryPass.forEach(({ snapshot }) => {
@@ -311,9 +364,21 @@ const resolvePoolSnapshots = async (pairEntries, dex) => {
   return snapshots;
 };
 
-const resolvePoolSnapshot = async (pairEntry, dex) => {
+const resolvePoolSnapshot = async (
+  pairEntry,
+  dex,
+  { allowAssetInfoFallback = true } = {}
+) => {
   const pairAddress = pairEntry?.pair;
   if (!pairAddress) return null;
+
+  if (dex.mode === "terrapump") {
+    return resolveTerraPumpSnapshot(pairAddress, dex);
+  }
+
+  if (dex.mode === "luncpump") {
+    return resolveLuncPumpSnapshot(pairAddress, dex);
+  }
 
   const fromAssetInfos = (assetInfos, leftAmount = "0", rightAmount = "0") => {
     const infos = Array.isArray(assetInfos) ? assetInfos : [];
@@ -337,7 +402,7 @@ const resolvePoolSnapshot = async (pairEntry, dex) => {
   try {
     data = await querySmart(pairAddress, { pool: {} });
   } catch {
-    return fromAssetInfos(pairEntry?.assetInfos);
+    return allowAssetInfoFallback ? fromAssetInfos(pairEntry?.assetInfos) : null;
   }
 
   const assets = Array.isArray(data?.assets) ? data.assets : null;
@@ -357,7 +422,99 @@ const resolvePoolSnapshot = async (pairEntry, dex) => {
     );
   }
 
-  return fromAssetInfos(pairEntry?.assetInfos);
+  return allowAssetInfoFallback ? fromAssetInfos(pairEntry?.assetInfos) : null;
+};
+
+const resolveTerraPumpSnapshot = async (pairAddress, dex) => {
+  let info;
+  let config;
+  try {
+    [info, config] = await Promise.all([
+      querySmart(pairAddress, { info: {} }),
+      querySmart(pairAddress, { config: {} }),
+    ]);
+  } catch {
+    return null;
+  }
+
+  const tokenAddress =
+    info?.token_address ?? config?.token ?? config?.token_address ?? "";
+  const nativeDenom =
+    info?.native_denom ?? config?.config?.native_denom ?? "uluna";
+  if (!looksLikeTerraAddress(tokenAddress) || !nativeDenom) return null;
+
+  const tokenAmount = String(info?.vault_token ?? "0");
+  const actualNativeAmount = String(info?.vault_native ?? "0");
+  const virtualNativeAmount = String(info?.virtual_reserve ?? config?.virtual_reserve ?? "0");
+  const effectiveNativeAmount = addBaseUnits(actualNativeAmount, virtualNativeAmount);
+  const tokenId = `cw20:${tokenAddress.toLowerCase()}`;
+  const nativeId = `native:${nativeDenom}`;
+
+  return {
+    pair: pairAddress,
+    dexId: dex.id,
+    dexLabel: dex.label,
+    type: "bonding-terrapump",
+    assets: [tokenAddress.toLowerCase(), nativeDenom],
+    poolAssets: [
+      { id: tokenId, amount: tokenAmount },
+      { id: nativeId, amount: effectiveNativeAmount },
+    ],
+    bonding: {
+      protocol: "terrapump",
+      factory: config?.contract_factory ?? "",
+      tokenAddress: tokenAddress.toLowerCase(),
+      nativeDenom,
+      status: String(info?.status ?? config?.status ?? ""),
+      virtualQuoteAmount: virtualNativeAmount,
+      liquidityAssetId: nativeId,
+      liquidityAmount: actualNativeAmount,
+    },
+  };
+};
+
+const resolveLuncPumpSnapshot = async (tokenAddress, dex) => {
+  if (!dex.factory || !looksLikeTerraAddress(tokenAddress)) return null;
+
+  let memeConfig;
+  try {
+    memeConfig = await querySmart(dex.factory, {
+      get_meme_config: {
+        token_address: tokenAddress,
+      },
+    });
+  } catch {
+    return null;
+  }
+
+  const nativeDenom = "uluna";
+  const tokenId = `cw20:${tokenAddress.toLowerCase()}`;
+  const nativeId = `native:${nativeDenom}`;
+  const tokenReserve = String(memeConfig?.token_reserve ?? "0");
+  const luncReserve = String(memeConfig?.lunc_reserve ?? "0");
+  const actualLuncReserve = String(memeConfig?.actual_lunc_reserve ?? "0");
+
+  return {
+    pair: tokenAddress.toLowerCase(),
+    dexId: dex.id,
+    dexLabel: dex.label,
+    type: "bonding-luncpump",
+    assets: [tokenAddress.toLowerCase(), nativeDenom],
+    poolAssets: [
+      { id: tokenId, amount: tokenReserve },
+      { id: nativeId, amount: luncReserve },
+    ],
+    bonding: {
+      protocol: "luncpump",
+      factory: dex.factory,
+      tokenAddress: tokenAddress.toLowerCase(),
+      nativeDenom,
+      status: memeConfig?.is_matured ? "matured" : "open",
+      virtualQuoteAmount: String(memeConfig?.initial_lunc_reserve ?? "0"),
+      liquidityAssetId: nativeId,
+      liquidityAmount: multiplyBaseUnits(actualLuncReserve, 2),
+    },
+  };
 };
 
 const parseOutArg = () => {
@@ -398,6 +555,10 @@ const run = async () => {
         ? await loadPairsFromGarudaFactory(dex)
         : dex.mode === "astroport"
         ? await loadPairsFromAstroportFactory(dex)
+        : dex.mode === "code-id" ||
+          dex.mode === "terrapump" ||
+          dex.mode === "luncpump"
+        ? await loadPairsFromCodeIds(dex)
         : await loadPairsFromTerraswapFactory(dex.factory);
 
     console.log(`${dex.label}: discovered ${pairEntries.length} pairs`);
@@ -424,6 +585,12 @@ const run = async () => {
       const volumes = existingVolumes.get(entry.pair);
       return volumes ? { ...entry, volumes } : entry;
     });
+
+  if (Number.isFinite(MIN_PAIR_COUNT) && pairs.length < MIN_PAIR_COUNT) {
+    throw new Error(
+      `Market index resolved ${pairs.length} pools, below MARKET_INDEX_MIN_PAIRS=${MIN_PAIR_COUNT}`
+    );
+  }
 
   const dexCounts = DEXES.map((dex) => ({
     id: dex.id,

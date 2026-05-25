@@ -19,6 +19,8 @@ type HexxagonDexPair = {
 
 type PoolAsset = {
   info?: {
+    cw20?: string
+    native?: string
     native_token?: { denom?: string }
     token?: { contract_addr?: string }
   }
@@ -27,7 +29,17 @@ type PoolAsset = {
 
 type PoolResponse = {
   data?: {
+    asset1?: {
+      cw20?: string
+      native?: string
+    }
+    asset2?: {
+      cw20?: string
+      native?: string
+    }
     assets?: PoolAsset[]
+    reserve1?: string
+    reserve2?: string
   }
 }
 
@@ -75,9 +87,9 @@ const normalizeAssetKey = (key: string) => {
 }
 
 const parsePoolAssetKey = (asset: PoolAsset) => {
-  const native = asset.info?.native_token?.denom
+  const native = asset.info?.native_token?.denom ?? asset.info?.native
   if (native) return normalizeAssetKey(native)
-  const cw20 = asset.info?.token?.contract_addr
+  const cw20 = asset.info?.token?.contract_addr ?? asset.info?.cw20
   if (cw20) return normalizeAssetKey(cw20)
   return undefined
 }
@@ -142,7 +154,20 @@ const fetchPairPool = async (pair: string) => {
   const response = await fetchWithEndpointFallback(url)
   if (!response.ok) return undefined
   const data = (await response.json()) as PoolResponse
-  const assets = data?.data?.assets
+  const assets =
+    data?.data?.assets ??
+    (data?.data?.asset1 && data?.data?.asset2
+      ? [
+          {
+            info: data.data.asset1,
+            amount: data.data.reserve1 ?? "0"
+          },
+          {
+            info: data.data.asset2,
+            amount: data.data.reserve2 ?? "0"
+          }
+        ]
+      : undefined)
   if (!Array.isArray(assets) || !assets.length) return undefined
   poolCache.set(pair, { ts: Date.now(), assets })
   return assets
@@ -156,11 +181,13 @@ const resolveDirectFactoryPair = async ({
   askKey
 }: {
   dexId: string
-  factory: string
-  mode?: "terraswap" | "garuda"
+  factory?: string
+  mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump"
   offerKey: string
   askKey: string
 }) => {
+  if (!factory || mode === "code-id") return undefined
+
   const cacheKey = `${dexId}:${factory}:${offerKey}:${askKey}`
   if (directFactoryPairCache.has(cacheKey)) {
     return directFactoryPairCache.get(cacheKey) ?? undefined
@@ -326,7 +353,11 @@ export const fetchDirectAnchorDexPrices = async (
   for (const { key } of normalized) {
     for (const anchorKey of ANCHORS) {
       const directQuotes = await Promise.all(
-        CLASSIC_SWAP_DEXES.map(async (dex) => {
+        CLASSIC_SWAP_DEXES.filter(
+          (dex) =>
+            dex.factory &&
+            (!dex.mode || dex.mode === "terraswap" || dex.mode === "garuda")
+        ).map(async (dex) => {
           const pair = await resolveDirectFactoryPair({
             dexId: dex.id,
             factory: dex.factory,

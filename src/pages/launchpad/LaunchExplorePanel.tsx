@@ -25,7 +25,6 @@ type LaunchExplorePanelProps = {
   registryError?: string
   registryLoading: boolean
   selectedLaunch?: LaunchCardItem
-  shouldShowSampleLaunches: boolean
   onCopyText: (value: string) => Promise<void>
   onFilterChange: (filter: LaunchFilter) => void
   onSearchChange: (value: string) => void
@@ -45,7 +44,6 @@ const LaunchExplorePanel = ({
   registryError,
   registryLoading,
   selectedLaunch,
-  shouldShowSampleLaunches,
   onCopyText,
   onFilterChange,
   onSearchChange,
@@ -60,11 +58,7 @@ const LaunchExplorePanel = ({
         {registryLoading ? <p>Loading registry...</p> : null}
         {registryError ? <p>{registryError}</p> : null}
         {!isLaunchRegistryConfigured ? (
-          <p>
-            {shouldShowSampleLaunches
-              ? "Showing preview launches until registry is configured."
-              : "Registry is not configured."}
-          </p>
+          <p>Registry is not configured.</p>
         ) : null}
       </div>
       <div className={styles.exploreControls}>
@@ -225,7 +219,7 @@ const LaunchExplorePanel = ({
               pairedWithLunc={isLuncPairLabel(item.pair)}
             />
             <div>
-              <span>{item.sample ? "Sample preview" : item.status}</span>
+              <span>{item.status}</span>
               <strong>{item.pair}</strong>
               <p>{item.name}</p>
             </div>

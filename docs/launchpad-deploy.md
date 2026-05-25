@@ -125,9 +125,9 @@ After redeploying:
 1. Open `/launchpad`.
 2. Confirm the status strip shows `LP locker: Configured` and
    `Registry: Configured`.
-3. Create or import a CW20 in `Manage`.
+3. Create a launch or use `Sync my launches` for an already published launch.
 4. Create/find the Terraswap LUNC pair.
-5. Provide liquidity.
+5. Open the market page from `Manage` and provide liquidity.
 6. Lock LP.
 7. Publish to Launchpad.
 8. Open `Explore`, click `Details`, and verify token, pair, LP lock, and market

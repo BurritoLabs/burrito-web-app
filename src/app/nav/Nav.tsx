@@ -54,7 +54,7 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
             }
           >
             <span className={styles.icon}>{icon}</span>
-            <span>{title}</span>
+            <span className={styles.label}>{title}</span>
           </NavLink>
         ))}
       </div>

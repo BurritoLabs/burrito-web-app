@@ -5,24 +5,18 @@ import {
   type ChangeEvent,
   type FormEvent
 } from "react"
-import { useSearchParams } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import PageShell from "../PageShell"
 import styles from "../Launchpad.module.css"
 import {
   buildCw20InstantiateMessage,
   buildCw20TransferMessage,
   extractContractAddressFromEvents,
-  formatBaseUnitsToTokenAmount,
-  parseTokenAmountToBaseUnits
+  formatBaseUnitsToTokenAmount
 } from "../../app/launchpad/cw20"
 import {
   buildCreateTerraswapLuncPairMessage,
-  buildIncreaseAllowanceMessage,
-  buildProvideTerraswapLiquidityMessage,
-  buildWithdrawTerraswapLiquidityMessage,
   fetchTerraswapLuncPair,
-  formatSlippageTolerance,
-  parseLuncAmountToBaseUnits,
   TERRASWAP_FACTORY_ADDRESS,
   waitForTerraswapLuncPair
 } from "../../app/launchpad/pool"
@@ -41,7 +35,6 @@ import {
   buildRegisterLaunchMessage,
   buildUpdateLaunchMessage,
   extractRegistryLaunchIdFromEvents,
-  fetchLaunchRegistryLaunch,
   fetchLaunchRegistryLaunches,
   isLaunchRegistryConfigured,
   LAUNCHPAD_REGISTRY_ADDRESS,
@@ -55,7 +48,7 @@ import {
 } from "../../app/wallet/walletAdapters"
 import { truncateHash } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
-import { fetchContractInfo, queryContractSmart } from "../../app/data/classic"
+import { queryContractSmart } from "../../app/data/classic"
 import LaunchCreateForm from "./LaunchCreateForm"
 import LaunchCreatePreview from "./LaunchCreatePreview"
 import LaunchDistributionTool from "./LaunchDistributionTool"
@@ -73,6 +66,7 @@ import {
   formatDateTime,
   formatNumber,
   getDistributionTotalAmount,
+  getLaunchpadMarketPath,
   getManageSectionFromTarget,
   initialDraft,
   launchRiskRank,
@@ -85,7 +79,6 @@ import {
   normalizeOptionalXProfile,
   ownerLaunches,
   parseDistributionTransfers,
-  sampleLaunches,
   saveCreatedLaunches,
   toNumber,
   type CreateStep,
@@ -134,9 +127,6 @@ const Launchpad = () => {
     hash: string
     contractAddress: string
   }>()
-  const [importAddress, setImportAddress] = useState("")
-  const [importSubmitting, setImportSubmitting] = useState(false)
-  const [importError, setImportError] = useState<string>()
   const [syncSubmitting, setSyncSubmitting] = useState(false)
   const [syncError, setSyncError] = useState<string>()
   const [syncResult, setSyncResult] = useState("")
@@ -153,19 +143,6 @@ const Launchpad = () => {
   const [createPairSubmitting, setCreatePairSubmitting] = useState(false)
   const [createPairError, setCreatePairError] = useState<string>()
   const [createPairTxHash, setCreatePairTxHash] = useState("")
-  const [liquidityTokenAmount, setLiquidityTokenAmount] = useState("")
-  const [liquidityLuncAmount, setLiquidityLuncAmount] = useState("")
-  const [liquiditySlippage, setLiquiditySlippage] = useState("1")
-  const [provideLiquiditySubmitting, setProvideLiquiditySubmitting] =
-    useState(false)
-  const [provideLiquidityError, setProvideLiquidityError] = useState<string>()
-  const [provideLiquidityTxHash, setProvideLiquidityTxHash] = useState("")
-  const [withdrawLiquidityAmount, setWithdrawLiquidityAmount] = useState("")
-  const [withdrawLiquiditySubmitting, setWithdrawLiquiditySubmitting] =
-    useState(false)
-  const [withdrawLiquidityError, setWithdrawLiquidityError] =
-    useState<string>()
-  const [withdrawLiquidityTxHash, setWithdrawLiquidityTxHash] = useState("")
   const [lockLpAmount, setLockLpAmount] = useState("")
   const [lockLpDays, setLockLpDays] = useState("90")
   const [lockLpSubmitting, setLockLpSubmitting] = useState(false)
@@ -566,6 +543,7 @@ const Launchpad = () => {
           ? "Token created, pool setup needed"
           : "CW20 contract created",
         mode: isLaunchWithPool ? "Launch with pool" : "CW20 only",
+        creatorAddress: signerAddress,
         contractAddress,
         txHash: result.transactionHash,
         decimals,
@@ -600,80 +578,6 @@ const Launchpad = () => {
       failTx(message)
     } finally {
       setCreateSubmitting(false)
-    }
-  }
-
-  const handleImportCw20 = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const address = importAddress.trim()
-    if (!/^terra1[0-9a-z]{38,80}$/.test(address)) {
-      setImportError("Enter a valid Terra Classic contract address.")
-      return
-    }
-
-    try {
-      setImportSubmitting(true)
-      setImportError(undefined)
-      const [contractInfo, tokenInfo] = await Promise.all([
-        fetchContractInfo(address),
-        queryContractSmart<Cw20TokenInfo>(address, { token_info: {} })
-      ])
-      if (!contractInfo) {
-        throw new Error("Contract was not found on Terra Classic.")
-      }
-      if (!tokenInfo?.symbol || !tokenInfo?.name) {
-        throw new Error("This contract does not look like a CW20 token.")
-      }
-
-      const [registryLaunch, pair] = await Promise.all([
-        fetchLaunchRegistryLaunch(address).catch(() => null),
-        fetchTerraswapLuncPair(address).catch(() => null)
-      ])
-      const symbol = (
-        registryLaunch?.metadata?.symbol ||
-        tokenInfo.symbol
-      ).toUpperCase()
-      const name = registryLaunch?.metadata?.name || tokenInfo.name
-      const importedRecord: OwnerLaunchRecord = registryLaunch
-        ? buildOwnerRecordFromRegistryLaunch(registryLaunch, tokenInfo)
-        : {
-            id: address,
-            symbol,
-            name,
-            pair: pair ? `${symbol} / LUNC` : `${symbol} standalone`,
-            liquidity: pair ? "Pair exists" : "--",
-            lockExpiry: pair ? "LP not locked" : "No LP",
-            infoStatus: "Imported contract",
-            ownerStatus: pair ? "Pair found" : "CW20 contract imported",
-            mode: pair ? "CW20 + Pair" : "CW20 only",
-            contractAddress: address,
-            decimals: tokenInfo.decimals,
-            totalSupply: tokenInfo.total_supply,
-            pairAddress: pair?.contract_addr,
-            liquidityToken: pair?.liquidity_token,
-            createdAt: new Date().toISOString()
-          }
-      setPairLookup((current) => ({
-        ...current,
-        [address]: {
-          status: pair ? "found" : "missing",
-          pair
-        }
-      }))
-      setCreatedLaunches((current) => [
-        importedRecord,
-        ...current.filter(
-          (record) => record.id !== address && record.contractAddress !== address
-        )
-      ])
-      setActiveOwnerId(address)
-      setImportAddress("")
-    } catch (error) {
-      setImportError(
-        error instanceof Error ? error.message : "Import token failed."
-      )
-    } finally {
-      setImportSubmitting(false)
     }
   }
 
@@ -840,15 +744,7 @@ const Launchpad = () => {
         }),
     [registryLaunches, registryLpLocks, registryTokenMetadata.data]
   )
-  const shouldShowSampleLaunches =
-    import.meta.env.DEV &&
-    !isLaunchRegistryConfigured &&
-    registeredLaunchCards.length === 0
-  const launchSource = registeredLaunchCards.length
-    ? registeredLaunchCards
-    : shouldShowSampleLaunches
-    ? sampleLaunches
-    : []
+  const launchSource = registeredLaunchCards
   const normalizedLaunchSearch = launchSearch.trim().toLowerCase()
   const filteredLaunches = launchSource
     .filter((launch) => {
@@ -900,10 +796,21 @@ const Launchpad = () => {
     : isLaunchRegistryConfigured
     ? "No on-chain Burrito launches have been published yet."
     : "Registry contract is not configured yet. No public launches are live."
-  const ownerRecords = useMemo(
+  const connectedOwnerAddress = account?.address?.trim().toLowerCase() ?? ""
+  const allOwnerRecords = useMemo(
     () => [...createdLaunches, ...ownerLaunches],
     [createdLaunches]
   )
+  const ownerRecords = useMemo(() => {
+    if (!connectedOwnerAddress) return []
+    return allOwnerRecords.filter(
+      (record) =>
+        record.creatorAddress?.trim().toLowerCase() === connectedOwnerAddress
+    )
+  }, [allOwnerRecords, connectedOwnerAddress])
+  const hiddenLocalRecordCount = connectedOwnerAddress
+    ? allOwnerRecords.length - ownerRecords.length
+    : 0
   const activeOwnerLaunch =
     ownerRecords.find((launch) => launch.id === activeOwnerId) ??
     ownerRecords[0]
@@ -929,9 +836,6 @@ const Launchpad = () => {
     activeOwnerLaunch &&
       createdLaunches.some((record) => record.id === activeOwnerLaunch.id)
   )
-  const activeOwnerPlannedTokenAmount =
-    activeOwnerLaunch?.plannedTokenAmount ?? ""
-  const activeOwnerPlannedLuncAmount = activeOwnerLaunch?.plannedLuncAmount ?? ""
   const activeOwnerPlannedLockDays = activeOwnerLaunch?.plannedLockDays ?? "90"
   const activeTokenAddress = activeOwnerLaunch?.contractAddress
   const activePairLookup = activeTokenAddress
@@ -1008,26 +912,6 @@ const Launchpad = () => {
       !distributionPreview.error &&
       !distributionSubmitting
   )
-  const hasLiquidityInput = Boolean(
-    liquidityTokenAmount.trim() && liquidityLuncAmount.trim()
-  )
-  const canProvideLiquidity = Boolean(
-    activeTokenAddress &&
-      activePairAddress &&
-      connectorId &&
-      account?.address &&
-      hasLiquidityInput &&
-      !provideLiquiditySubmitting
-  )
-  const hasWithdrawLiquidityInput = Boolean(withdrawLiquidityAmount.trim())
-  const canWithdrawLiquidity = Boolean(
-    activePairAddress &&
-      activeLiquidityToken &&
-      connectorId &&
-      account?.address &&
-      hasWithdrawLiquidityInput &&
-      !withdrawLiquiditySubmitting
-  )
   const hasLockInput = Boolean(lockLpAmount.trim() && lockLpDays.trim())
   const canLockLp = Boolean(
     activeLiquidityToken &&
@@ -1095,7 +979,7 @@ const Launchpad = () => {
       current.filter((record) => record.id !== activeOwnerLaunch.id)
     )
     setLocalRecordNotice(
-      `${activeOwnerLaunch.pair} was removed from local browser storage. On-chain data is unchanged and can be recovered with Import or Sync.`
+      `${activeOwnerLaunch.pair} was removed from local browser storage. On-chain data is unchanged. Published launches can be restored with Sync.`
     )
   }
   const canPublishListing = Boolean(
@@ -1109,7 +993,8 @@ const Launchpad = () => {
   const hasProvidedLiquidity = Boolean(
     activeOwnerLaunch?.liquidityTxHash ||
       activeOwnerLaunch?.lpLockId ||
-      isActiveListingPublished
+      isActiveListingPublished ||
+      hasActiveLpBalance
   )
   const hasLockedLp = Boolean(
     activeOwnerLaunch?.lpLockId && activeOwnerLaunch.lpUnlockAt
@@ -1125,7 +1010,7 @@ const Launchpad = () => {
             done: Boolean(activeOwnerLaunch.contractAddress),
             value: activeOwnerLaunch.contractAddress
               ? truncateHash(activeOwnerLaunch.contractAddress)
-              : "Create or import"
+              : "Missing"
           },
           {
             label: "Distribution",
@@ -1149,7 +1034,7 @@ const Launchpad = () => {
             done: Boolean(activeOwnerLaunch.contractAddress),
             value: activeOwnerLaunch.contractAddress
               ? truncateHash(activeOwnerLaunch.contractAddress)
-              : "Create or import"
+              : "Missing"
           },
           {
             label: "Pair",
@@ -1188,17 +1073,13 @@ const Launchpad = () => {
     : []
   const activeOwnerNextAction: OwnerNextAction = !activeOwnerLaunch
     ? {
-        title: "Create or import a CW20 token",
-        text: "Owner tools unlock after a token exists in this browser.",
-        actionLabel: "Import token",
-        targetId: "launchpad-import"
+        title: "Create or sync a launch",
+        text: "Owner tools unlock after you create a launch or sync published launches for the connected wallet."
       }
     : !activeOwnerLaunch.contractAddress
     ? {
-        title: "Recover the token contract",
-        text: "Import the CW20 contract again so the creator dashboard can read chain state.",
-        actionLabel: "Go to import",
-        targetId: "launchpad-import"
+        title: "Token contract missing",
+        text: "This local record is incomplete. Remove it from this browser or sync published launches for the connected wallet."
       }
     : activeOwnerIsCw20Only
     ? {
@@ -1216,10 +1097,10 @@ const Launchpad = () => {
       }
     : !hasProvidedLiquidity
     ? {
-        title: "Provide initial liquidity",
+        title: "Add liquidity from market",
         text: "The pair exists, but traders still need funded liquidity before price discovery is meaningful.",
-        actionLabel: "Open liquidity form",
-        targetId: "launchpad-pool"
+        actionLabel: "Open market",
+        actionTo: getLaunchpadMarketPath(activePairAddress)
       }
     : !isLpLockerConfigured
     ? {
@@ -1418,11 +1299,6 @@ const Launchpad = () => {
   ])
 
   useEffect(() => {
-    setProvideLiquidityError(undefined)
-    setProvideLiquidityTxHash("")
-    setWithdrawLiquidityError(undefined)
-    setWithdrawLiquidityTxHash("")
-    setWithdrawLiquidityAmount("")
     setLockLpError(undefined)
     setLockLpTxHash("")
     setLockRegistryError(undefined)
@@ -1453,19 +1329,12 @@ const Launchpad = () => {
   ])
 
   useEffect(() => {
-    setLiquidityTokenAmount(activeOwnerPlannedTokenAmount)
-    setLiquidityLuncAmount(activeOwnerPlannedLuncAmount)
     setLockLpDays(activeOwnerPlannedLockDays)
-  }, [
-    activeOwnerRecordId,
-    activeOwnerPlannedTokenAmount,
-    activeOwnerPlannedLuncAmount,
-    activeOwnerPlannedLockDays
-  ])
+  }, [activeOwnerRecordId, activeOwnerPlannedLockDays])
 
   const handleCreateTerraswapPair = async () => {
     if (!activeOwnerLaunch || !activeTokenAddress) {
-      setCreatePairError("Import or create a CW20 token first.")
+      setCreatePairError("Create or sync a launch first.")
       return
     }
     if (activePairAddress) {
@@ -1539,158 +1408,6 @@ const Launchpad = () => {
       failTx(message)
     } finally {
       setCreatePairSubmitting(false)
-    }
-  }
-
-  const handleProvideLiquidity = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!activeOwnerLaunch || !activeTokenAddress) {
-      setProvideLiquidityError("Import or create a CW20 token first.")
-      return
-    }
-    if (!activePairAddress) {
-      setProvideLiquidityError("Create or find the LUNC pair first.")
-      return
-    }
-    if (!connectorId || !account?.address) {
-      setProvideLiquidityError("Connect a wallet first.")
-      return
-    }
-
-    try {
-      setProvideLiquiditySubmitting(true)
-      setProvideLiquidityError(undefined)
-      setProvideLiquidityTxHash("")
-      const tokenBaseAmount = parseTokenAmountToBaseUnits(
-        liquidityTokenAmount,
-        activeTokenDecimals,
-        `${activeOwnerLaunch.symbol} amount`
-      )
-      const luncBaseAmount = parseLuncAmountToBaseUnits(liquidityLuncAmount)
-      const slippageTolerance = formatSlippageTolerance(
-        liquiditySlippage || "1"
-      )
-
-      startTx(`Provide ${activeOwnerLaunch.symbol} / LUNC liquidity`)
-      const signerAddress = await getSignerAddressForConnector(connectorId)
-      const client = await connectClassicSigningClientForConnector(connectorId)
-      const result = await client.signAndBroadcast(
-        signerAddress,
-        [
-          buildIncreaseAllowanceMessage({
-            sender: signerAddress,
-            tokenAddress: activeTokenAddress,
-            spender: activePairAddress,
-            amount: tokenBaseAmount
-          }),
-          buildProvideTerraswapLiquidityMessage({
-            sender: signerAddress,
-            pairAddress: activePairAddress,
-            tokenAddress: activeTokenAddress,
-            tokenAmount: tokenBaseAmount,
-            luncAmount: luncBaseAmount,
-            slippageTolerance
-          })
-        ],
-        "auto",
-        "Burrito provide liquidity"
-      )
-      if (result.code !== 0) {
-        throw new Error(result.rawLog || "Provide liquidity failed")
-      }
-
-      const liquidityLabel = `${formatCompact(
-        toNumber(liquidityTokenAmount)
-      )} ${activeOwnerLaunch.symbol} + ${formatCompact(
-        toNumber(liquidityLuncAmount)
-      )} LUNC`
-      setProvideLiquidityTxHash(result.transactionHash)
-      setLpBalanceRefreshNonce((current) => current + 1)
-      setCreatedLaunches((current) =>
-        current.map((record) =>
-          record.id === activeOwnerLaunch.id
-            ? {
-                ...record,
-                pair: `${record.symbol} / LUNC`,
-                liquidity: liquidityLabel,
-                mode: "CW20 + Pair + LP",
-                lockExpiry: "LP not locked",
-                ownerStatus: "Liquidity added, LP not locked",
-                liquidityTxHash: result.transactionHash
-              }
-            : record
-        )
-      )
-      finishTx(result.transactionHash)
-    } catch (error) {
-      const message = formatTxError(error, "Provide liquidity failed.")
-      setProvideLiquidityError(message)
-      failTx(message)
-    } finally {
-      setProvideLiquiditySubmitting(false)
-    }
-  }
-
-  const handleWithdrawLiquidity = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!activeOwnerLaunch || !activePairAddress || !activeLiquidityToken) {
-      setWithdrawLiquidityError("Create or find the pair and LP token first.")
-      return
-    }
-    if (!connectorId || !account?.address) {
-      setWithdrawLiquidityError("Connect a wallet first.")
-      return
-    }
-
-    try {
-      setWithdrawLiquiditySubmitting(true)
-      setWithdrawLiquidityError(undefined)
-      setWithdrawLiquidityTxHash("")
-      const amount = parseLpAmountToBaseUnits(
-        withdrawLiquidityAmount,
-        activeLpDecimals
-      )
-
-      startTx(`Withdraw ${activeOwnerLaunch.symbol} / LUNC liquidity`)
-      const signerAddress = await getSignerAddressForConnector(connectorId)
-      const client = await connectClassicSigningClientForConnector(connectorId)
-      const result = await client.signAndBroadcast(
-        signerAddress,
-        [
-          buildWithdrawTerraswapLiquidityMessage({
-            sender: signerAddress,
-            pairAddress: activePairAddress,
-            lpTokenAddress: activeLiquidityToken,
-            lpAmount: amount
-          })
-        ],
-        "auto",
-        "Burrito withdraw liquidity"
-      )
-      if (result.code !== 0) {
-        throw new Error(result.rawLog || "Withdraw liquidity failed")
-      }
-
-      setWithdrawLiquidityTxHash(result.transactionHash)
-      setLpBalanceRefreshNonce((current) => current + 1)
-      setCreatedLaunches((current) =>
-        current.map((record) =>
-          record.id === activeOwnerLaunch.id
-            ? {
-                ...record,
-                ownerStatus: "Liquidity withdrawn",
-                liquidityWithdrawTxHash: result.transactionHash
-              }
-            : record
-        )
-      )
-      finishTx(result.transactionHash)
-    } catch (error) {
-      const message = formatTxError(error, "Withdraw liquidity failed.")
-      setWithdrawLiquidityError(message)
-      failTx(message)
-    } finally {
-      setWithdrawLiquiditySubmitting(false)
     }
   }
 
@@ -1907,7 +1624,7 @@ const Launchpad = () => {
   const handleDistributeTokens = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!activeOwnerLaunch?.contractAddress) {
-      setDistributionError("Create or import a CW20 token first.")
+      setDistributionError("Create or sync a launch first.")
       return
     }
     if (!connectorId || !account?.address) {
@@ -1979,7 +1696,7 @@ const Launchpad = () => {
   const handlePublishListing = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!activeOwnerLaunch?.contractAddress) {
-      setPublishError("Create or import a CW20 token first.")
+      setPublishError("Create or sync a launch first.")
       return
     }
     const isUpdatingExistingListing = Boolean(
@@ -2248,7 +1965,6 @@ const Launchpad = () => {
           registryError={registryError}
           registryLoading={registryLoading}
           selectedLaunch={selectedLaunch}
-          shouldShowSampleLaunches={shouldShowSampleLaunches}
           onCopyText={handleCopyText}
           onFilterChange={setActiveLaunchFilter}
           onSearchChange={setLaunchSearch}
@@ -2269,11 +1985,9 @@ const Launchpad = () => {
             accountAddress={account?.address}
             copiedValue={copiedValue}
             copyError={copyError}
-            importAddress={importAddress}
-            importError={importError}
-            importSubmitting={importSubmitting}
             isActiveOwnerLocalRecord={isActiveOwnerLocalRecord}
             isLaunchRegistryConfigured={isLaunchRegistryConfigured}
+            hiddenLocalRecordCount={hiddenLocalRecordCount}
             localRecordNotice={localRecordNotice}
             ownerRecords={ownerRecords}
             showOwnerDistributionTool={showOwnerDistributionTool}
@@ -2281,8 +1995,6 @@ const Launchpad = () => {
             syncResult={syncResult}
             syncSubmitting={syncSubmitting}
             onCopyText={handleCopyText}
-            onImportAddressChange={setImportAddress}
-            onImportSubmit={handleImportCw20}
             onRemoveLocalRecord={handleRemoveLocalRecord}
             onScrollToManageSection={scrollToManageSection}
             onSelectOwnerId={setActiveOwnerId}
@@ -2376,41 +2088,27 @@ const Launchpad = () => {
                       </strong>
                     </a>
                   ) : null}
-                  {activeOwnerLaunch.liquidityTxHash ||
-                  provideLiquidityTxHash ? (
+                  {activeOwnerLaunch.liquidityTxHash ? (
                     <a
-                      href={`https://finder.burrito.money/classic/tx/${
-                        activeOwnerLaunch.liquidityTxHash ||
-                        provideLiquidityTxHash
-                      }`}
+                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.liquidityTxHash}`}
                       target="_blank"
                       rel="noreferrer"
                     >
                       <span>Liquidity tx</span>
                       <strong>
-                        {truncateHash(
-                          activeOwnerLaunch.liquidityTxHash ||
-                            provideLiquidityTxHash
-                        )}
+                        {truncateHash(activeOwnerLaunch.liquidityTxHash)}
                       </strong>
                     </a>
                   ) : null}
-                  {activeOwnerLaunch.liquidityWithdrawTxHash ||
-                  withdrawLiquidityTxHash ? (
+                  {activeOwnerLaunch.liquidityWithdrawTxHash ? (
                     <a
-                      href={`https://finder.burrito.money/classic/tx/${
-                        activeOwnerLaunch.liquidityWithdrawTxHash ||
-                        withdrawLiquidityTxHash
-                      }`}
+                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.liquidityWithdrawTxHash}`}
                       target="_blank"
                       rel="noreferrer"
                     >
                       <span>Remove LP tx</span>
                       <strong>
-                        {truncateHash(
-                          activeOwnerLaunch.liquidityWithdrawTxHash ||
-                            withdrawLiquidityTxHash
-                        )}
+                        {truncateHash(activeOwnerLaunch.liquidityWithdrawTxHash)}
                       </strong>
                     </a>
                   ) : null}
@@ -2418,7 +2116,8 @@ const Launchpad = () => {
               ) : null}
 
               <div className={styles.noticeBox}>
-                Create the pair first, then add liquidity.
+                Create the pair here, then open the market page to add or
+                remove liquidity for this pool.
               </div>
 
               {activePairLookup.status === "error" &&
@@ -2457,171 +2156,12 @@ const Launchpad = () => {
               </button>
 
               {activePairAddress ? (
-                <form
-                  className={styles.liquidityForm}
-                  onSubmit={handleProvideLiquidity}
+                <Link
+                  className="uiButton uiButtonPrimary"
+                  to={getLaunchpadMarketPath(activePairAddress)}
                 >
-                  <div className={styles.planHeader}>
-                    <span>Liquidity</span>
-                    <h3>Provide initial liquidity</h3>
-                  </div>
-                  <div className={styles.liquidityInputs}>
-                    <label className={styles.field}>
-                      <span>{activeOwnerLaunch.symbol} amount</span>
-                      <input
-                        value={liquidityTokenAmount}
-                        onChange={(event) =>
-                          setLiquidityTokenAmount(event.target.value)
-                        }
-                        placeholder="1000000"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>LUNC amount</span>
-                      <input
-                        value={liquidityLuncAmount}
-                        onChange={(event) =>
-                          setLiquidityLuncAmount(event.target.value)
-                        }
-                        placeholder="1000000"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Max slippage %</span>
-                      <input
-                        value={liquiditySlippage}
-                        onChange={(event) =>
-                          setLiquiditySlippage(event.target.value)
-                        }
-                        placeholder="1"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    <div className={styles.readOnlyField}>
-                      <span>Token decimals</span>
-                      <strong>{activeTokenDecimals}</strong>
-                    </div>
-                  </div>
-                  <div className={styles.noticeBox}>
-                    This broadcasts two messages in one transaction: approve the
-                    pair to spend the CW20 amount, then deposit CW20 + LUNC into
-                    Terraswap.
-                  </div>
-                  {provideLiquidityError ? (
-                    <div className={styles.txError}>
-                      {provideLiquidityError}
-                    </div>
-                  ) : null}
-                  {provideLiquidityTxHash ? (
-                    <div className={styles.txResult}>
-                      <div>
-                        <span>Liquidity tx</span>
-                        <a
-                          href={`https://finder.burrito.money/classic/tx/${provideLiquidityTxHash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {truncateHash(provideLiquidityTxHash)}
-                        </a>
-                      </div>
-                    </div>
-                  ) : null}
-                  <button
-                    className="uiButton uiButtonPrimary"
-                    type="submit"
-                    disabled={!canProvideLiquidity}
-                  >
-                    {provideLiquiditySubmitting
-                      ? "Broadcasting..."
-                      : !connectorId || !account?.address
-                      ? "Connect wallet first"
-                      : hasLiquidityInput
-                      ? "Provide liquidity"
-                      : "Enter liquidity amounts"}
-                  </button>
-                </form>
-              ) : null}
-
-              {activeLiquidityToken ? (
-                <form
-                  className={styles.liquidityForm}
-                  onSubmit={handleWithdrawLiquidity}
-                >
-                  <div className={styles.planHeader}>
-                    <span>Withdraw liquidity</span>
-                    <h3>Remove unlocked LP from the pool</h3>
-                  </div>
-                  <div className={styles.liquidityInputs}>
-                    <label className={styles.field}>
-                      <span>LP token amount</span>
-                      <input
-                        value={withdrawLiquidityAmount}
-                        onChange={(event) =>
-                          setWithdrawLiquidityAmount(event.target.value)
-                        }
-                        placeholder="100"
-                        inputMode="decimal"
-                      />
-                    </label>
-                    <div className={`${styles.readOnlyField} ${styles.balanceField}`}>
-                      <span>Wallet LP balance</span>
-                      <strong>
-                        {activeLpBalanceLookup.status === "loading"
-                          ? "Checking..."
-                          : activeLpBalanceDisplay}
-                      </strong>
-                      <button
-                        className={styles.textButton}
-                        type="button"
-                        disabled={!hasActiveLpBalance}
-                        onClick={() =>
-                          setWithdrawLiquidityAmount(activeLpBalanceInputAmount)
-                        }
-                      >
-                        Use full balance
-                      </button>
-                    </div>
-                  </div>
-                  <div className={styles.noticeBox}>
-                    This sends unlocked LP tokens back to the Terraswap pair and
-                    receives the underlying {activeOwnerLaunch.symbol} + LUNC.
-                    Locked LP must be withdrawn from the locker first.
-                  </div>
-                  {withdrawLiquidityError ? (
-                    <div className={styles.txError}>
-                      {withdrawLiquidityError}
-                    </div>
-                  ) : null}
-                  {withdrawLiquidityTxHash ? (
-                    <div className={styles.txResult}>
-                      <div>
-                        <span>Remove LP tx</span>
-                        <a
-                          href={`https://finder.burrito.money/classic/tx/${withdrawLiquidityTxHash}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {truncateHash(withdrawLiquidityTxHash)}
-                        </a>
-                      </div>
-                    </div>
-                  ) : null}
-                  <button
-                    className="uiButton uiButtonOutline"
-                    type="submit"
-                    disabled={!canWithdrawLiquidity}
-                  >
-                    {withdrawLiquiditySubmitting
-                      ? "Broadcasting..."
-                      : !connectorId || !account?.address
-                      ? "Connect wallet first"
-                      : hasWithdrawLiquidityInput
-                      ? "Withdraw liquidity"
-                      : "Enter LP amount"}
-                  </button>
-                </form>
+                  Open market liquidity
+                </Link>
               ) : null}
             </article>
           ) : null}

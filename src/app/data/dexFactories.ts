@@ -90,13 +90,15 @@ export const CLASSIC_DEX_FACTORIES: readonly ClassicDexFactory[] = [
 export type ClassicSwapDex = {
   id: string
   label: string
-  factory: string
-  mode?: "terraswap" | "garuda"
+  factory?: string
+  mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump"
   pairCodeIds?: readonly number[]
 }
 
 /**
- * Active DEX factories used by the in-app swap quote router.
+ * Active DEX sources used by the market index and route-aware swap flows.
+ * DEXes without a factory are discoverable by pair code id only, so the global
+ * swap router must skip them unless the user is already on a specific pair.
  */
 export const CLASSIC_SWAP_DEXES: readonly ClassicSwapDex[] = [
   {
@@ -142,5 +144,30 @@ export const CLASSIC_SWAP_DEXES: readonly ClassicSwapDex[] = [
     factory: "terra1ypwj6sw25g0qcykv7mzmcvsndvx56r3yrgkaw3fds7yzwl7fwwcsnxkeh7",
     mode: "garuda",
     pairCodeIds: [10907]
+  },
+  {
+    id: "white-whale",
+    label: "White Whale",
+    mode: "code-id",
+    pairCodeIds: [8710]
+  },
+  {
+    id: "luncswap",
+    label: "LUNCSwap.fun",
+    mode: "code-id",
+    pairCodeIds: [9913]
+  },
+  {
+    id: "terra-pump",
+    label: "Terra.pump",
+    mode: "terrapump",
+    pairCodeIds: [9882, 10495]
+  },
+  {
+    id: "luncpump",
+    label: "LUNCPump.fun",
+    factory: "terra1szpen6r7eqstv3qlyvgzkx9d54gzl03a70asdctnp2uz8wqzaymsrpq8ag",
+    mode: "luncpump",
+    pairCodeIds: [9912]
   }
 ]

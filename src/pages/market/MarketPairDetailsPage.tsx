@@ -6,10 +6,13 @@ import PageShell from "../PageShell"
 import SwapPanel from "../components/SwapPanel"
 import MarketPairAssetIcon from "./MarketPairAssetIcon"
 import MarketPairChartPanel from "./MarketPairChartPanel"
+import BondingCurveSwapPanel from "./BondingCurveSwapPanel"
+import MarketLiquidityPanel from "./MarketLiquidityPanel"
 import MarketRecentTrades from "./MarketRecentTrades"
 import styles from "../MarketPairDetails.module.css"
 import { fetchPrices } from "../../app/data/classic"
 import { fetchCirculatingSnapshot } from "../../app/data/dashboard"
+import { useCw20Supplies } from "../../app/data/cw20"
 import {
   type PairCandle,
   fetchPairCandles,
@@ -80,6 +83,12 @@ const DETAIL_CANDLE_TX_MAX_PAGES: Record<Timeframe, number> = {
   "24h": 8,
   "7d": 12
 }
+const DETAIL_TRADER_STATS_LIMIT = 400
+const TIMEFRAME_WINDOW_MS: Record<Timeframe, number> = {
+  "1h": 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000
+}
 
 type ResolvedAsset = {
   id: string
@@ -91,6 +100,16 @@ type ResolvedAsset = {
   isLunc: boolean
   isUstc: boolean
 }
+
+type DetailCopyItem = {
+  key: string
+  label: string
+  value: string
+  displayValue: string
+  copyLabel: string
+}
+
+type SidePanelMode = "swap" | "add" | "remove"
 
 const toPairFallbackAsset = (assetId: string) => {
   if (assetId.startsWith("native:")) return assetId.slice("native:".length)
@@ -129,6 +148,34 @@ const shouldSwapForDisplay = (left: ResolvedAsset, right: ResolvedAsset) => {
   return false
 }
 
+const buildDetailCopyItem = (
+  key: string,
+  asset: ResolvedAsset
+): DetailCopyItem => {
+  if (asset.id.startsWith("cw20:")) {
+    const contract = asset.id.slice("cw20:".length)
+    return {
+      key,
+      label: asset.symbol,
+      value: contract,
+      displayValue: truncateHash(contract, 8, 7),
+      copyLabel: "contract"
+    }
+  }
+
+  const denom = asset.id.startsWith("native:")
+    ? asset.id.slice("native:".length)
+    : asset.id
+
+  return {
+    key,
+    label: asset.symbol,
+    value: denom,
+    displayValue: denom,
+    copyLabel: "denom"
+  }
+}
+
 const MarketPairDetails = () => {
   const params = useParams<{ pairId?: string; dexId?: string; pair?: string }>()
   const navigate = useNavigate()
@@ -138,6 +185,8 @@ const MarketPairDetails = () => {
     pair: "",
     limit: 25
   })
+  const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("swap")
+  const [copiedAddressKey, setCopiedAddressKey] = useState("")
   const [activeCandleTime, setActiveCandleTime] = useState<number | null>(null)
   const chartHostRef = useRef<HTMLDivElement | null>(null)
   const chartTooltipRef = useRef<HTMLDivElement | null>(null)
@@ -255,7 +304,16 @@ const MarketPairDetails = () => {
     refetchInterval: 90_000
   })
 
-  const displayPool = liveSelectedPool ?? selectedPool
+  const displayPool = useMemo(
+    () =>
+      liveSelectedPool && selectedPool
+        ? {
+            ...liveSelectedPool,
+            volumes: liveSelectedPool.volumes ?? selectedPool.volumes
+          }
+        : liveSelectedPool ?? selectedPool,
+    [liveSelectedPool, selectedPool]
+  )
 
   const poolsForMetadata = useMemo(
     () => (displayPool ? [displayPool] : []),
@@ -481,10 +539,27 @@ const MarketPairDetails = () => {
 
     const leftUsd = getAssetUsdPrice(left)
     const rightUsd = getAssetUsdPrice(right)
+    const bondingLiquidityUsd =
+      displayPool.bonding?.liquidityAssetId && displayPool.bonding?.liquidityAmount
+        ? (() => {
+            const liquidityAsset = resolveAsset(displayPool.bonding!.liquidityAssetId!)
+            const liquidityAssetUsd = getAssetUsdPrice(liquidityAsset)
+            if (liquidityAssetUsd === undefined) return undefined
+            const liquidityAmount = toUnitAmount(
+              displayPool.bonding!.liquidityAmount!,
+              liquidityAsset.decimals
+            )
+            return Number.isFinite(liquidityAmount)
+              ? liquidityAmount * liquidityAssetUsd
+              : undefined
+          })()
+        : undefined
     const leftValue = leftUsd !== undefined ? leftUsd * leftAmount : undefined
     const rightValue = rightUsd !== undefined ? rightUsd * rightAmount : undefined
     const liquidityUsd =
-      leftValue !== undefined && rightValue !== undefined
+      bondingLiquidityUsd !== undefined
+        ? bondingLiquidityUsd
+        : leftValue !== undefined && rightValue !== undefined
         ? leftValue + rightValue
         : leftValue !== undefined
           ? leftValue * 2
@@ -518,6 +593,14 @@ const MarketPairDetails = () => {
       return quoteChange !== undefined ? -quoteChange : undefined
     }
 
+    const getVolumeUsd = (tf: Timeframe) => {
+      const volumeMap = displayPool.volumes?.[tf]
+      if (!volumeMap) return undefined
+      const volumeQuote = volumeMap[`${priceBase.key}|${priceQuote.key}`]
+      if (volumeQuote === undefined) return undefined
+      return priceQuoteUsd !== undefined ? volumeQuote * priceQuoteUsd : undefined
+    }
+
     return {
       pool: displayPool,
       left,
@@ -531,6 +614,11 @@ const MarketPairDetails = () => {
       priceUsd,
       liquidityUsd,
       marketCapUsd,
+      volumesUsd: {
+        "1h": getVolumeUsd("1h"),
+        "24h": getVolumeUsd("24h"),
+        "7d": getVolumeUsd("7d")
+      } as Record<Timeframe, number | undefined>,
       changes: {
         "1h": getPairChange("1h"),
         "24h": getPairChange("24h"),
@@ -538,6 +626,37 @@ const MarketPairDetails = () => {
       } as Record<Timeframe, number | undefined>
     }
   })()
+
+  const liquidityTokenAsset = detail
+    ? [detail.left, detail.right].find((asset) => asset.id.startsWith("cw20:"))
+    : undefined
+  const isBondingCurve = detail?.pool.type.startsWith("bonding-") ?? false
+
+  useEffect(() => {
+    if (isBondingCurve && sidePanelMode !== "swap") {
+      setSidePanelMode("swap")
+    }
+  }, [isBondingCurve, sidePanelMode])
+
+  const detailBaseCw20Contracts = useMemo(
+    () =>
+      detail?.priceBase.id.startsWith("cw20:")
+        ? [detail.priceBase.id.slice("cw20:".length).toLowerCase()]
+        : [],
+    [detail?.priceBase.id]
+  )
+  const { data: detailCw20Supplies = {} } = useCw20Supplies(
+    detailBaseCw20Contracts,
+    cw20Whitelist
+  )
+  const detailFdvUsd = useMemo(() => {
+    if (!detail?.priceBase.id.startsWith("cw20:")) return undefined
+    if (detail.priceUsd === undefined) return undefined
+    const contract = detail.priceBase.id.slice("cw20:".length).toLowerCase()
+    const units = detailCw20Supplies[contract]?.units
+    return units !== undefined ? units * detail.priceUsd : undefined
+  }, [detail, detailCw20Supplies])
+  const detailMarketCapUsd = detail?.marketCapUsd
 
   const tradesLimit =
     detail?.pool.pair && tradePager.pair === detail.pool.pair ? tradePager.limit : 25
@@ -571,6 +690,50 @@ const MarketPairDetails = () => {
 
   const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
   const hasMoreTrades = Boolean(tradesData?.hasMore)
+
+  const { data: traderStatsData } = useQuery({
+    queryKey: [
+      "market",
+      "pair-trader-stats",
+      detail?.pool.pair,
+      detail?.left.key,
+      detail?.right.key,
+      detail?.left.decimals,
+      detail?.right.decimals
+    ],
+    queryFn: () =>
+      fetchPairTrades({
+        pairAddress: detail!.pool.pair,
+        leftAssetKey: detail!.left.key,
+        rightAssetKey: detail!.right.key,
+        leftDecimals: detail!.left.decimals,
+        rightDecimals: detail!.right.decimals,
+        offset: 0,
+        limit: DETAIL_TRADER_STATS_LIMIT,
+        maxPages: DETAIL_TRADES_MAX_PAGES
+      }),
+    enabled: Boolean(detail?.pool.pair),
+    staleTime: 60_000,
+    refetchInterval: 120_000
+  })
+  const tradersByTimeframe = useMemo(() => {
+    const source = traderStatsData?.trades?.length ? traderStatsData.trades : trades
+    const now = Date.now()
+
+    return (["1h", "24h", "7d"] as Timeframe[]).reduce(
+      (acc, tf) => {
+        const cutoff = now - TIMEFRAME_WINDOW_MS[tf]
+        const traders = new Set(
+          source
+            .filter((trade) => trade.timestamp >= cutoff && trade.trader)
+            .map((trade) => trade.trader)
+        )
+        acc[tf] = traders.size || undefined
+        return acc
+      },
+      {} as Record<Timeframe, number | undefined>
+    )
+  }, [traderStatsData?.trades, trades])
 
   const { data: candlesData = [], isLoading: isCandlesLoading } = useQuery({
     queryKey: [
@@ -971,12 +1134,34 @@ const MarketPairDetails = () => {
 
   const { dexName, dexVersion } = splitDexLabel(detail.pool.dexLabel)
   const timeframeValue = chartStats?.change ?? detail.changes[timeframe]
+  const timeframeVolumeUsd = detail.volumesUsd[timeframe]
+  const timeframeTradersCount = tradersByTimeframe[timeframe]
   const chartPairLabel = `${detail.left.symbol}/${detail.right.symbol}`
   const candleChange =
     activeCandle && activeCandle.open > 0
       ? ((activeCandle.close - activeCandle.open) / activeCandle.open) * 100
       : undefined
   const candleTimeLabel = activeCandle ? formatChartTime(activeCandle.bucketStart, timeframe) : chartPairLabel
+  const detailAddressItems = [
+    {
+      key: "pool",
+      label: "Pool address",
+      value: detail.pool.pair,
+      displayValue: truncateHash(detail.pool.pair, 10, 8),
+      copyLabel: "address"
+    },
+    buildDetailCopyItem("base", detail.left),
+    buildDetailCopyItem("quote", detail.right)
+  ]
+  const handleCopyDetailAddress = (key: string, value: string) => {
+    void navigator.clipboard
+      ?.writeText(value)
+      .then(() => {
+        setCopiedAddressKey(key)
+        window.setTimeout(() => setCopiedAddressKey(""), 1600)
+      })
+      .catch(() => undefined)
+  }
 
   return (
     <PageShell
@@ -1055,11 +1240,23 @@ const MarketPairDetails = () => {
         <div className={styles.heroMeta}>
           <span className={styles.heroMetaItem}>
             <em>Mkt Cap</em>
-            <strong>{formatUsdCompact(detail.marketCapUsd)}</strong>
+            <strong>{formatUsdCompact(detailMarketCapUsd)}</strong>
+          </span>
+          <span className={styles.heroMetaItem}>
+            <em>FDV</em>
+            <strong>{formatUsdCompact(detailFdvUsd)}</strong>
           </span>
           <span className={styles.heroMetaItem}>
             <em>Liquidity</em>
             <strong>{detail.liquidityUsd !== undefined ? formatUsd(detail.liquidityUsd) : "--"}</strong>
+          </span>
+          <span className={styles.heroMetaItem}>
+            <em>{timeframe} Vol</em>
+            <strong>{timeframeVolumeUsd !== undefined ? formatUsd(timeframeVolumeUsd) : "--"}</strong>
+          </span>
+          <span className={styles.heroMetaItem}>
+            <em>{timeframe} Traders</em>
+            <strong>{timeframeTradersCount ?? "--"}</strong>
           </span>
         </div>
         <div className={styles.heroInfoRow}>
@@ -1083,6 +1280,23 @@ const MarketPairDetails = () => {
             </a>
           </span>
         </div>
+        <div className={styles.heroAddressRow}>
+          {detailAddressItems.map((item) => (
+            <button
+              key={item.key}
+              className={styles.heroAddressButton}
+              type="button"
+              onClick={() => handleCopyDetailAddress(item.key, item.value)}
+              title={`Copy ${item.copyLabel}: ${item.value}`}
+            >
+              <em>{item.label}</em>
+              <strong>{item.displayValue}</strong>
+              <span>
+                {copiedAddressKey === item.key ? "Copied" : "Copy"}
+              </span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <div className={styles.marketLayout}>
@@ -1103,28 +1317,107 @@ const MarketPairDetails = () => {
 
         <aside className={styles.marketRight}>
           <section className={styles.swapEmbed}>
-            <SwapPanel
-              key={`${detail.left.id}:${detail.right.id}`}
-              embedded
-              defaultFromAssetId={detail.left.id}
-              defaultToAssetId={detail.right.id}
-              assetOverrides={[
-                {
-                  id: detail.left.id,
-                  symbol: detail.left.symbol,
-                  name: detail.left.name,
-                  decimals: detail.left.decimals,
-                  iconCandidates: detail.left.iconCandidates
-                },
-                {
-                  id: detail.right.id,
-                  symbol: detail.right.symbol,
-                  name: detail.right.name,
-                  decimals: detail.right.decimals,
-                  iconCandidates: detail.right.iconCandidates
-                }
-              ]}
-            />
+            <div
+              className={`${styles.sidePanelTabs} ${
+                isBondingCurve ? styles.sidePanelTabsSingle : ""
+              }`}
+            >
+              {(isBondingCurve
+                ? (["swap"] as SidePanelMode[])
+                : (["swap", "add", "remove"] as SidePanelMode[])
+              ).map((item) => (
+                <button
+                  key={item}
+                  className={
+                    sidePanelMode === item ? styles.sidePanelTabActive : ""
+                  }
+                  type="button"
+                  onClick={() => setSidePanelMode(item)}
+                >
+                  {item === "swap" ? "Swap" : item === "add" ? "Add" : "Remove"}
+                </button>
+              ))}
+            </div>
+            {sidePanelMode === "swap" && isBondingCurve ? (
+              <BondingCurveSwapPanel
+                assets={[
+                  {
+                    id: detail.left.id,
+                    symbol: detail.left.symbol,
+                    name: detail.left.name,
+                    decimals: detail.left.decimals,
+                    iconCandidates: detail.left.iconCandidates
+                  },
+                  {
+                    id: detail.right.id,
+                    symbol: detail.right.symbol,
+                    name: detail.right.name,
+                    decimals: detail.right.decimals,
+                    iconCandidates: detail.right.iconCandidates
+                  }
+                ]}
+                bonding={detail.pool.bonding}
+                dexId={detail.pool.dexId}
+                dexLabel={detail.pool.dexLabel}
+                pairAddress={detail.pool.pair}
+              />
+            ) : sidePanelMode === "swap" ? (
+              <SwapPanel
+                key={`${detail.left.id}:${detail.right.id}`}
+                embedded
+                defaultFromAssetId={detail.left.id}
+                defaultToAssetId={detail.right.id}
+                pairOnly={{
+                  dexId: detail.pool.dexId,
+                  dexLabel: detail.pool.dexLabel,
+                  pairAddress: detail.pool.pair
+                }}
+                assetOverrides={[
+                  {
+                    id: detail.left.id,
+                    symbol: detail.left.symbol,
+                    name: detail.left.name,
+                    decimals: detail.left.decimals,
+                    iconCandidates: detail.left.iconCandidates
+                  },
+                  {
+                    id: detail.right.id,
+                    symbol: detail.right.symbol,
+                    name: detail.right.name,
+                    decimals: detail.right.decimals,
+                    iconCandidates: detail.right.iconCandidates
+                  }
+                ]}
+              />
+            ) : (
+              <MarketLiquidityPanel
+                assets={[
+                  {
+                    id: detail.left.id,
+                    symbol: detail.left.symbol,
+                    name: detail.left.name,
+                    decimals: detail.left.decimals,
+                    iconCandidates: detail.left.iconCandidates
+                  },
+                  {
+                    id: detail.right.id,
+                    symbol: detail.right.symbol,
+                    name: detail.right.name,
+                    decimals: detail.right.decimals,
+                    iconCandidates: detail.right.iconCandidates
+                  }
+                ]}
+                dexId={detail.pool.dexId}
+                dexLabel={detail.pool.dexLabel}
+                mode={sidePanelMode === "add" ? "provide" : "withdraw"}
+                pairAddress={detail.pool.pair}
+                poolAssets={detail.pool.poolAssets}
+                tokenAddress={liquidityTokenAsset?.id.slice("cw20:".length)}
+                tokenDecimals={liquidityTokenAsset?.decimals}
+                tokenIconCandidates={liquidityTokenAsset?.iconCandidates}
+                tokenSymbol={liquidityTokenAsset?.symbol}
+              />
+            )}
           </section>
         </aside>
 
