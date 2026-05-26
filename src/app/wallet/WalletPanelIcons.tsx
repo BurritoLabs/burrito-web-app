@@ -65,6 +65,27 @@ export const ReceiveIcon = (props: IconProps) => (
   </svg>
 )
 
+export const SwapIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...props}>
+    <path
+      d="M5 7h11l-3-3M19 17H8l3 3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M13 4l3 3-3 3M11 20l-3-3 3-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 export const ManageIcon = (props: IconProps) => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" {...props}>
     <path

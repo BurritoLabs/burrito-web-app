@@ -59,6 +59,7 @@ import {
   resolveChartEventTime,
   type Timeframe
 } from "../../app/market/pairChart"
+import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
 
 type MarketDetailLocationState = {
@@ -556,16 +557,12 @@ const MarketPairDetails = () => {
         : undefined
     const leftValue = leftUsd !== undefined ? leftUsd * leftAmount : undefined
     const rightValue = rightUsd !== undefined ? rightUsd * rightAmount : undefined
-    const liquidityUsd =
-      bondingLiquidityUsd !== undefined
-        ? bondingLiquidityUsd
-        : leftValue !== undefined && rightValue !== undefined
-        ? leftValue + rightValue
-        : leftValue !== undefined
-          ? leftValue * 2
-          : rightValue !== undefined
-            ? rightValue * 2
-            : undefined
+    const liquidityUsd = calculatePoolLiquidityUsd({
+      bondingLiquidityUsd,
+      leftValue,
+      pool: displayPool,
+      rightValue
+    })
 
     let marketCapUsd: number | undefined
     if (priceBase.isLunc) {

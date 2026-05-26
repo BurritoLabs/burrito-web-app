@@ -18,6 +18,7 @@ import {
   useWalletAssets,
   type WalletAssetRow
 } from "../../app/wallet/useWalletAssets"
+import { getWalletSwapPath } from "../../app/wallet/swapNavigation"
 import { CoinsSection, TokensSection } from "./WalletAssetSections"
 
 type WalletAsset = WalletAssetRow
@@ -92,15 +93,7 @@ const Wallet = () => {
 
   const handleSwapAsset = useCallback(
     (asset: WalletAsset) => {
-      const fromAssetId =
-        asset.kind === "cw20"
-          ? `cw20:${asset.denom.toLowerCase()}`
-          : `native:${asset.denom}`
-      const searchParams = new URLSearchParams({ from: fromAssetId })
-      navigate({
-        pathname: "/swap",
-        search: `?${searchParams.toString()}`
-      })
+      navigate(getWalletSwapPath(asset))
     },
     [navigate]
   )

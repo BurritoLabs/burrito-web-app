@@ -1,4 +1,5 @@
 import styles from "./WalletPanel.module.css"
+import { SwapIcon } from "./WalletPanelIcons"
 import type { WalletPanelView } from "./walletPanelUtils"
 
 type WalletPanelActionsProps = {
@@ -11,6 +12,7 @@ type WalletPanelActionsProps = {
   onSendSubmit: () => void
   onAssetSend: () => void
   onAssetReceive: () => void
+  onAssetSwap: () => void
 }
 
 const WalletPanelActions = ({
@@ -22,7 +24,8 @@ const WalletPanelActions = ({
   sendRecipientReceivesSummaryDisplay,
   onSendSubmit,
   onAssetSend,
-  onAssetReceive
+  onAssetReceive,
+  onAssetSwap
 }: WalletPanelActionsProps) => {
   if (view === "send") {
     return (
@@ -59,6 +62,14 @@ const WalletPanelActions = ({
           onClick={onAssetReceive}
         >
           Receive
+        </button>
+        <button
+          className="uiButton uiButtonOutline"
+          type="button"
+          onClick={onAssetSwap}
+        >
+          <SwapIcon />
+          Swap
         </button>
       </div>
     )

@@ -36,6 +36,7 @@ import {
   numberToPlainString,
   trimFractionByNonZeroDigits
 } from "../../app/utils/numberDisplay"
+import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
 
 type SortMetric = "change" | "volume" | "liquidity" | "marketCap"
@@ -556,16 +557,12 @@ const Market = () => {
           : undefined
       const leftValue = leftUsd !== undefined ? leftUsd * leftAmount : undefined
       const rightValue = rightUsd !== undefined ? rightUsd * rightAmount : undefined
-      const liquidityUsd =
-        bondingLiquidityUsd !== undefined
-          ? bondingLiquidityUsd
-          : leftValue !== undefined && rightValue !== undefined
-          ? leftValue + rightValue
-          : leftValue !== undefined
-            ? leftValue * 2
-            : rightValue !== undefined
-              ? rightValue * 2
-              : undefined
+      const liquidityUsd = calculatePoolLiquidityUsd({
+        bondingLiquidityUsd,
+        leftValue,
+        pool,
+        rightValue
+      })
 
       const priceQuoteUsd = getAssetUsdPrice(priceQuote)
       const priceUsd = priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined

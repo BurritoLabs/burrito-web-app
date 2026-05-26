@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "react-router-dom"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletContext"
 import { CLASSIC_DENOMS } from "../chain"
@@ -29,6 +30,7 @@ import {
   useWalletHideLowBalancePreference
 } from "./useWalletVisibilityPreferences"
 import { useWalletAssets, type WalletAssetRow } from "./useWalletAssets"
+import { getWalletSwapPath } from "./swapNavigation"
 import {
   formatTokenAmount,
   formatUsd,
@@ -65,6 +67,7 @@ import {
 const WalletPanel = () => {
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === "undefined") return false
     return window.localStorage.getItem("burritoWalletOpen") === "true"
@@ -373,6 +376,10 @@ const WalletPanel = () => {
       amount: getBalance(selectedAsset.denom) ?? "0"
     }
   }, [getBalance, selectedAsset, selectedAssetRow])
+  const handleAssetSwap = useCallback(() => {
+    navigate(getWalletSwapPath(selectedAssetRow ?? selectedAsset))
+    setIsOpen(false)
+  }, [navigate, selectedAsset, selectedAssetRow])
   const sendBalanceMicro = useMemo(
     () => parseBigInt(sendAsset.amount),
     [sendAsset.amount]
@@ -1359,6 +1366,7 @@ const WalletPanel = () => {
           onAssetReceive={() =>
             openReceiveView(selectedAssetRow ?? selectedAsset)
           }
+          onAssetSwap={handleAssetSwap}
         />
       </aside>
       <ManageTokensModal
