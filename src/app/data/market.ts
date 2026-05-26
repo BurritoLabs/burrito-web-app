@@ -62,6 +62,8 @@ export type MarketBondingSnapshot = {
   liquidityAssetId?: string
   nativeDenom?: string
   protocol?: "terrapump" | "luncpump" | string
+  spotPriceAmount?: string
+  spotPriceAssetId?: string
   status?: string
   tokenAddress?: string
   virtualQuoteAmount?: string
@@ -848,6 +850,14 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
               typeof entry.bonding.nativeDenom === "string"
                 ? entry.bonding.nativeDenom
                 : undefined,
+            spotPriceAmount:
+              typeof entry.bonding.spotPriceAmount === "string"
+                ? entry.bonding.spotPriceAmount
+                : undefined,
+            spotPriceAssetId:
+              typeof entry.bonding.spotPriceAssetId === "string"
+                ? normalizeMarketAssetId(entry.bonding.spotPriceAssetId)
+                : undefined,
             status:
               typeof entry.bonding.status === "string"
                 ? entry.bonding.status
@@ -1091,7 +1101,8 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
   if (
     dex.mode === "code-id" ||
     dex.mode === "terrapump" ||
-    dex.mode === "luncpump"
+    dex.mode === "luncpump" ||
+    dex.mode === "weso-defi"
   ) {
     await Promise.all((dex.pairCodeIds ?? []).map((codeId) => loadContractsByCodeId(codeId)))
     return pairContracts

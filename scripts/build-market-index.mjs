@@ -88,6 +88,12 @@ const DEXES = [
     mode: "luncpump",
     pairCodeIds: [9912],
   },
+  {
+    id: "weso-defi",
+    label: "WESO DeFi",
+    mode: "weso-defi",
+    pairCodeIds: [11102, 11151, 10996, 11213, 11329],
+  },
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -398,6 +404,10 @@ const resolvePoolSnapshot = async (
     };
   };
 
+  if (dex.mode === "weso-defi") {
+    return resolveWesoDefiSnapshot(pairAddress, dex, fromAssetInfos);
+  }
+
   let data;
   try {
     data = await querySmart(pairAddress, { pool: {} });
@@ -423,6 +433,67 @@ const resolvePoolSnapshot = async (
   }
 
   return allowAssetInfoFallback ? fromAssetInfos(pairEntry?.assetInfos) : null;
+};
+
+const resolveWesoDefiSnapshot = async (pairAddress, dex, fromAssetInfos) => {
+  try {
+    const data = await querySmart(pairAddress, { pool: {} });
+    const assets = Array.isArray(data?.assets) ? data.assets : null;
+
+    if (assets?.length >= 2) {
+      const snapshot = fromAssetInfos(
+        [assets[0]?.info, assets[1]?.info],
+        assets[0]?.amount ?? "0",
+        assets[1]?.amount ?? "0"
+      );
+      return snapshot ? { ...snapshot, type: "weso-pool" } : null;
+    }
+  } catch {
+    // Some WESO DeFi curve contracts are CW20 contracts with curve_info only.
+  }
+
+  let curveInfo;
+  let tokenInfo;
+  try {
+    [curveInfo, tokenInfo] = await Promise.all([
+      querySmart(pairAddress, { curve_info: {} }),
+      querySmart(pairAddress, { token_info: {} }),
+    ]);
+  } catch {
+    return null;
+  }
+
+  const reserveDenom = String(curveInfo?.reserve_denom ?? "");
+  const reserveAmount = String(curveInfo?.reserve ?? "0");
+  const supplyAmount = String(curveInfo?.supply ?? tokenInfo?.total_supply ?? "0");
+  const spotPriceAmount = String(curveInfo?.spot_price ?? "0");
+  if (!reserveDenom || !looksLikeTerraAddress(pairAddress)) return null;
+
+  const tokenId = `cw20:${pairAddress.toLowerCase()}`;
+  const nativeId = `native:${reserveDenom}`;
+  const hasSpotPrice = parseBaseUnits(spotPriceAmount) > 0n;
+
+  return {
+    pair: pairAddress.toLowerCase(),
+    dexId: dex.id,
+    dexLabel: dex.label,
+    type: "bonding-weso-defi",
+    assets: [pairAddress.toLowerCase(), reserveDenom],
+    poolAssets: [
+      { id: tokenId, amount: hasSpotPrice ? "1000000" : supplyAmount },
+      { id: nativeId, amount: hasSpotPrice ? spotPriceAmount : reserveAmount },
+    ],
+    bonding: {
+      protocol: "weso-defi",
+      tokenAddress: pairAddress.toLowerCase(),
+      nativeDenom: reserveDenom,
+      status: "open",
+      liquidityAssetId: nativeId,
+      liquidityAmount: reserveAmount,
+      spotPriceAssetId: nativeId,
+      spotPriceAmount,
+    },
+  };
 };
 
 const resolveTerraPumpSnapshot = async (pairAddress, dex) => {
@@ -557,7 +628,8 @@ const run = async () => {
         ? await loadPairsFromAstroportFactory(dex)
         : dex.mode === "code-id" ||
           dex.mode === "terrapump" ||
-          dex.mode === "luncpump"
+          dex.mode === "luncpump" ||
+          dex.mode === "weso-defi"
         ? await loadPairsFromCodeIds(dex)
         : await loadPairsFromTerraswapFactory(dex.factory);
 

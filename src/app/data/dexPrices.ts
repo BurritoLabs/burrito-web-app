@@ -182,7 +182,7 @@ const resolveDirectFactoryPair = async ({
 }: {
   dexId: string
   factory?: string
-  mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump"
+  mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump" | "weso-defi"
   offerKey: string
   askKey: string
 }) => {

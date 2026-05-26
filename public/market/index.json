@@ -2,7 +2,7 @@
   "generatedAt": "2026-05-24T03:33:11.045Z",
   "lcd": "https://terra-classic-lcd.publicnode.com",
   "chainId": "columbus-5",
-  "pairCount": 3983,
+  "pairCount": 3988,
   "dexes": [
     {
       "id": "terraswap",
@@ -63,6 +63,11 @@
       "id": "luncpump",
       "label": "LUNCPump.fun",
       "pairCount": 145
+    },
+    {
+      "id": "weso-defi",
+      "label": "WESO DeFi",
+      "pairCount": 5
     }
   ],
   "pairs": [
@@ -85423,6 +85428,126 @@
         {
           "id": "native:uluna",
           "amount": "12632183382"
+        }
+      ]
+    },
+    {
+      "pair": "terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+      "dexId": "weso-defi",
+      "dexLabel": "WESO DeFi",
+      "type": "weso-pool",
+      "assets": [
+        "uluna",
+        "terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6"
+      ],
+      "poolAssets": [
+        {
+          "id": "native:uluna",
+          "amount": "1000020800752494299"
+        },
+        {
+          "id": "cw20:terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+          "amount": "1000020800752494299"
+        }
+      ]
+    },
+    {
+      "pair": "terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
+      "dexId": "weso-defi",
+      "dexLabel": "WESO DeFi",
+      "type": "bonding-weso-defi",
+      "assets": [
+        "terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
+        "uluna"
+      ],
+      "poolAssets": [
+        {
+          "id": "cw20:terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
+          "amount": "1000000"
+        },
+        {
+          "id": "native:uluna",
+          "amount": "39839301"
+        }
+      ],
+      "bonding": {
+        "protocol": "weso-defi",
+        "tokenAddress": "terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
+        "nativeDenom": "uluna",
+        "status": "open",
+        "liquidityAssetId": "native:uluna",
+        "liquidityAmount": "7454875104838072",
+        "spotPriceAssetId": "native:uluna",
+        "spotPriceAmount": "39839301"
+      }
+    },
+    {
+      "pair": "terra1l7yt60npu2vj67v7qhdam3l7h0pejtsgysfjll2srqaxppt635pqqjh8hc",
+      "dexId": "weso-defi",
+      "dexLabel": "WESO DeFi",
+      "type": "weso-pool",
+      "assets": [
+        "terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+        "terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h"
+      ],
+      "poolAssets": [
+        {
+          "id": "cw20:terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+          "amount": "17747180539785"
+        },
+        {
+          "id": "cw20:terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
+          "amount": "214716367268"
+        }
+      ]
+    },
+    {
+      "pair": "terra1uewxz67jhhhs2tj97pfm2egtk7zqxuhenm4y4m",
+      "dexId": "weso-defi",
+      "dexLabel": "WESO DeFi",
+      "type": "bonding-weso-defi",
+      "assets": [
+        "terra1uewxz67jhhhs2tj97pfm2egtk7zqxuhenm4y4m",
+        "uusd"
+      ],
+      "poolAssets": [
+        {
+          "id": "cw20:terra1uewxz67jhhhs2tj97pfm2egtk7zqxuhenm4y4m",
+          "amount": "1000000"
+        },
+        {
+          "id": "native:uusd",
+          "amount": "538712"
+        }
+      ],
+      "bonding": {
+        "protocol": "weso-defi",
+        "tokenAddress": "terra1uewxz67jhhhs2tj97pfm2egtk7zqxuhenm4y4m",
+        "nativeDenom": "uusd",
+        "status": "open",
+        "liquidityAssetId": "native:uusd",
+        "liquidityAmount": "4586066813316",
+        "spotPriceAssetId": "native:uusd",
+        "spotPriceAmount": "538712"
+      }
+    },
+    {
+      "pair": "terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
+      "dexId": "weso-defi",
+      "dexLabel": "WESO DeFi",
+      "type": "weso-pool",
+      "assets": [
+        "uusd",
+        "terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h"
+      ],
+      "poolAssets": [
+        {
+          "id": "native:uusd",
+          "amount": "1000007424846526"
+        },
+        {
+          "id": "cw20:terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
+          "amount": "1000007424846526"
         }
       ]
     }

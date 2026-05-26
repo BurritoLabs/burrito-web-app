@@ -91,7 +91,7 @@ export type ClassicSwapDex = {
   id: string
   label: string
   factory?: string
-  mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump"
+  mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump" | "weso-defi"
   pairCodeIds?: readonly number[]
 }
 
@@ -169,5 +169,11 @@ export const CLASSIC_SWAP_DEXES: readonly ClassicSwapDex[] = [
     factory: "terra1szpen6r7eqstv3qlyvgzkx9d54gzl03a70asdctnp2uz8wqzaymsrpq8ag",
     mode: "luncpump",
     pairCodeIds: [9912]
+  },
+  {
+    id: "weso-defi",
+    label: "WESO DeFi",
+    mode: "weso-defi",
+    pairCodeIds: [11102, 11151, 10996, 11213, 11329]
   }
 ]

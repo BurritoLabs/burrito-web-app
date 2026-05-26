@@ -51,6 +51,7 @@ type DexFilter =
   | "luncswap"
   | "terra-pump"
   | "luncpump"
+  | "weso-defi"
 
 type NativeSupplyInfo = {
   denom: string
@@ -109,7 +110,8 @@ const DEX_FILTER_OPTIONS: Array<{ value: DexFilter; label: string }> = [
   { value: "white-whale", label: "White Whale" },
   { value: "luncswap", label: "LUNCSwap" },
   { value: "terra-pump", label: "Terra.pump" },
-  { value: "luncpump", label: "LUNCPump" }
+  { value: "luncpump", label: "LUNCPump" },
+  { value: "weso-defi", label: "WESO DeFi" }
 ]
 const MAIN_DEX_FILTER_OPTIONS = DEX_FILTER_OPTIONS.slice(0, 5)
 const SECONDARY_DEX_FILTER_OPTIONS = DEX_FILTER_OPTIONS.slice(5)
@@ -162,6 +164,7 @@ const getDexFilterBucket = (card: Pick<MarketCard, "dexId" | "dexLabel">): DexFi
     return "terra-pump"
   }
   if (value.includes("luncpump")) return "luncpump"
+  if (value.includes("weso defi") || value.includes("weso-defi")) return "weso-defi"
   return "all"
 }
 
