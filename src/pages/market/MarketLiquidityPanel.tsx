@@ -104,7 +104,7 @@ type GarudaPoolResponse = {
   total_supply?: string
 }
 
-type LiquidityProtocol = "standard" | "garuda"
+type LiquidityProtocol = "standard" | "garuda" | "weso-defi"
 type LiquidityMode = "provide" | "withdraw"
 
 const EMPTY_ICON_CANDIDATES: string[] = []
@@ -117,6 +117,7 @@ const STANDARD_LIQUIDITY_DEX_IDS = new Set([
   "terraport-v3"
 ])
 const GARUDA_LIQUIDITY_DEX_IDS = new Set(["garuda-v1", "garuda-v2"])
+const WESO_DEFI_LIQUIDITY_DEX_IDS = new Set(["weso-defi"])
 
 const normalizeAddress = (value: string | undefined) =>
   value?.trim().toLowerCase() ?? ""
@@ -339,8 +340,12 @@ const MarketLiquidityPanel = ({
       ? "standard"
       : GARUDA_LIQUIDITY_DEX_IDS.has(normalizedDexId)
       ? "garuda"
+      : WESO_DEFI_LIQUIDITY_DEX_IDS.has(normalizedDexId)
+      ? "weso-defi"
       : undefined
-  const supportsStandardLiquidity = liquidityProtocol === "standard"
+  const supportsWesoLiquidity = liquidityProtocol === "weso-defi"
+  const supportsStandardLiquidity =
+    liquidityProtocol === "standard" || supportsWesoLiquidity
   const supportsGarudaLiquidity = liquidityProtocol === "garuda"
   const hasLiquidityAssets = Boolean(tokenAsset && luncAsset)
   const isProvideMode = mode === "provide"
@@ -353,7 +358,7 @@ const MarketLiquidityPanel = ({
       hasLiquidityAssets
   )
 
-  const { data: pairInfo } = useQuery({
+  const { data: pairInfo, isLoading: pairInfoLoading } = useQuery({
     queryKey: [
       "market",
       "liquidity",
@@ -372,7 +377,7 @@ const MarketLiquidityPanel = ({
       : normalizedPairAddress
   const unsupportedPairType =
     supportsStandardLiquidity && Boolean(pairInfo?.pair_type?.custom)
-  const liquidityEnabled = supported && !unsupportedPairType
+  const baseLiquidityAvailable = supported && !unsupportedPairType
   const pairAssetDecimals = useMemo(() => {
     const map = new Map<string, number>()
     pairInfo?.asset_infos?.forEach((info, index) => {
@@ -402,7 +407,7 @@ const MarketLiquidityPanel = ({
           pool: {}
         }
       ),
-    enabled: liquidityEnabled && Boolean(resolvedPairAddress),
+    enabled: baseLiquidityAvailable && Boolean(resolvedPairAddress),
     staleTime: 45_000,
     refetchInterval: 90_000
   })
@@ -414,6 +419,22 @@ const MarketLiquidityPanel = ({
     pairInfo?.liquidity_token?.toLowerCase() ??
     garudaPoolInfo?.liquidity_token?.toLowerCase() ??
     ""
+  const lpTokenMatchesPoolAsset = Boolean(
+    lpTokenAddress &&
+      [tokenAsset, luncAsset].some(
+        (asset) => asset?.type === "cw20" && asset.contract === lpTokenAddress
+      )
+  )
+  const unsupportedWesoPool =
+    supportsWesoLiquidity &&
+    (!lpTokenAddress ||
+      lpTokenAddress === resolvedPairAddress ||
+      lpTokenMatchesPoolAsset)
+  const liquidityInfoLoading = supportsWesoLiquidity && pairInfoLoading
+  const liquidityEnabled =
+    baseLiquidityAvailable &&
+    !liquidityInfoLoading &&
+    !unsupportedWesoPool
 
   const { data: lpTokenInfo } = useQuery({
     queryKey: ["market", "liquidity", "lp-token-info", lpTokenAddress],
@@ -1064,18 +1085,25 @@ const MarketLiquidityPanel = ({
     }
   }
 
+  const unsupportedLiquidityLabel = liquidityInfoLoading
+    ? "Loading pool"
+    : "Unsupported pair"
+  const unsupportedLiquidityMessage = liquidityInfoLoading
+    ? "Pool information is loading."
+    : unsupportedPairType
+    ? "This pool uses a custom concentrated liquidity contract, so proportional liquidity controls are disabled."
+    : unsupportedWesoPool
+    ? "WESO DeFi liquidity controls are available only for AMM pools with a separate LP token. Bonding and wrapped-token pools use trade controls instead."
+    : `Liquidity controls are available for standard AMM pairs on Terraswap, Astroport, Terraport, Garuda, and WESO DeFi. This pair is listed on ${dexLabel}.`
+
   if (!liquidityEnabled) {
     return (
       <section className={`card ${styles.liquidityCard}`}>
         <div className={styles.liquidityHeader}>
           <span>Liquidity</span>
-          <strong>Unsupported pair</strong>
+          <strong>{unsupportedLiquidityLabel}</strong>
         </div>
-        <p className={styles.liquidityNotice}>
-          {unsupportedPairType
-            ? "This pool uses a custom concentrated liquidity contract, so proportional liquidity controls are disabled."
-            : `Liquidity controls are available for standard AMM pairs on Terraswap, Astroport, Terraport, and Garuda. This pair is listed on ${dexLabel}.`}
-        </p>
+        <p className={styles.liquidityNotice}>{unsupportedLiquidityMessage}</p>
       </section>
     )
   }
