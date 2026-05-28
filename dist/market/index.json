@@ -85437,19 +85437,29 @@
       "dexLabel": "WESO DeFi",
       "type": "weso-pool",
       "assets": [
-        "uluna",
-        "terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6"
+        "terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+        "uluna"
       ],
       "poolAssets": [
         {
-          "id": "native:uluna",
-          "amount": "1000020800752494299"
+          "id": "cw20:terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+          "amount": "119876146234833"
         },
         {
-          "id": "cw20:terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
-          "amount": "1000020800752494299"
+          "id": "native:uluna",
+          "amount": "119876146234833"
         }
-      ]
+      ],
+      "bonding": {
+        "protocol": "weso-defi",
+        "tokenAddress": "terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
+        "nativeDenom": "uluna",
+        "status": "open",
+        "liquidityAssetId": "native:uluna",
+        "liquidityAmount": "239752292469666",
+        "spotPriceAssetId": "native:uluna",
+        "spotPriceAmount": "1000000"
+      }
     },
     {
       "pair": "terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
@@ -85463,11 +85473,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
-          "amount": "1000000"
+          "amount": "14017718737101"
         },
         {
           "id": "native:uluna",
-          "amount": "39839301"
+          "amount": "558545987614304"
         }
       ],
       "bonding": {
@@ -85476,9 +85486,9 @@
         "nativeDenom": "uluna",
         "status": "open",
         "liquidityAssetId": "native:uluna",
-        "liquidityAmount": "7454875104838072",
+        "liquidityAmount": "1117091975228608",
         "spotPriceAssetId": "native:uluna",
-        "spotPriceAmount": "39839301"
+        "spotPriceAmount": "39845734"
       }
     },
     {
@@ -85493,11 +85503,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra10fusc7487y4ju2v5uavkauf3jdpxx9h8sc7wsqdqg4rne8t4qyrq8385q6",
-          "amount": "17747180539785"
+          "amount": "4656640569626"
         },
         {
           "id": "cw20:terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
-          "amount": "214716367268"
+          "amount": "57247050502"
         }
       ]
     },
@@ -85513,11 +85523,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1uewxz67jhhhs2tj97pfm2egtk7zqxuhenm4y4m",
-          "amount": "1000000"
+          "amount": "3267454598269"
         },
         {
           "id": "native:uusd",
-          "amount": "538712"
+          "amount": "1759597410737"
         }
       ],
       "bonding": {
@@ -85526,9 +85536,9 @@
         "nativeDenom": "uusd",
         "status": "open",
         "liquidityAssetId": "native:uusd",
-        "liquidityAmount": "4586066813316",
+        "liquidityAmount": "3519194821474",
         "spotPriceAssetId": "native:uusd",
-        "spotPriceAmount": "538712"
+        "spotPriceAmount": "538523"
       }
     },
     {
@@ -85537,19 +85547,29 @@
       "dexLabel": "WESO DeFi",
       "type": "weso-pool",
       "assets": [
-        "uusd",
-        "terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h"
+        "terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
+        "uusd"
       ],
       "poolAssets": [
         {
-          "id": "native:uusd",
-          "amount": "1000007424846526"
+          "id": "cw20:terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
+          "amount": "879233278559"
         },
         {
-          "id": "cw20:terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
-          "amount": "1000007424846526"
+          "id": "native:uusd",
+          "amount": "879233278559"
         }
-      ]
+      ],
+      "bonding": {
+        "protocol": "weso-defi",
+        "tokenAddress": "terra1uncwzdhxdktqpx4rj6mkuhl0ekv0raua0058rr7zgnapm9najyyqgtpf6h",
+        "nativeDenom": "uusd",
+        "status": "open",
+        "liquidityAssetId": "native:uusd",
+        "liquidityAmount": "1758466557118",
+        "spotPriceAssetId": "native:uusd",
+        "spotPriceAmount": "1000000"
+      }
     }
   ]
 }

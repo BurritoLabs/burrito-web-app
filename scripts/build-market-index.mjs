@@ -127,6 +127,17 @@ const querySmart = async (contract, query) => {
   return payload?.data ?? payload;
 };
 
+const queryBankBalance = async (address, denom) => {
+  try {
+    const url = new URL(`${LCD}/cosmos/bank/v1beta1/balances/${address}/by_denom`);
+    url.searchParams.set("denom", denom);
+    const payload = await fetchJson(url.toString());
+    return String(payload?.balance?.amount ?? "0");
+  } catch {
+    return "0";
+  }
+};
+
 const looksLikeTerraAddress = (value) =>
   typeof value === "string" && value.toLowerCase().startsWith("terra1");
 
@@ -201,6 +212,18 @@ const addBaseUnits = (...values) =>
 
 const multiplyBaseUnits = (value, multiplier) =>
   (parseBaseUnits(value) * BigInt(multiplier)).toString();
+
+const pow10BaseUnits = (decimals) => {
+  const parsed = Number.parseInt(String(decimals ?? 6), 10);
+  const safeDecimals = Number.isFinite(parsed) && parsed >= 0 && parsed <= 30 ? parsed : 6;
+  return 10n ** BigInt(safeDecimals);
+};
+
+const multiplyDivideBaseUnits = (value, multiplier, divisor) => {
+  const denominator = typeof divisor === "bigint" ? divisor : parseBaseUnits(divisor);
+  if (denominator <= 0n) return "0";
+  return ((parseBaseUnits(value) * parseBaseUnits(multiplier)) / denominator).toString();
+};
 
 const mapWithConcurrency = async (items, limit, mapper) => {
   const results = [];
@@ -436,6 +459,9 @@ const resolvePoolSnapshot = async (
 };
 
 const resolveWesoDefiSnapshot = async (pairAddress, dex, fromAssetInfos) => {
+  const curveSnapshot = await resolveWesoDefiCurveSnapshot(pairAddress, dex);
+  if (curveSnapshot) return curveSnapshot;
+
   try {
     const data = await querySmart(pairAddress, { pool: {} });
     const assets = Array.isArray(data?.assets) ? data.assets : null;
@@ -449,15 +475,19 @@ const resolveWesoDefiSnapshot = async (pairAddress, dex, fromAssetInfos) => {
       return snapshot ? { ...snapshot, type: "weso-pool" } : null;
     }
   } catch {
-    // Some WESO DeFi curve contracts are CW20 contracts with curve_info only.
+    return null;
   }
+};
 
+const resolveWesoDefiCurveSnapshot = async (pairAddress, dex) => {
   let curveInfo;
   let tokenInfo;
+  let contractBalance;
   try {
-    [curveInfo, tokenInfo] = await Promise.all([
+    [curveInfo, tokenInfo, contractBalance] = await Promise.all([
       querySmart(pairAddress, { curve_info: {} }),
       querySmart(pairAddress, { token_info: {} }),
+      querySmart(pairAddress, { balance: { address: pairAddress } }),
     ]);
   } catch {
     return null;
@@ -471,17 +501,42 @@ const resolveWesoDefiSnapshot = async (pairAddress, dex, fromAssetInfos) => {
 
   const tokenId = `cw20:${pairAddress.toLowerCase()}`;
   const nativeId = `native:${reserveDenom}`;
+  const tokenDecimals = tokenInfo?.decimals ?? 6;
+  const tokenScale = pow10BaseUnits(tokenDecimals);
+  const contractTokenBalance = String(contractBalance?.balance ?? "0");
+  const tokenReserveAmount =
+    parseBaseUnits(contractTokenBalance) > 0n ? contractTokenBalance : supplyAmount;
   const hasSpotPrice = parseBaseUnits(spotPriceAmount) > 0n;
+  const computedReserveEquivalentAmount =
+    hasSpotPrice && parseBaseUnits(tokenReserveAmount) > 0n
+      ? multiplyDivideBaseUnits(tokenReserveAmount, spotPriceAmount, tokenScale)
+      : reserveAmount;
+  const bankReserveAmount = await queryBankBalance(pairAddress, reserveDenom);
+  const reserveEquivalentAmount =
+    parseBaseUnits(bankReserveAmount) > 0n ? bankReserveAmount : computedReserveEquivalentAmount;
+  const displayTokenAmount =
+    parseBaseUnits(tokenReserveAmount) > 0n
+      ? tokenReserveAmount
+      : hasSpotPrice
+        ? "1000000"
+        : supplyAmount;
+  const displayReserveAmount =
+    parseBaseUnits(reserveEquivalentAmount) > 0n
+      ? reserveEquivalentAmount
+      : hasSpotPrice
+        ? spotPriceAmount
+        : reserveAmount;
+  const isNativeWrapper = parseBaseUnits(spotPriceAmount) === tokenScale;
 
   return {
     pair: pairAddress.toLowerCase(),
     dexId: dex.id,
     dexLabel: dex.label,
-    type: "bonding-weso-defi",
+    type: isNativeWrapper ? "weso-pool" : "bonding-weso-defi",
     assets: [pairAddress.toLowerCase(), reserveDenom],
     poolAssets: [
-      { id: tokenId, amount: hasSpotPrice ? "1000000" : supplyAmount },
-      { id: nativeId, amount: hasSpotPrice ? spotPriceAmount : reserveAmount },
+      { id: tokenId, amount: displayTokenAmount },
+      { id: nativeId, amount: displayReserveAmount },
     ],
     bonding: {
       protocol: "weso-defi",
@@ -489,7 +544,7 @@ const resolveWesoDefiSnapshot = async (pairAddress, dex, fromAssetInfos) => {
       nativeDenom: reserveDenom,
       status: "open",
       liquidityAssetId: nativeId,
-      liquidityAmount: reserveAmount,
+      liquidityAmount: multiplyBaseUnits(displayReserveAmount, 2),
       spotPriceAssetId: nativeId,
       spotPriceAmount,
     },

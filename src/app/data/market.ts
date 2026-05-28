@@ -46,6 +46,28 @@ type PoolResponse = {
   reserve2?: string
 }
 
+type WesoCurveInfoResponse = {
+  reserve?: string
+  reserve_denom?: string
+  spot_price?: string
+  supply?: string
+}
+
+type Cw20TokenInfoResponse = {
+  decimals?: number | string
+  total_supply?: string
+}
+
+type Cw20BalanceResponse = {
+  balance?: string
+}
+
+type BankBalanceResponse = {
+  balance?: {
+    amount?: string
+  }
+}
+
 export type MarketDexPair = {
   pair: string
   dexId: string
@@ -740,6 +762,112 @@ const resolveAssetId = (info: PoolAssetInfo, fallback?: string) => {
   return "native:unknown"
 }
 
+const parseBaseUnits = (value: unknown) => {
+  if (!value || !/^\d+$/.test(String(value))) return 0n
+  try {
+    return BigInt(String(value))
+  } catch {
+    return 0n
+  }
+}
+
+const pow10BaseUnits = (decimals: unknown) => {
+  const parsed =
+    typeof decimals === "number" ? decimals : Number.parseInt(String(decimals ?? 6), 10)
+  const safeDecimals = Number.isFinite(parsed) && parsed >= 0 && parsed <= 30 ? parsed : 6
+  return 10n ** BigInt(safeDecimals)
+}
+
+const multiplyBaseUnits = (value: unknown, multiplier: number) =>
+  (parseBaseUnits(value) * BigInt(multiplier)).toString()
+
+const multiplyDivideBaseUnits = (
+  value: unknown,
+  multiplier: unknown,
+  divisor: bigint
+) => {
+  if (divisor <= 0n) return "0"
+  return ((parseBaseUnits(value) * parseBaseUnits(multiplier)) / divisor).toString()
+}
+
+const fetchNativeBalance = async (address: string, denom: string) => {
+  try {
+    const url = new URL(
+      `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/balances/${address}/by_denom`
+    )
+    url.searchParams.set("denom", denom)
+    const response = await fetchWithEndpointFallback(url.toString())
+    if (!response.ok) return "0"
+    const payload = (await response.json()) as BankBalanceResponse
+    return payload.balance?.amount ?? "0"
+  } catch {
+    return "0"
+  }
+}
+
+const fetchWesoCurvePoolForPair = async (
+  pair: MarketDexPair
+): Promise<MarketPoolSnapshot | null> => {
+  if (pair.dexId !== "weso-defi") return null
+
+  try {
+    const [curveInfo, tokenInfo, contractBalance] = await Promise.all([
+      queryContractSmart<WesoCurveInfoResponse>(pair.pair, { curve_info: {} }),
+      queryContractSmart<Cw20TokenInfoResponse>(pair.pair, { token_info: {} }),
+      queryContractSmart<Cw20BalanceResponse>(pair.pair, {
+        balance: { address: pair.pair }
+      })
+    ])
+
+    const reserveDenom = curveInfo.reserve_denom ?? ""
+    if (!reserveDenom) return null
+
+    const tokenScale = pow10BaseUnits(tokenInfo.decimals)
+    const tokenReserveAmount =
+      parseBaseUnits(contractBalance.balance) > 0n
+        ? (contractBalance.balance ?? "0")
+        : (curveInfo.supply ?? tokenInfo.total_supply ?? "0")
+    const hasSpotPrice = parseBaseUnits(curveInfo.spot_price) > 0n
+    const computedReserveAmount =
+      hasSpotPrice && parseBaseUnits(tokenReserveAmount) > 0n
+        ? multiplyDivideBaseUnits(tokenReserveAmount, curveInfo.spot_price, tokenScale)
+        : (curveInfo.reserve ?? "0")
+    const bankReserveAmount = await fetchNativeBalance(pair.pair, reserveDenom)
+    const reserveAmount =
+      parseBaseUnits(bankReserveAmount) > 0n ? bankReserveAmount : computedReserveAmount
+    const isNativeWrapper = parseBaseUnits(curveInfo.spot_price) === tokenScale
+
+    return {
+      bonding: {
+        liquidityAmount: multiplyBaseUnits(reserveAmount, 2),
+        liquidityAssetId: `native:${reserveDenom}`,
+        nativeDenom: reserveDenom,
+        protocol: "weso-defi",
+        spotPriceAmount: curveInfo.spot_price,
+        spotPriceAssetId: `native:${reserveDenom}`,
+        status: "open",
+        tokenAddress: pair.pair.toLowerCase()
+      },
+      pair: pair.pair,
+      dexId: pair.dexId,
+      dexLabel: pair.dexLabel,
+      type: isNativeWrapper ? "weso-pool" : "bonding-weso-defi",
+      poolAssets: [
+        {
+          id: `cw20:${pair.pair.toLowerCase()}`,
+          amount: tokenReserveAmount
+        },
+        {
+          id: `native:${reserveDenom}`,
+          amount: reserveAmount
+        }
+      ]
+    }
+  } catch {
+    return null
+  }
+}
+
 const toFallbackAsset = (assetId: string) => {
   if (assetId.startsWith("native:")) return assetId.slice("native:".length)
   if (assetId.startsWith("cw20:")) return assetId.slice("cw20:".length)
@@ -1232,6 +1360,9 @@ const fetchPoolForPair = async (
   pair: MarketDexPair,
   pairDexMap: Map<string, { dexId: string; dexLabel: string }>
 ): Promise<MarketPoolSnapshot | null> => {
+  const wesoCurvePool = await fetchWesoCurvePoolForPair(pair)
+  if (wesoCurvePool) return wesoCurvePool
+
   try {
     const data = await queryContractSmart<PoolResponse>(pair.pair, { pool: {} })
     const assets = data?.assets
