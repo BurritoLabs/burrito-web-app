@@ -82,6 +82,9 @@ const fetchJson = async (url, retries = 2) => {
   throw lastError ?? new Error("Unknown fetch failure");
 };
 
+const formatError = (error) =>
+  error instanceof Error ? error.message : String(error ?? "unknown error");
+
 const parseCommonJsArray = (source) => {
   const normalized = source.replace(/^\uFEFF/, "").trim();
   if (!/^module\.exports\s*=/.test(normalized)) {
@@ -518,7 +521,7 @@ const summarizeCandleVolumes = (candlesByTf) => {
   return summary;
 };
 
-const mergeVolumeSummariesIntoIndex = async ({ indexFile, volumesByPair }) => {
+const mergeVolumeSummariesIntoIndex = async ({ indexFile, refreshedPairs, volumesByPair }) => {
   let payload;
   try {
     payload = JSON.parse(await fs.readFile(indexFile, "utf8"));
@@ -533,6 +536,7 @@ const mergeVolumeSummariesIntoIndex = async ({ indexFile, volumesByPair }) => {
   payload.pairs = pairs.map((entry) => {
     const pair = typeof entry?.pair === "string" ? entry.pair.toLowerCase() : "";
     if (!pair) return entry;
+    if (!refreshedPairs.has(pair)) return entry;
 
     const next = { ...entry };
     const volumes = volumesByPair.get(pair);
@@ -561,9 +565,20 @@ const collectPairTicks = async ({ meta, oldestAllowed }) => {
 
   let scannedTx = 0;
   let matchedEvents = 0;
+  let fetchErrors = 0;
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const txs = await fetchPairTxPage(meta.pair, page);
+    let txs;
+    try {
+      txs = await fetchPairTxPage(meta.pair, page);
+    } catch (error) {
+      fetchErrors += 1;
+      console.warn(
+        `[warn] ${meta.pair} page ${page} tx fetch failed after retries: ${formatError(error)}`
+      );
+      break;
+    }
+
     if (!txs.length) break;
 
     scannedTx += txs.length;
@@ -616,20 +631,8 @@ const collectPairTicks = async ({ meta, oldestAllowed }) => {
     store,
     scannedTx,
     matchedEvents,
+    fetchErrors,
   };
-};
-
-const clearDirectory = async (dir) => {
-  try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    await Promise.all(
-      entries.map((entry) =>
-        fs.rm(path.join(dir, entry.name), { recursive: true, force: true })
-      )
-    );
-  } catch {
-    // Ignore if folder does not exist yet.
-  }
 };
 
 const run = async () => {
@@ -646,7 +649,24 @@ const run = async () => {
     selectedMetas,
     PAIR_QUERY_CONCURRENCY,
     async (meta, index) => {
-      const result = await collectPairTicks({ meta, oldestAllowed });
+      let result;
+      try {
+        result = await collectPairTicks({ meta, oldestAllowed });
+      } catch (error) {
+        console.warn(
+          `[warn] ${meta.pair} candle collection failed: ${formatError(error)}`
+        );
+        result = {
+          pair: meta.pair,
+          store: {
+            [meta.keys[0]]: [],
+            [meta.keys[1]]: [],
+          },
+          scannedTx: 0,
+          matchedEvents: 0,
+          fetchErrors: 1,
+        };
+      }
       console.log(
         `[${index + 1}/${selectedMetas.length}] ${meta.pair} -> ${result.matchedEvents} ticks from ${result.scannedTx} tx`
       );
@@ -655,15 +675,22 @@ const run = async () => {
   );
 
   const pairTicks = new Map(pairResults.map((result) => [result.pair, result.store]));
+  const pairResultMap = new Map(pairResults.map((result) => [result.pair, result]));
+  const refreshedPairs = new Set(
+    pairResults.filter((result) => result.fetchErrors === 0).map((result) => result.pair)
+  );
   const scannedTx = pairResults.reduce((sum, result) => sum + result.scannedTx, 0);
   const matchedEvents = pairResults.reduce((sum, result) => sum + result.matchedEvents, 0);
+  const fetchErrors = pairResults.reduce((sum, result) => sum + result.fetchErrors, 0);
 
   await fs.mkdir(OUT_DIR, { recursive: true });
-  await clearDirectory(OUT_DIR);
 
   let filesWritten = 0;
   const volumeSummaries = new Map();
   for (const meta of selectedMetas) {
+    const result = pairResultMap.get(meta.pair);
+    if (!result || result.fetchErrors > 0) continue;
+
     const store = pairTicks.get(meta.pair);
     if (!store) continue;
 
@@ -723,6 +750,7 @@ const run = async () => {
 
   const indexVolumesUpdated = await mergeVolumeSummariesIntoIndex({
     indexFile: INDEX_FILE,
+    refreshedPairs,
     volumesByPair: volumeSummaries,
   });
 
@@ -730,8 +758,10 @@ const run = async () => {
   console.log(`- Pair metadata: ${pairMetaMap.size}`);
   console.log(`- Hot pairs selected: ${selectedMetas.length}`);
   console.log(`- Hot pairs with liquidity score: ${scoredPairs}`);
+  console.log(`- Hot pairs refreshed: ${refreshedPairs.size}`);
   console.log(`- Scanned tx: ${scannedTx}`);
   console.log(`- Matched swap ticks: ${matchedEvents}`);
+  console.log(`- Pair tx fetch errors: ${fetchErrors}`);
   console.log(`- Candle files: ${filesWritten}`);
   console.log(`- Index volume summaries: ${indexVolumesUpdated}`);
   console.log(`- Output: ${OUT_DIR}`);
