@@ -387,6 +387,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
             ? signAndBroadcastImpl(messages, fee, memo)
             : client.signAndBroadcast(signerAddress, messages, fee, memo),
         getSequence: (address: string) => client.getSequence(address),
+        broadcastTx: (
+          tx: Parameters<ClassicStargateClient["broadcastTx"]>[0],
+          timeoutMs?: Parameters<ClassicStargateClient["broadcastTx"]>[1],
+          pollIntervalMs?: Parameters<ClassicStargateClient["broadcastTx"]>[2]
+        ) => client.broadcastTx(tx, timeoutMs, pollIntervalMs),
         broadcastTxSync: (tx: Parameters<ClassicStargateClient["broadcastTxSync"]>[0]) =>
           client.broadcastTxSync(tx),
         delegateTokens: (

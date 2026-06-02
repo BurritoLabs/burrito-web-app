@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import JSON5 from "json5";
 
 const LCD = process.env.LCD_URL?.trim() || "https://terra-classic-lcd.publicnode.com";
 const CHAIN_ID = "columbus-5";
@@ -93,8 +94,14 @@ const parseCommonJsArray = (source) => {
   const expression = normalized
     .replace(/^module\.exports\s*=\s*/, "")
     .replace(/;\s*$/, "");
-  // Trusted remote source from chain-registry.
-  const value = new Function(`return (${expression})`)();
+
+  let value;
+  try {
+    value = JSON5.parse(expression);
+  } catch (error) {
+    throw new Error(`Unsupported CJS payload: ${formatError(error)}`);
+  }
+
   if (!Array.isArray(value)) {
     throw new Error("Expected array payload");
   }

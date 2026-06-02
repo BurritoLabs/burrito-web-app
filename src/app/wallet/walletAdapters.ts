@@ -87,6 +87,11 @@ export type ClassicStargateClient = {
     memo: string,
     signerData: SignerDataLike
   ) => Promise<TxRaw>
+  broadcastTx: (
+    tx: Uint8Array,
+    timeoutMs?: number,
+    pollIntervalMs?: number
+  ) => Promise<BroadcastResultLike>
   broadcastTxSync: (tx: Uint8Array) => Promise<string>
   delegateTokens: (
     delegatorAddress: string,
@@ -183,6 +188,11 @@ const bindSignerAddress = <T extends ClassicStargateClient>(
       memo?: string
     ) => client.undelegateTokens(signerAddress, validatorAddress, amount, fee, memo),
     getSequence: (address: string) => client.getSequence(address),
+    broadcastTx: (
+      tx: Uint8Array,
+      timeoutMs?: number,
+      pollIntervalMs?: number
+    ) => client.broadcastTx(tx, timeoutMs, pollIntervalMs),
     broadcastTxSync: (tx: Uint8Array) => client.broadcastTxSync(tx)
   }) as T
 

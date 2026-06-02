@@ -1,4 +1,5 @@
 const BINODES_BASE = "https://api.binodes.com"
+const BINODES_REQUEST_TIMEOUT_MS = 3_500
 
 type BinodesResponse<T> = {
   code?: number
@@ -160,11 +161,27 @@ const buildBinodesUrl = (path: string, params?: Record<string, string>) => {
   return url.toString()
 }
 
+const fetchBinodes = async (url: string) => {
+  const controller =
+    typeof AbortController === "undefined" ? undefined : new AbortController()
+  const timeoutId = controller
+    ? globalThis.setTimeout(() => controller.abort(), BINODES_REQUEST_TIMEOUT_MS)
+    : undefined
+
+  try {
+    return await fetch(url, { signal: controller?.signal })
+  } finally {
+    if (timeoutId !== undefined) {
+      globalThis.clearTimeout(timeoutId)
+    }
+  }
+}
+
 const fetchBinodesList = async <T>(
   path: string,
   params: Record<string, string> = {}
 ) => {
-  const response = await fetch(
+  const response = await fetchBinodes(
     buildBinodesUrl(path, {
       limit: "1",
       ...params

@@ -102,6 +102,8 @@ const EMPTY_ICON_CANDIDATES: string[] = []
 const BONDING_SWAP_MEMO = "Burrito bonding swap"
 const FALLBACK_BONDING_BUY_GAS = 420_000
 const FALLBACK_BONDING_SELL_GAS = 520_000
+const BONDING_BROADCAST_TIMEOUT_MS = 60_000
+const BONDING_BROADCAST_POLL_INTERVAL_MS = 2_000
 
 const parseBondingAsset = (
   asset: BondingAsset | undefined,
@@ -228,9 +230,18 @@ const signAndBroadcastFast = async ({
           chainId: CLASSIC_CHAIN.chainId,
         },
       )
-      const txHash = await client.broadcastTxSync(TxRaw.encode(signed).finish())
-      if (!txHash) throw new Error("Bonding swap broadcast failed")
-      return txHash
+      const result = await client.broadcastTx(
+        TxRaw.encode(signed).finish(),
+        BONDING_BROADCAST_TIMEOUT_MS,
+        BONDING_BROADCAST_POLL_INTERVAL_MS,
+      )
+      if (result.code !== 0) {
+        throw new Error(
+          result.rawLog || `Bonding swap failed with code ${result.code}`,
+        )
+      }
+      if (!result.transactionHash) throw new Error("Bonding swap broadcast failed")
+      return result.transactionHash
     } catch (error) {
       const expectedSequence = parseSequenceMismatchExpected(
         error instanceof Error ? error.message : String(error),

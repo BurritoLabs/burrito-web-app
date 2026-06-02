@@ -159,6 +159,8 @@ type SwapPanelProps = {
 }
 const DEFAULT_FROM_ASSET_ID = NATIVE_ASSETS[0].id
 const DEFAULT_TO_ASSET_ID = NATIVE_ASSETS[1].id
+const SWAP_BROADCAST_TIMEOUT_MS = 60_000
+const SWAP_BROADCAST_POLL_INTERVAL_MS = 2_000
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
 const ROUTED_SWAP_DEXES = CLASSIC_SWAP_DEXES.filter(
   (item) =>
@@ -578,11 +580,18 @@ const signAndBroadcastSwapFast = async ({
           chainId: CLASSIC_CHAIN.chainId
         }
       )
-      const txHash = await client.broadcastTxSync(TxRaw.encode(signed).finish())
-      if (!txHash) {
+      const result = await client.broadcastTx(
+        TxRaw.encode(signed).finish(),
+        SWAP_BROADCAST_TIMEOUT_MS,
+        SWAP_BROADCAST_POLL_INTERVAL_MS
+      )
+      if (result.code !== 0) {
+        throw new Error(result.rawLog || `Swap failed with code ${result.code}`)
+      }
+      if (!result.transactionHash) {
         throw new Error("Swap broadcast failed")
       }
-      return txHash
+      return result.transactionHash
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const expectedSequence = parseSequenceMismatchExpected(message)
