@@ -182,10 +182,11 @@
 @media (max-width: 991.98px) {
   .layout {
     height: auto;
-    min-height: 100dvh;
+    min-height: 100vh;
+    min-height: 100svh;
     grid-template-columns: 1fr;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow-x: clip;
+    overflow-y: visible;
     grid-template-rows: auto var(--header-height) 1fr;
     grid-template-areas:
       "banner"
@@ -204,7 +205,9 @@
     grid-template-columns: 1fr;
     grid-template-areas: "main";
     height: auto;
-    min-height: calc(100dvh - var(--header-height));
+    min-height: calc(100vh - var(--header-height));
+    min-height: calc(100svh - var(--header-height));
+    overflow: visible;
   }
 
   .header,
@@ -221,7 +224,8 @@
   }
 
   .menuOpen {
-    height: 100dvh;
+    height: 100vh;
+    height: 100svh;
     overflow: hidden;
     grid-template-rows: auto 1fr;
     grid-template-areas:

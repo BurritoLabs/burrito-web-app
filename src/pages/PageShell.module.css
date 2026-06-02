@@ -111,13 +111,15 @@
     height: auto;
     min-height: 0;
     overflow: visible;
-    padding: 28px var(--main-padding);
+    padding: 28px var(--main-padding)
+      max(28px, calc(20px + env(safe-area-inset-bottom)));
   }
 }
 
 @media (max-width: 600px) {
   .page {
-    padding: 28px var(--main-padding);
+    padding: 28px var(--main-padding)
+      max(28px, calc(20px + env(safe-area-inset-bottom)));
   }
 
   .banner {
