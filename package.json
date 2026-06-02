@@ -53,5 +53,10 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vite-plugin-node-polyfills": "^0.25.0"
+  },
+  "overrides": {
+    "@walletconnect/utils": {
+      "bn.js": "4.12.3"
+    }
   }
 }

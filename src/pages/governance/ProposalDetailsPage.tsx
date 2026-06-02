@@ -77,6 +77,8 @@ const VOTE_GAS_LIMIT = 220000
 const DEPOSIT_GAS_LIMIT = 220000
 const GOV_GAS_ADJUSTMENT = 1.6
 const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
+const GOV_BROADCAST_TIMEOUT_MS = 60_000
+const GOV_BROADCAST_POLL_INTERVAL_MS = 2_000
 const buildGovFee = (gasLimit: number) => ({
   amount: [
     {
@@ -842,9 +844,7 @@ const ProposalDetails = () => {
       }
 
       let sequenceHint: number | undefined
-      let result:
-        | Awaited<ReturnType<ClassicStargateClient["broadcastTxSync"]>>
-        | undefined
+      let result: string | undefined
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
@@ -872,11 +872,21 @@ const ProposalDetails = () => {
             }
           )
           const txBytes = TxRaw.encode(signed).finish()
-          const txHash = await client.broadcastTxSync(txBytes)
-          if (!txHash) {
+          const broadcastResult = await client.broadcastTx(
+            txBytes,
+            GOV_BROADCAST_TIMEOUT_MS,
+            GOV_BROADCAST_POLL_INTERVAL_MS
+          )
+          if (broadcastResult.code !== 0) {
+            throw new Error(
+              broadcastResult.rawLog ||
+                `Vote transaction failed with code ${broadcastResult.code}`
+            )
+          }
+          if (!broadcastResult.transactionHash) {
             throw new Error("Vote transaction failed")
           }
-          result = txHash
+          result = broadcastResult.transactionHash
           break
         } catch (innerErr) {
           const message =
@@ -964,9 +974,7 @@ const ProposalDetails = () => {
       }
 
       let sequenceHint: number | undefined
-      let result:
-        | Awaited<ReturnType<ClassicStargateClient["broadcastTxSync"]>>
-        | undefined
+      let result: string | undefined
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
@@ -994,11 +1002,21 @@ const ProposalDetails = () => {
             }
           )
           const txBytes = TxRaw.encode(signed).finish()
-          const txHash = await client.broadcastTxSync(txBytes)
-          if (!txHash) {
+          const broadcastResult = await client.broadcastTx(
+            txBytes,
+            GOV_BROADCAST_TIMEOUT_MS,
+            GOV_BROADCAST_POLL_INTERVAL_MS
+          )
+          if (broadcastResult.code !== 0) {
+            throw new Error(
+              broadcastResult.rawLog ||
+                `Deposit transaction failed with code ${broadcastResult.code}`
+            )
+          }
+          if (!broadcastResult.transactionHash) {
             throw new Error("Deposit transaction failed")
           }
-          result = txHash
+          result = broadcastResult.transactionHash
           break
         } catch (innerErr) {
           const message =
