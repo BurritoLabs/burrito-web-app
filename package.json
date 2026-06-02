@@ -11,6 +11,7 @@
     "build:market-candles": "node scripts/build-market-candles.mjs",
     "build:market-all": "npm run build:market-index && npm run build:market-candles",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
     "deploy:launchpad": "node scripts/deploy-launchpad-contracts.mjs"
   },
@@ -52,7 +53,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vite-plugin-node-polyfills": "^0.25.0"
+    "vite-plugin-node-polyfills": "^0.25.0",
+    "vitest": "^4.1.8"
   },
   "overrides": {
     "@walletconnect/utils": {
