@@ -64,6 +64,10 @@
   --normal: 500;
   --bold: 700;
 
+  --app-background:
+    radial-gradient(1600px 900px at 12% -20%, rgba(255, 255, 255, 0.065), transparent 70%),
+    radial-gradient(1400px 800px at 88% -10%, rgba(104, 216, 63, 0.055), transparent 72%),
+    linear-gradient(180deg, #14231d 0%, #101b17 55%, #0d1815 100%);
   --font-montserrat: "Montserrat", "Nunito Sans", system-ui, sans-serif;
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
 }
@@ -87,10 +91,12 @@ body,
 html,
 body {
   overflow-x: clip;
+  overscroll-behavior-y: none;
 }
 
 html {
-  background-color: #0d1815;
+  background: var(--app-background);
+  background-color: var(--bg);
 }
 
 body {
@@ -103,10 +109,7 @@ body {
   line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  background:
-    radial-gradient(1600px 900px at 12% -20%, rgba(255, 255, 255, 0.065), transparent 70%),
-    radial-gradient(1400px 800px at 88% -10%, rgba(104, 216, 63, 0.055), transparent 72%),
-    linear-gradient(180deg, #14231d 0%, #101b17 55%, #0d1815 100%);
+  background: var(--app-background);
   background-color: var(--bg);
 }
 
