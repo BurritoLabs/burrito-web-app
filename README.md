@@ -115,8 +115,7 @@ npm run build:release
 ## Supported Wallets
 
 - Keplr extension
-- Keplr mobile
-- Galaxy Station
+- Galaxy Station extension
 
 Wallets remain the signing boundary. Burrito never stores private keys and does
 not custody user assets.
@@ -126,16 +125,14 @@ not custody user assets.
 All variables are optional unless the related production feature is enabled.
 
 ```bash
-VITE_WALLETCONNECT_PROJECT_ID=
 VITE_SWAP_PLATFORM_FEE_BPS=
 VITE_SWAP_PLATFORM_FEE_RECIPIENT=
 VITE_LAUNCHPAD_LP_LOCKER_ADDRESS=
 VITE_LAUNCHPAD_REGISTRY_ADDRESS=
 ```
 
-If `VITE_WALLETCONNECT_PROJECT_ID` is missing, the app uses the bundled fallback
-project id. Launchpad LP locking and registry publishing remain disabled until
-their contract addresses are configured.
+Launchpad LP locking and registry publishing remain disabled until their
+contract addresses are configured.
 
 ## Development
 

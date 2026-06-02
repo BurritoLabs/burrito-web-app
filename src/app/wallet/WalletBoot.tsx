@@ -1,6 +1,4 @@
 import {
-  Suspense,
-  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -20,17 +18,14 @@ import {
   WALLET_CONNECTOR_STORAGE_KEY,
   getStoredWalletConnectorId
 } from "./walletMeta"
-import {
-  isLikelyMobileBrowser,
-  isTouchWalletCapableBrowser
-} from "./walletPlatform"
-
-const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
 
 type WalletWindow = Window & {
   keplr?: unknown
   galaxyStation?: unknown
 }
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "Wallet connection failed"
 
 const getWalletWindow = () =>
   typeof window === "undefined" ? undefined : (window as WalletWindow)
@@ -38,10 +33,9 @@ const getWalletWindow = () =>
 const getFallbackConnectors = (): WalletConnector[] => {
   const walletWindow = getWalletWindow()
   const desktopKeplr = Boolean(walletWindow?.keplr)
-  const desktopGalaxy = Boolean(walletWindow?.galaxyStation)
-  const mobileCapable =
-    !desktopKeplr &&
-    (isLikelyMobileBrowser() || isTouchWalletCapableBrowser())
+  const desktopGalaxy =
+    Boolean(walletWindow?.galaxyStation) &&
+    !(walletWindow?.galaxyStation instanceof HTMLElement)
 
   return [
     {
@@ -50,27 +44,36 @@ const getFallbackConnectors = (): WalletConnector[] => {
     },
     {
       ...CONNECTOR_META["keplr-mobile"],
-      available: mobileCapable
+      available: false
     },
     {
       ...CONNECTOR_META.galaxy,
-      type: mobileCapable && !desktopGalaxy ? "mobile" : "extension",
-      available: desktopGalaxy || mobileCapable
+      type: "extension",
+      available: desktopGalaxy
     }
   ]
 }
 
+const getInitialStoredConnector = () => {
+  const stored = getStoredWalletConnectorId()
+  if (stored === "keplr-mobile" && getWalletWindow()?.keplr) {
+    return "keplr"
+  }
+  return stored === "keplr-mobile" ? undefined : stored
+}
+
 const WalletFallbackProvider = ({
   children,
-  onRuntimeRequest
+  autoConnectId
 }: {
   children: ReactNode
-  onRuntimeRequest: () => void
+  autoConnectId?: WalletConnectorId
 }) => {
   const [status, setStatus] = useState<WalletStatus>("disconnected")
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
+  const [account, setAccount] = useState<WalletContextValue["account"]>()
   const [error, setError] = useState<string>()
-  const txState = useMemo<TxState>(() => ({ status: "idle" }), [])
+  const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const connectors = useMemo(() => getFallbackConnectors(), [])
 
   const connect = useCallback(
@@ -78,98 +81,109 @@ const WalletFallbackProvider = ({
       setStatus("connecting")
       setConnectorId(id)
       setError(undefined)
+      setAccount(undefined)
       try {
         window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, id)
       } catch {
-        // Storage can be unavailable in private browsing; runtime still loads.
+        // Storage can be unavailable in private browsing.
       }
-      onRuntimeRequest()
+
+      if (id === "keplr-mobile") {
+        setError("Keplr Mobile is unavailable in this hardened wallet build.")
+        setStatus("error")
+        return
+      }
+
+      try {
+        const { connectWalletConnector } = await import("./walletAdapters")
+        const nextAccount = await connectWalletConnector(id)
+        setAccount(nextAccount)
+        setStatus("connected")
+      } catch (connectError) {
+        setError(getErrorMessage(connectError))
+        setStatus("error")
+      }
     },
-    [onRuntimeRequest]
+    []
   )
 
   const disconnect = useCallback(async () => {
+    if (connectorId) {
+      try {
+        const { disconnectWalletConnector } = await import("./walletAdapters")
+        await disconnectWalletConnector(connectorId)
+      } catch {
+        // The local UI should still reset even when a wallet does not expose disconnect.
+      }
+    }
     setStatus("disconnected")
     setConnectorId(undefined)
+    setAccount(undefined)
     setError(undefined)
     try {
       window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
     } catch {
       // ignore
     }
-  }, [])
+  }, [connectorId])
+
+  useEffect(() => {
+    if (!autoConnectId) return
+    if (status !== "disconnected") return
+    if (!connectors.some((item) => item.id === autoConnectId && item.available)) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void connect(autoConnectId)
+    }, 700)
+    return () => window.clearTimeout(timer)
+  }, [autoConnectId, connect, connectors, status])
 
   const value = useMemo<WalletContextValue>(
     () => ({
       status,
       connectorId,
-      account: undefined,
+      account,
       error,
       connectors,
       connect,
       disconnect,
       txState,
-      startTx: () => undefined,
-      finishTx: () => undefined,
-      failTx: () => undefined,
-      clearTx: () => undefined
+      startTx: (label?: string) =>
+        setTxState({
+          status: "pending",
+          label,
+          startedAt: Date.now()
+        }),
+      finishTx: (hash?: string) =>
+        setTxState((current) => ({
+          status: "success",
+          hash,
+          label: current.label,
+          startedAt: current.startedAt
+        })),
+      failTx: (txError?: string) =>
+        setTxState((current) => ({
+          status: "error",
+          label: current.label,
+          error: txError,
+          startedAt: current.startedAt
+        })),
+      clearTx: () => setTxState({ status: "idle" })
     }),
-    [connect, connectorId, connectors, disconnect, error, status, txState]
+    [account, connect, connectorId, connectors, disconnect, error, status, txState]
   )
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
 }
 
 const WalletBoot = ({ children }: { children: ReactNode }) => {
-  const [hasStoredConnector] = useState(() => Boolean(getStoredWalletConnectorId()))
-  const [shouldAutoLoadRuntime] = useState(() => {
-    if (!getStoredWalletConnectorId()) return false
-    return !isLikelyMobileBrowser() && !isTouchWalletCapableBrowser()
-  })
-  const [runtimeRequested, setRuntimeRequested] = useState(false)
-  const requestRuntime = useCallback(() => setRuntimeRequested(true), [])
-
-  useEffect(() => {
-    if (!hasStoredConnector || !shouldAutoLoadRuntime || runtimeRequested) return
-
-    const loadRuntime = () => setRuntimeRequested(true)
-    const walletWindow = window as Window & {
-      requestIdleCallback?: (
-        callback: () => void,
-        options?: { timeout?: number }
-      ) => number
-      cancelIdleCallback?: (handle: number) => void
-    }
-
-    if (walletWindow.requestIdleCallback) {
-      const handle = walletWindow.requestIdleCallback(loadRuntime, {
-        timeout: 1800
-      })
-      return () => walletWindow.cancelIdleCallback?.(handle)
-    }
-
-    const timer = window.setTimeout(loadRuntime, 900)
-    return () => window.clearTimeout(timer)
-  }, [hasStoredConnector, runtimeRequested, shouldAutoLoadRuntime])
-
-  if (!runtimeRequested) {
-    return (
-      <WalletFallbackProvider onRuntimeRequest={requestRuntime}>
-        {children}
-      </WalletFallbackProvider>
-    )
-  }
-
+  const [storedAutoConnectId] = useState(() => getInitialStoredConnector())
   return (
-    <Suspense
-      fallback={
-        <WalletFallbackProvider onRuntimeRequest={requestRuntime}>
-          {children}
-        </WalletFallbackProvider>
-      }
-    >
-      <WalletRuntimeProvider>{children}</WalletRuntimeProvider>
-    </Suspense>
+    <WalletFallbackProvider autoConnectId={storedAutoConnectId}>
+      {children}
+    </WalletFallbackProvider>
   )
 }
 

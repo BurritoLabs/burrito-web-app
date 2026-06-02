@@ -7,10 +7,6 @@ import type {
 import type { SignDoc } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { CLASSIC_CHAIN } from "../chain"
 import type { WalletAccount } from "./WalletContext"
-import {
-  isLikelyMobileBrowser,
-  isTouchWalletCapableBrowser
-} from "./walletPlatform"
 
 type GalaxyConnectResponse = {
   addresses: Record<string, string>
@@ -24,41 +20,28 @@ type GalaxyConnectResponse = {
 type GalaxyWalletLike = {
   connect: () => Promise<GalaxyConnectResponse>
   disconnect?: () => Promise<void>
-  signDirect: (tx: {
+  signDirect?: (tx: {
     signerAddress: string
     signDoc: SignDoc
   }) => Promise<DirectSignResponse>
+  getOfflineSigner?: (chainId: string) => OfflineDirectSigner
 }
 
-let mobileGalaxyWallet: GalaxyWalletLike | undefined
-
-const getDesktopGalaxyWallet = async (): Promise<GalaxyWalletLike> => {
-  const { default: StationWallet } = await import("@hexxagon/station-wallet")
-  return new StationWallet() as GalaxyWalletLike
+type GalaxyWindow = Window & {
+  galaxyStation?: GalaxyWalletLike | HTMLElement
 }
 
-const getMobileGalaxyWallet = async (): Promise<GalaxyWalletLike> => {
-  if (!mobileGalaxyWallet) {
-    const { default: GalaxyStationMobileWallet } = await import(
-      "@hexxagon/galaxy-station-mobile"
-    )
-    mobileGalaxyWallet = new GalaxyStationMobileWallet() as GalaxyWalletLike
-  }
-  return mobileGalaxyWallet
-}
-
-const shouldUseMobileGalaxyWallet = () => {
-  if (typeof window === "undefined") return false
-
-  if (window.galaxyStation) {
-    return false
+const getGalaxyProvider = () => {
+  if (typeof window === "undefined") {
+    throw new Error("Galaxy Station unavailable")
   }
 
-  if (isLikelyMobileBrowser()) {
-    return true
+  const provider = (window as GalaxyWindow).galaxyStation
+  if (!provider || provider instanceof HTMLElement) {
+    throw new Error("Galaxy Station extension not installed")
   }
 
-  return isTouchWalletCapableBrowser()
+  return provider
 }
 
 const decodePubkey = (value?: string) => {
@@ -75,9 +58,6 @@ const decodePubkey = (value?: string) => {
   }
 }
 
-const getGalaxyWallet = async () =>
-  shouldUseMobileGalaxyWallet() ? getMobileGalaxyWallet() : getDesktopGalaxyWallet()
-
 const resolveGalaxyAddress = (
   response: GalaxyConnectResponse,
   chainId: string
@@ -88,7 +68,7 @@ const resolveGalaxyAddress = (
 const getConnectedResponse = async (
   chainId: string = CLASSIC_CHAIN.chainId
 ) => {
-  const wallet = await getGalaxyWallet()
+  const wallet = getGalaxyProvider()
   const response = await wallet.connect()
   const address = resolveGalaxyAddress(response, chainId)
 
@@ -135,6 +115,10 @@ class GalaxyOfflineSigner implements OfflineDirectSigner {
     signerAddress: string,
     signDoc: SignDoc
   ): Promise<DirectSignResponse> {
+    if (!this.wallet.signDirect) {
+      throw new Error("Galaxy Station direct signer unavailable")
+    }
+
     return this.wallet.signDirect({
       signerAddress,
       signDoc
@@ -143,17 +127,16 @@ class GalaxyOfflineSigner implements OfflineDirectSigner {
 }
 
 export const getGalaxyConnector = () => {
-  const isMobile = shouldUseMobileGalaxyWallet()
   const desktopInstalled =
-    typeof window !== "undefined" && Boolean(window.galaxyStation)
-  const available = desktopInstalled || isMobile
-  const type: "mobile" | "extension" = isMobile ? "mobile" : "extension"
+    typeof window !== "undefined" &&
+    Boolean((window as GalaxyWindow).galaxyStation) &&
+    !((window as GalaxyWindow).galaxyStation instanceof HTMLElement)
 
   return {
     id: "galaxy" as const,
     label: "Galaxy Station",
-    type,
-    available
+    type: "extension" as const,
+    available: desktopInstalled
   }
 }
 
@@ -166,19 +149,16 @@ export const connectGalaxyWallet = async (): Promise<WalletAccount> => {
 }
 
 export const disconnectGalaxyWallet = async () => {
-  const wallet = await getGalaxyWallet()
+  const wallet = getGalaxyProvider()
   await wallet.disconnect?.()
 }
 
 export const getGalaxyOfflineSigner = async () => {
-  const wallet = await getGalaxyWallet()
+  const wallet = getGalaxyProvider()
   await wallet.connect()
 
-  if (!shouldUseMobileGalaxyWallet()) {
-    const station = window.galaxyStation
-    if (station) {
-      return station.getOfflineSigner(CLASSIC_CHAIN.chainId)
-    }
+  if (wallet.getOfflineSigner) {
+    return wallet.getOfflineSigner(CLASSIC_CHAIN.chainId)
   }
 
   return new GalaxyOfflineSigner(wallet, CLASSIC_CHAIN.chainId)

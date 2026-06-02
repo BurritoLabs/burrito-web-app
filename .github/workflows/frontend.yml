@@ -5,11 +5,13 @@ on:
   pull_request:
     paths:
       - "src/**"
+      - "tests/**"
       - "scripts/**"
       - "public/**"
       - "index.html"
       - "package.json"
       - "package-lock.json"
+      - "playwright.config.ts"
       - "tsconfig*.json"
       - "vite.config.ts"
       - ".github/workflows/frontend.yml"
@@ -18,18 +20,20 @@ on:
       - main
     paths:
       - "src/**"
+      - "tests/**"
       - "scripts/**"
       - "public/**"
       - "index.html"
       - "package.json"
       - "package-lock.json"
+      - "playwright.config.ts"
       - "tsconfig*.json"
       - "vite.config.ts"
       - ".github/workflows/frontend.yml"
 
 jobs:
   verify:
-    name: Lint and build
+    name: Lint, test, and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -52,5 +56,17 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Production dependency audit
+        run: npm run check:audit
+
       - name: Build
         run: npm run build
+
+      - name: Bundle budget
+        run: npm run check:bundle
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Mobile layout regression
+        run: npm run test:e2e

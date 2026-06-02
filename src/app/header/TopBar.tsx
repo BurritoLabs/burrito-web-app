@@ -1,10 +1,8 @@
-import { useRef, useState, useEffect } from "react"
+import { lazy, Suspense, useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { Link, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import styles from "./TopBar.module.css"
-import ConnectModal from "../wallet/ConnectModal"
-import WalletAddressesModal from "../wallet/WalletAddressesModal"
 import { WalletIcon } from "../icons"
 import { useWallet } from "../wallet/WalletContext"
 import { getWalletConnectorLabel } from "../wallet/walletMeta"
@@ -12,6 +10,9 @@ import { CLASSIC_CHAIN } from "../chain"
 import { fetchValidator } from "../data/classic"
 import { convertBech32Prefix } from "../utils/bech32"
 import BrandLogo from "../../components/brand/BrandLogo"
+
+const ConnectModal = lazy(() => import("../wallet/ConnectModal"))
+const WalletAddressesModal = lazy(() => import("../wallet/WalletAddressesModal"))
 
 type TopBarProps = {
   onMenuClick?: () => void
@@ -295,11 +296,19 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         </div>
       </div>
 
-      <ConnectModal open={connectOpen} onClose={() => setConnectOpen(false)} />
-      <WalletAddressesModal
-        open={addressesOpen}
-        onClose={() => setAddressesOpen(false)}
-      />
+      {connectOpen ? (
+        <Suspense fallback={null}>
+          <ConnectModal open onClose={() => setConnectOpen(false)} />
+        </Suspense>
+      ) : null}
+      {addressesOpen ? (
+        <Suspense fallback={null}>
+          <WalletAddressesModal
+            open
+            onClose={() => setAddressesOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

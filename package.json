@@ -11,23 +11,19 @@
     "build:market-candles": "node scripts/build-market-candles.mjs",
     "build:market-all": "npm run build:market-index && npm run build:market-candles",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --exclude tests/e2e/**",
+    "test:e2e": "playwright test",
+    "check:audit": "npm audit --omit=dev --audit-level=low",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
+    "verify": "npm run lint && npm test && npm run check:audit && npm run build && npm run check:bundle",
     "preview": "vite preview",
     "deploy:launchpad": "node scripts/deploy-launchpad-contracts.mjs"
   },
   "dependencies": {
-    "@cosmjs/encoding": "^0.32.4",
-    "@cosmjs/proto-signing": "^0.32.4",
-    "@cosmjs/stargate": "^0.32.4",
-    "@cosmos-kit/core": "^2.18.1",
-    "@cosmos-kit/keplr": "^2.17.1",
-    "@cosmos-kit/keplr-mobile": "^2.17.1",
-    "@cosmos-kit/react": "^2.24.1",
-    "@cosmos-kit/walletconnect": "^2.15.1",
-    "@hexxagon/feather.js": "^2.1.1",
-    "@hexxagon/galaxy-station-mobile": "^1.0.23",
-    "@hexxagon/station-wallet": "^1.0.23",
-    "@interchain-ui/react": "^1.26.3",
+    "@cosmjs/amino": "^0.36.2",
+    "@cosmjs/encoding": "^0.36.2",
+    "@cosmjs/proto-signing": "^0.36.2",
+    "@cosmjs/stargate": "^0.36.2",
     "@tanstack/react-query": "^5.90.20",
     "@terra-money/log-finder-ruleset": "^3.0.3",
     "cosmjs-types": "^0.10.1",
@@ -40,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^24.10.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.5",
@@ -55,10 +52,5 @@
     "vite": "^7.2.4",
     "vite-plugin-node-polyfills": "^0.25.0",
     "vitest": "^4.1.8"
-  },
-  "overrides": {
-    "@walletconnect/utils": {
-      "bn.js": "4.12.3"
-    }
   }
 }
