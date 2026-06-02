@@ -38,6 +38,34 @@ const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
 const MOBILE_ACCOUNT_HYDRATION_DELAYS_MS = [250, 1000, 2500, 5000] as const
 const AUTO_RECONNECT_RETRY_COOLDOWN_MS = 15_000
 
+type WalletConnectNamespace = {
+  accounts?: string[]
+}
+
+type WalletConnectSession = {
+  expiry?: number
+  namespaces?: Record<string, WalletConnectNamespace>
+  pairingTopic?: string
+}
+
+type WalletConnectPairing = {
+  expiry?: number
+  topic?: string
+}
+
+type WalletConnectRuntime = {
+  pairing?: WalletConnectPairing
+  pairings?: WalletConnectPairing[]
+  restorePairings?: () => void
+  restoreSessions?: () => void
+  sessions?: WalletConnectSession[]
+  signClient?: {
+    session?: {
+      getAll?: () => WalletConnectSession[]
+    }
+  }
+}
+
 const connectMobileWallet = async (wallet: ChainWalletBase) => {
   const attemptConnect = async (resetPairings: boolean) => {
     if (resetPairings) {
@@ -128,6 +156,48 @@ const getOfflineSignerAddress = async (signer: OfflineSigner) => {
     throw new Error("Wallet account unavailable")
   }
   return account.address
+}
+
+const getWalletConnectRuntime = (wallet: ChainWalletBase) =>
+  wallet.client as WalletConnectRuntime | undefined
+
+const walletConnectSessionSupportsClassic = (session: WalletConnectSession) =>
+  session.namespaces?.cosmos?.accounts?.some((account) =>
+    account.startsWith(`cosmos:${CLASSIC_CHAIN.chainId}:`)
+  )
+
+const walletConnectRecordIsActive = (record?: { expiry?: number }) =>
+  !record?.expiry || record.expiry * 1000 > Date.now() + 1000
+
+const getActiveWalletConnectSession = (wallet: ChainWalletBase) => {
+  const client = getWalletConnectRuntime(wallet)
+  if (!client?.signClient) {
+    return undefined
+  }
+
+  try {
+    client.restorePairings?.()
+    client.restoreSessions?.()
+  } catch {
+    return undefined
+  }
+
+  const activePairing = client.pairing ?? client.pairings?.find(walletConnectRecordIsActive)
+  if (!activePairing?.topic || !walletConnectRecordIsActive(activePairing)) {
+    return undefined
+  }
+
+  const sessions = [
+    ...(client.signClient.session?.getAll?.() ?? []),
+    ...(client.sessions ?? [])
+  ]
+
+  return sessions.find(
+    (session) =>
+      walletConnectRecordIsActive(session) &&
+      session.pairingTopic === activePairing.topic &&
+      walletConnectSessionSupportsClassic(session)
+  )
 }
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
@@ -277,6 +347,50 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
     },
     [ensureCosmosWalletSession]
+  )
+
+  const hydrateMobileWalletSession = useCallback(
+    async (
+      id: keyof typeof COSMOS_CONNECTOR_CONFIGS,
+      options?: { warmSigner?: boolean }
+    ) => {
+      if (COSMOS_CONNECTOR_CONFIGS[id].type !== "mobile" || desktopKeplrAvailable) {
+        return false
+      }
+
+      const wallet =
+        getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
+      if (!wallet || wallet.isWalletNotExist || !getActiveWalletConnectSession(wallet)) {
+        return false
+      }
+
+      try {
+        await wallet.connect(false)
+        if (!wallet.address) {
+          await wallet.update({ connect: false })
+        }
+        await waitForWalletAddress(wallet, 8, 150)
+        if (!wallet.address) {
+          return false
+        }
+
+        syncCosmosWalletAccount(id, wallet)
+
+        if (options?.warmSigner) {
+          try {
+            wallet.offlineSigner = undefined
+            await wallet.initOfflineSigner("amino")
+          } catch {
+            // Signer warm-up is only a latency optimization.
+          }
+        }
+
+        return true
+      } catch {
+        return false
+      }
+    },
+    [desktopKeplrAvailable, getCosmosWallet, syncCosmosWalletAccount]
   )
 
   const getCosmosConnector = useCallback(
@@ -719,6 +833,15 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     const requestStoredReconnect = () => {
       const storedConnectorId = getStoredWalletConnectorId()
       if (!storedConnectorId) return
+
+      if (
+        isCosmosConnectorId(storedConnectorId) &&
+        COSMOS_CONNECTOR_CONFIGS[storedConnectorId].type === "mobile"
+      ) {
+        void hydrateMobileWalletSession(storedConnectorId, { warmSigner: true })
+        return
+      }
+
       if (accountAddressRef.current) return
       if (walletStatusRef.current === "connecting") return
       if (walletStatusRef.current === "connected") return
@@ -748,7 +871,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener("pageshow", handleFocus)
       document.removeEventListener("visibilitychange", handleFocus)
     }
-  }, [refreshConnectors])
+  }, [hydrateMobileWalletSession, refreshConnectors])
 
   useEffect(() => {
     registerWalletAdapterRuntime({
@@ -856,6 +979,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     () =>
       Boolean(
         effectiveAutoConnectId &&
+          (!isCosmosConnectorId(effectiveAutoConnectId) ||
+            COSMOS_CONNECTOR_CONFIGS[effectiveAutoConnectId].type !== "mobile") &&
           connectors.some(
             (connector) =>
               connector.id === effectiveAutoConnectId &&
@@ -866,6 +991,27 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   )
 
   useEffect(() => {
+    if (
+      effectiveAutoConnectId &&
+      isCosmosConnectorId(effectiveAutoConnectId) &&
+      COSMOS_CONNECTOR_CONFIGS[effectiveAutoConnectId].type === "mobile"
+    ) {
+      let cancelled = false
+      const timer = window.setTimeout(() => {
+        if (cancelled) return
+        void hydrateMobileWalletSession(effectiveAutoConnectId, {
+          warmSigner: true
+        })
+        if (!autoConnectAttempted) {
+          setAutoConnectAttempted(true)
+        }
+      }, 0)
+      return () => {
+        cancelled = true
+        window.clearTimeout(timer)
+      }
+    }
+
     if (autoConnectAttempted || !effectiveAutoConnectId) return
     if (!autoConnectAvailable) return
     let cancelled = false
@@ -885,6 +1031,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     connect,
     effectiveAutoConnectId,
     autoConnectAvailable,
+    hydrateMobileWalletSession,
     supportsMobileWallets
   ])
 
@@ -894,28 +1041,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     if (account?.address || status === "connected") return
 
     let cancelled = false
-    const wallet = getCosmosWallet(connectorId, { preferConnected: true }) ?? getCosmosWallet(connectorId)
-    if (!wallet) return
 
     const tryHydrate = async () => {
-      try {
-        if (!wallet.address) {
-          await wallet.update({ connect: false })
-        }
-        await waitForWalletAddress(wallet, 4, 150)
-        if (cancelled || !wallet.address) return
-
-        const nextAccount = buildWalletAccount(wallet)
-        if (!nextAccount) return
-        setAccount(nextAccount)
-        setStatus("connected")
-        setError(undefined)
-        rememberWalletConnectorId(connectorId)
-        setStoredAutoConnectId(connectorId)
-      } catch {
-        // Mobile WalletConnect sessions can hydrate after focus returns; keep
-        // the explicit connect button available if silent hydration fails.
-      }
+      const hydrated = await hydrateMobileWalletSession(connectorId, {
+        warmSigner: true
+      })
+      if (cancelled || hydrated) return
     }
 
     const timers = MOBILE_ACCOUNT_HYDRATION_DELAYS_MS.map((delay) =>
@@ -932,7 +1063,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     account?.address,
     connectorId,
     desktopKeplrAvailable,
-    getCosmosWallet,
+    hydrateMobileWalletSession,
     connectorRefreshNonce,
     status
   ])
