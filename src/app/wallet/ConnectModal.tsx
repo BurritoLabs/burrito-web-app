@@ -48,7 +48,12 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
             <div className={styles.title}>Connect wallet</div>
             <div className={styles.subtitle}>Terra Classic</div>
           </div>
-          <button className={styles.closeButton} type="button" onClick={onClose}>
+          <button
+            aria-label="Close"
+            className={styles.closeButton}
+            type="button"
+            onClick={onClose}
+          >
             <span />
             <span />
           </button>

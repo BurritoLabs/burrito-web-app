@@ -115,7 +115,9 @@ npm run build:release
 ## Supported Wallets
 
 - Keplr extension
+- Keplr Mobile
 - Galaxy Station extension
+- Galaxy Station mobile in-app browser injection
 
 Wallets remain the signing boundary. Burrito never stores private keys and does
 not custody user assets.
@@ -127,9 +129,14 @@ All variables are optional unless the related production feature is enabled.
 ```bash
 VITE_SWAP_PLATFORM_FEE_BPS=
 VITE_SWAP_PLATFORM_FEE_RECIPIENT=
+VITE_WALLETCONNECT_PROJECT_ID=
 VITE_LAUNCHPAD_LP_LOCKER_ADDRESS=
 VITE_LAUNCHPAD_REGISTRY_ADDRESS=
 ```
+
+`VITE_WALLETCONNECT_PROJECT_ID` is used for Keplr Mobile WalletConnect handoff.
+The app has a bundled fallback, but production deployments should configure a
+project id owned by Burrito.
 
 Launchpad LP locking and registry publishing remain disabled until their
 contract addresses are configured.

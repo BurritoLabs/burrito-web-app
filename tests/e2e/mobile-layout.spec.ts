@@ -20,6 +20,15 @@ test("mobile market keeps the fixed header above content and covers the bottom",
 
   await expect(page.getByRole("button", { name: "Connect" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Market" })).toBeVisible()
+  await expect(async () => {
+    if (!(await page.getByRole("dialog").isVisible())) {
+      await page.getByRole("button", { name: "Connect" }).click()
+    }
+    await expect(page.getByRole("button", { name: /Keplr Mobile/ })).toBeEnabled({
+      timeout: 1000
+    })
+  }).toPass({ timeout: 15_000 })
+  await page.getByRole("button", { name: "Close" }).click()
 
   const header = await getHeaderMetrics(page)
   expect(header.position).toBe("fixed")

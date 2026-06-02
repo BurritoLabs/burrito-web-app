@@ -5,7 +5,8 @@ const distDir = path.resolve("dist")
 const assetsDir = path.join(distDir, "assets")
 const maxInitialJsBytes = 700 * 1024
 const maxAsyncJsBytes = 1200 * 1024
-const forbiddenRuntimeChunks = [/WalletRuntimeProvider/i]
+const maxWalletRuntimeBytes = 2300 * 1024
+const walletRuntimeChunks = [/WalletRuntimeProvider/i]
 
 const formatBytes = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`
 
@@ -40,7 +41,9 @@ if (initialBytes > maxInitialJsBytes) {
 }
 
 for (const item of jsStats) {
-  if (item.size > maxAsyncJsBytes) {
+  const isWalletRuntime = walletRuntimeChunks.some((pattern) => pattern.test(item.file))
+
+  if (!isWalletRuntime && item.size > maxAsyncJsBytes) {
     fail(
       `Async JS chunk too large: ${item.file} is ${formatBytes(item.size)} > ${formatBytes(
         maxAsyncJsBytes
@@ -48,8 +51,16 @@ for (const item of jsStats) {
     )
   }
 
-  if (forbiddenRuntimeChunks.some((pattern) => pattern.test(item.file))) {
-    fail(`Forbidden wallet runtime chunk emitted: ${item.file}`)
+  if (isWalletRuntime && item.size > maxWalletRuntimeBytes) {
+    fail(
+      `Wallet runtime chunk too large: ${item.file} is ${formatBytes(
+        item.size
+      )} > ${formatBytes(maxWalletRuntimeBytes)}`
+    )
+  }
+
+  if (initialScriptSet.has(item.file) && isWalletRuntime) {
+    fail(`Wallet runtime chunk must stay async: ${item.file}`)
   }
 }
 

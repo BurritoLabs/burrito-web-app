@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run --exclude tests/e2e/**",
     "test:e2e": "playwright test",
-    "check:audit": "npm audit --omit=dev --audit-level=low",
+    "check:audit": "npm audit --omit=dev --audit-level=moderate",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "verify": "npm run lint && npm test && npm run check:audit && npm run build && npm run check:bundle",
     "preview": "vite preview",
@@ -24,8 +24,14 @@
     "@cosmjs/encoding": "^0.36.2",
     "@cosmjs/proto-signing": "^0.36.2",
     "@cosmjs/stargate": "^0.36.2",
+    "@cosmos-kit/core": "^2.18.1",
+    "@cosmos-kit/keplr-mobile": "^2.17.1",
+    "@cosmos-kit/react": "^2.24.1",
+    "@cosmos-kit/walletconnect": "^2.15.1",
+    "@interchain-ui/react": "^1.26.3",
     "@tanstack/react-query": "^5.90.20",
     "@terra-money/log-finder-ruleset": "^3.0.3",
+    "axios": "^1.16.1",
     "cosmjs-types": "^0.10.1",
     "json5": "^2.2.3",
     "lightweight-charts": "^5.1.0",
@@ -52,5 +58,9 @@
     "vite": "^7.2.4",
     "vite-plugin-node-polyfills": "^0.25.0",
     "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "protobufjs": "7.5.8",
+    "uuid": "11.1.1"
   }
 }

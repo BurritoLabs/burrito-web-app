@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -18,6 +20,9 @@ import {
   WALLET_CONNECTOR_STORAGE_KEY,
   getStoredWalletConnectorId
 } from "./walletMeta"
+import { isTouchWalletCapableBrowser } from "./walletPlatform"
+
+const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
 
 type WalletWindow = Window & {
   keplr?: unknown
@@ -62,6 +67,20 @@ const getInitialStoredConnector = () => {
   return stored === "keplr-mobile" ? undefined : stored
 }
 
+const shouldLoadWalletRuntime = () => {
+  const walletWindow = getWalletWindow()
+  if (walletWindow?.keplr) {
+    return false
+  }
+
+  const stored = getStoredWalletConnectorId()
+  if (stored === "keplr-mobile") {
+    return true
+  }
+
+  return isTouchWalletCapableBrowser()
+}
+
 const WalletFallbackProvider = ({
   children,
   autoConnectId
@@ -89,7 +108,7 @@ const WalletFallbackProvider = ({
       }
 
       if (id === "keplr-mobile") {
-        setError("Keplr Mobile is unavailable in this hardened wallet build.")
+        setError("Keplr Mobile is available from mobile wallet-capable browsers.")
         setStatus("error")
         return
       }
@@ -180,6 +199,22 @@ const WalletFallbackProvider = ({
 
 const WalletBoot = ({ children }: { children: ReactNode }) => {
   const [storedAutoConnectId] = useState(() => getInitialStoredConnector())
+  const [loadWalletRuntime] = useState(() => shouldLoadWalletRuntime())
+
+  if (loadWalletRuntime) {
+    return (
+      <Suspense
+        fallback={
+          <WalletFallbackProvider autoConnectId={storedAutoConnectId}>
+            {children}
+          </WalletFallbackProvider>
+        }
+      >
+        <WalletRuntimeProvider>{children}</WalletRuntimeProvider>
+      </Suspense>
+    )
+  }
+
   return (
     <WalletFallbackProvider autoConnectId={storedAutoConnectId}>
       {children}
