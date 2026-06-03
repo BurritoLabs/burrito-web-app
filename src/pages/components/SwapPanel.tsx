@@ -16,6 +16,7 @@ import {
   useCw20Balances
 } from "../../app/data/cw20"
 import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
+import { fetchMarketDexPairs } from "../../app/data/market"
 import {
   useResolvedCw20Whitelist,
   useResolvedIbcWhitelist,
@@ -29,7 +30,6 @@ import {
   buildCw20IconCandidates,
   buildIbcAssetIconCandidates
 } from "../../app/utils/assetIcons"
-import { parseCommonJsArray } from "../../app/utils/cjsRegistry"
 import { parseSequenceMismatchExpected } from "../../app/tx/txDiagnostics"
 import {
   fromMicroAmount,
@@ -38,7 +38,6 @@ import {
   toMicroAmount
 } from "../../app/swap/amount"
 import { useWallet } from "../../app/wallet/WalletContext"
-import { HEXXAGON_DEX_PAIRS_URL } from "../../app/config/externalServices"
 import {
   DEFAULT_SLIPPAGE_BPS,
   FALLBACK_GAS_CW20_FEE,
@@ -112,19 +111,6 @@ type SmartSimulateResponse = {
 type PairQueryResponse = {
   contract_addr?: string
   contract?: string
-}
-
-type DexPairAsset = {
-  dex?: string
-  type?: string
-  assets?: string[]
-}
-
-type HexxagonDexPair = {
-  token?: string
-  dex?: string
-  type?: string
-  assets?: string[]
 }
 
 const asNativeId = (denom: string) => `native:${denom}`
@@ -689,33 +675,36 @@ const SwapPanel = ({
     }
   }, [pairOnly])
 
-  const { data: dexPairs = {} } = useQuery({
+  const { data: dexPairs = [] } = useQuery({
     queryKey: ["swap-dex-pairs", "classic"],
-    queryFn: async () => {
-      const response = await fetch(HEXXAGON_DEX_PAIRS_URL)
-      if (!response.ok) {
-        throw new Error(`Failed to load DEX pairs: ${response.status}`)
-      }
-      const source = await response.text()
-      const pairs = parseCommonJsArray<HexxagonDexPair>(source)
-      return pairs.reduce<Record<string, DexPairAsset>>((acc, pair, index) => {
-        const key = pair.token || `${pair.dex ?? "dex"}:${index}`
-        acc[key] = {
-          dex: pair.dex,
-          type: pair.type,
-          assets: pair.assets ?? []
-        }
-        return acc
-      }, {})
-    },
+    queryFn: fetchMarketDexPairs,
     enabled: !isPairOnly,
     staleTime: 60 * 60 * 1000
   })
 
+  const defaultCw20Contracts = useMemo(() => {
+    return [defaultFromAssetId, defaultToAssetId]
+      .filter((id) => id.startsWith("cw20:"))
+      .map((id) => id.slice("cw20:".length).toLowerCase())
+  }, [defaultFromAssetId, defaultToAssetId])
+
+  const defaultNativeDenoms = useMemo(() => {
+    const builtInNativeIds = new Set(NATIVE_ASSETS.map((asset) => asset.id))
+    return [defaultFromAssetId, defaultToAssetId]
+      .filter((id) => id.startsWith("native:") && !builtInNativeIds.has(id))
+      .map((id) => {
+        const denom = id.slice("native:".length)
+        return denom.startsWith("ibc/")
+          ? `ibc/${denom.slice(4).toUpperCase()}`
+          : denom
+      })
+      .filter(Boolean)
+  }, [defaultFromAssetId, defaultToAssetId])
+
   const tradableCw20Set = useMemo(() => {
     const set = new Set<string>()
-    Object.values(dexPairs).forEach((entry) => {
-      const dexName = entry.dex ? normalizeDexName(entry.dex) : undefined
+    dexPairs.forEach((entry) => {
+      const dexName = normalizeDexName(entry.dexId)
       if (dexName && !ACTIVE_DEX_IDS.has(dexName)) return
       ;(entry.assets ?? []).forEach((asset) => {
         if (asset.startsWith("terra1")) {
@@ -723,21 +712,23 @@ const SwapPanel = ({
         }
       })
     })
+    defaultCw20Contracts.forEach((contract) => set.add(contract))
     return set
-  }, [dexPairs])
+  }, [defaultCw20Contracts, dexPairs])
 
   const tradableNativeDenoms = useMemo(() => {
     const set = new Set<string>()
-    Object.values(dexPairs).forEach((entry) => {
-      const dexName = entry.dex ? normalizeDexName(entry.dex) : undefined
+    dexPairs.forEach((entry) => {
+      const dexName = normalizeDexName(entry.dexId)
       if (dexName && !ACTIVE_DEX_IDS.has(dexName)) return
       ;(entry.assets ?? []).forEach((asset) => {
         if (!asset || asset.startsWith("terra1")) return
         set.add(asset.startsWith("ibc/") ? `ibc/${asset.slice(4).toUpperCase()}` : asset)
       })
     })
+    defaultNativeDenoms.forEach((denom) => set.add(denom))
     return Array.from(set)
-  }, [dexPairs])
+  }, [defaultNativeDenoms, dexPairs])
 
   const tradableBankDenoms = useMemo(
     () => tradableNativeDenoms.filter((denom) => !denom.startsWith("ibc/")),
