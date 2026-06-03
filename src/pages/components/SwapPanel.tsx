@@ -16,10 +16,19 @@ import {
   useCw20Balances
 } from "../../app/data/cw20"
 import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
-import { useResolvedCw20Whitelist, type Cw20Token } from "../../app/data/terraAssets"
+import {
+  useResolvedCw20Whitelist,
+  useResolvedIbcWhitelist,
+  useResolvedNativeWhitelist,
+  type Cw20Token
+} from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
-import { buildClassicNativeIconCandidates, buildCw20IconCandidates } from "../../app/utils/assetIcons"
+import {
+  buildClassicNativeIconCandidates,
+  buildCw20IconCandidates,
+  buildIbcAssetIconCandidates
+} from "../../app/utils/assetIcons"
 import { parseCommonJsArray } from "../../app/utils/cjsRegistry"
 import { parseSequenceMismatchExpected } from "../../app/tx/txDiagnostics"
 import {
@@ -122,6 +131,20 @@ const asNativeId = (denom: string) => `native:${denom}`
 const asCw20Id = (contract: string) => `cw20:${contract}`
 const buildNativeIconCandidates = (denom: string, symbol: string) =>
   buildClassicNativeIconCandidates({ denom, symbol })
+
+const formatSwapNativeSymbol = (denom: string) => {
+  if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) return CLASSIC_DENOMS.lunc.coinDenom
+  if (denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) return CLASSIC_DENOMS.ustc.coinDenom
+  if (denom.startsWith("ibc/")) return "IBC"
+  if (denom.startsWith("u") && denom.length > 1) {
+    const base = denom.slice(1)
+    if (base.length === 3) {
+      return `${base.slice(0, 2).toUpperCase()}TC`
+    }
+    return base.toUpperCase()
+  }
+  return denom.split("/").pop()?.toUpperCase() || denom.toUpperCase()
+}
 
 const NATIVE_ASSETS: readonly SwapAsset[] = [
   {
@@ -703,9 +726,34 @@ const SwapPanel = ({
     return set
   }, [dexPairs])
 
+  const tradableNativeDenoms = useMemo(() => {
+    const set = new Set<string>()
+    Object.values(dexPairs).forEach((entry) => {
+      const dexName = entry.dex ? normalizeDexName(entry.dex) : undefined
+      if (dexName && !ACTIVE_DEX_IDS.has(dexName)) return
+      ;(entry.assets ?? []).forEach((asset) => {
+        if (!asset || asset.startsWith("terra1")) return
+        set.add(asset.startsWith("ibc/") ? `ibc/${asset.slice(4).toUpperCase()}` : asset)
+      })
+    })
+    return Array.from(set)
+  }, [dexPairs])
+
+  const tradableBankDenoms = useMemo(
+    () => tradableNativeDenoms.filter((denom) => !denom.startsWith("ibc/")),
+    [tradableNativeDenoms]
+  )
+  const tradableIbcDenoms = useMemo(
+    () => tradableNativeDenoms.filter((denom) => denom.startsWith("ibc/")),
+    [tradableNativeDenoms]
+  )
+
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(
     Array.from(tradableCw20Set)
   )
+  const { data: nativeWhitelist = {} } =
+    useResolvedNativeWhitelist(tradableBankDenoms)
+  const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(tradableIbcDenoms)
 
   const overrideCw20Whitelist = useMemo<Record<string, Cw20Token>>(() => {
     const records: Record<string, Cw20Token> = {}
@@ -732,6 +780,44 @@ const SwapPanel = ({
     () => ({ ...cw20Whitelist, ...overrideCw20Whitelist }),
     [cw20Whitelist, overrideCw20Whitelist]
   )
+
+  const dexNativeAssets = useMemo<SwapAsset[]>(() => {
+    return tradableNativeDenoms.map((denom) => {
+      if (denom.startsWith("ibc/")) {
+        const hash = denom.slice(4).toUpperCase()
+        const token = ibcWhitelist[hash]
+        const symbol = token?.symbol || formatSwapNativeSymbol(denom)
+        return {
+          id: asNativeId(denom),
+          type: "native" as const,
+          symbol,
+          name: token?.name || symbol,
+          denom,
+          decimals: token?.decimals ?? 6,
+          iconCandidates: buildIbcAssetIconCandidates([token?.icon], "/system/ibc.svg", {
+            baseDenom: token?.base_denom,
+            symbol
+          })
+        }
+      }
+
+      const token = nativeWhitelist[denom.toLowerCase()]
+      const symbol = token?.symbol || formatSwapNativeSymbol(denom)
+      return {
+        id: asNativeId(denom),
+        type: "native" as const,
+        symbol,
+        name: token?.name || symbol,
+        denom,
+        decimals: token?.decimals ?? 6,
+        iconCandidates: buildClassicNativeIconCandidates({
+          denom,
+          symbol,
+          primaryIcon: token?.icon
+        })
+      }
+    })
+  }, [ibcWhitelist, nativeWhitelist, tradableNativeDenoms])
 
   const overrideNativeAssets = useMemo<SwapAsset[]>(() => {
     return assetOverrides
@@ -779,6 +865,9 @@ const SwapPanel = ({
     const nativeRows = new Map(
       NATIVE_ASSETS.map((asset) => [asset.id, applyOverride(asset)] as const)
     )
+    dexNativeAssets.forEach((asset) => {
+      nativeRows.set(asset.id, applyOverride(asset))
+    })
     overrideNativeAssets.forEach((asset) => {
       nativeRows.set(asset.id, applyOverride(asset))
     })
@@ -811,6 +900,7 @@ const SwapPanel = ({
   }, [
     assetOverrideMap,
     assetOverrides,
+    dexNativeAssets,
     isPairOnly,
     overrideNativeAssets,
     swapCw20Whitelist,
