@@ -197,6 +197,10 @@
 }
 
 @media (min-width: 992px) {
+  .brand {
+    border-bottom: 0;
+  }
+
   .toggle {
     display: none;
   }
