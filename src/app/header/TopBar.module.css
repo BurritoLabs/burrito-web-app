@@ -170,8 +170,26 @@
 
 .validatorButton {
   color: #52c41a;
+  border-color: rgba(82, 196, 26, 0.48);
   background: transparent;
+  box-shadow: none;
+  height: var(--button-height-small);
   max-width: 190px;
+  padding: 0 18px;
+  line-height: 1;
+  font-weight: var(--bold);
+  letter-spacing: 0;
+}
+
+.validatorButton:hover {
+  border-color: rgba(82, 196, 26, 0.72);
+  background: rgba(82, 196, 26, 0.04);
+}
+
+.validatorButton:focus-visible {
+  outline: none;
+  border-color: rgba(82, 196, 26, 0.75);
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.18);
 }
 
 .validatorLabel {
