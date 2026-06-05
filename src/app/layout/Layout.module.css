@@ -129,7 +129,6 @@
   background: var(--glass-header);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border-bottom: var(--border-width) solid var(--card-border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
