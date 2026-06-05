@@ -352,7 +352,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const hydrateMobileWalletSession = useCallback(
     async (
       id: keyof typeof COSMOS_CONNECTOR_CONFIGS,
-      options?: { warmSigner?: boolean }
+      options?: { allowWalletOpen?: boolean; warmSigner?: boolean }
     ) => {
       if (COSMOS_CONNECTOR_CONFIGS[id].type !== "mobile" || desktopKeplrAvailable) {
         return false
@@ -365,23 +365,26 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        await wallet.connect(false)
         if (!wallet.address) {
           await wallet.update({ connect: false })
         }
         await waitForWalletAddress(wallet, 8, 150)
+        if (!wallet.address && options?.allowWalletOpen) {
+          await wallet.connect(false)
+          await waitForWalletAddress(wallet, 8, 150)
+        }
         if (!wallet.address) {
           return false
         }
 
         syncCosmosWalletAccount(id, wallet)
 
-        if (options?.warmSigner) {
+        if (options?.allowWalletOpen && options?.warmSigner) {
           try {
             wallet.offlineSigner = undefined
             await wallet.initOfflineSigner("amino")
           } catch {
-            // Signer warm-up is only a latency optimization.
+            // Interactive signer warm-up is only a latency optimization.
           }
         }
 
@@ -838,7 +841,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         isCosmosConnectorId(storedConnectorId) &&
         COSMOS_CONNECTOR_CONFIGS[storedConnectorId].type === "mobile"
       ) {
-        void hydrateMobileWalletSession(storedConnectorId, { warmSigner: true })
+        void hydrateMobileWalletSession(storedConnectorId)
         return
       }
 
@@ -999,9 +1002,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       let cancelled = false
       const timer = window.setTimeout(() => {
         if (cancelled) return
-        void hydrateMobileWalletSession(effectiveAutoConnectId, {
-          warmSigner: true
-        })
+        void hydrateMobileWalletSession(effectiveAutoConnectId)
         if (!autoConnectAttempted) {
           setAutoConnectAttempted(true)
         }
@@ -1043,9 +1044,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     let cancelled = false
 
     const tryHydrate = async () => {
-      const hydrated = await hydrateMobileWalletSession(connectorId, {
-        warmSigner: true
-      })
+      const hydrated = await hydrateMobileWalletSession(connectorId)
       if (cancelled || hydrated) return
     }
 
