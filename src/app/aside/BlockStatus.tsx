@@ -3,7 +3,18 @@ import { CLASSIC_CHAIN } from "../chain"
 import { fetchWithEndpointFallback } from "../data/endpointFallback"
 import styles from "./Aside.module.css"
 
-const fetchLatestHeight = async () => {
+const BLOCK_REFRESH_MS = 6_000
+const LIVE_BLOCK_MAX_AGE_MS = 30_000
+const STALE_BLOCK_MAX_AGE_MS = 90_000
+
+type LatestBlock = {
+  endpoint: string
+  fetchedAt: number
+  height: number
+  timeMs: number
+}
+
+const fetchLatestBlock = async (): Promise<LatestBlock> => {
   const response = await fetchWithEndpointFallback(
     `${CLASSIC_CHAIN.lcd}/cosmos/base/tendermint/v1beta1/blocks/latest`
   )
@@ -11,35 +22,80 @@ const fetchLatestHeight = async () => {
     throw new Error("Failed to fetch latest block")
   }
   const data = (await response.json()) as {
-    block?: { header?: { height?: string } }
+    block?: { header?: { height?: string; time?: string } }
   }
   const height = Number(data?.block?.header?.height)
   if (!Number.isFinite(height)) {
     throw new Error("Invalid block height")
   }
-  return height
+
+  const timeMs = Date.parse(data?.block?.header?.time ?? "")
+  if (!Number.isFinite(timeMs)) {
+    throw new Error("Invalid block time")
+  }
+
+  return {
+    endpoint: response.url || CLASSIC_CHAIN.lcd,
+    fetchedAt: Date.now(),
+    height,
+    timeMs
+  }
 }
 
 const BlockStatus = () => {
-  const { data: height, isError } = useQuery({
+  const { data: latestBlock, isError } = useQuery({
     queryKey: ["latest-block-height"],
-    queryFn: fetchLatestHeight,
-    refetchInterval: 10_000,
-    refetchIntervalInBackground: false,
-    staleTime: 8_000,
+    queryFn: fetchLatestBlock,
+    refetchInterval: BLOCK_REFRESH_MS,
+    refetchIntervalInBackground: true,
+    staleTime: BLOCK_REFRESH_MS - 1_000,
     retry: false
   })
+
+  const blockAgeMs =
+    latestBlock?.timeMs && Number.isFinite(latestBlock.timeMs)
+      ? Math.max(0, latestBlock.fetchedAt - latestBlock.timeMs)
+      : Number.POSITIVE_INFINITY
+  const status = isError
+    ? "offline"
+    : !latestBlock
+      ? "checking"
+      : blockAgeMs <= LIVE_BLOCK_MAX_AGE_MS
+        ? "live"
+        : blockAgeMs <= STALE_BLOCK_MAX_AGE_MS
+          ? "stale"
+          : "offline"
+  const statusLabel =
+    status === "live"
+      ? "Live"
+      : status === "stale"
+        ? "Stale"
+        : status === "offline"
+          ? "Offline"
+          : "Checking"
+  const dotClass =
+    status === "live"
+      ? styles.blockDotLive
+      : status === "stale"
+        ? styles.blockDotStale
+        : status === "offline"
+          ? styles.blockDotOffline
+          : styles.blockDotChecking
+  const title = latestBlock
+    ? `${statusLabel}: block ${latestBlock.height.toLocaleString()} · ${Math.round(
+        blockAgeMs / 1_000
+      )}s old · LCD: ${latestBlock.endpoint}`
+    : `${statusLabel}: LCD ${CLASSIC_CHAIN.lcd}`
+  const height = latestBlock?.height
 
   return (
     <div
       className={styles.blockStatus}
-      title={`LCD: ${CLASSIC_CHAIN.lcd}`}
-      aria-label={`LCD: ${CLASSIC_CHAIN.lcd}`}
+      title={title}
+      aria-label={title}
     >
       <span
-        className={`${styles.blockDot} ${
-          isError ? styles.blockDotOffline : styles.blockDotLive
-        }`}
+        className={`${styles.blockDot} ${dotClass}`}
         aria-hidden="true"
       />
       {height ? (
