@@ -107,11 +107,22 @@
   grid-area: header;
   min-width: 0;
   border-left: var(--border-width) solid var(--card-border);
-  border-bottom: var(--border-width) solid var(--card-border);
   background: transparent;
   position: sticky;
   top: 0;
   z-index: 200;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--sidebar-width));
+  bottom: 0;
+  width: 100vw;
+  height: var(--border-width);
+  background: var(--card-border);
+  pointer-events: none;
+  z-index: 3;
 }
 
 .headerInner {
@@ -220,6 +231,10 @@
   .header,
   .main {
     border-left: none;
+  }
+
+  .header::after {
+    left: 0;
   }
 
   .main {
