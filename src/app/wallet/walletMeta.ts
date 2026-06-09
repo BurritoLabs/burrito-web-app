@@ -4,6 +4,10 @@ import type {
 } from "./WalletContext"
 
 export const WALLET_CONNECTOR_STORAGE_KEY = "burritoWalletConnector"
+const COSMOS_KIT_STORAGE_KEYS = [
+  "cosmos-kit@2:core//accounts",
+  "cosmos-kit@2:core//current-wallet"
+] as const
 
 export const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = [
   "keplr",
@@ -67,6 +71,16 @@ export const forgetStoredWalletConnectorId = () => {
   if (typeof window === "undefined") return
   try {
     window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
+  } catch {
+    // Storage can be unavailable in private or restricted mobile browsers.
+  }
+}
+
+export const forgetStoredWalletSession = () => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
+    COSMOS_KIT_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // Storage can be unavailable in private or restricted mobile browsers.
   }

@@ -18,6 +18,7 @@ import {
 import {
   CONNECTOR_META,
   WALLET_CONNECTOR_STORAGE_KEY,
+  forgetStoredWalletSession,
   getStoredWalletConnectorId
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
@@ -139,11 +140,7 @@ const WalletFallbackProvider = ({
     setConnectorId(undefined)
     setAccount(undefined)
     setError(undefined)
-    try {
-      window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
-    } catch {
-      // ignore
-    }
+    forgetStoredWalletSession()
   }, [connectorId])
 
   useEffect(() => {
