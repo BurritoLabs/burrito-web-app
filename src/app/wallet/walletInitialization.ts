@@ -10,5 +10,9 @@ const getWalletErrorMessage = (error: unknown) => {
 
 export const isWalletInitializationError = (error: unknown) => {
   const message = getWalletErrorMessage(error).toLowerCase()
-  return message.includes("not initialized") && message.includes("wallet")
+  return (
+    (message.includes("not initialized") && message.includes("wallet")) ||
+    (message.includes("not sync") && message.includes("wallet")) ||
+    (message.includes("out of sync") && message.includes("wallet"))
+  )
 }

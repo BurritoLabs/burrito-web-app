@@ -6,6 +6,7 @@ type WalletPanelActionsProps = {
   view: WalletPanelView
   canSubmitSend: boolean
   sendSubmitting: boolean
+  walletPreparingForTx: boolean
   sendSymbol: string
   sendSubmitDisabledReason?: string
   sendRecipientReceivesSummaryDisplay: string
@@ -19,6 +20,7 @@ const WalletPanelActions = ({
   view,
   canSubmitSend,
   sendSubmitting,
+  walletPreparingForTx,
   sendSymbol,
   sendSubmitDisabledReason,
   sendRecipientReceivesSummaryDisplay,
@@ -36,7 +38,11 @@ const WalletPanelActions = ({
           onClick={onSendSubmit}
           disabled={!canSubmitSend}
         >
-          {sendSubmitting ? "Sending..." : `Send ${sendSymbol}`}
+          {walletPreparingForTx
+            ? "Preparing wallet..."
+            : sendSubmitting
+            ? "Sending..."
+            : `Send ${sendSymbol}`}
         </button>
         <div className={styles.actionHint}>
           {sendSubmitDisabledReason ??

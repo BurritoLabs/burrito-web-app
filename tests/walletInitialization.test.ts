@@ -19,6 +19,7 @@ describe("wallet initialization errors", () => {
       )
     ).toBe(true)
     expect(isWalletInitializationError("wallet not initialized")).toBe(true)
+    expect(isWalletInitializationError("wallet not sync")).toBe(true)
   })
 
   it("ignores unrelated transaction errors", () => {

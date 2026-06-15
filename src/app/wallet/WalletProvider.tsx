@@ -207,6 +207,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [account, setAccount] = useState<WalletAccount>()
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
+  const [walletPreparingForTx, setWalletPreparingForTx] = useState(false)
   const currentTxLabelRef = useRef<string | undefined>(undefined)
   const accountAddressRef = useRef<string | undefined>(undefined)
   const connectorIdRef = useRef<WalletConnectorId | undefined>(undefined)
@@ -368,9 +369,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        if (!wallet.address) {
-          await wallet.update({ connect: false })
-        }
+        await wallet.update({ connect: false })
         await waitForWalletAddress(wallet, 8, 150)
         if (!wallet.address && options?.allowWalletOpen) {
           await wallet.connect(false)
@@ -785,6 +784,72 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     forgetStoredWalletSession()
   }, [connectorId, cosmosChain.walletRepo, desktopKeplrAvailable])
 
+  const prepareWalletForTx = useCallback(async () => {
+    const activeConnectorId = connectorIdRef.current
+    if (!activeConnectorId || !accountAddressRef.current) {
+      setError("Connect wallet before submitting a transaction.")
+      return false
+    }
+
+    setWalletPreparingForTx(true)
+    setError(undefined)
+    try {
+      if (
+        isCosmosConnectorId(activeConnectorId) &&
+        !(activeConnectorId === "keplr" && desktopKeplrAvailable)
+      ) {
+        const wallet =
+          getCosmosWallet(activeConnectorId, { preferConnected: true }) ??
+          getCosmosWallet(activeConnectorId)
+        if (!wallet) {
+          throw new Error(
+            `${COSMOS_CONNECTOR_CONFIGS[activeConnectorId].label} signer not available`
+          )
+        }
+
+        if (COSMOS_CONNECTOR_CONFIGS[activeConnectorId].type === "mobile") {
+          await hydrateMobileWalletSession(activeConnectorId, {
+            allowWalletOpen: true,
+            warmSigner: true
+          })
+        }
+
+        const signer = await getCosmosOfflineSigner(activeConnectorId)
+        const signerAddress = await getOfflineSignerAddress(signer)
+        const nextAccount = {
+          address: signerAddress,
+          name: wallet.username || wallet.walletPrettyName
+        }
+        setAccount((current) =>
+          current?.address === nextAccount.address && current?.name === nextAccount.name
+            ? current
+            : nextAccount
+        )
+        setConnectorId((current) =>
+          current === activeConnectorId ? current : activeConnectorId
+        )
+        setStatus("connected")
+        rememberWalletConnectorId(activeConnectorId)
+        setStoredAutoConnectId(activeConnectorId)
+      }
+
+      return true
+    } catch (prepareError) {
+      const message = isWalletInitializationError(prepareError)
+        ? "Wallet is still syncing. Return to the wallet if it opens, then try again."
+        : formatWalletError(prepareError)
+      setError(message)
+      return false
+    } finally {
+      setWalletPreparingForTx(false)
+    }
+  }, [
+    desktopKeplrAvailable,
+    getCosmosOfflineSigner,
+    getCosmosWallet,
+    hydrateMobileWalletSession,
+  ])
+
   const startTx = useCallback((label?: string) => {
     currentTxLabelRef.current = label
     recordTxDiagnostic({
@@ -1100,9 +1165,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       connectorId,
       account,
       error,
+      walletReadyForTx: Boolean(connectorId && account?.address),
+      walletPreparingForTx,
       connectors,
       connect,
       disconnect,
+      prepareWalletForTx,
       txState,
       startTx,
       finishTx,
@@ -1116,6 +1184,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       connect,
       disconnect,
       error,
+      walletPreparingForTx,
+      prepareWalletForTx,
       status,
       txState,
       startTx,

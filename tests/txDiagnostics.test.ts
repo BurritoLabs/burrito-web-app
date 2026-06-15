@@ -28,6 +28,13 @@ describe("transaction diagnostics", () => {
     expect(result.userMessage).toContain("Wallet signature is out of sync")
   })
 
+  it("classifies mobile wallet sync errors with a wallet sync message", () => {
+    const result = classifyTxError("wallet not sync", "Submit failed")
+
+    expect(result.category).toBe("sequence_mismatch")
+    expect(result.userMessage).toContain("Wallet signature is out of sync")
+  })
+
   it("removes noisy chain prefixes from transaction errors", () => {
     expect(
       cleanTxErrorMessage(

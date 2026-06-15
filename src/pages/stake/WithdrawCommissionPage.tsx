@@ -127,7 +127,15 @@ const TokenIcon = ({
 }) => <TokenIconInner key={`${symbol}:${candidates.join("|")}`} symbol={symbol} candidates={candidates} />
 
 const WithdrawCommission = () => {
-  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
+  const {
+    account,
+    connectorId,
+    prepareWalletForTx,
+    walletPreparingForTx,
+    startTx,
+    finishTx,
+    failTx
+  } = useWallet()
   const [feeDenom, setFeeDenom] = useState<(typeof FEE_DENOM_OPTIONS)[number]>(
     CLASSIC_DENOMS.lunc.coinMinimalDenom
   )
@@ -224,19 +232,21 @@ const WithdrawCommission = () => {
 
     try {
       setSubmitting(true)
+      const walletReady = await prepareWalletForTx()
+      if (!walletReady) {
+        setSubmitError("Wallet is still syncing. Wait a moment, then submit again.")
+        return
+      }
       startTx("Withdraw commission")
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        {
-          connectClassicStargateClientForConnector,
-          getSignerAddressForConnector
-        },
+        { connectClassicStargateClientForConnector },
         { MsgWithdrawValidatorCommission }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmos/distribution/v1beta1/tx")
       ])
-      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const signerAddress = account.address
       const signerValoperAddress = convertBech32Prefix(
         signerAddress,
         `${CLASSIC_CHAIN.bech32Prefix}valoper`
@@ -374,10 +384,14 @@ const WithdrawCommission = () => {
                 <button
                   type="button"
                   className={styles.submit}
-                  disabled={submitting}
+                  disabled={submitting || walletPreparingForTx}
                   onClick={submit}
                 >
-                  {submitting ? "Submitting..." : "Submit"}
+                  {walletPreparingForTx
+                    ? "Preparing wallet..."
+                    : submitting
+                    ? "Submitting..."
+                    : "Submit"}
                 </button>
                 {submitError ? (
                   <div className={styles.submitError}>{submitError}</div>

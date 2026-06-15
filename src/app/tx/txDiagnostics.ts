@@ -90,6 +90,8 @@ export const classifyTxError = (
     lower.includes("signature verification failed") ||
     lower.includes("account sequence mismatch") ||
     lower.includes("wrong sequence") ||
+    lower.includes("wallet not sync") ||
+    lower.includes("wallet is not sync") ||
     /\bsequence\b.*\bchain-id\b/i.test(raw) ||
     /expected\s+\d+\s*,\s*got\s+\d+/i.test(raw)
   ) {

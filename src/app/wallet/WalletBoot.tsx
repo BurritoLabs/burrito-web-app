@@ -94,9 +94,10 @@ const WalletFallbackProvider = ({
   const [account, setAccount] = useState<WalletContextValue["account"]>()
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
+  const [walletPreparingForTx, setWalletPreparingForTx] = useState(false)
   const connectors = useMemo(() => getFallbackConnectors(), [])
 
-  const connect = useCallback(
+  const reconnectConnector = useCallback(
     async (id: WalletConnectorId) => {
       setStatus("connecting")
       setConnectorId(id)
@@ -127,6 +128,13 @@ const WalletFallbackProvider = ({
     []
   )
 
+  const connect = useCallback(
+    async (id: WalletConnectorId) => {
+      await reconnectConnector(id)
+    },
+    [reconnectConnector]
+  )
+
   const disconnect = useCallback(async () => {
     if (connectorId) {
       try {
@@ -143,6 +151,26 @@ const WalletFallbackProvider = ({
     forgetStoredWalletSession()
   }, [connectorId])
 
+  const prepareWalletForTx = useCallback(async () => {
+    if (!connectorId || !account?.address) {
+      setError("Connect wallet before submitting a transaction.")
+      return false
+    }
+
+    setWalletPreparingForTx(true)
+    setError(undefined)
+    try {
+      const { getSignerAddressForConnector } = await import("./walletAdapters")
+      await getSignerAddressForConnector(connectorId)
+      return true
+    } catch (prepareError) {
+      setError(getErrorMessage(prepareError))
+      return false
+    } finally {
+      setWalletPreparingForTx(false)
+    }
+  }, [account?.address, connectorId])
+
   useEffect(() => {
     if (!autoConnectId) return
     if (status !== "disconnected") return
@@ -156,15 +184,50 @@ const WalletFallbackProvider = ({
     return () => window.clearTimeout(timer)
   }, [autoConnectId, connect, connectors, status])
 
+  useEffect(() => {
+    const reconnectStoredDesktopWallet = (id: WalletConnectorId) => {
+      const stored = getStoredWalletConnectorId()
+      if (stored !== id && connectorId !== id) return
+      const connector = connectors.find((item) => item.id === id)
+      if (!connector?.available) return
+
+      window.setTimeout(() => {
+        void reconnectConnector(id)
+      }, 100)
+    }
+
+    const handleKeplrChange = () => reconnectStoredDesktopWallet("keplr")
+    const handleGalaxyChange = () => reconnectStoredDesktopWallet("galaxy")
+
+    window.addEventListener("keplr_keystorechange", handleKeplrChange)
+    window.addEventListener("galaxy_station_wallet_change", handleGalaxyChange)
+    window.addEventListener("galaxy_station_network_change", handleGalaxyChange)
+
+    return () => {
+      window.removeEventListener("keplr_keystorechange", handleKeplrChange)
+      window.removeEventListener(
+        "galaxy_station_wallet_change",
+        handleGalaxyChange
+      )
+      window.removeEventListener(
+        "galaxy_station_network_change",
+        handleGalaxyChange
+      )
+    }
+  }, [connectorId, connectors, reconnectConnector])
+
   const value = useMemo<WalletContextValue>(
     () => ({
       status,
       connectorId,
       account,
       error,
+      walletReadyForTx: Boolean(connectorId && account?.address),
+      walletPreparingForTx,
       connectors,
       connect,
       disconnect,
+      prepareWalletForTx,
       txState,
       startTx: (label?: string) =>
         setTxState({
@@ -188,7 +251,18 @@ const WalletFallbackProvider = ({
         })),
       clearTx: () => setTxState({ status: "idle" })
     }),
-    [account, connect, connectorId, connectors, disconnect, error, status, txState]
+    [
+      account,
+      connect,
+      connectorId,
+      connectors,
+      disconnect,
+      error,
+      prepareWalletForTx,
+      status,
+      txState,
+      walletPreparingForTx
+    ]
   )
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>

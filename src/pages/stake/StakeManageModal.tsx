@@ -37,7 +37,15 @@ const StakeManageModal = ({
   active,
   available
 }: StakeManageModalProps) => {
-  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
+  const {
+    account,
+    connectorId,
+    prepareWalletForTx,
+    walletPreparingForTx,
+    startTx,
+    finishTx,
+    failTx
+  } = useWallet()
   const accountAddress = account?.address
   const [tab, setTab] = useState<StakeAction>("Delegate")
   const [amount, setAmount] = useState("")
@@ -263,19 +271,21 @@ const StakeManageModal = ({
     try {
       setSubmitting(true)
       setSubmitError(undefined)
+      const walletReady = await prepareWalletForTx()
+      if (!walletReady) {
+        setSubmitError("Wallet is still syncing. Wait a moment, then submit again.")
+        return
+      }
       startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        {
-          connectClassicStargateClientForConnector,
-          getSignerAddressForConnector
-        },
+        { connectClassicStargateClientForConnector },
         { MsgDelegate, MsgBeginRedelegate, MsgUndelegate }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmos/staking/v1beta1/tx")
       ])
-      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const signerAddress = accountAddress
       const client = await connectClassicStargateClientForConnector(connectorId)
 
       const msg =
@@ -531,9 +541,13 @@ const StakeManageModal = ({
             className={styles.submit}
             type="button"
             onClick={submit}
-            disabled={submitting || Boolean(amountWarning)}
+            disabled={submitting || walletPreparingForTx || Boolean(amountWarning)}
           >
-            {submitting ? "Submitting..." : tab}
+            {walletPreparingForTx
+              ? "Preparing wallet..."
+              : submitting
+              ? "Submitting..."
+              : tab}
           </button>
         </div>
       </div>

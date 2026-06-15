@@ -29,9 +29,12 @@ export type WalletContextValue = {
   connectorId?: WalletConnectorId
   account?: WalletAccount
   error?: string
+  walletReadyForTx: boolean
+  walletPreparingForTx: boolean
   connectors: WalletConnector[]
   connect: (id: WalletConnectorId) => Promise<void>
   disconnect: () => Promise<void>
+  prepareWalletForTx: () => Promise<boolean>
   txState: TxState
   startTx: (label?: string) => void
   finishTx: (hash?: string) => void

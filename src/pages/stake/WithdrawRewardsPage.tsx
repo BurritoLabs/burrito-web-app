@@ -148,7 +148,15 @@ const TokenIcon = ({
 }
 
 const WithdrawRewards = () => {
-  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
+  const {
+    account,
+    connectorId,
+    prepareWalletForTx,
+    walletPreparingForTx,
+    startTx,
+    finishTx,
+    failTx
+  } = useWallet()
   const accountAddress = account?.address
   const { data: rewardData } = useQuery({
     queryKey: ["rewardsByValidator", accountAddress],
@@ -291,19 +299,21 @@ const WithdrawRewards = () => {
     if (!selected.length) return
     try {
       setSubmitting(true)
+      const walletReady = await prepareWalletForTx()
+      if (!walletReady) {
+        setSubmitError("Wallet is still syncing. Wait a moment, then submit again.")
+        return
+      }
       startTx("Withdraw rewards")
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        {
-          connectClassicStargateClientForConnector,
-          getSignerAddressForConnector
-        },
+        { connectClassicStargateClientForConnector },
         { MsgWithdrawDelegatorReward }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmos/distribution/v1beta1/tx")
       ])
-      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const signerAddress = accountAddress
       const client = await connectClassicStargateClientForConnector(
         connectorId,
         feeDenom
@@ -530,14 +540,26 @@ const WithdrawRewards = () => {
             <button
               type="button"
               className={`${styles.submit} ${
-                !accountAddress || !selected.length || submitting
+                !accountAddress ||
+                !selected.length ||
+                submitting ||
+                walletPreparingForTx
                   ? styles.disabled
                   : ""
               }`}
-              disabled={!accountAddress || !selected.length || submitting}
+              disabled={
+                !accountAddress ||
+                !selected.length ||
+                submitting ||
+                walletPreparingForTx
+              }
               onClick={submit}
             >
-              {submitting ? "Submitting..." : "Submit"}
+              {walletPreparingForTx
+                ? "Preparing wallet..."
+                : submitting
+                ? "Submitting..."
+                : "Submit"}
             </button>
           </>
         ) : null}

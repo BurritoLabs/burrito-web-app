@@ -65,7 +65,15 @@ import {
 } from "./WalletPanelIcons"
 
 const WalletPanel = () => {
-  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
+  const {
+    account,
+    connectorId,
+    prepareWalletForTx,
+    walletPreparingForTx,
+    startTx,
+    finishTx,
+    failTx
+  } = useWallet()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(() => {
@@ -728,7 +736,8 @@ const WalletPanel = () => {
     sendFeeDisplay,
     sendFeeMicro
   ])
-  const canSubmitSend = !sendSubmitting && !sendSubmitDisabledReason
+  const canSubmitSend =
+    !sendSubmitting && !walletPreparingForTx && !sendSubmitDisabledReason
 
   const handleReceiveCopy = useCallback(async () => {
     if (!receiveAddress || !navigator?.clipboard?.writeText) return
@@ -800,10 +809,15 @@ const WalletPanel = () => {
     setSendError(undefined)
 
     try {
+      const walletReady = await prepareWalletForTx()
+      if (!walletReady) {
+        setSendError("Wallet is still syncing. Wait a moment, then submit again.")
+        return
+      }
       startTx(`Send ${sendAsset.symbol}`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        { connectClassicSigningClientForConnector, getSignerAddressForConnector },
+        { connectClassicSigningClientForConnector },
         { MsgExecuteContract },
         { MsgSend }
       ] = await Promise.all([
@@ -811,7 +825,7 @@ const WalletPanel = () => {
         import("cosmjs-types/cosmwasm/wasm/v1/tx"),
         import("cosmjs-types/cosmos/bank/v1beta1/tx")
       ])
-      const signerAddress = await getSignerAddressForConnector(connectorId)
+      const signerAddress = account.address
       const client = await connectClassicSigningClientForConnector(connectorId)
       const msg =
         sendAsset.kind === "cw20"
@@ -891,6 +905,7 @@ const WalletPanel = () => {
     connectorId,
     failTx,
     finishTx,
+    prepareWalletForTx,
     queryClient,
     recipient,
     resetSendForm,
@@ -1356,6 +1371,7 @@ const WalletPanel = () => {
           view={view}
           canSubmitSend={canSubmitSend}
           sendSubmitting={sendSubmitting}
+          walletPreparingForTx={walletPreparingForTx}
           sendSymbol={sendAsset.symbol}
           sendSubmitDisabledReason={sendSubmitDisabledReason}
           sendRecipientReceivesSummaryDisplay={
