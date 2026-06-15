@@ -9,6 +9,7 @@ export type TxErrorCategory =
   | "insufficient_funds"
   | "slippage"
   | "gas_too_low"
+  | "network"
   | "unauthorized"
   | "invalid_symbol"
   | "validation"
@@ -140,6 +141,25 @@ export const classifyTxError = (
       rawMessage,
       userMessage:
         "Network fee was too low for this transaction. Retry with a higher gas estimate."
+    }
+  }
+
+  if (
+    /\b(408|425|429|500|502|503|504)\b/.test(raw) ||
+    lower.includes("too many requests") ||
+    lower.includes("rate limit") ||
+    lower.includes("timed out") ||
+    lower.includes("timeout") ||
+    lower.includes("network error") ||
+    lower.includes("failed to fetch") ||
+    lower.includes("fetch failed")
+  ) {
+    return {
+      category: "network" as const,
+      raw,
+      rawMessage,
+      userMessage:
+        "The network endpoint is busy or rate limited. Burrito will try another endpoint when possible; wait a moment and submit again if this continues."
     }
   }
 

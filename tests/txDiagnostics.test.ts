@@ -42,4 +42,14 @@ describe("transaction diagnostics", () => {
       )
     ).toBe("max spread assertion")
   })
+
+  it("classifies endpoint rate limits as network errors", () => {
+    const result = classifyTxError(
+      new Error("Bad status on response: 429"),
+      "Broadcast failed"
+    )
+
+    expect(result.category).toBe("network")
+    expect(result.userMessage).toContain("rate limited")
+  })
 })

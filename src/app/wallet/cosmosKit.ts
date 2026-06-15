@@ -2,6 +2,7 @@ import type { AssetList, Chain } from "@chain-registry/types"
 import type { MainWalletBase, WalletConnectOptions } from "@cosmos-kit/core"
 import { wallets as keplrMobileWallets } from "@cosmos-kit/keplr-mobile"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
+import { CLASSIC_READ_ENDPOINTS_CONFIG } from "../config/chainConfig"
 import {
   getBurritoAppOrigin,
   WALLETCONNECT_PROJECT_ID,
@@ -60,8 +61,14 @@ export const COSMOS_KIT_CHAIN: Chain = {
     }
   },
   apis: {
-    rpc: [{ address: CLASSIC_CHAIN.rpc, provider: "publicnode" }],
-    rest: [{ address: CLASSIC_CHAIN.lcd, provider: "publicnode" }]
+    rpc: CLASSIC_READ_ENDPOINTS_CONFIG.rpc.map((address, index) => ({
+      address,
+      provider: index === 0 ? "publicnode" : "burrito-fallback"
+    })),
+    rest: CLASSIC_READ_ENDPOINTS_CONFIG.lcd.map((address, index) => ({
+      address,
+      provider: index === 0 ? "publicnode" : "burrito-fallback"
+    }))
   }
 }
 
