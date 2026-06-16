@@ -593,6 +593,40 @@
   display: grid;
 }
 
+.validatorLoadMoreRow {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px;
+  border-top: var(--border-width) solid rgba(255, 255, 255, 0.06);
+}
+
+.validatorLoadMoreButton {
+  min-height: 34px;
+  padding: 0 18px;
+  border-radius: 17px;
+  border: 1px solid rgba(82, 196, 26, 0.55);
+  background: rgba(82, 196, 26, 0.14);
+  color: #eaffea;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.validatorLoadMoreButton:hover {
+  border-color: rgba(82, 196, 26, 0.8);
+  background: rgba(82, 196, 26, 0.2);
+}
+
+.validatorLoadMoreCount {
+  color: rgba(234, 245, 235, 0.62);
+  font-weight: 500;
+}
+
 .validatorRow {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr) minmax(0, 0.6fr) minmax(0, 0.6fr);

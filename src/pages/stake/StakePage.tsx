@@ -39,6 +39,8 @@ import {
 import StakeManageModal from "./StakeManageModal"
 import StakeValidatorRow from "./StakeValidatorRow"
 
+const VALIDATOR_PAGE_SIZE = 30
+
 const Stake = () => {
   const { account } = useWallet()
 
@@ -428,6 +430,23 @@ const Stake = () => {
     }
     return list
   }, [filteredValidators, sortDirection, totalValidatorTokens, validatorQuery, validatorSort])
+
+  const [visibleValidatorCount, setVisibleValidatorCount] =
+    useState(VALIDATOR_PAGE_SIZE)
+
+  useEffect(() => {
+    setVisibleValidatorCount(VALIDATOR_PAGE_SIZE)
+  }, [activeOnly, sortDirection, validatorQuery, validatorSort])
+
+  const visibleValidators = useMemo(
+    () => sortedValidators.slice(0, visibleValidatorCount),
+    [sortedValidators, visibleValidatorCount]
+  )
+
+  const hiddenValidatorCount = Math.max(
+    sortedValidators.length - visibleValidators.length,
+    0
+  )
 
   const donutSegments = useMemo(
     () => buildStakeDonutSegments(validatorDelegations, totalDelegated),
@@ -858,7 +877,7 @@ const Stake = () => {
                     <span className={styles.validatorHeaderAction}>Actions</span>
                   </div>
                   <div className={styles.validatorRows}>
-                    {sortedValidators.map(({ validator, votingPower }) => {
+                    {visibleValidators.map(({ validator, votingPower }) => {
                       const identity = normalizeIdentity(
                         validator.description?.identity
                       )
@@ -885,6 +904,31 @@ const Stake = () => {
                       )
                     })}
                   </div>
+                  {hiddenValidatorCount > 0 ? (
+                    <div className={styles.validatorLoadMoreRow}>
+                      <button
+                        type="button"
+                        className={styles.validatorLoadMoreButton}
+                        onClick={() =>
+                          setVisibleValidatorCount((count) =>
+                            Math.min(
+                              count + VALIDATOR_PAGE_SIZE,
+                              sortedValidators.length
+                            )
+                          )
+                        }
+                      >
+                        Load more
+                        <span className={styles.validatorLoadMoreCount}>
+                          {Math.min(
+                            hiddenValidatorCount,
+                            VALIDATOR_PAGE_SIZE
+                          )}{" "}
+                          of {hiddenValidatorCount}
+                        </span>
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className={styles.emptyState}>No validators found.</div>
