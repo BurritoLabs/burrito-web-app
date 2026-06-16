@@ -1,5 +1,9 @@
 export const KEYBASE_FETCH_CONCURRENCY = 8
 export const DEFAULT_VALIDATOR_LOGO = "/system/validator.png"
+export const KNOWN_VALIDATOR_LOGOS: Record<string, string> = {
+  b2ae8f5fa0214f9d:
+    "https://s3.amazonaws.com/keybase_processed_uploads/29b17d7e0bf3917c5b31a4b2f7fd1505_360_360.jpg"
+}
 
 const KEYBASE_CACHE_STORAGE_KEY = "burrito:keybase-pictures:v1"
 const KEYBASE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14

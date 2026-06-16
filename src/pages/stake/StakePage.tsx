@@ -24,6 +24,7 @@ import { KEYBASE_PROXY_URL } from "../../app/config/externalServices"
 import {
   DEFAULT_VALIDATOR_LOGO,
   KEYBASE_FETCH_CONCURRENCY,
+  KNOWN_VALIDATOR_LOGOS,
   cacheStoreToPictureMap,
   readKeybaseCacheStore,
   type KeybasePictureCacheStore,
@@ -232,6 +233,9 @@ const Stake = () => {
   const resolveValidatorLogo = (identity?: string) => {
     const normalizedIdentity = normalizeIdentity(identity).toLowerCase()
     if (!normalizedIdentity) return DEFAULT_VALIDATOR_LOGO
+    if (KNOWN_VALIDATOR_LOGOS[normalizedIdentity]) {
+      return KNOWN_VALIDATOR_LOGOS[normalizedIdentity]
+    }
     return keybasePictures[normalizedIdentity] || DEFAULT_VALIDATOR_LOGO
   }
 
