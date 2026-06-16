@@ -144,14 +144,20 @@ const Stake = () => {
 
     validatorDelegations.forEach((item) => addIdentity(item.identity))
 
-    const topByVotingPower = [...validators]
+    validators
+      .filter(
+        (validator) =>
+          validator.description?.moniker?.trim().toLowerCase() === "burrito node"
+      )
+      .forEach((validator) => addIdentity(validator.description?.identity))
+
+    const validatorsByVotingPower = [...validators]
       .sort((a, b) => {
         const tokensA = toBigIntOrZero(a.tokens)
         const tokensB = toBigIntOrZero(b.tokens)
         return tokensA === tokensB ? 0 : tokensA > tokensB ? -1 : 1
       })
-      .slice(0, 24)
-    topByVotingPower.forEach((validator) =>
+    validatorsByVotingPower.forEach((validator) =>
       addIdentity(validator.description?.identity)
     )
 
@@ -161,7 +167,8 @@ const Stake = () => {
   useEffect(() => {
     const pending = prioritizedIdentities.filter(
       (identity) =>
-        !keybasePictures[identity] && !inFlightIdentitiesRef.current.has(identity)
+        !keybaseCacheRef.current[identity]?.url &&
+        !inFlightIdentitiesRef.current.has(identity)
     )
     if (!pending.length) return
 
@@ -220,7 +227,7 @@ const Stake = () => {
     return () => {
       cancelled = true
     }
-  }, [keybasePictures, prioritizedIdentities])
+  }, [prioritizedIdentities])
 
   const resolveValidatorLogo = (identity?: string) => {
     const normalizedIdentity = normalizeIdentity(identity).toLowerCase()
