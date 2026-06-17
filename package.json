@@ -61,7 +61,9 @@
     "vitest": "^4.1.8"
   },
   "overrides": {
-    "protobufjs": "7.5.8",
+    "form-data": "4.0.6",
+    "protobufjs": "7.6.4",
+    "ws": "7.5.11",
     "uuid": "11.1.1"
   }
 }
