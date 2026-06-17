@@ -240,7 +240,7 @@ const WithdrawCommission = () => {
       startTx("Withdraw commission")
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        { connectClassicStargateClientForConnector },
+        { connectClassicSigningClientForConnector },
         { MsgWithdrawValidatorCommission }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
@@ -254,9 +254,8 @@ const WithdrawCommission = () => {
       if (!signerValoperAddress) {
         throw new Error("Validator account not connected.")
       }
-      const client = await connectClassicStargateClientForConnector(
-        connectorId,
-        feeDenom
+      const client = await connectClassicSigningClientForConnector(
+        connectorId
       )
       const msg = {
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",

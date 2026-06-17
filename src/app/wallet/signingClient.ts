@@ -15,7 +15,10 @@ import {
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import { CLASSIC_READ_ENDPOINTS_CONFIG } from "../config/chainConfig"
-import { isTxAlreadyInCacheError } from "../tx/txDiagnostics"
+import {
+  isTxAlreadyInCacheError,
+  parseSequenceMismatchExpected
+} from "../tx/txDiagnostics"
 
 type EncodeObjectLike = {
   typeUrl: string
@@ -130,6 +133,9 @@ const createAlreadySubmittedResult = (txBytes: Uint8Array) => ({
   rawLog: "Transaction already exists in cache",
   transactionHash: getClassicTxHash(txBytes)
 })
+
+const waitBeforeSequenceRetry = () =>
+  new Promise((resolve) => setTimeout(resolve, 220))
 
 export const getClassicRegistry = () => {
   return new Registry([...defaultRegistryTypes, ...wasmTypes])
@@ -255,29 +261,46 @@ const connectClassicClientWithFallback = async (
         )
       }
 
-      let signingClient = client
-      const { accountNumber, sequence } = await withEndpointFallback(
-        async (activeClient) => {
-          signingClient = activeClient
-          return activeClient.getSequence(signerAddress)
+      let sequenceHint: number | undefined
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          let signingClient = client
+          const { accountNumber, sequence } = await withEndpointFallback(
+            async (activeClient) => {
+              signingClient = activeClient
+              return activeClient.getSequence(signerAddress)
+            }
+          )
+          const txRaw = await signingClient.sign(signerAddress, messages, fee, memo, {
+            accountNumber,
+            sequence: sequenceHint ?? sequence,
+            chainId: CLASSIC_CHAIN.chainId
+          })
+          const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
+          try {
+            return await withEndpointFallback((activeClient) =>
+              activeClient.broadcastTx(txBytes)
+            )
+          } catch (broadcastError) {
+            if (isTxAlreadyInCacheError(broadcastError)) {
+              return createAlreadySubmittedResult(txBytes)
+            }
+            throw broadcastError
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          const expectedSequence = parseSequenceMismatchExpected(message)
+          if (expectedSequence !== undefined && attempt < 2) {
+            sequenceHint = expectedSequence
+            await waitBeforeSequenceRetry()
+            continue
+          }
+          throw error
         }
-      )
-      const txRaw = await signingClient.sign(signerAddress, messages, fee, memo, {
-        accountNumber,
-        sequence,
-        chainId: CLASSIC_CHAIN.chainId
-      })
-      const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
-      try {
-        return await withEndpointFallback((activeClient) =>
-          activeClient.broadcastTx(txBytes)
-        )
-      } catch (error) {
-        if (isTxAlreadyInCacheError(error)) {
-          return createAlreadySubmittedResult(txBytes)
-        }
-        throw error
       }
+
+      throw new Error("Classic transaction broadcast failed")
     },
     getSequence: (address) =>
       withEndpointFallback((activeClient) => activeClient.getSequence(address)),

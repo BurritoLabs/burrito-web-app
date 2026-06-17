@@ -279,14 +279,14 @@ const StakeManageModal = ({
       startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        { connectClassicStargateClientForConnector },
+        { connectClassicSigningClientForConnector },
         { MsgDelegate, MsgBeginRedelegate, MsgUndelegate }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmos/staking/v1beta1/tx")
       ])
       const signerAddress = accountAddress
-      const client = await connectClassicStargateClientForConnector(connectorId)
+      const client = await connectClassicSigningClientForConnector(connectorId)
 
       const msg =
         tab === "Redelegate"
