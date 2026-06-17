@@ -30,7 +30,10 @@ import {
   buildCw20IconCandidates,
   buildIbcAssetIconCandidates
 } from "../../app/utils/assetIcons"
-import { parseSequenceMismatchExpected } from "../../app/tx/txDiagnostics"
+import {
+  isTxAlreadyInCacheError,
+  parseSequenceMismatchExpected
+} from "../../app/tx/txDiagnostics"
 import {
   fromMicroAmount,
   parseBigInt,
@@ -51,6 +54,7 @@ import {
   SWAP_MEMO
 } from "../../app/config/swapConfig"
 import type { ClassicStargateClient } from "../../app/wallet/walletAdapters"
+import { getClassicTxHash } from "../../app/wallet/signingClient"
 import SwapAssetPickerModal from "./swap/SwapAssetPickerModal"
 import SwapAssetIcon from "./swap/SwapAssetIcon"
 
@@ -589,11 +593,21 @@ const signAndBroadcastSwapFast = async ({
           chainId: CLASSIC_CHAIN.chainId
         }
       )
+      const txBytes = TxRaw.encode(signed).finish()
       const result = await client.broadcastTx(
-        TxRaw.encode(signed).finish(),
+        txBytes,
         SWAP_BROADCAST_TIMEOUT_MS,
         SWAP_BROADCAST_POLL_INTERVAL_MS
-      )
+      ).catch((broadcastError) => {
+        if (isTxAlreadyInCacheError(broadcastError)) {
+          return {
+            code: 0,
+            rawLog: "Transaction already exists in cache",
+            transactionHash: getClassicTxHash(txBytes)
+          }
+        }
+        throw broadcastError
+      })
       if (result.code !== 0) {
         throw new Error(result.rawLog || `Swap failed with code ${result.code}`)
       }

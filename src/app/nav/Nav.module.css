@@ -20,8 +20,8 @@
   color: var(--menu-text);
   z-index: 1;
   background: var(--glass-brand);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .brandLink {
@@ -126,8 +126,8 @@
   bottom: 225px;
   transform: rotate(65deg);
   background-color: rgba(82, 196, 26, 0.4);
-  filter: blur(95px);
-  transition: all 0.5s ease-in-out;
+  filter: blur(42px);
+  transition: opacity 0.2s ease;
 }
 
 .backgroundBlurPrimary[data-open="true"] {
@@ -136,7 +136,7 @@
   left: -200px;
   bottom: 0;
   transform: rotate(45deg);
-  filter: blur(150px);
+  filter: blur(52px);
 }
 
 .backgroundBlurSecondary {
@@ -145,8 +145,8 @@
   bottom: -15px;
   left: -15px;
   background-color: rgba(82, 196, 26, 0.28);
-  filter: blur(35px);
-  transition: all 0.5s ease-in-out;
+  filter: blur(24px);
+  transition: opacity 0.2s ease;
 }
 
 .backgroundBlurSecondary[data-open="true"] {
@@ -154,7 +154,7 @@
   width: 250px;
   left: -50px;
   bottom: -50px;
-  filter: blur(60px);
+  filter: blur(32px);
 }
 
 .backgroundBlurTertiary {
@@ -164,7 +164,7 @@
   bottom: 10px;
   transform: rotate(50deg);
   background-color: rgba(82, 196, 26, 0.2);
-  filter: blur(90px);
+  filter: blur(34px);
 }
 
 @media (max-width: 991.98px) {

@@ -1,3 +1,5 @@
+import { sha256 } from "@cosmjs/crypto"
+import { toHex } from "@cosmjs/encoding"
 import { Registry, type OfflineSigner } from "@cosmjs/proto-signing"
 import {
   createWasmAminoConverters,
@@ -13,6 +15,7 @@ import {
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import { CLASSIC_READ_ENDPOINTS_CONFIG } from "../config/chainConfig"
+import { isTxAlreadyInCacheError } from "../tx/txDiagnostics"
 
 type EncodeObjectLike = {
   typeUrl: string
@@ -118,6 +121,15 @@ export const isClassicEndpointRetryableError = (error: unknown) => {
     lower.includes("fetch failed")
   )
 }
+
+export const getClassicTxHash = (txBytes: Uint8Array) =>
+  toHex(sha256(txBytes)).toUpperCase()
+
+const createAlreadySubmittedResult = (txBytes: Uint8Array) => ({
+  code: 0,
+  rawLog: "Transaction already exists in cache",
+  transactionHash: getClassicTxHash(txBytes)
+})
 
 export const getClassicRegistry = () => {
   return new Registry([...defaultRegistryTypes, ...wasmTypes])
@@ -238,7 +250,9 @@ const connectClassicClientWithFallback = async (
       ),
     signAndBroadcast: async (signerAddress, messages, fee, memo = "") => {
       if (fee === "auto") {
-        return client.signAndBroadcast(signerAddress, messages, fee, memo)
+        return withEndpointFallback((activeClient) =>
+          activeClient.signAndBroadcast(signerAddress, messages, fee, memo)
+        )
       }
 
       let signingClient = client
@@ -254,18 +268,45 @@ const connectClassicClientWithFallback = async (
         chainId: CLASSIC_CHAIN.chainId
       })
       const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
-      return withEndpointFallback((activeClient) => activeClient.broadcastTx(txBytes))
+      try {
+        return await withEndpointFallback((activeClient) =>
+          activeClient.broadcastTx(txBytes)
+        )
+      } catch (error) {
+        if (isTxAlreadyInCacheError(error)) {
+          return createAlreadySubmittedResult(txBytes)
+        }
+        throw error
+      }
     },
     getSequence: (address) =>
       withEndpointFallback((activeClient) => activeClient.getSequence(address)),
     sign: (signerAddress, messages, fee, memo, signerData) =>
       client.sign(signerAddress, messages, fee, memo, signerData),
-    broadcastTx: (tx, timeoutMs, pollIntervalMs) =>
-      withEndpointFallback((activeClient) =>
-        activeClient.broadcastTx(tx, timeoutMs, pollIntervalMs)
-      ),
-    broadcastTxSync: (tx) =>
-      withEndpointFallback((activeClient) => activeClient.broadcastTxSync(tx)),
+    broadcastTx: async (tx, timeoutMs, pollIntervalMs) => {
+      try {
+        return await withEndpointFallback((activeClient) =>
+          activeClient.broadcastTx(tx, timeoutMs, pollIntervalMs)
+        )
+      } catch (error) {
+        if (isTxAlreadyInCacheError(error)) {
+          return createAlreadySubmittedResult(tx)
+        }
+        throw error
+      }
+    },
+    broadcastTxSync: async (tx) => {
+      try {
+        return await withEndpointFallback((activeClient) =>
+          activeClient.broadcastTxSync(tx)
+        )
+      } catch (error) {
+        if (isTxAlreadyInCacheError(error)) {
+          return getClassicTxHash(tx)
+        }
+        throw error
+      }
+    },
     delegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
       fee === "auto"
         ? client.delegateTokens(delegatorAddress, validatorAddress, amount, fee, memo)

@@ -39,10 +39,9 @@
   background:
     radial-gradient(1100px 740px at 70% 26%, rgba(104, 216, 63, 0.13), transparent 62%),
     radial-gradient(980px 620px at 52% 44%, rgba(104, 216, 63, 0.075), transparent 66%);
-  filter: blur(12px);
-  opacity: 0.82;
-  animation: burritoSystemBreath 7.5s ease-in-out infinite;
-  will-change: opacity;
+  filter: none;
+  opacity: 0.72;
+  animation: none;
 }
 
 .globalGlow span {
@@ -51,15 +50,7 @@
 }
 
 .glowPrimary {
-  height: 360px;
-  width: 980px;
-  left: -420px;
-  bottom: -40px;
-  transform: rotate(55deg);
-  background-color: rgba(104, 216, 63, 0.28);
-  filter: blur(110px);
-  animation: burritoSystemBreath 7.5s ease-in-out infinite;
-  will-change: opacity;
+  display: none;
 }
 
 @keyframes burritoSystemBreath {
@@ -92,12 +83,8 @@
   background: var(--glass-sidebar);
   position: relative;
   overflow: hidden;
-  backdrop-filter:
-    blur(calc(var(--glass-blur) + 6px))
-    saturate(calc(var(--glass-saturate) + 20%));
-  -webkit-backdrop-filter:
-    blur(calc(var(--glass-blur) + 6px))
-    saturate(calc(var(--glass-saturate) + 20%));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     10px 0 28px rgba(0, 0, 0, 0.35);
@@ -138,8 +125,8 @@
   white-space: nowrap;
   overflow: visible;
   background: var(--glass-header);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 

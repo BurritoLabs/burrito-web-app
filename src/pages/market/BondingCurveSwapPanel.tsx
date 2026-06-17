@@ -22,7 +22,10 @@ import {
   formatBaseUnitsToTokenAmount,
   parseTokenAmountToBaseUnits,
 } from "../../app/launchpad/cw20"
-import { parseSequenceMismatchExpected } from "../../app/tx/txDiagnostics"
+import {
+  isTxAlreadyInCacheError,
+  parseSequenceMismatchExpected,
+} from "../../app/tx/txDiagnostics"
 import {
   buildClassicNativeIconCandidates,
   buildCw20IconCandidates,
@@ -30,6 +33,7 @@ import {
 import { truncateHash } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
 import { useWallet } from "../../app/wallet/WalletContext"
+import { getClassicTxHash } from "../../app/wallet/signingClient"
 import type { ClassicStargateClient } from "../../app/wallet/walletAdapters"
 import {
   connectClassicSigningClientForConnector,
@@ -230,11 +234,21 @@ const signAndBroadcastFast = async ({
           chainId: CLASSIC_CHAIN.chainId,
         },
       )
+      const txBytes = TxRaw.encode(signed).finish()
       const result = await client.broadcastTx(
-        TxRaw.encode(signed).finish(),
+        txBytes,
         BONDING_BROADCAST_TIMEOUT_MS,
         BONDING_BROADCAST_POLL_INTERVAL_MS,
-      )
+      ).catch((broadcastError) => {
+        if (isTxAlreadyInCacheError(broadcastError)) {
+          return {
+            code: 0,
+            rawLog: "Transaction already exists in cache",
+            transactionHash: getClassicTxHash(txBytes),
+          }
+        }
+        throw broadcastError
+      })
       if (result.code !== 0) {
         throw new Error(
           result.rawLog || `Bonding swap failed with code ${result.code}`,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   cleanTxErrorMessage,
   classifyTxError,
+  isTxAlreadyInCacheError,
   parseSequenceMismatchExpected
 } from "../src/app/tx/txDiagnostics"
 
@@ -51,5 +52,21 @@ describe("transaction diagnostics", () => {
 
     expect(result.category).toBe("network")
     expect(result.userMessage).toContain("rate limited")
+  })
+
+  it("recognizes already submitted broadcast cache errors", () => {
+    expect(
+      isTxAlreadyInCacheError(
+        '{"code":-32603,"message":"Internal error","data":"tx already exists in cache"}'
+      )
+    ).toBe(true)
+
+    const result = classifyTxError(
+      new Error("Internal error: tx already exists in cache"),
+      "Broadcast failed"
+    )
+
+    expect(result.category).toBe("already_submitted")
+    expect(result.userMessage).toContain("already submitted")
   })
 })

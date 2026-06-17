@@ -385,8 +385,25 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
           try {
             wallet.offlineSigner = undefined
             await wallet.initOfflineSigner("amino")
-          } catch {
-            // Interactive signer warm-up is only a latency optimization.
+          } catch (warmError) {
+            if (!isWalletInitializationError(warmError)) {
+              // Interactive signer warm-up is only a latency optimization.
+            } else {
+              try {
+                wallet.offlineSigner = undefined
+                await wallet.connect(false)
+                await waitForWalletAddress(wallet, 12, 200)
+                if (!wallet.address) {
+                  return false
+                }
+                syncCosmosWalletAccount(id, wallet)
+                await wallet.initOfflineSigner("amino")
+              } catch (retryError) {
+                if (isWalletInitializationError(retryError)) {
+                  return false
+                }
+              }
+            }
           }
         }
 
@@ -808,10 +825,13 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (COSMOS_CONNECTOR_CONFIGS[activeConnectorId].type === "mobile") {
-          await hydrateMobileWalletSession(activeConnectorId, {
+          const hydrated = await hydrateMobileWalletSession(activeConnectorId, {
             allowWalletOpen: true,
             warmSigner: true
           })
+          if (!hydrated) {
+            throw new Error("Wallet not sync")
+          }
         }
 
         const signer = await getCosmosOfflineSigner(activeConnectorId)

@@ -33,7 +33,6 @@ import {
 import {
   buildStakeDonutSegments,
   normalizeIdentity,
-  toBigIntOrZero,
   type StakeValidatorDelegation
 } from "../../app/stake/stakeFormat"
 import StakeManageModal from "./StakeManageModal"
@@ -124,130 +123,6 @@ const Stake = () => {
       })
       .sort((a, b) => (a.amount === b.amount ? 0 : a.amount > b.amount ? -1 : 1))
   }, [account, delegations, validatorMap, validators])
-
-  const keybaseCacheRef = useRef<KeybasePictureCacheStore>(
-    readKeybaseCacheStore()
-  )
-
-  const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>(
-    () => cacheStoreToPictureMap(keybaseCacheRef.current)
-  )
-
-  const inFlightIdentitiesRef = useRef<Set<string>>(new Set())
-
-  const prioritizedIdentities = useMemo(() => {
-    const result: string[] = []
-    const seen = new Set<string>()
-    const addIdentity = (identity?: string) => {
-      const normalized = normalizeIdentity(identity).toLowerCase()
-      if (!normalized || seen.has(normalized)) return
-      seen.add(normalized)
-      result.push(normalized)
-    }
-
-    validatorDelegations.forEach((item) => addIdentity(item.identity))
-
-    validators
-      .filter(
-        (validator) =>
-          validator.description?.moniker?.trim().toLowerCase() === "burrito node"
-      )
-      .forEach((validator) => addIdentity(validator.description?.identity))
-
-    const validatorsByVotingPower = [...validators]
-      .sort((a, b) => {
-        const tokensA = toBigIntOrZero(a.tokens)
-        const tokensB = toBigIntOrZero(b.tokens)
-        return tokensA === tokensB ? 0 : tokensA > tokensB ? -1 : 1
-      })
-    validatorsByVotingPower.forEach((validator) =>
-      addIdentity(validator.description?.identity)
-    )
-
-    return result
-  }, [validatorDelegations, validators])
-
-  useEffect(() => {
-    const pending = prioritizedIdentities.filter(
-      (identity) =>
-        !keybaseCacheRef.current[identity]?.url &&
-        !inFlightIdentitiesRef.current.has(identity)
-    )
-    if (!pending.length) return
-
-    let cancelled = false
-    pending.forEach((identity) => inFlightIdentitiesRef.current.add(identity))
-
-    const fetchPicture = async (identity: string) => {
-      try {
-        const response = await fetch(
-          `${KEYBASE_PROXY_URL}/?identity=${encodeURIComponent(identity)}`
-        )
-        const data = await response.json()
-        if (typeof data === "string") return data.trim()
-        if (typeof data?.picture === "string") return data.picture.trim()
-        if (typeof data?.url === "string") return data.url.trim()
-      } catch {
-        // Ignore; no fallback by request.
-      }
-      return ""
-    }
-
-    const load = async () => {
-      const queue = [...pending]
-      let cursor = 0
-
-      const worker = async () => {
-        while (true) {
-          const index = cursor
-          cursor += 1
-          if (index >= queue.length) return
-          const identity = queue[index]
-          const picture = await fetchPicture(identity)
-          inFlightIdentitiesRef.current.delete(identity)
-          if (!cancelled && picture) {
-            setKeybasePictures((prev) => {
-              if (prev[identity] === picture) return prev
-              return { ...prev, [identity]: picture }
-            })
-            keybaseCacheRef.current[identity] = {
-              url: picture,
-              updatedAt: Date.now()
-            }
-            writeKeybaseCacheStore(keybaseCacheRef.current)
-          }
-        }
-      }
-
-      await Promise.all(
-        Array.from({
-          length: Math.min(KEYBASE_FETCH_CONCURRENCY, queue.length)
-        }).map(() => worker())
-      )
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [prioritizedIdentities])
-
-  const resolveValidatorLogo = (identity?: string) => {
-    const normalizedIdentity = normalizeIdentity(identity).toLowerCase()
-    if (!normalizedIdentity) return DEFAULT_VALIDATOR_LOGO
-    if (KNOWN_VALIDATOR_LOGOS[normalizedIdentity]) {
-      return KNOWN_VALIDATOR_LOGOS[normalizedIdentity]
-    }
-    return keybasePictures[normalizedIdentity] || DEFAULT_VALIDATOR_LOGO
-  }
-
-  const handleValidatorLogoError = (
-    event: SyntheticEvent<HTMLImageElement>
-  ) => {
-    const target = event.currentTarget
-    if (target.src.includes(DEFAULT_VALIDATOR_LOGO)) return
-    target.src = DEFAULT_VALIDATOR_LOGO
-  }
 
   const totalDelegated = useMemo(() => {
     return validatorDelegations.reduce((sum, item) => sum + item.amount, 0n)
@@ -447,6 +322,124 @@ const Stake = () => {
     sortedValidators.length - visibleValidators.length,
     0
   )
+
+  const keybaseCacheRef = useRef<KeybasePictureCacheStore>(
+    readKeybaseCacheStore()
+  )
+
+  const [keybasePictures, setKeybasePictures] = useState<Record<string, string>>(
+    () => cacheStoreToPictureMap(keybaseCacheRef.current)
+  )
+
+  const inFlightIdentitiesRef = useRef<Set<string>>(new Set())
+
+  const prioritizedIdentities = useMemo(() => {
+    const result: string[] = []
+    const seen = new Set<string>()
+    const addIdentity = (identity?: string) => {
+      const normalized = normalizeIdentity(identity).toLowerCase()
+      if (!normalized || seen.has(normalized)) return
+      seen.add(normalized)
+      result.push(normalized)
+    }
+
+    validatorDelegations.forEach((item) => addIdentity(item.identity))
+
+    validators
+      .filter(
+        (validator) =>
+          validator.description?.moniker?.trim().toLowerCase() === "burrito node"
+      )
+      .forEach((validator) => addIdentity(validator.description?.identity))
+
+    visibleValidators.forEach(({ validator }) =>
+      addIdentity(validator.description?.identity)
+    )
+
+    return result
+  }, [validatorDelegations, validators, visibleValidators])
+
+  useEffect(() => {
+    const pending = prioritizedIdentities.filter(
+      (identity) =>
+        !keybaseCacheRef.current[identity]?.url &&
+        !inFlightIdentitiesRef.current.has(identity)
+    )
+    if (!pending.length) return
+
+    let cancelled = false
+    pending.forEach((identity) => inFlightIdentitiesRef.current.add(identity))
+
+    const fetchPicture = async (identity: string) => {
+      try {
+        const response = await fetch(
+          `${KEYBASE_PROXY_URL}/?identity=${encodeURIComponent(identity)}`
+        )
+        const data = await response.json()
+        if (typeof data === "string") return data.trim()
+        if (typeof data?.picture === "string") return data.picture.trim()
+        if (typeof data?.url === "string") return data.url.trim()
+      } catch {
+        // Ignore; no fallback by request.
+      }
+      return ""
+    }
+
+    const load = async () => {
+      const queue = [...pending]
+      let cursor = 0
+
+      const worker = async () => {
+        while (true) {
+          const index = cursor
+          cursor += 1
+          if (index >= queue.length) return
+          const identity = queue[index]
+          const picture = await fetchPicture(identity)
+          inFlightIdentitiesRef.current.delete(identity)
+          if (!cancelled && picture) {
+            setKeybasePictures((prev) => {
+              if (prev[identity] === picture) return prev
+              return { ...prev, [identity]: picture }
+            })
+            keybaseCacheRef.current[identity] = {
+              url: picture,
+              updatedAt: Date.now()
+            }
+            writeKeybaseCacheStore(keybaseCacheRef.current)
+          }
+        }
+      }
+
+      await Promise.all(
+        Array.from({
+          length: Math.min(KEYBASE_FETCH_CONCURRENCY, queue.length)
+        }).map(() => worker())
+      )
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [prioritizedIdentities])
+
+  const resolveValidatorLogo = (identity?: string) => {
+    const normalizedIdentity = normalizeIdentity(identity).toLowerCase()
+    if (!normalizedIdentity) return DEFAULT_VALIDATOR_LOGO
+    if (KNOWN_VALIDATOR_LOGOS[normalizedIdentity]) {
+      return KNOWN_VALIDATOR_LOGOS[normalizedIdentity]
+    }
+    return keybasePictures[normalizedIdentity] || DEFAULT_VALIDATOR_LOGO
+  }
+
+  const handleValidatorLogoError = (
+    event: SyntheticEvent<HTMLImageElement>
+  ) => {
+    const target = event.currentTarget
+    if (target.src.includes(DEFAULT_VALIDATOR_LOGO)) return
+    target.src = DEFAULT_VALIDATOR_LOGO
+  }
 
   const donutSegments = useMemo(
     () => buildStakeDonutSegments(validatorDelegations, totalDelegated),

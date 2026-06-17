@@ -6,6 +6,7 @@ export type TxDiagnosticPhase = "start" | "success" | "failure"
 export type TxErrorCategory =
   | "wallet_rejected"
   | "sequence_mismatch"
+  | "already_submitted"
   | "insufficient_funds"
   | "slippage"
   | "gas_too_low"
@@ -55,6 +56,16 @@ export const parseSequenceMismatchExpected = (message: string) => {
   if (!matched) return undefined
   const value = Number(matched[1])
   return Number.isFinite(value) ? value : undefined
+}
+
+export const isTxAlreadyInCacheError = (error: unknown) => {
+  const rawMessage = toRawMessage(error, "")
+  const lower = cleanTxErrorMessage(rawMessage).toLowerCase()
+  return (
+    lower.includes("tx already exists in cache") ||
+    lower.includes("transaction already exists in cache") ||
+    lower.includes("already exists in cache")
+  )
 }
 
 const createDiagnosticId = () => {
@@ -141,6 +152,16 @@ export const classifyTxError = (
       rawMessage,
       userMessage:
         "Network fee was too low for this transaction. Retry with a higher gas estimate."
+    }
+  }
+
+  if (isTxAlreadyInCacheError(rawMessage)) {
+    return {
+      category: "already_submitted" as const,
+      raw,
+      rawMessage,
+      userMessage:
+        "Transaction was already submitted and is waiting in the network cache. Wait a moment for confirmation before trying again."
     }
   }
 
