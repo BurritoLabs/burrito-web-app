@@ -17,9 +17,11 @@ import {
 } from "./WalletContext"
 import {
   CONNECTOR_META,
-  WALLET_CONNECTOR_STORAGE_KEY,
   forgetStoredWalletSession,
-  getStoredWalletConnectorId
+  getStoredWalletConnectorId,
+  isWalletManualDisconnectStored,
+  rememberWalletConnectorId,
+  rememberWalletManualDisconnect
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 
@@ -61,6 +63,7 @@ const getFallbackConnectors = (): WalletConnector[] => {
 }
 
 const getInitialStoredConnector = () => {
+  if (isWalletManualDisconnectStored()) return undefined
   const stored = getStoredWalletConnectorId()
   if (stored === "keplr-mobile" && getWalletWindow()?.keplr) {
     return "keplr"
@@ -103,11 +106,7 @@ const WalletFallbackProvider = ({
       setConnectorId(id)
       setError(undefined)
       setAccount(undefined)
-      try {
-        window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, id)
-      } catch {
-        // Storage can be unavailable in private browsing.
-      }
+      rememberWalletConnectorId(id)
 
       if (id === "keplr-mobile") {
         setError("Keplr Mobile is available from mobile wallet-capable browsers.")
@@ -148,6 +147,7 @@ const WalletFallbackProvider = ({
     setConnectorId(undefined)
     setAccount(undefined)
     setError(undefined)
+    rememberWalletManualDisconnect()
     forgetStoredWalletSession()
   }, [connectorId])
 
@@ -173,6 +173,7 @@ const WalletFallbackProvider = ({
 
   useEffect(() => {
     if (!autoConnectId) return
+    if (isWalletManualDisconnectStored()) return
     if (status !== "disconnected") return
     if (!connectors.some((item) => item.id === autoConnectId && item.available)) {
       return
@@ -186,6 +187,10 @@ const WalletFallbackProvider = ({
 
   useEffect(() => {
     const reconnectStoredDesktopWallet = (id: WalletConnectorId) => {
+      if (isWalletManualDisconnectStored()) {
+        forgetStoredWalletSession()
+        return
+      }
       const stored = getStoredWalletConnectorId()
       if (stored !== id && connectorId !== id) return
       const connector = connectors.find((item) => item.id === id)

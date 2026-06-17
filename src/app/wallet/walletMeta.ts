@@ -4,6 +4,8 @@ import type {
 } from "./WalletContext"
 
 export const WALLET_CONNECTOR_STORAGE_KEY = "burritoWalletConnector"
+export const WALLET_MANUAL_DISCONNECT_STORAGE_KEY =
+  "burritoWalletManuallyDisconnected"
 const COSMOS_KIT_STORAGE_KEYS = [
   "cosmos-kit@2:core//accounts",
   "cosmos-kit@2:core//current-wallet"
@@ -51,6 +53,7 @@ export const isKnownWalletConnectorId = (
 export const getStoredWalletConnectorId = () => {
   if (typeof window === "undefined") return undefined
   try {
+    if (isWalletManualDisconnectStored()) return undefined
     const stored = window.localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)
     return isKnownWalletConnectorId(stored) ? stored : undefined
   } catch {
@@ -58,9 +61,37 @@ export const getStoredWalletConnectorId = () => {
   }
 }
 
+export const isWalletManualDisconnectStored = () => {
+  if (typeof window === "undefined") return false
+  try {
+    return window.localStorage.getItem(WALLET_MANUAL_DISCONNECT_STORAGE_KEY) === "true"
+  } catch {
+    return false
+  }
+}
+
+export const rememberWalletManualDisconnect = () => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(WALLET_MANUAL_DISCONNECT_STORAGE_KEY, "true")
+  } catch {
+    // Storage can be unavailable in private or restricted mobile browsers.
+  }
+}
+
+export const clearWalletManualDisconnect = () => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(WALLET_MANUAL_DISCONNECT_STORAGE_KEY)
+  } catch {
+    // Storage can be unavailable in private or restricted mobile browsers.
+  }
+}
+
 export const rememberWalletConnectorId = (id: WalletConnectorId) => {
   if (typeof window === "undefined") return
   try {
+    window.localStorage.removeItem(WALLET_MANUAL_DISCONNECT_STORAGE_KEY)
     window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, id)
   } catch {
     // Storage can be unavailable in private or restricted mobile browsers.

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  WALLET_MANUAL_DISCONNECT_STORAGE_KEY,
   WALLET_CONNECTOR_STORAGE_KEY,
   forgetStoredWalletSession,
+  getStoredWalletConnectorId,
+  isWalletManualDisconnectStored,
+  rememberWalletManualDisconnect,
   rememberWalletConnectorId
 } from "../src/app/wallet/walletMeta"
 
@@ -39,5 +43,23 @@ describe("wallet storage metadata", () => {
     expect(localStorage.getItem("cosmos-kit@2:core//current-wallet")).toBeNull()
     expect(localStorage.getItem("cosmos-kit@2:core//accounts")).toBeNull()
     expect(localStorage.getItem("unrelated")).toBe("keep")
+  })
+
+  it("keeps refresh auto-connect disabled after a manual disconnect", () => {
+    const localStorage = createLocalStorage()
+    vi.stubGlobal("window", { localStorage })
+
+    rememberWalletConnectorId("keplr")
+    rememberWalletManualDisconnect()
+    forgetStoredWalletSession()
+
+    expect(isWalletManualDisconnectStored()).toBe(true)
+    expect(getStoredWalletConnectorId()).toBeUndefined()
+    expect(localStorage.getItem(WALLET_MANUAL_DISCONNECT_STORAGE_KEY)).toBe("true")
+
+    rememberWalletConnectorId("keplr")
+
+    expect(isWalletManualDisconnectStored()).toBe(false)
+    expect(getStoredWalletConnectorId()).toBe("keplr")
   })
 })

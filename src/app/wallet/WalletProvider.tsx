@@ -31,6 +31,8 @@ import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import {
   forgetStoredWalletSession,
   getStoredWalletConnectorId,
+  isWalletManualDisconnectStored,
+  rememberWalletManualDisconnect,
   rememberWalletConnectorId
 } from "./walletMeta"
 import { isWalletInitializationError } from "./walletInitialization"
@@ -213,7 +215,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const connectorIdRef = useRef<WalletConnectorId | undefined>(undefined)
   const walletStatusRef = useRef<WalletStatus>("disconnected")
   const lastAutoConnectRetryAtRef = useRef(0)
-  const manualDisconnectRef = useRef(false)
+  const manualDisconnectRef = useRef(isWalletManualDisconnectStored())
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const [storedAutoConnectId, setStoredAutoConnectId] = useState<
     WalletConnectorId | undefined
@@ -736,7 +738,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const requestDesktopWalletReconnect = (id: WalletConnectorId) => {
-      if (manualDisconnectRef.current) return
+      if (manualDisconnectRef.current || isWalletManualDisconnectStored()) {
+        forgetStoredWalletSession()
+        return
+      }
 
       const storedConnectorId = getStoredWalletConnectorId()
       const activeConnectorId = connectorIdRef.current
@@ -772,6 +777,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   const disconnect = useCallback(async () => {
     manualDisconnectRef.current = true
+    rememberWalletManualDisconnect()
     forgetStoredWalletSession()
     setStoredAutoConnectId(undefined)
     setAutoConnectAttempted(true)
@@ -798,6 +804,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       // The local disconnect must still stick if a wallet SDK cannot end its session.
     }
+    rememberWalletManualDisconnect()
     forgetStoredWalletSession()
   }, [connectorId, cosmosChain.walletRepo, desktopKeplrAvailable])
 
@@ -937,7 +944,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       window.setTimeout(refreshConnectors, delay)
     )
     const requestStoredReconnect = () => {
-      if (manualDisconnectRef.current) {
+      if (manualDisconnectRef.current || isWalletManualDisconnectStored()) {
         forgetStoredWalletSession()
         return
       }
@@ -1031,7 +1038,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     if (!activeCosmosConnectorId || !cosmosChain.isWalletConnected || !cosmosChain.address) {
       return
     }
-    if (manualDisconnectRef.current) {
+    if (manualDisconnectRef.current || isWalletManualDisconnectStored()) {
       forgetStoredWalletSession()
       return
     }
@@ -1111,6 +1118,10 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       isCosmosConnectorId(effectiveAutoConnectId) &&
       COSMOS_CONNECTOR_CONFIGS[effectiveAutoConnectId].type === "mobile"
     ) {
+      if (manualDisconnectRef.current || isWalletManualDisconnectStored()) {
+        forgetStoredWalletSession()
+        return
+      }
       let cancelled = false
       const timer = window.setTimeout(() => {
         if (cancelled) return
