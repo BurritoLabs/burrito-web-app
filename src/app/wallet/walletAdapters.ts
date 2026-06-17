@@ -382,7 +382,9 @@ export const getAminoOfflineSignerForConnector = async (
 export const connectClassicSigningClientForConnector = async (
   id: WalletConnectorId
 ) => {
-  const signer = await getOfflineSignerForConnector(id)
+  const signer =
+    (await getAminoOfflineSignerForConnector(id)) ??
+    (await getOfflineSignerForConnector(id))
   const signerAddress = await getSignerAddress(signer)
   const client = await connectClassicSigningClient(signer)
   return bindSignerAddress(client as ClassicStargateClient, signerAddress)

@@ -841,7 +841,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        const signer = await getCosmosOfflineSigner(activeConnectorId)
+        const signer =
+          COSMOS_CONNECTOR_CONFIGS[activeConnectorId].type === "mobile"
+            ? (await getCosmosAminoOfflineSigner(activeConnectorId)) ??
+              (await getCosmosOfflineSigner(activeConnectorId))
+            : await getCosmosOfflineSigner(activeConnectorId)
         const signerAddress = await getOfflineSignerAddress(signer)
         const nextAccount = {
           address: signerAddress,
@@ -872,6 +876,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [
     desktopKeplrAvailable,
+    getCosmosAminoOfflineSigner,
     getCosmosOfflineSigner,
     getCosmosWallet,
     hydrateMobileWalletSession,
