@@ -279,9 +279,15 @@ const connectClassicClientWithFallback = async (
           })
           const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
           try {
-            return await withEndpointFallback((activeClient) =>
+            const result = await withEndpointFallback((activeClient) =>
               activeClient.broadcastTx(txBytes)
             )
+            if (result.code !== 0) {
+              throw new Error(
+                result.rawLog || `Classic transaction failed with code ${result.code}`
+              )
+            }
+            return result
           } catch (broadcastError) {
             if (isTxAlreadyInCacheError(broadcastError)) {
               return createAlreadySubmittedResult(txBytes)

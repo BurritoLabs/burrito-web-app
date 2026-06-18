@@ -240,13 +240,16 @@ const WithdrawCommission = () => {
       startTx("Withdraw commission")
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        { connectClassicSigningClientForConnector },
+        {
+          connectClassicSigningClientForConnector,
+          getSignerAddressForConnector
+        },
         { MsgWithdrawValidatorCommission }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmos/distribution/v1beta1/tx")
       ])
-      const signerAddress = account.address
+      const signerAddress = await getSignerAddressForConnector(connectorId)
       const signerValoperAddress = convertBech32Prefix(
         signerAddress,
         `${CLASSIC_CHAIN.bech32Prefix}valoper`
