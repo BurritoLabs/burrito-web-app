@@ -52,7 +52,9 @@ export const cleanTxErrorMessage = (message: string) =>
     .trim()
 
 export const parseSequenceMismatchExpected = (message: string) => {
-  const matched = message.match(/expected\s+(\d+)\s*,\s*got\s+\d+/i)
+  const matched =
+    message.match(/expected\s*:?\s*(\d+)\s*,\s*(?:got|actual)\s*:?\s*\d+/i) ??
+    message.match(/expected\s+account\s+sequence\s+(\d+)\s*,\s*got\s+\d+/i)
   if (!matched) return undefined
   const value = Number(matched[1])
   return Number.isFinite(value) ? value : undefined

@@ -247,11 +247,11 @@ const WalletFallbackProvider = ({
           label: current.label,
           startedAt: current.startedAt
         })),
-      failTx: (txError?: string) =>
+      failTx: (txError?: unknown) =>
         setTxState((current) => ({
           status: "error",
           label: current.label,
-          error: txError,
+          error: txError instanceof Error ? txError.message : String(txError ?? ""),
           startedAt: current.startedAt
         })),
       clearTx: () => setTxState({ status: "idle" })

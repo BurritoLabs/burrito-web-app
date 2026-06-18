@@ -241,7 +241,7 @@ const WithdrawCommission = () => {
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         {
-          connectClassicSigningClientForConnector,
+          connectClassicStargateClientForConnector,
           getSignerAddressForConnector
         },
         { MsgWithdrawValidatorCommission }
@@ -257,8 +257,9 @@ const WithdrawCommission = () => {
       if (!signerValoperAddress) {
         throw new Error("Validator account not connected.")
       }
-      const client = await connectClassicSigningClientForConnector(
-        connectorId
+      const client = await connectClassicStargateClientForConnector(
+        connectorId,
+        feeDenom
       )
       const msg = {
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
@@ -294,7 +295,7 @@ const WithdrawCommission = () => {
     } catch (error) {
       const message = formatTxError(error, "Broadcast failed")
       setSubmitError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setSubmitting(false)
     }

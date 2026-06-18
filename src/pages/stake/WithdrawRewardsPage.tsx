@@ -308,7 +308,7 @@ const WithdrawRewards = () => {
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         {
-          connectClassicSigningClientForConnector,
+          connectClassicStargateClientForConnector,
           getSignerAddressForConnector
         },
         { MsgWithdrawDelegatorReward }
@@ -317,7 +317,10 @@ const WithdrawRewards = () => {
         import("cosmjs-types/cosmos/distribution/v1beta1/tx")
       ])
       const signerAddress = await getSignerAddressForConnector(connectorId)
-      const client = await connectClassicSigningClientForConnector(connectorId)
+      const client = await connectClassicStargateClientForConnector(
+        connectorId,
+        feeDenom
+      )
       const msgs = selected.map((validator) => ({
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
         value: MsgWithdrawDelegatorReward.fromPartial({
@@ -349,7 +352,7 @@ const WithdrawRewards = () => {
       finishTx(result.transactionHash)
     } catch (err) {
       const message = formatTxError(err, "Submit failed")
-      failTx(message)
+      failTx(err)
       setSubmitError(message)
     } finally {
       setSubmitting(false)

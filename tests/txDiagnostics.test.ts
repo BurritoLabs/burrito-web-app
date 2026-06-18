@@ -13,6 +13,12 @@ describe("transaction diagnostics", () => {
         "signature verification failed; account sequence mismatch, expected 42, got 41"
       )
     ).toBe(42)
+
+    expect(
+      parseSequenceMismatchExpected(
+        "account sequence mismatch, expected: 43, actual: 42"
+      )
+    ).toBe(43)
   })
 
   it("ignores messages without an expected sequence", () => {

@@ -38,7 +38,7 @@ export type WalletContextValue = {
   txState: TxState
   startTx: (label?: string) => void
   finishTx: (hash?: string) => void
-  failTx: (error?: string) => void
+  failTx: (error?: unknown) => void
   clearTx: () => void
 }
 

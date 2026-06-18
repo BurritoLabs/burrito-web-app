@@ -905,7 +905,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     setTxState({ status: "success", hash })
   }, [account?.address, connectorId])
 
-  const failTx = useCallback((err?: string) => {
+  const failTx = useCallback((err?: unknown) => {
     const classified = classifyTxError(err, "Transaction failed")
     recordTxDiagnostic({
       phase: "failure",
@@ -917,7 +917,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       rawMessage: classified.rawMessage
     })
     currentTxLabelRef.current = undefined
-    setTxState({ status: "error", error: err })
+    setTxState({ status: "error", error: classified.userMessage })
   }, [account?.address, connectorId])
 
   const clearTx = useCallback(() => {
