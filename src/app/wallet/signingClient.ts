@@ -134,6 +134,16 @@ const createAlreadySubmittedResult = (txBytes: Uint8Array) => ({
   transactionHash: getClassicTxHash(txBytes)
 })
 
+const createBroadcastResultError = (result: BroadcastResultLike) =>
+  new Error(result.rawLog || `Classic transaction failed with code ${result.code}`)
+
+const ensureBroadcastSuccess = (result: BroadcastResultLike) => {
+  if (result.code !== 0) {
+    throw createBroadcastResultError(result)
+  }
+  return result
+}
+
 const waitBeforeSequenceRetry = () =>
   new Promise((resolve) => setTimeout(resolve, 220))
 
@@ -256,9 +266,25 @@ const connectClassicClientWithFallback = async (
       ),
     signAndBroadcast: async (signerAddress, messages, fee, memo = "") => {
       if (fee === "auto") {
-        return withEndpointFallback((activeClient) =>
-          activeClient.signAndBroadcast(signerAddress, messages, fee, memo)
-        )
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            return await withEndpointFallback(async (activeClient) =>
+              ensureBroadcastSuccess(
+                await activeClient.signAndBroadcast(signerAddress, messages, fee, memo)
+              )
+            )
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            const expectedSequence = parseSequenceMismatchExpected(message)
+            if (expectedSequence !== undefined && attempt < 2) {
+              await waitBeforeSequenceRetry()
+              continue
+            }
+            throw error
+          }
+        }
+
+        throw new Error("Classic transaction broadcast failed")
       }
 
       let sequenceHint: number | undefined
@@ -279,14 +305,9 @@ const connectClassicClientWithFallback = async (
           })
           const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
           try {
-            const result = await withEndpointFallback((activeClient) =>
-              activeClient.broadcastTx(txBytes)
+            const result = await withEndpointFallback(async (activeClient) =>
+              ensureBroadcastSuccess(await activeClient.broadcastTx(txBytes))
             )
-            if (result.code !== 0) {
-              throw new Error(
-                result.rawLog || `Classic transaction failed with code ${result.code}`
-              )
-            }
             return result
           } catch (broadcastError) {
             if (isTxAlreadyInCacheError(broadcastError)) {
