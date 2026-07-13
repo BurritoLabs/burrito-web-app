@@ -332,11 +332,12 @@
   background: transparent;
   box-shadow: none;
   height: var(--button-height-small);
-  max-width: 190px;
-  padding: 0 18px;
+  max-width: 160px;
+  padding: 0 16px;
   line-height: 1;
   font-weight: var(--bold);
   letter-spacing: 0;
+  flex: 0 1 auto;
 }
 
 .validatorButton:hover {
@@ -560,6 +561,10 @@
     gap: 8px;
     min-width: 0;
     flex-shrink: 1;
+  }
+
+  .validatorButton {
+    display: none;
   }
 
   .connectButton {
