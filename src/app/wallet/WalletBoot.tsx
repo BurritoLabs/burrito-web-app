@@ -52,7 +52,7 @@ const getFallbackConnectors = (): WalletConnector[] => {
     },
     {
       ...CONNECTOR_META["keplr-mobile"],
-      available: false
+      available: isTouchWalletCapableBrowser()
     },
     {
       ...CONNECTOR_META.galaxy,
@@ -77,20 +77,17 @@ const shouldLoadWalletRuntime = () => {
     return false
   }
 
-  const stored = getStoredWalletConnectorId()
-  if (stored === "keplr-mobile") {
-    return true
-  }
-
-  return isTouchWalletCapableBrowser()
+  return getStoredWalletConnectorId() === "keplr-mobile"
 }
 
 const WalletFallbackProvider = ({
   children,
-  autoConnectId
+  autoConnectId,
+  onRuntimeRequested
 }: {
   children: ReactNode
   autoConnectId?: WalletConnectorId
+  onRuntimeRequested?: () => void
 }) => {
   const [status, setStatus] = useState<WalletStatus>("disconnected")
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
@@ -109,8 +106,7 @@ const WalletFallbackProvider = ({
       rememberWalletConnectorId(id)
 
       if (id === "keplr-mobile") {
-        setError("Keplr Mobile is available from mobile wallet-capable browsers.")
-        setStatus("error")
+        onRuntimeRequested?.()
         return
       }
 
@@ -124,7 +120,7 @@ const WalletFallbackProvider = ({
         setStatus("error")
       }
     },
-    []
+    [onRuntimeRequested]
   )
 
   const connect = useCallback(
@@ -275,7 +271,9 @@ const WalletFallbackProvider = ({
 
 const WalletBoot = ({ children }: { children: ReactNode }) => {
   const [storedAutoConnectId] = useState(() => getInitialStoredConnector())
-  const [loadWalletRuntime] = useState(() => shouldLoadWalletRuntime())
+  const [loadWalletRuntime, setLoadWalletRuntime] = useState(() =>
+    shouldLoadWalletRuntime()
+  )
 
   if (loadWalletRuntime) {
     return (
@@ -292,7 +290,10 @@ const WalletBoot = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <WalletFallbackProvider autoConnectId={storedAutoConnectId}>
+    <WalletFallbackProvider
+      autoConnectId={storedAutoConnectId}
+      onRuntimeRequested={() => setLoadWalletRuntime(true)}
+    >
       {children}
     </WalletFallbackProvider>
   )

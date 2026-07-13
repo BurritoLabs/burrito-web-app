@@ -42,6 +42,11 @@ import {
   sanitizeAmount,
   toMicroAmount
 } from "../../app/swap/amount"
+import {
+  buildSwapRouteCandidates,
+  normalizeDexFamily,
+  type SwapRouteCandidate
+} from "../../app/swap/routeCandidates"
 import { useWallet } from "../../app/wallet/WalletContext"
 import {
   DEFAULT_SLIPPAGE_BPS,
@@ -106,6 +111,18 @@ type DexQuote = DexConfig & {
   spreadAmount: bigint
   commissionAmount: bigint
   beliefPrice: string | undefined
+  pathSymbols: string[]
+  hops: SwapRouteHopQuote[]
+}
+
+type SwapRouteHopQuote = {
+  dex: DexConfig
+  pair: string
+  offerAsset: SwapAsset
+  askAsset: SwapAsset
+  amountIn: bigint
+  returnAmount: bigint
+  beliefPrice: string | undefined
 }
 
 type SmartSimulateResponse = {
@@ -151,7 +168,7 @@ type SwapPanelProps = {
 }
 const SWAP_BROADCAST_TIMEOUT_MS = 60_000
 const SWAP_BROADCAST_POLL_INTERVAL_MS = 2_000
-const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
+const normalizeDexName = normalizeDexFamily
 const FACTORY_PAIR_CACHE = new Map<string, string>()
 
 const encodeJsonBytes = (value: unknown) =>
@@ -227,21 +244,6 @@ const toRegistryAssetKey = (asset: SwapAsset) => {
   return asset.contract?.toLowerCase() ?? ""
 }
 
-const pairMatchesAssets = (
-  pairAssets: readonly string[],
-  offerAsset: SwapAsset,
-  askAsset: SwapAsset
-) => {
-  const expected = new Set([
-    toRegistryAssetKey(offerAsset),
-    toRegistryAssetKey(askAsset)
-  ])
-  const actual = new Set(
-    pairAssets.map((asset) => asset.trim().toLowerCase()).filter(Boolean)
-  )
-  return expected.size === 2 && actual.size === 2 && [...expected].every((id) => actual.has(id))
-}
-
 const toGarudaAsset = (asset: SwapAsset) => {
   if (asset.type === "native" && asset.denom) {
     return { native: asset.denom }
@@ -297,13 +299,14 @@ const simulateSwapQuote = async (
   amount: bigint
 ) => {
   const pair = await resolveFactoryPair(dex, offerAsset, askAsset)
-  return simulatePairSwapQuote(dex, pair, offerAsset, amount)
+  return simulatePairSwapQuote(dex, pair, offerAsset, askAsset, amount)
 }
 
 const simulatePairSwapQuote = async (
   dex: DexConfig,
   pair: string,
   offerAsset: SwapAsset,
+  askAsset: SwapAsset,
   amount: bigint
 ) => {
   const query =
@@ -344,9 +347,24 @@ const simulatePairSwapQuote = async (
     returnAmount,
     spreadAmount: parseBigInt(result.spread_amount),
     commissionAmount: parseBigInt(result.commission_amount),
-    beliefPrice
+    beliefPrice,
+    pathSymbols: [offerAsset.symbol, askAsset.symbol],
+    hops: [
+      {
+        dex,
+        pair,
+        offerAsset,
+        askAsset,
+        amountIn: amount,
+        returnAmount,
+        beliefPrice
+      }
+    ]
   } satisfies DexQuote
 }
+
+const applySlippageBuffer = (amount: bigint, slippageBps: bigint) =>
+  (amount * (10_000n - slippageBps)) / 10_000n
 
 const usesMinReceiveExecute = (dexId: string, mode: DexQueryMode = "terraswap") =>
   mode === "garuda" || dexId === "terraport-v2" || dexId === "terraport-cpmm"
@@ -494,13 +512,20 @@ const buildPlatformFeeMessage = async (
 }
 
 const estimateFallbackGas = (
-  offerAsset: SwapAsset,
+  offerAssets: readonly SwapAsset[],
   includePlatformFee: boolean
 ) => {
-  const swapGas =
-    offerAsset.type === "cw20" ? FALLBACK_GAS_CW20_SWAP : FALLBACK_GAS_NATIVE_SWAP
+  const swapGas = offerAssets.reduce(
+    (total, offerAsset) =>
+      total +
+      (offerAsset.type === "cw20"
+        ? FALLBACK_GAS_CW20_SWAP
+        : FALLBACK_GAS_NATIVE_SWAP),
+    0
+  )
+  const feeAsset = offerAssets[0]
   const feeGas = includePlatformFee
-    ? offerAsset.type === "cw20"
+    ? feeAsset?.type === "cw20"
       ? FALLBACK_GAS_CW20_FEE
       : FALLBACK_GAS_NATIVE_FEE
     : 0
@@ -508,11 +533,11 @@ const estimateFallbackGas = (
 }
 
 const estimateFallbackFeeMicro = (
-  offerAsset: SwapAsset,
+  offerAssets: readonly SwapAsset[],
   includePlatformFee: boolean,
   gasPrice: number
 ) => {
-  const gas = estimateFallbackGas(offerAsset, includePlatformFee)
+  const gas = estimateFallbackGas(offerAssets, includePlatformFee)
   return BigInt(Math.ceil(gas * gasPrice))
 }
 
@@ -1250,20 +1275,7 @@ const SwapPanel = ({
     return quotes.find((item) => item.routeId === selectedDexId) ?? bestQuote
   }, [bestQuote, quotes, selectedDexId])
 
-  const selectedQuotePair = selectedQuote?.pair ?? ""
-  const selectedQuoteMode = selectedQuote?.mode ?? "terraswap"
-
-  const feeQuote = useMemo(
-    () =>
-      selectedQuotePair
-        ? {
-            pair: selectedQuotePair,
-            mode: selectedQuoteMode,
-            beliefPrice: selectedQuote?.beliefPrice
-          }
-        : undefined,
-    [selectedQuote?.beliefPrice, selectedQuoteMode, selectedQuotePair]
-  )
+  const feeQuote = selectedQuote
 
   const hasAmountInput = amountInMicro > 0n
   const hasQuotePreview = hasAmountInput && Boolean(selectedQuote)
@@ -1425,86 +1437,159 @@ const SwapPanel = ({
       setQuoteLoading(true)
       setQuoteError(undefined)
       try {
-        const directRoutes = dexPairs
-          .filter((entry) => {
-            const dexName = normalizeDexName(entry.dexId)
-            return (
-              activeDexIds.has(dexName) &&
-              pairMatchesAssets(entry.assets, quoteFromAsset, quoteToAsset)
-            )
-          })
-          .map((entry) => {
-            const exact = dexes.find(
-              (dex) => dex.id.toLowerCase() === entry.dexId.toLowerCase()
-            )
-            const matched =
-              exact ??
-              dexes.find(
-                (dex) =>
-                  normalizeDexName(dex.id) === normalizeDexName(entry.dexId)
-              )
-            return {
-              dex: {
-                factory: matched?.factory ?? "",
-                id: entry.dexId.toLowerCase(),
-                label: entry.dexLabel || matched?.label || entry.dexId,
-                mode:
-                  matched?.mode ??
-                  (entry.dexId.toLowerCase().startsWith("garuda")
-                    ? "garuda"
-                    : "terraswap")
-              } satisfies DexConfig,
-              pair: entry.pair
-            }
-          })
-          .filter(
-            (entry, index, rows) =>
-              rows.findIndex(
-                (candidate) =>
-                  candidate.dex.id === entry.dex.id &&
-                  candidate.pair === entry.pair
-              ) === index
+        const resolveDexConfig = (dexId: string, dexLabel: string) => {
+          const exact = dexes.find(
+            (dex) => dex.id.toLowerCase() === dexId.toLowerCase()
           )
+          const matched =
+            exact ??
+            dexes.find(
+              (dex) =>
+                normalizeDexName(dex.id) === normalizeDexName(dexId)
+            )
+          return {
+            factory: matched?.factory ?? "",
+            id: dexId.toLowerCase(),
+            label: dexLabel || matched?.label || dexId,
+            mode:
+              matched?.mode ??
+              (dexId.toLowerCase().startsWith("garuda")
+                ? "garuda"
+                : "terraswap")
+          } satisfies DexConfig
+        }
 
-        const quoteTasks =
-          directRoutes.length > 0
-            ? directRoutes.map(({ dex, pair }) =>
-                simulatePairSwapQuote(
-                  dex,
-                  pair,
-                  quoteFromAsset,
-                  swapAmountMicro
-                )
-              )
-            : dexes
-                .filter((dex) => Boolean(dex.factory))
-                .map((dex) =>
-                  simulateSwapQuote(
-                    dex,
-                    quoteFromAsset,
-                    quoteToAsset,
-                    swapAmountMicro
-                  )
-                )
+        const routeAssets = new Map(
+          assets.map((asset) => [toRegistryAssetKey(asset), asset] as const)
+        )
+        const routeCandidates = buildSwapRouteCandidates({
+          activeDexIds,
+          askAssetKey: toRegistryAssetKey(quoteToAsset),
+          maxTwoHopRoutes: chainKey === "luna" ? 6 : 0,
+          offerAssetKey: toRegistryAssetKey(quoteFromAsset),
+          pairs: dexPairs
+        })
 
-        const settled = await Promise.allSettled(
+        const simulateRoute = async (candidate: SwapRouteCandidate) => {
+          const hopQuotes: DexQuote[] = []
+          let nextAmount = swapAmountMicro
+
+          for (const [index, hop] of candidate.hops.entries()) {
+            const offerAsset = routeAssets.get(hop.offerAssetKey)
+            const askAsset = routeAssets.get(hop.askAssetKey)
+            if (!offerAsset || !askAsset || nextAmount <= 0n) {
+              throw new Error("Route asset unavailable")
+            }
+
+            const hopQuote = await simulatePairSwapQuote(
+              resolveDexConfig(hop.dexId, hop.dexLabel),
+              hop.pair,
+              offerAsset,
+              askAsset,
+              nextAmount
+            )
+            hopQuotes.push(hopQuote)
+            nextAmount =
+              index < candidate.hops.length - 1
+                ? applySlippageBuffer(hopQuote.returnAmount, slippageBps)
+                : hopQuote.returnAmount
+          }
+
+          const first = hopQuotes[0]
+          const last = hopQuotes[hopQuotes.length - 1]
+          if (!first || !last) throw new Error("Route quote unavailable")
+          if (hopQuotes.length === 1) return first
+
+          const hops = hopQuotes.flatMap((quote) => quote.hops)
+          const dexLabels = Array.from(
+            new Set(hops.map((hop) => hop.dex.label))
+          )
+          return {
+            ...first,
+            id: hops.map((hop) => hop.dex.id).join("+"),
+            label:
+              dexLabels.length === 1
+                ? `${dexLabels[0]} · ${hops.length} hops`
+                : dexLabels.join(" → "),
+            routeId: candidate.id,
+            returnAmount: last.returnAmount,
+            spreadAmount: last.spreadAmount,
+            commissionAmount: last.commissionAmount,
+            beliefPrice: last.beliefPrice,
+            pathSymbols: [
+              hops[0].offerAsset.symbol,
+              ...hops.map((hop) => hop.askAsset.symbol)
+            ],
+            hops
+          } satisfies DexQuote
+        }
+
+        const directCandidates = routeCandidates.filter(
+          (candidate) => candidate.hops.length === 1
+        )
+        const primaryTasks =
           isPairOnly && pairOnly && pairOnlyDex
             ? [
                 simulatePairSwapQuote(
                   pairOnlyDex,
                   pairOnly.pairAddress,
                   quoteFromAsset,
+                  quoteToAsset,
                   swapAmountMicro
                 )
               ]
-            : quoteTasks
-        )
-        const nextQuotes = settled
+            : directCandidates.length
+              ? directCandidates.map(simulateRoute)
+              : dexes
+                  .filter((dex) => Boolean(dex.factory))
+                  .map((dex) =>
+                    simulateSwapQuote(
+                      dex,
+                      quoteFromAsset,
+                      quoteToAsset,
+                      swapAmountMicro
+                    )
+                  )
+
+        const primarySettled = await Promise.allSettled(primaryTasks)
+        const primaryQuotes = primarySettled
           .filter((item): item is PromiseFulfilledResult<DexQuote> => item.status === "fulfilled")
           .map((item) => item.value)
           .sort((a, b) =>
             b.returnAmount > a.returnAmount ? 1 : b.returnAmount < a.returnAmount ? -1 : 0
           )
+
+        if (cancelled) return
+        if (primaryQuotes.length) {
+          setQuotes(primaryQuotes)
+          setSelectedDexId((current) =>
+            current && primaryQuotes.some((quote) => quote.routeId === current)
+              ? current
+              : primaryQuotes[0].routeId
+          )
+          setQuoteLoading(false)
+        }
+
+        const secondarySettled = await Promise.allSettled(
+          isPairOnly
+            ? []
+            : routeCandidates
+                .filter((candidate) => candidate.hops.length === 2)
+                .map(simulateRoute)
+        )
+        const secondaryQuotes = secondarySettled
+          .filter((item): item is PromiseFulfilledResult<DexQuote> => item.status === "fulfilled")
+          .map((item) => item.value)
+        const nextQuotes = Array.from(
+          new Map(
+            [...primaryQuotes, ...secondaryQuotes].map((quote) => [
+              quote.routeId,
+              quote
+            ])
+          ).values()
+        ).sort((a, b) =>
+          b.returnAmount > a.returnAmount ? 1 : b.returnAmount < a.returnAmount ? -1 : 0
+        )
 
         if (cancelled) return
         if (!nextQuotes.length) {
@@ -1544,6 +1629,8 @@ const SwapPanel = ({
     }
   }, [
     activeDexIds,
+    assets,
+    chainKey,
     dexPairs,
     dexes,
     isPairOnly,
@@ -1551,6 +1638,7 @@ const SwapPanel = ({
     pairOnlyDex,
     quoteFromAsset,
     quoteToAsset,
+    slippageBps,
     swapAmountMicro
   ])
 
@@ -1563,7 +1651,7 @@ const SwapPanel = ({
 
     const fallbackFee = `${formatTokenAmount(
       estimateFallbackFeeMicro(
-        quoteFromAsset,
+        feeQuote.hops.map((hop) => hop.offerAsset),
         platformFeeMicro > 0n,
         chain.runtime.gasPriceStep.average
       ).toString(),
@@ -1578,7 +1666,6 @@ const SwapPanel = ({
     chain.runtime.gasPriceStep.average,
     feeQuote,
     platformFeeMicro,
-    quoteFromAsset,
     swapAmountMicro
   ])
 
@@ -1649,22 +1736,29 @@ const SwapPanel = ({
       const client = await connectSigningClientForConnector(connectorId)
 
       const feeMsg = await buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
-      const msg = await buildSwapMessage(
-        signerAddress,
-        selectedQuote.pair,
-        fromAsset,
-        swapAmountMicro,
-        maxSpread,
-        minReceiveMicro,
-        selectedQuote.id,
-        selectedQuote.mode ?? "terraswap",
-        selectedQuote.beliefPrice
+      const swapMessages = await Promise.all(
+        selectedQuote.hops.map((hop, index) =>
+          buildSwapMessage(
+            signerAddress,
+            hop.pair,
+            hop.offerAsset,
+            hop.amountIn,
+            maxSpread,
+            selectedQuote.hops[index + 1]?.amountIn ?? minReceiveMicro,
+            hop.dex.id,
+            hop.dex.mode ?? "terraswap",
+            hop.beliefPrice
+          )
+        )
       )
-      const messages = feeMsg ? [feeMsg, msg] : [msg]
+      const messages = feeMsg ? [feeMsg, ...swapMessages] : swapMessages
       const hash = await signAndBroadcastSwapFast({
         client,
         chainId: chain.chainId,
-        fallbackGas: estimateFallbackGas(fromAsset, platformFeeMicro > 0n),
+        fallbackGas: estimateFallbackGas(
+          selectedQuote.hops.map((hop) => hop.offerAsset),
+          platformFeeMicro > 0n
+        ),
         feeDenom: chain.nativeDenom,
         gasPrice: chain.runtime.gasPriceStep.average,
         messages,
@@ -1952,7 +2046,8 @@ const SwapPanel = ({
                       <div>
                         <label>Route path</label>
                         <strong>
-                          {fromAsset.symbol} → {toAsset.symbol}
+                          {selectedQuote?.pathSymbols.join(" → ") ??
+                            `${fromAsset.symbol} → ${toAsset.symbol}`}
                         </strong>
                       </div>
                     </div>
