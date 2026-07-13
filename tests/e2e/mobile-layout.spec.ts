@@ -20,6 +20,10 @@ test("mobile market keeps the fixed header above content and covers the bottom",
 
   await expect(page.getByRole("button", { name: "Connect" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Market" })).toBeVisible()
+  const networkSwitcher = page.getByRole("button", { name: "Switch network" })
+  await expect(networkSwitcher).toBeVisible()
+  await expect(networkSwitcher).toHaveCSS("width", "50px")
+  await expect(networkSwitcher.getByText("LUNC", { exact: true })).toBeHidden()
   await expect(async () => {
     if (!(await page.getByRole("dialog").isVisible())) {
       await page.getByRole("button", { name: "Connect" }).click()

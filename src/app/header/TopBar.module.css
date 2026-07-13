@@ -627,4 +627,27 @@
   }
 }
 
+@media (max-width: 680px) {
+  .chainTrigger {
+    width: 50px;
+    min-width: 50px;
+    padding: 0 6px 0 5px;
+    gap: 2px;
+  }
+
+  .chainCurrent {
+    display: none;
+  }
+
+  .chainChevron {
+    width: 12px;
+    height: 12px;
+  }
+
+  .chainLogo {
+    width: 24px;
+    height: 24px;
+  }
+}
+
 
