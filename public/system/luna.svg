@@ -1,17 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 277.43 300">
   <defs>
-    <linearGradient id="luna-a" x1="18" y1="12" x2="62" y2="68" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#f9d85e"/>
-      <stop offset=".55" stop-color="#f97316"/>
-      <stop offset="1" stop-color="#c2410c"/>
+    <linearGradient id="luna-gradient-main" x1="107.88" y1="180.59" x2="159.63" y2="302.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f7d45c"/>
+      <stop offset="1" stop-color="#de3633"/>
     </linearGradient>
-    <linearGradient id="luna-b" x1="22" y1="18" x2="56" y2="54" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff7ad"/>
-      <stop offset="1" stop-color="#facc15"/>
-    </linearGradient>
+    <linearGradient id="luna-gradient-upper" x1="46.6" y1="58.2" x2="167.36" y2="193.9" xlink:href="#luna-gradient-main"/>
   </defs>
-  <circle cx="40" cy="40" r="36" fill="#0c1411"/>
-  <path fill="url(#luna-a)" d="M71.6 34.4c-5.2-6.6-13.4-9.5-24.2-13.3C33.9 16.4 27.2 12 30.8 6.2A35.9 35.9 0 0 1 71.6 34.4Z"/>
-  <path fill="url(#luna-b)" d="M42.8 49.1C27 42 16.8 28.5 15.7 14.5a35.9 35.9 0 0 0 57.4 40.2 45.7 45.7 0 0 1-30.3-5.6Z"/>
-  <path fill="#fb923c" d="M71.7 34.6c.9 5.1.7 10.3-.6 15.1-7.9-5.8-14.3-10.6-17.9-21.1 7.9 2.8 13.8 5.1 18.5 6Z" opacity=".88"/>
+  <ellipse cx="132.59" cy="167.16" rx="131.86" ry="132.03" fill="#f2e373"/>
+  <path d="M186.17 153.48 6 207.22c8.22 26.19 25 50.35 50.42 68.21 62.74 44 141 25.28 190.06-27.26 1.05-1.13 0-3-1.42-2.36a48.06 48.06 0 0 1-29.58 3.68A47.28 47.28 0 0 1 177.91 212a48 48 0 0 1 33.6-55.37Z" fill="url(#luna-gradient-main)" fill-rule="evenodd"/>
+  <path d="M165.36 143a82.69 82.69 0 0 0 10.33-5.11 81.64 81.64 0 0 1 101.38 16.28 1.45 1.45 0 0 1-1.42 2.35c-22.46-4.73-46.67-5.66-65.11.37C188.31 164.18 172 180 160.71 199.63c-16.54 28.78-23.35 36.92-50.07 47.34-46.56 18.18-90 1.71-104.63-39.68A133.12 133.12 0 0 1 71.69 49.54C87.82 41 107.38 33.8 123.76 29.06 139.55 24.55 166.42 18 173.35 1a1.57 1.57 0 0 1 3 .43c2.77 20.09-1.83 29.24-13.36 40.09-12.5 11.77-27.93 17.13-41.77 25.63-21.11 14-27.8 39.57-13.8 60.68 8.32 12.55 22.49 19.21 37.38 19.21a56.82 56.82 0 0 0 13.55-1.68 52.56 52.56 0 0 0 7.01-2.36Z" fill="url(#luna-gradient-upper)" fill-rule="evenodd"/>
 </svg>

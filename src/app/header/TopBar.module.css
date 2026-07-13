@@ -448,6 +448,32 @@
   background: rgba(82, 196, 26, 0.12);
 }
 
+.validatorMenuItem {
+  border-color: rgba(82, 196, 26, 0.28);
+}
+
+.walletMenuItemText {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.walletMenuItemText > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletMenuItemText > span:last-child {
+  color: rgba(234, 245, 235, 0.55);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.validatorMenuItem .walletMenuIcon {
+  color: #52c41a;
+}
+
 .walletMenuIcon {
   width: 16px;
   height: 16px;

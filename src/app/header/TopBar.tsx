@@ -271,6 +271,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
             type="button"
             onClick={() => navigate("/commission")}
             title={validatorMoniker}
+            aria-label={`Withdraw ${validatorMoniker} commission`}
           >
             <span className={styles.validatorLabel}>{validatorMoniker}</span>
           </button>
@@ -315,6 +316,39 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
                     right: walletMenuPos.right
                   }}
                 >
+                  {showValidator ? (
+                    <button
+                      type="button"
+                      className={`${styles.walletMenuItem} ${styles.validatorMenuItem}`}
+                      onClick={() => {
+                        setWalletMenuOpen(false)
+                        navigate("/commission")
+                      }}
+                    >
+                      <span className={styles.walletMenuItemText}>
+                        <span>{validatorMoniker}</span>
+                        <span>Withdraw commission</span>
+                      </span>
+                      <span className={styles.walletMenuIcon} aria-hidden="true">
+                        <svg viewBox="0 0 16 16" fill="none">
+                          <circle
+                            cx="8"
+                            cy="8"
+                            r="5.25"
+                            stroke="currentColor"
+                            strokeWidth="1.2"
+                          />
+                          <path
+                            d="M8 4.75v6.5M6.25 6.25h2.6a1.4 1.4 0 0 1 0 2.8H7.1a1.4 1.4 0 0 0 0 2.8h2.65"
+                            stroke="currentColor"
+                            strokeWidth="1.1"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className={styles.walletMenuItem}
