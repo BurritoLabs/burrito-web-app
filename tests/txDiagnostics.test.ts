@@ -1,12 +1,26 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  buildTxDiagnosticsReport,
   cleanTxErrorMessage,
   classifyTxError,
   isTxAlreadyInCacheError,
-  parseSequenceMismatchExpected
+  parseSequenceMismatchExpected,
+  recordTxDiagnostic
 } from "../src/app/tx/txDiagnostics"
 
+const createMemoryStorage = () => {
+  const values = new Map<string, string>()
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value)
+  }
+}
+
 describe("transaction diagnostics", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it("extracts expected account sequence values", () => {
     expect(
       parseSequenceMismatchExpected(
@@ -74,5 +88,40 @@ describe("transaction diagnostics", () => {
 
     expect(result.category).toBe("already_submitted")
     expect(result.userMessage).toContain("already submitted")
+  })
+
+  it("includes release, chain, connection state, and duration in copied diagnostics", () => {
+    vi.stubGlobal("window", {
+      localStorage: createMemoryStorage(),
+      location: { pathname: "/commission" },
+      navigator: { onLine: true, userAgent: "Burrito test" }
+    })
+    vi.stubGlobal("document", { visibilityState: "visible" })
+
+    recordTxDiagnostic({
+      phase: "failure",
+      label: "Withdraw commission",
+      durationMs: 1_234,
+      message: "Test failure"
+    })
+
+    const report = JSON.parse(buildTxDiagnosticsReport()) as {
+      context: Record<string, unknown>
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(report.context).toMatchObject({
+      chainKey: "lunc",
+      chainId: "columbus-5",
+      online: true,
+      path: "/commission",
+      visibilityState: "visible"
+    })
+    expect(report.context.release).toBeTruthy()
+    expect(report.events[0]).toMatchObject({
+      durationMs: 1_234,
+      label: "Withdraw commission",
+      phase: "failure"
+    })
   })
 })

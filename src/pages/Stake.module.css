@@ -628,6 +628,8 @@
 }
 
 .validatorRow {
+  content-visibility: auto;
+  contain-intrinsic-size: 72px;
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr) minmax(0, 0.6fr) minmax(0, 0.6fr);
   gap: 12px;

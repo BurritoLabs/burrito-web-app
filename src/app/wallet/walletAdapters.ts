@@ -1,12 +1,8 @@
 import type { OfflineSigner } from "@cosmjs/proto-signing"
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
+import type { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { getActiveAppChainKey } from "../activeChain"
 import { getKeplrChainConfig } from "../chain"
 import { CHAIN_RUNTIME_CONFIG } from "../config/chainConfig"
-import {
-  connectSigningClient,
-  connectStargateClient
-} from "./signingClient"
 import {
   connectGalaxyWallet,
   disconnectGalaxyWallet,
@@ -153,42 +149,64 @@ export const getSignerAddressForConnector = async (id: WalletConnectorId) => {
 
 const bindSignerAddress = <T extends ClassicStargateClient>(
   client: T,
-  signerAddress: string
-): T =>
-  ({
+  signerAddress: string,
+  signer: OfflineSigner
+): T => {
+  const ensureCurrentSigner = async () => {
+    const currentAddress = await getSignerAddress(signer)
+    if (currentAddress !== signerAddress) {
+      throw new Error(
+        "Wallet account changed before signing. Burrito stopped the transaction; try again with the active account."
+      )
+    }
+  }
+
+  return ({
     ...client,
     simulate: (
       _signerAddress: string,
       messages: readonly EncodeObjectLike[],
       memo: string
     ) => client.simulate(signerAddress, messages, memo),
-    sign: (
+    sign: async (
       _signerAddress: string,
       messages: readonly EncodeObjectLike[],
       fee: StdFeeLike,
       memo: string,
       signerData: SignerDataLike
-    ) => client.sign(signerAddress, messages, fee, memo, signerData),
-    signAndBroadcast: (
+    ) => {
+      await ensureCurrentSigner()
+      return client.sign(signerAddress, messages, fee, memo, signerData)
+    },
+    signAndBroadcast: async (
       _signerAddress: string,
       messages: readonly EncodeObjectLike[],
       fee: "auto" | StdFeeLike,
       memo = ""
-    ) => client.signAndBroadcast(signerAddress, messages, fee, memo),
-    delegateTokens: (
+    ) => {
+      await ensureCurrentSigner()
+      return client.signAndBroadcast(signerAddress, messages, fee, memo)
+    },
+    delegateTokens: async (
       _delegatorAddress: string,
       validatorAddress: string,
       amount: { denom: string; amount: string },
       fee: "auto" | StdFeeLike,
       memo?: string
-    ) => client.delegateTokens(signerAddress, validatorAddress, amount, fee, memo),
-    undelegateTokens: (
+    ) => {
+      await ensureCurrentSigner()
+      return client.delegateTokens(signerAddress, validatorAddress, amount, fee, memo)
+    },
+    undelegateTokens: async (
       _delegatorAddress: string,
       validatorAddress: string,
       amount: { denom: string; amount: string },
       fee: "auto" | StdFeeLike,
       memo?: string
-    ) => client.undelegateTokens(signerAddress, validatorAddress, amount, fee, memo),
+    ) => {
+      await ensureCurrentSigner()
+      return client.undelegateTokens(signerAddress, validatorAddress, amount, fee, memo)
+    },
     getSequence: (address: string) => client.getSequence(address),
     broadcastTx: (
       tx: Uint8Array,
@@ -197,6 +215,7 @@ const bindSignerAddress = <T extends ClassicStargateClient>(
     ) => client.broadcastTx(tx, timeoutMs, pollIntervalMs),
     broadcastTxSync: (tx: Uint8Array) => client.broadcastTxSync(tx)
   }) as T
+}
 
 const getWalletWindow = () => {
   if (typeof window === "undefined") return undefined
@@ -392,18 +411,20 @@ export const getAminoOfflineSignerForConnector = async (
 export const connectClassicSigningClientForConnector = async (
   id: WalletConnectorId
 ) => {
+  const { connectSigningClient } = await import("./signingClient")
   const signer =
     (await getAminoOfflineSignerForConnector(id)) ??
     (await getOfflineSignerForConnector(id))
   const signerAddress = await getSignerAddress(signer)
   const client = await connectSigningClient(signer, getActiveChain())
-  return bindSignerAddress(client as ClassicStargateClient, signerAddress)
+  return bindSignerAddress(client as ClassicStargateClient, signerAddress, signer)
 }
 
 export const connectClassicStargateClientForConnector = async (
   id: WalletConnectorId,
   feeDenom?: string
 ) : Promise<ClassicStargateClient> => {
+  const { connectStargateClient } = await import("./signingClient")
   if (id === "keplr" && hasDesktopKeplr()) {
     const signer = await getDirectDesktopKeplrSigner()
     if (!signer) {
@@ -411,7 +432,7 @@ export const connectClassicStargateClientForConnector = async (
     }
     const signerAddress = await getSignerAddress(signer)
     const client = await connectStargateClient(signer, getActiveChain(), feeDenom)
-    return bindSignerAddress(client, signerAddress)
+    return bindSignerAddress(client, signerAddress, signer)
   }
 
   const runtimeClient = await walletAdapterRuntime?.getSigningStargateClient?.(
@@ -430,13 +451,13 @@ export const connectClassicStargateClientForConnector = async (
       getActiveChain(),
       feeDenom
     )
-    return bindSignerAddress(client, signerAddress)
+    return bindSignerAddress(client, signerAddress, aminoSigner)
   }
 
   const signer = await getOfflineSignerForConnector(id)
   const signerAddress = await getSignerAddress(signer)
   const client = await connectStargateClient(signer, getActiveChain(), feeDenom)
-  return bindSignerAddress(client, signerAddress)
+  return bindSignerAddress(client, signerAddress, signer)
 }
 
 export const connectSigningClientForConnector =

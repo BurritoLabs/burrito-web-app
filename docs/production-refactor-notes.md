@@ -199,3 +199,16 @@
 - Corrected the mobile testing checklist to use the real `/gov` route.
 - Isolated Playwright mobile checks on port `4173` so an existing local `5173` session cannot produce false failures.
 - Wallet, transaction, chain, market, swap, staking, governance, and launchpad behavior were not changed.
+
+## Wallet Reliability And Runtime Performance
+
+- Replaced the full Cosmos Kit React package with `@cosmos-kit/react-lite` while preserving the existing Keplr desktop and mobile connectors.
+- Deferred the signing client and transaction protobuf runtime until a transaction client is requested.
+- Serialized broadcasts per chain and wallet address so two actions cannot race the same account sequence.
+- Re-checks the signer address immediately before wallet approval and stops safely if the active wallet account changed.
+- Added transaction duration, release, chain ID, online state, and page visibility to copied diagnostics; remote diagnostics continue to omit wallet addresses and raw signatures.
+- Added desktop fallback transaction diagnostics so desktop and mobile failures follow the same classification path.
+- Disabled background-tab query intervals and retained reconnect refreshes.
+- Added browser-native offscreen rendering containment to the Market, Stake, and Governance long lists.
+- Added raw, gzip, wallet-runtime dependency-chain, and signing-client reachability checks to the bundle budget.
+- The optimized build keeps initial JavaScript at about 110 KiB and the wallet runtime static dependency chain below 1 MiB gzip.

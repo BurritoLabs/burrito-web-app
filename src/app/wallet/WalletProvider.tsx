@@ -1,4 +1,4 @@
-import { useChain } from "@cosmos-kit/react"
+import { useChain } from "@cosmos-kit/react-lite"
 import type { ChainWalletBase } from "@cosmos-kit/core"
 import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -218,6 +218,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const [walletPreparingForTx, setWalletPreparingForTx] = useState(false)
   const currentTxLabelRef = useRef<string | undefined>(undefined)
+  const currentTxStartedAtRef = useRef<number | undefined>(undefined)
   const accountAddressRef = useRef<string | undefined>(undefined)
   const connectorIdRef = useRef<WalletConnectorId | undefined>(undefined)
   const walletStatusRef = useRef<WalletStatus>("disconnected")
@@ -912,29 +913,39 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   ])
 
   const startTx = useCallback((label?: string) => {
+    const startedAt = Date.now()
     currentTxLabelRef.current = label
+    currentTxStartedAtRef.current = startedAt
     recordTxDiagnostic({
       phase: "start",
       label,
       connectorId,
       accountAddress: account?.address
     })
-    setTxState({ status: "pending", label, startedAt: Date.now() })
+    setTxState({ status: "pending", label, startedAt })
   }, [account?.address, connectorId])
 
   const finishTx = useCallback((hash?: string) => {
+    const durationMs = currentTxStartedAtRef.current
+      ? Date.now() - currentTxStartedAtRef.current
+      : undefined
     recordTxDiagnostic({
       phase: "success",
       label: currentTxLabelRef.current,
       connectorId,
       accountAddress: account?.address,
-      txHash: hash
+      txHash: hash,
+      durationMs
     })
     currentTxLabelRef.current = undefined
+    currentTxStartedAtRef.current = undefined
     setTxState({ status: "success", hash })
   }, [account?.address, connectorId])
 
   const failTx = useCallback((err?: unknown) => {
+    const durationMs = currentTxStartedAtRef.current
+      ? Date.now() - currentTxStartedAtRef.current
+      : undefined
     const classified = classifyTxError(err, "Transaction failed")
     recordTxDiagnostic({
       phase: "failure",
@@ -943,9 +954,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       accountAddress: account?.address,
       category: classified.category,
       message: classified.userMessage,
-      rawMessage: classified.rawMessage
+      rawMessage: classified.rawMessage,
+      durationMs
     })
     currentTxLabelRef.current = undefined
+    currentTxStartedAtRef.current = undefined
     setTxState({ status: "error", error: classified.userMessage })
   }, [account?.address, connectorId])
 

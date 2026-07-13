@@ -1,12 +1,33 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import { nodePolyfills } from "vite-plugin-node-polyfills"
+import { execFileSync } from "node:child_process"
+
+const getGitRelease = () => {
+  try {
+    return execFileSync("git", ["rev-parse", "--short=12", "HEAD"], {
+      encoding: "utf8",
+      windowsHide: true
+    }).trim()
+  } catch {
+    return "local"
+  }
+}
+
+const appRelease =
+  process.env.VITE_APP_RELEASE?.trim() ||
+  process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+  getGitRelease()
 
 const hasPackage = (id: string, pkg: string) =>
   id.includes(`/node_modules/${pkg}/`) || id.includes(`\\node_modules\\${pkg}\\`)
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __BURRITO_RELEASE__: JSON.stringify(appRelease)
+  },
   plugins: [
     react(),
     nodePolyfills({
@@ -19,6 +40,7 @@ export default defineConfig({
     })
   ],
   build: {
+    manifest: true,
     minify: "terser",
     rollupOptions: {
       output: {

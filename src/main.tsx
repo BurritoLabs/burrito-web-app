@@ -23,7 +23,9 @@ const shouldRetryQuery = (failureCount: number, error: unknown) => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
       retry: shouldRetryQuery
     }
   }

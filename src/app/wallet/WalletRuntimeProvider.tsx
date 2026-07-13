@@ -1,4 +1,4 @@
-import { ChainProvider } from "@cosmos-kit/react"
+import { ChainProvider } from "@cosmos-kit/react-lite"
 import type { ReactNode } from "react"
 import { WalletProvider } from "./WalletProvider"
 import {

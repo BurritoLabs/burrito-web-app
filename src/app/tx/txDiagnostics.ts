@@ -1,4 +1,5 @@
 import { getActiveAppChainKey } from "../activeChain"
+import { CHAIN_RUNTIME_CONFIG } from "../config/chainConfig"
 
 const TX_DIAGNOSTICS_STORAGE_KEY = "burrito:tx-diagnostics:v1"
 const MAX_STORED_TX_DIAGNOSTICS = 50
@@ -30,6 +31,7 @@ export type TxDiagnosticEvent = {
   rawMessage?: string
   gasUsed?: string | number
   gasWanted?: string | number
+  durationMs?: number
 }
 
 export type StoredTxDiagnosticEvent = TxDiagnosticEvent & {
@@ -40,10 +42,15 @@ export type StoredTxDiagnosticEvent = TxDiagnosticEvent & {
 const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
   if (!TX_DIAGNOSTICS_ENDPOINT || typeof window === "undefined") return
 
+  const chainKey = getActiveAppChainKey()
   const payload = JSON.stringify({
     version: 1,
-    chainKey: getActiveAppChainKey(),
+    release: __BURRITO_RELEASE__,
+    chainKey,
+    chainId: CHAIN_RUNTIME_CONFIG[chainKey].chain.chainId,
     path: window.location.pathname,
+    online: window.navigator.onLine,
+    visibilityState: document.visibilityState,
     phase: event.phase,
     label: event.label,
     connectorId: event.connectorId,
@@ -51,6 +58,7 @@ const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
     message: event.message?.slice(0, 300),
     gasUsed: event.gasUsed,
     gasWanted: event.gasWanted,
+    durationMs: event.durationMs,
     at: event.at
   })
 
@@ -307,12 +315,18 @@ export const getStoredTxDiagnostics = () => {
 
 export const buildTxDiagnosticsReport = (limit = 8) => {
   const events = getStoredTxDiagnostics().slice(0, limit)
+  const chainKey = getActiveAppChainKey()
   const context =
     typeof window === "undefined"
       ? {}
       : {
+          release: __BURRITO_RELEASE__,
+          chainKey,
+          chainId: CHAIN_RUNTIME_CONFIG[chainKey].chain.chainId,
           path: window.location.pathname,
-          userAgent: window.navigator.userAgent
+          userAgent: window.navigator.userAgent,
+          online: window.navigator.onLine,
+          visibilityState: document.visibilityState
         }
 
   return JSON.stringify(

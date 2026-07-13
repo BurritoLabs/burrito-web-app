@@ -23,6 +23,7 @@ import {
   isTxAlreadyInCacheError,
   parseSequenceMismatchExpected
 } from "../tx/txDiagnostics"
+import { runSerializedTransaction } from "../tx/transactionQueue"
 
 type EncodeObjectLike = {
   typeUrl: string
@@ -279,71 +280,86 @@ const connectClassicClientWithFallback = async (
       withEndpointFallback((activeClient) =>
         activeClient.simulate(signerAddress, messages, memo)
       ),
-    signAndBroadcast: async (signerAddress, messages, fee, memo = "") => {
-      if (fee === "auto") {
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          try {
-            return await withEndpointFallback(async (activeClient) =>
-              ensureBroadcastSuccess(
-                await activeClient.signAndBroadcast(signerAddress, messages, fee, memo)
+    signAndBroadcast: (signerAddress, messages, fee, memo = "") =>
+      runSerializedTransaction(
+        `${runtime.chain.chainId}:${signerAddress}`,
+        async () => {
+          if (fee === "auto") {
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              try {
+                return await withEndpointFallback(async (activeClient) =>
+                  ensureBroadcastSuccess(
+                    await activeClient.signAndBroadcast(
+                      signerAddress,
+                      messages,
+                      fee,
+                      memo
+                    )
+                  )
+                )
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error)
+                const expectedSequence = parseSequenceMismatchExpected(message)
+                if (expectedSequence !== undefined && attempt < 2) {
+                  await waitBeforeSequenceRetry()
+                  continue
+                }
+                throw error
+              }
+            }
+
+            throw new Error("Classic transaction broadcast failed")
+          }
+
+          let sequenceHint: number | undefined
+
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            try {
+              let signingClient = client
+              const { accountNumber, sequence } = await withEndpointFallback(
+                async (activeClient) => {
+                  signingClient = activeClient
+                  return activeClient.getSequence(signerAddress)
+                }
               )
-            )
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
-            const expectedSequence = parseSequenceMismatchExpected(message)
-            if (expectedSequence !== undefined && attempt < 2) {
-              await waitBeforeSequenceRetry()
-              continue
+              const txRaw = await signingClient.sign(
+                signerAddress,
+                messages,
+                fee,
+                memo,
+                {
+                  accountNumber,
+                  sequence: sequenceHint ?? sequence,
+                  chainId: runtime.chain.chainId
+                }
+              )
+              const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
+              try {
+                const result = await withEndpointFallback(async (activeClient) =>
+                  ensureBroadcastSuccess(await activeClient.broadcastTx(txBytes))
+                )
+                return result
+              } catch (broadcastError) {
+                if (isTxAlreadyInCacheError(broadcastError)) {
+                  return createAlreadySubmittedResult(txBytes)
+                }
+                throw broadcastError
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error)
+              const expectedSequence = parseSequenceMismatchExpected(message)
+              if (expectedSequence !== undefined && attempt < 2) {
+                sequenceHint = expectedSequence
+                await waitBeforeSequenceRetry()
+                continue
+              }
+              throw error
             }
-            throw error
           }
+
+          throw new Error("Classic transaction broadcast failed")
         }
-
-        throw new Error("Classic transaction broadcast failed")
-      }
-
-      let sequenceHint: number | undefined
-
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          let signingClient = client
-          const { accountNumber, sequence } = await withEndpointFallback(
-            async (activeClient) => {
-              signingClient = activeClient
-              return activeClient.getSequence(signerAddress)
-            }
-          )
-          const txRaw = await signingClient.sign(signerAddress, messages, fee, memo, {
-            accountNumber,
-            sequence: sequenceHint ?? sequence,
-            chainId: runtime.chain.chainId
-          })
-          const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
-          try {
-            const result = await withEndpointFallback(async (activeClient) =>
-              ensureBroadcastSuccess(await activeClient.broadcastTx(txBytes))
-            )
-            return result
-          } catch (broadcastError) {
-            if (isTxAlreadyInCacheError(broadcastError)) {
-              return createAlreadySubmittedResult(txBytes)
-            }
-            throw broadcastError
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          const expectedSequence = parseSequenceMismatchExpected(message)
-          if (expectedSequence !== undefined && attempt < 2) {
-            sequenceHint = expectedSequence
-            await waitBeforeSequenceRetry()
-            continue
-          }
-          throw error
-        }
-      }
-
-      throw new Error("Classic transaction broadcast failed")
-    },
+      ),
     getSequence: (address) =>
       withEndpointFallback((activeClient) => activeClient.getSequence(address)),
     sign: (signerAddress, messages, fee, memo, signerData) =>

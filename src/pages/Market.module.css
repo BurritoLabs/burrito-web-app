@@ -414,6 +414,8 @@
 }
 
 .poolCardLink {
+  content-visibility: auto;
+  contain-intrinsic-size: 190px;
   display: block;
   color: inherit;
   text-decoration: none;

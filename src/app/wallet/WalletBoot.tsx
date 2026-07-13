@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react"
@@ -24,6 +25,7 @@ import {
   rememberWalletManualDisconnect
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
+import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 
 const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
 
@@ -95,6 +97,8 @@ const WalletFallbackProvider = ({
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const [walletPreparingForTx, setWalletPreparingForTx] = useState(false)
+  const currentTxLabelRef = useRef<string | undefined>(undefined)
+  const currentTxStartedAtRef = useRef<number | undefined>(undefined)
   const connectors = useMemo(() => getFallbackConnectors(), [])
 
   const reconnectConnector = useCallback(
@@ -217,6 +221,67 @@ const WalletFallbackProvider = ({
     }
   }, [connectorId, connectors, reconnectConnector])
 
+  const startTx = useCallback(
+    (label?: string) => {
+      const startedAt = Date.now()
+      currentTxLabelRef.current = label
+      currentTxStartedAtRef.current = startedAt
+      recordTxDiagnostic({
+        phase: "start",
+        label,
+        connectorId,
+        accountAddress: account?.address
+      })
+      setTxState({ status: "pending", label, startedAt })
+    },
+    [account?.address, connectorId]
+  )
+
+  const finishTx = useCallback(
+    (hash?: string) => {
+      const durationMs = currentTxStartedAtRef.current
+        ? Date.now() - currentTxStartedAtRef.current
+        : undefined
+      recordTxDiagnostic({
+        phase: "success",
+        label: currentTxLabelRef.current,
+        connectorId,
+        accountAddress: account?.address,
+        txHash: hash,
+        durationMs
+      })
+      currentTxLabelRef.current = undefined
+      currentTxStartedAtRef.current = undefined
+      setTxState({ status: "success", hash })
+    },
+    [account?.address, connectorId]
+  )
+
+  const failTx = useCallback(
+    (txError?: unknown) => {
+      const classified = classifyTxError(txError, "Transaction failed")
+      const durationMs = currentTxStartedAtRef.current
+        ? Date.now() - currentTxStartedAtRef.current
+        : undefined
+      recordTxDiagnostic({
+        phase: "failure",
+        label: currentTxLabelRef.current,
+        connectorId,
+        accountAddress: account?.address,
+        category: classified.category,
+        message: classified.userMessage,
+        rawMessage: classified.rawMessage,
+        durationMs
+      })
+      currentTxLabelRef.current = undefined
+      currentTxStartedAtRef.current = undefined
+      setTxState({ status: "error", error: classified.userMessage })
+    },
+    [account?.address, connectorId]
+  )
+
+  const clearTx = useCallback(() => setTxState({ status: "idle" }), [])
+
   const value = useMemo<WalletContextValue>(
     () => ({
       status,
@@ -230,27 +295,10 @@ const WalletFallbackProvider = ({
       disconnect,
       prepareWalletForTx,
       txState,
-      startTx: (label?: string) =>
-        setTxState({
-          status: "pending",
-          label,
-          startedAt: Date.now()
-        }),
-      finishTx: (hash?: string) =>
-        setTxState((current) => ({
-          status: "success",
-          hash,
-          label: current.label,
-          startedAt: current.startedAt
-        })),
-      failTx: (txError?: unknown) =>
-        setTxState((current) => ({
-          status: "error",
-          label: current.label,
-          error: txError instanceof Error ? txError.message : String(txError ?? ""),
-          startedAt: current.startedAt
-        })),
-      clearTx: () => setTxState({ status: "idle" })
+      startTx,
+      finishTx,
+      failTx,
+      clearTx
     }),
     [
       account,
@@ -259,7 +307,11 @@ const WalletFallbackProvider = ({
       connectors,
       disconnect,
       error,
+      clearTx,
+      failTx,
+      finishTx,
       prepareWalletForTx,
+      startTx,
       status,
       txState,
       walletPreparingForTx

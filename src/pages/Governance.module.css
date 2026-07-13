@@ -149,6 +149,8 @@
 }
 
 .proposalLink {
+  content-visibility: auto;
+  contain-intrinsic-size: 180px;
   text-decoration: none;
   color: inherit;
   height: 100%;
