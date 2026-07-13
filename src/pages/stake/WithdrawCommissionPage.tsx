@@ -11,7 +11,6 @@ import {
   type CoinBalance
 } from "../../app/data/classic"
 import { formatTokenAmount } from "../../app/utils/format"
-import { buildClassicNativeIconCandidates, buildIbcAssetIconCandidates } from "../../app/utils/assetIcons"
 import { convertBech32Prefix } from "../../app/utils/bech32"
 import { formatTxError } from "../../app/utils/txError"
 import {
@@ -20,38 +19,10 @@ import {
   WITHDRAW_SUBMIT_GAS_ADJUSTMENT,
   buildWithdrawTxFee
 } from "../../app/stake/withdrawTx"
-
-const toSymbol = (denom: string) => {
-  if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
-    return CLASSIC_DENOMS.lunc.coinDenom
-  }
-  if (denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) {
-    return CLASSIC_DENOMS.ustc.coinDenom
-  }
-  if (denom.startsWith("u")) {
-    const base = denom.slice(1)
-    if (base.length === 3) {
-      return `${base.slice(0, 2).toUpperCase()}TC`
-    }
-    return base.toUpperCase()
-  }
-  if (denom.startsWith("ibc/")) {
-    return `IBC/${denom.slice(4, 8).toUpperCase()}`
-  }
-  return denom.toUpperCase()
-}
-
-const formatDenom = (denom: string, isClassic?: boolean) => {
-  if (!denom) return ""
-  if (denom.startsWith("u")) {
-    const f = denom.slice(1)
-    if (f.length > 3) {
-      return f === "luna" ? (isClassic ? "LUNC" : "Luna") : f.toUpperCase()
-    }
-    return f.slice(0, 2).toUpperCase() + `T${isClassic ? "C" : ""}`
-  }
-  return denom
-}
+import {
+  buildCommissionIconCandidates,
+  getCommissionSymbol
+} from "./commissionAssets"
 
 const formatCommission = (coin: CoinBalance) => {
   const raw = String(coin.amount ?? "0").split(".")[0]
@@ -65,19 +36,6 @@ const parseCoinAmount = (amount?: string) => {
   } catch {
     return 0n
   }
-}
-
-const buildIconCandidates = (denom: string) => {
-  if (denom.startsWith("ibc/")) {
-    return buildIbcAssetIconCandidates([], "/system/ibc.svg")
-  }
-
-  const classicSymbol = formatDenom(denom, true)
-  return buildClassicNativeIconCandidates({
-    denom,
-    symbol: classicSymbol,
-    fallback: "/system/cw20.svg"
-  })
 }
 
 const TokenIconInner = ({
@@ -131,7 +89,7 @@ const WithdrawCommission = () => {
     finishTx,
     failTx
   } = useWallet()
-  const { chain } = useAppChain()
+  const { chain, chainKey } = useAppChain()
   const gasPrice = chain.runtime.gasPriceStep.average
   const feeDenomOptions = chain.runtime.feeDenoms
   const [feeDenom, setFeeDenom] = useState<string>(chain.nativeDenom)
@@ -303,7 +261,7 @@ const WithdrawCommission = () => {
   }
 
   const moniker = validator?.description?.moniker?.trim() || "Validator"
-  const feeSymbol = toSymbol(feeDenom)
+  const feeSymbol = getCommissionSymbol(feeDenom, chainKey)
 
   return (
     <PageShell title="Withdraw commission" backTo="/stake" backLabel="">
@@ -328,10 +286,13 @@ const WithdrawCommission = () => {
                   <div className={styles.commissionRow} key={coin.denom}>
                     <div className={styles.commissionLeft}>
                       <TokenIcon
-                        symbol={toSymbol(coin.denom)}
-                        candidates={buildIconCandidates(coin.denom)}
+                        symbol={getCommissionSymbol(coin.denom, chainKey)}
+                        candidates={buildCommissionIconCandidates(
+                          coin.denom,
+                          chainKey
+                        )}
                       />
-                      <span>{toSymbol(coin.denom)}</span>
+                      <span>{getCommissionSymbol(coin.denom, chainKey)}</span>
                     </div>
                     <strong>{formatCommission(coin)}</strong>
                   </div>
