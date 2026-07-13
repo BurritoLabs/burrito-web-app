@@ -59,7 +59,7 @@ describe("chain-specific market registry", () => {
 
     const pairs = await fetchMarketDexPairs()
 
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
     expect(pairs.map((pair) => pair.pair)).toEqual([
       "terra1lunapair",
       "terra1phoenixpair",

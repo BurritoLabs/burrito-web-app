@@ -54,6 +54,12 @@ describe("chain-specific launchpad configuration", () => {
     expect(getTerraswapFactoryAddress()).toBe(
       "terra1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqxl5qul"
     )
+    expect(config.lpLockerAddress).toBe(
+      "terra1zs54uanqzwh2y4a6z9xlzawjyjp3tddd99ad0h58ghr5yh2fdfjq95gmcv"
+    )
+    expect(config.registryAddress).toBe(
+      "terra1wlfv0q9hye0x0tpd8844c0cmnaz7893x50h2z9q7897d6mjw0w3st4xj5f"
+    )
     expect(buildLuncPairAssetInfos("terra1token")[1]).toEqual({
       native_token: { denom: "uluna" }
     })

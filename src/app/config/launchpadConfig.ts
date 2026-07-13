@@ -12,6 +12,10 @@ const parsePositiveAmount = (value: string | undefined, fallback: number) => {
 }
 
 const FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
+const LUNA_LP_LOCKER_ADDRESS =
+  "terra1zs54uanqzwh2y4a6z9xlzawjyjp3tddd99ad0h58ghr5yh2fdfjq95gmcv"
+const LUNA_LAUNCH_REGISTRY_ADDRESS =
+  "terra1wlfv0q9hye0x0tpd8844c0cmnaz7893x50h2z9q7897d6mjw0w3st4xj5f"
 
 const classicCreationFee = parsePositiveAmount(
   import.meta.env.VITE_LUNC_LAUNCHPAD_CREATION_FEE,
@@ -57,10 +61,12 @@ const launchpadConfigs = {
     terraswapFactoryAddress:
       "terra1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqxl5qul",
     lpLockerAddress: parseTerraAddress(
-      import.meta.env.VITE_LUNA_LAUNCHPAD_LP_LOCKER_ADDRESS
+      import.meta.env.VITE_LUNA_LAUNCHPAD_LP_LOCKER_ADDRESS ||
+        LUNA_LP_LOCKER_ADDRESS
     ),
     registryAddress: parseTerraAddress(
-      import.meta.env.VITE_LUNA_LAUNCHPAD_REGISTRY_ADDRESS
+      import.meta.env.VITE_LUNA_LAUNCHPAD_REGISTRY_ADDRESS ||
+        LUNA_LAUNCH_REGISTRY_ADDRESS
     )
   }
 } as const
