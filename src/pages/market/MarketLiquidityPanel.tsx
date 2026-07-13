@@ -25,6 +25,8 @@ import {
 } from "../../app/utils/assetIcons"
 import { formatTxError } from "../../app/utils/txError"
 import { truncateHash } from "../../app/utils/format"
+import { getTxExplorerUrl } from "../../app/explorer"
+import { useAppChain } from "../../app/appChainContext"
 import { useWallet } from "../../app/wallet/WalletContext"
 import {
   connectClassicSigningClientForConnector,
@@ -270,6 +272,7 @@ const MarketLiquidityPanel = ({
   tokenIconCandidates = EMPTY_ICON_CANDIDATES,
   tokenSymbol: fallbackTokenSymbol = "TOKEN"
 }: MarketLiquidityPanelProps) => {
+  const { chainKey } = useAppChain()
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const queryClient = useQueryClient()
   const [tokenAmount, setTokenAmount] = useState("")
@@ -1299,7 +1302,7 @@ const MarketLiquidityPanel = ({
           {provideTxHash ? (
             <a
               className={styles.liquidityTxLink}
-              href={`https://finder.burrito.money/classic/tx/${provideTxHash}`}
+              href={getTxExplorerUrl(chainKey, provideTxHash)}
               target="_blank"
               rel="noreferrer"
             >
@@ -1438,7 +1441,7 @@ const MarketLiquidityPanel = ({
           {withdrawTxHash ? (
             <a
               className={styles.liquidityTxLink}
-              href={`https://finder.burrito.money/classic/tx/${withdrawTxHash}`}
+              href={getTxExplorerUrl(chainKey, withdrawTxHash)}
               target="_blank"
               rel="noreferrer"
             >

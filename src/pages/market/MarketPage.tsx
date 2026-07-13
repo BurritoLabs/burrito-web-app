@@ -17,7 +17,10 @@ import {
 } from "../../app/data/terraAssets"
 import { useCw20Supplies } from "../../app/data/cw20"
 import { fetchPrices } from "../../app/data/classic"
-import { fetchCirculatingSnapshot } from "../../app/data/dashboard"
+import {
+  fetchCirculatingSnapshot,
+  fetchCurrentPhoenixDashboardSnapshot
+} from "../../app/data/dashboard"
 import { useDexEstimatedPrices } from "../../app/data/dexPrices"
 import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
 import { formatNumber, formatPercent, formatUsd, toUnitAmount } from "../../app/utils/format"
@@ -38,6 +41,7 @@ import {
 } from "../../app/utils/numberDisplay"
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
+import { useAppChain } from "../../app/appChainContext"
 
 type SortMetric = "change" | "volume" | "liquidity" | "marketCap"
 type SortDirection = "desc" | "asc"
@@ -47,6 +51,7 @@ type DexFilter =
   | "terraswap"
   | "terraport"
   | "astroport"
+  | "phoenix"
   | "garuda"
   | "white-whale"
   | "luncswap"
@@ -107,6 +112,7 @@ const DEX_FILTER_OPTIONS: Array<{ value: DexFilter; label: string }> = [
   { value: "terraport", label: "Terraport" },
   { value: "terraswap", label: "Terraswap" },
   { value: "astroport", label: "Astroport" },
+  { value: "phoenix", label: "Phoenix" },
   { value: "garuda", label: "Garuda" },
   { value: "white-whale", label: "White Whale" },
   { value: "luncswap", label: "LUNCSwap" },
@@ -156,6 +162,7 @@ const getDexFilterBucket = (card: Pick<MarketCard, "dexId" | "dexLabel">): DexFi
   if (value.includes("terraport")) return "terraport"
   if (value.includes("terraswap")) return "terraswap"
   if (value.includes("astroport")) return "astroport"
+  if (value.includes("phoenix")) return "phoenix"
   if (value.includes("garuda")) return "garuda"
   if (value.includes("white whale") || value.includes("white-whale")) {
     return "white-whale"
@@ -316,6 +323,7 @@ const AssetIconInner = ({
 
 const Market = () => {
   const location = useLocation()
+  const { chain, chainKey } = useAppChain()
   const [search, setSearch] = useState("")
   const [sortMetric, setSortMetric] = useState<SortMetric>("liquidity")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
@@ -328,14 +336,19 @@ const Market = () => {
   const sortMenuRef = useRef<HTMLDivElement | null>(null)
 
   const { data: pairs = [], isLoading: isPairsLoading } = useQuery({
-    queryKey: ["market", "pairs"],
+    queryKey: ["market", chain.chainId, "pairs"],
     queryFn: fetchMarketDexPairs,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000
   })
 
   const { data: pools = [], isLoading: isPoolsLoading } = useQuery({
-    queryKey: ["market", "pools", pairs.map((pair) => pair.pair).join(",")],
+    queryKey: [
+      "market",
+      chain.chainId,
+      "pools",
+      pairs.map((pair) => pair.pair).join(",")
+    ],
     queryFn: () => fetchMarketPools(pairs),
     enabled: pairs.length > 0,
     staleTime: 2 * 60 * 1000,
@@ -369,15 +382,19 @@ const Market = () => {
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist()
 
   const { data: prices } = useQuery({
-    queryKey: ["prices"],
+    queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
   })
+  const nativePrice = chainKey === "luna" ? prices?.luna : prices?.lunc
 
   const { data: dashboardSnapshot } = useQuery({
-    queryKey: ["dashboard", "circulating", "market"],
-    queryFn: fetchCirculatingSnapshot,
+    queryKey: ["dashboard", chain.chainId, "circulating", "market"],
+    queryFn: () =>
+      chainKey === "luna"
+        ? fetchCurrentPhoenixDashboardSnapshot()
+        : fetchCirculatingSnapshot(),
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000
   })
@@ -479,35 +496,35 @@ const Market = () => {
         seedAssetIds: ["native:uluna", "native:uusd"],
         getDecimals: (assetId) => resolveAsset(assetId).decimals,
         getSeedUsdPrice: (_assetId, normalizedKey) => {
-          if (normalizedKey === "uluna") return prices?.lunc?.usd
+          if (normalizedKey === "uluna") return nativePrice?.usd
           if (normalizedKey === "uusd") return prices?.ustc?.usd
           return undefined
         }
       }),
-    [pools, prices?.lunc?.usd, prices?.ustc?.usd, resolveAsset]
+    [nativePrice?.usd, pools, prices?.ustc?.usd, resolveAsset]
   )
 
   const getAssetUsdPrice = useCallback(
     (asset: ResolvedAsset) => {
-      if (asset.isLunc) return prices?.lunc?.usd
+      if (asset.isLunc) return nativePrice?.usd
       if (asset.isUstc) return prices?.ustc?.usd
       const graphUsdPrice = poolGraphUsdPrices[asset.key]
       if (graphUsdPrice !== undefined) return graphUsdPrice
       const estimate = dexEstimatedPrices?.[asset.key]
       if (!estimate) return undefined
-      const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : prices?.lunc?.usd
+      const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : nativePrice?.usd
       if (quoteUsd === undefined) return undefined
       return estimate.priceInQuote * quoteUsd
     },
-    [dexEstimatedPrices, poolGraphUsdPrices, prices?.lunc?.usd, prices?.ustc?.usd]
+    [dexEstimatedPrices, nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
   )
 
   const getAssetChange = useCallback(
     (asset: ResolvedAsset, tf: Timeframe) => {
       if (asset.isLunc) {
-        if (tf === "1h") return prices?.lunc?.usd_1h_change
-        if (tf === "7d") return prices?.lunc?.usd_7d_change
-        return prices?.lunc?.usd_24h_change
+        if (tf === "1h") return nativePrice?.usd_1h_change
+        if (tf === "7d") return nativePrice?.usd_7d_change
+        return nativePrice?.usd_24h_change
       }
       if (asset.isUstc) {
         if (tf === "1h") return prices?.ustc?.usd_1h_change
@@ -516,7 +533,7 @@ const Market = () => {
       }
       return undefined
     },
-    [prices]
+    [nativePrice, prices]
   )
 
   const buildMarketCard = useCallback(
@@ -568,7 +585,7 @@ const Market = () => {
       const priceUsd = priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined
       const marketCapUsd =
         priceBase.isLunc
-          ? (prices?.lunc?.usd_market_cap ??
+          ? (nativePrice?.usd_market_cap ??
             (priceUsd !== undefined && dashboardSnapshot?.circulatingLunc
               ? priceUsd * dashboardSnapshot.circulatingLunc
               : undefined))
@@ -604,7 +621,7 @@ const Market = () => {
     [
       dashboardSnapshot,
       getAssetUsdPrice,
-      prices?.lunc?.usd_market_cap,
+      nativePrice?.usd_market_cap,
       prices?.ustc?.usd_market_cap,
       resolveAsset
     ]
@@ -665,6 +682,7 @@ const Market = () => {
   const { data: nativeSupplies = {} } = useQuery({
     queryKey: [
       "native-supplies",
+      chain.chainId,
       nativeSupplyDenoms.map((entry) => `${entry.denom}:${entry.decimals}`).join("|")
     ],
     queryFn: () => fetchNativeSupplies(nativeSupplyDenoms),
@@ -679,9 +697,9 @@ const Market = () => {
       // Do not override CW20 pairs just because quote side is LUNC/USTC.
       if (card.priceBase.isLunc) {
         return (
-          prices?.lunc?.usd_market_cap ??
-          (prices?.lunc?.usd !== undefined && dashboardSnapshot?.circulatingLunc
-            ? prices.lunc.usd * dashboardSnapshot.circulatingLunc
+          nativePrice?.usd_market_cap ??
+          (nativePrice?.usd !== undefined && dashboardSnapshot?.circulatingLunc
+            ? nativePrice.usd * dashboardSnapshot.circulatingLunc
             : undefined)
         )
       }
@@ -707,7 +725,7 @@ const Market = () => {
       if (supply === undefined) return undefined
       return supply * card.priceUsd
     },
-    [cw20Supplies, dashboardSnapshot, nativeSupplies, prices]
+    [cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
   )
 
   const getPairChange = useCallback(
@@ -817,7 +835,12 @@ const Market = () => {
     .join("|")
 
   const { data: liveVisiblePools = [] } = useQuery({
-    queryKey: ["market", "visible-pools-live", liveRefreshKey],
+    queryKey: [
+      "market",
+      chain.chainId,
+      "visible-pools-live",
+      liveRefreshKey
+    ],
     queryFn: async () => {
       const rows = await Promise.all(
         liveRefreshCards.map((card) =>

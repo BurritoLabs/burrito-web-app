@@ -206,6 +206,17 @@
   background: rgba(82, 196, 26, 0.22);
 }
 
+.retryButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 20px;
+}
+
 .messagePrimary {
   display: inline-flex;
   font-size: var(--font-size);

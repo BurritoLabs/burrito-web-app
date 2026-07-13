@@ -1,9 +1,13 @@
 import { useMemo, type ReactNode } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import PageShell from "../PageShell"
 import styles from "../History.module.css"
 import { useWallet } from "../../app/wallet/WalletContext"
-import { fetchTxs, fetchValidators, fetchContractInfo } from "../../app/data/classic"
+import {
+  fetchContractInfo,
+  fetchTxHistoryPage,
+  fetchValidators
+} from "../../app/data/classic"
 import type { CoinBalance, TxItem, ValidatorItem } from "../../app/data/classic"
 import {
   useCw20Contracts,
@@ -439,13 +443,24 @@ const History = () => {
     [actionRuleSet]
   )
   const {
-    data: txs = [],
+    data: txPages,
     isError: isTxError,
     isLoading,
-    refetch: refetchTxs
-  } = useQuery({
+    refetch: refetchTxs,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery({
     queryKey: ["txs", chain.chainId, account?.address],
-    queryFn: () => fetchTxs(account?.address ?? "", HISTORY_TX_LIMIT),
+    queryFn: ({ pageParam }) =>
+      fetchTxHistoryPage(
+        account?.address ?? "",
+        pageParam,
+        HISTORY_TX_LIMIT
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.page + 1 : undefined,
     enabled: Boolean(account?.address),
     retry: 3,
     retryDelay: retryBackoff,
@@ -453,6 +468,20 @@ const History = () => {
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false
   })
+
+  const txs = useMemo(() => {
+    const merged = new Map<string, TxItem>()
+    txPages?.pages.forEach((page) => {
+      page.items.forEach((tx) => {
+        if (tx.txhash && !merged.has(tx.txhash)) {
+          merged.set(tx.txhash, tx)
+        }
+      })
+    })
+    return Array.from(merged.values()).sort(
+      (a, b) => Number(b.height ?? 0) - Number(a.height ?? 0)
+    )
+  }, [txPages?.pages])
 
   const contractCandidates = useMemo(() => collectContractCandidates(txs), [txs])
   const relevantCw20Contracts = useMemo(
@@ -709,7 +738,8 @@ const History = () => {
               </div>
             </div>
           ) : (
-              items.map((item) => (
+            <>
+              {items.map((item) => (
                 <div key={item.hash} className={`card ${styles.card}`}>
                   <div className={styles.header}>
                     <div className={styles.hash}>
@@ -795,7 +825,20 @@ const History = () => {
                   ) : null}
                 </div>
               </div>
-            ))
+              ))}
+              {hasNextPage ? (
+                <div className={styles.loadMoreRow}>
+                  <button
+                    className={styles.retryButton}
+                    type="button"
+                    disabled={isFetchingNextPage}
+                    onClick={() => void fetchNextPage()}
+                  >
+                    {isFetchingNextPage ? "Loading..." : "Load more"}
+                  </button>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </div>

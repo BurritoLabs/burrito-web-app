@@ -4,7 +4,7 @@ import {
   isLaunchRegistryConfigured
 } from "../launchpad/registry"
 import {
-  HEXXAGON_DEX_PAIRS_URL,
+  ASSET_DEX_PAIRS_URL,
   LOCAL_MARKET_CANDLES_BASE_URL,
   LOCAL_MARKET_INDEX_URL
 } from "../config/externalServices"
@@ -15,10 +15,9 @@ import {
 import { queryContractSmart } from "./classic"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
-import { parseCommonJsArray } from "../utils/cjsRegistry"
+import { pickChainAssets } from "./terraAssets"
 
-type HexxagonDexPair = {
-  token?: string
+type AssetDexPair = {
   dex?: string
   type?: string
   assets?: string[]
@@ -196,7 +195,11 @@ type CodeContractsResponse = {
 const FACTORY_PAIR_CACHE_TTL = 30 * 60 * 1000
 const LOCAL_INDEX_CACHE_TTL = 5 * 60 * 1000
 let factoryPairDexCache:
-  | { at: number; map: Map<string, { dexId: string; dexLabel: string }> }
+  | {
+      at: number
+      chainId: string
+      map: Map<string, { dexId: string; dexLabel: string }>
+    }
   | null = null
 let factoryPairDexInFlight:
   | Promise<Map<string, { dexId: string; dexLabel: string }>>
@@ -235,8 +238,6 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> =>
       .then(resolve, reject)
       .finally(() => globalThis.clearTimeout(timeoutId))
   })
-
-const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
 
 const normalizeAssetKey = (value: string) => {
   if (!value) return value
@@ -728,10 +729,6 @@ const ACTIVE_DEX_LABEL_BY_ID = new Map(
   CLASSIC_SWAP_DEXES.map((dex) => [dex.id.toLowerCase(), dex.label])
 )
 
-const ACTIVE_DEX_IDS = new Set(
-  CLASSIC_SWAP_DEXES.map((dex) => normalizeDexName(dex.id))
-)
-
 const pickDexLabel = (dexId: string) => {
   const direct = ACTIVE_DEX_LABEL_BY_ID.get(dexId.toLowerCase())
   if (direct) return direct
@@ -1033,6 +1030,7 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
 }
 
 const fetchLocalMarketIndex = async () => {
+  if (CLASSIC_CHAIN.chainId !== "columbus-5") return null
   if (localMarketIndexCache && Date.now() - localMarketIndexCache.at < LOCAL_INDEX_CACHE_TTL) {
     return localMarketIndexCache
   }
@@ -1058,6 +1056,7 @@ const fetchLocalMarketIndex = async () => {
 }
 
 const fetchLaunchpadMarketPairs = async (): Promise<MarketDexPair[]> => {
+  if (CLASSIC_CHAIN.chainId !== "columbus-5") return []
   if (!isLaunchRegistryConfigured) return []
 
   try {
@@ -1149,6 +1148,7 @@ const fetchPairCandlesFromLocal = async ({
   maxCandles: number
   minLatestBucketStart?: number
 }) => {
+  if (CLASSIC_CHAIN.chainId !== "columbus-5") return null
   const payload = await loadLocalPairCandlesFile(pairAddress)
   if (!payload?.candles) return null
 
@@ -1291,6 +1291,7 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
 
 const fetchPairDexMapFromFactories = async () => {
   const map = new Map<string, { dexId: string; dexLabel: string }>()
+  if (CLASSIC_CHAIN.chainId !== "columbus-5") return map
   await Promise.all(
     CLASSIC_SWAP_DEXES.map(async (dex) => {
       const pairs = await loadFactoryPairsForDex(dex)
@@ -1303,14 +1304,20 @@ const fetchPairDexMapFromFactories = async () => {
 }
 
 const getPairDexMap = async () => {
-  if (factoryPairDexCache && Date.now() - factoryPairDexCache.at < FACTORY_PAIR_CACHE_TTL) {
+  const chainId = CLASSIC_CHAIN.chainId
+  if (chainId !== "columbus-5") return new Map()
+  if (
+    factoryPairDexCache &&
+    factoryPairDexCache.chainId === chainId &&
+    Date.now() - factoryPairDexCache.at < FACTORY_PAIR_CACHE_TTL
+  ) {
     return factoryPairDexCache.map
   }
   if (factoryPairDexInFlight) return factoryPairDexInFlight
 
   factoryPairDexInFlight = fetchPairDexMapFromFactories()
     .then((map) => {
-      factoryPairDexCache = { at: Date.now(), map }
+      factoryPairDexCache = { at: Date.now(), chainId, map }
       return map
     })
     .finally(() => {
@@ -1329,24 +1336,27 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
     return mergeMarketPairs(local.pairs, launchpadPairs)
   }
 
-  const response = await fetch(HEXXAGON_DEX_PAIRS_URL)
+  const response = await fetch(ASSET_DEX_PAIRS_URL)
   if (!response.ok) {
     throw new Error(`Failed to load DEX pairs: ${response.status}`)
   }
 
-  const source = await response.text()
-  const payload = parseCommonJsArray<HexxagonDexPair>(source, "hexxagon CJS")
+  const registry = (await response.json()) as Record<
+    string,
+    Record<string, AssetDexPair>
+  >
+  const payload =
+    pickChainAssets(registry, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
 
-  const externalPairs = payload
-    .filter((item) => {
-      if (!item?.token || !item?.dex || !item?.assets || item.assets.length < 2) {
+  const externalPairs = Object.entries(payload)
+    .filter(([pair, item]) => {
+      if (!pair || !item?.dex || !item?.assets || item.assets.length < 2) {
         return false
       }
-      const rootDex = normalizeDexName(item.dex)
-      return ACTIVE_DEX_IDS.has(rootDex)
+      return true
     })
-    .map((item) => ({
-      pair: item.token!,
+    .map(([pair, item]) => ({
+      pair: pair.toLowerCase(),
       dexId: item.dex!.toLowerCase(),
       dexLabel: pickDexLabel(item.dex!),
       type: item.type ?? "xyk",
@@ -1832,7 +1842,10 @@ export const fetchPairTrades = async ({
   const normalizedLeftKey = normalizeAssetKey(leftAssetKey)
   const normalizedRightKey = normalizeAssetKey(rightAssetKey)
 
-  if (Date.now() >= binodesPairTradesUnavailableUntil) {
+  if (
+    CLASSIC_CHAIN.chainId === "columbus-5" &&
+    Date.now() >= binodesPairTradesUnavailableUntil
+  ) {
     try {
       const binodesTrades = await withTimeout(
         fetchPairTradesFromBinodes({

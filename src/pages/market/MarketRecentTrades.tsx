@@ -6,6 +6,8 @@ import {
   formatTradeTime
 } from "../../app/market/pairChart"
 import { truncateHash } from "../../app/utils/format"
+import { getAddressExplorerUrl, getTxExplorerUrl } from "../../app/explorer"
+import { useAppChain } from "../../app/appChainContext"
 import styles from "../MarketPairDetails.module.css"
 
 type MarketRecentTradesProps = {
@@ -26,7 +28,9 @@ const MarketRecentTrades = ({
   priceQuoteSymbol,
   priceQuoteUsd,
   trades
-}: MarketRecentTradesProps) => (
+}: MarketRecentTradesProps) => {
+  const { chainKey } = useAppChain()
+  return (
   <section className={`card ${styles.tradesSection}`}>
     <header className={styles.tradesHeader}>
       <span className={styles.sectionTitle}>Recent trades</span>
@@ -85,7 +89,7 @@ const MarketRecentTrades = ({
                     </td>
                     <td>
                       <a
-                        href={`https://finder.burrito.money/classic/address/${trade.trader}`}
+                        href={getAddressExplorerUrl(chainKey, trade.trader)}
                         target="_blank"
                         rel="noreferrer"
                         className={styles.tradesLink}
@@ -95,7 +99,7 @@ const MarketRecentTrades = ({
                     </td>
                     <td>
                       <a
-                        href={`https://finder.burrito.money/classic/tx/${trade.txhash}`}
+                        href={getTxExplorerUrl(chainKey, trade.txhash)}
                         target="_blank"
                         rel="noreferrer"
                         className={styles.tradesLink}
@@ -123,6 +127,7 @@ const MarketRecentTrades = ({
       </>
     )}
   </section>
-)
+  )
+}
 
 export default MarketRecentTrades

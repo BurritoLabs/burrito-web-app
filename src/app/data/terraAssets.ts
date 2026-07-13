@@ -3,11 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import { getActiveAppChainKey } from "../activeChain"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
-import {
-  ASSET_URL,
-  HEXXAGON_REGISTRY_URL
-} from "../config/externalServices"
-import { parseCommonJsArray } from "../utils/cjsRegistry"
+import { ASSET_URL } from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 
 export type Cw20Token = {
@@ -44,22 +40,6 @@ const LOCAL_CW20_TOKEN_OVERRIDES: Record<string, Partial<Cw20Token>> = {
     protocol: "DO",
     icon: "/system/do-cookie.jpg"
   }
-}
-
-type HexxagonCw20Token = {
-  protocol?: string
-  symbol?: string
-  token?: string
-  icon?: string
-  decimals?: number | string
-  name?: string
-}
-
-type HexxagonCw20Contract = {
-  contract?: string
-  protocol?: string
-  name?: string
-  icon?: string
 }
 
 type IbcTraceResponse = {
@@ -477,13 +457,6 @@ const fetchNativeMetadataToken = async (
   return token
 }
 
-const fetchHexxagonArray = async <T,>(path: string): Promise<T[]> => {
-  const res = await fetch(`${HEXXAGON_REGISTRY_URL}/${path}`)
-  if (!res.ok) throw new Error(`Failed to load ${path}`)
-  const source = await res.text()
-  return parseCommonJsArray<T>(source, "hexxagon CJS")
-}
-
 export const pickChainAssets = <T,>(
   data: Record<string, T> | undefined,
   name: string,
@@ -498,12 +471,14 @@ export const pickChainAssets = <T,>(
     (key) => key.toLowerCase() === loweredName || key.toLowerCase() === loweredChain
   )
   if (match) return data[match]
-  return (
-    data.classic ??
-    data["columbus-5"] ??
-    data.mainnet ??
-    data["phoenix-1"]
-  )
+
+  if (loweredChain === "columbus-5") {
+    return data.classic ?? data["columbus-5"]
+  }
+  if (loweredChain === "phoenix-1") {
+    return data.mainnet ?? data["phoenix-1"]
+  }
+  return data.mainnet ?? data.classic
 }
 
 export type Cw20Contract = {
@@ -516,12 +491,13 @@ export const useCw20Whitelist = () => {
   return useQuery({
     queryKey: ["terra-assets", "cw20", CLASSIC_CHAIN.chainId],
     queryFn: async () => {
-      const hexxagonTokens = await fetchHexxagonArray<HexxagonCw20Token>(
-        "cw20/tokens/mainnet/terra.js"
+      const data = await fetchAsset<Record<string, Record<string, Cw20Token>>>(
+        "cw20/tokens.json"
       )
-
-      const mapped = hexxagonTokens.reduce<Record<string, Cw20Token>>((acc, token) => {
-        const address = token.token?.toLowerCase()
+      const tokens = pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
+      const mapped = Object.entries(tokens).reduce<Record<string, Cw20Token>>((acc, entry) => {
+        const [key, token] = entry
+        const address = (token.token || key).toLowerCase()
         const symbol = token.symbol?.trim()
         if (!address || !symbol) return acc
 
@@ -832,12 +808,14 @@ export const useCw20Contracts = () => {
   return useQuery({
     queryKey: ["terra-assets", "cw20-contracts", CLASSIC_CHAIN.chainId],
     queryFn: async () => {
-      const hexxagonContracts = await fetchHexxagonArray<HexxagonCw20Contract>(
-        "cw20/contracts/mainnet/terra.js"
+      const data = await fetchAsset<Record<string, Record<string, Cw20Contract>>>(
+        "cw20/contracts.json"
       )
-
-      return hexxagonContracts.reduce<Record<string, Cw20Contract>>((acc, contract) => {
-        const address = contract.contract?.toLowerCase()
+      const contracts =
+        pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
+      return Object.entries(contracts).reduce<Record<string, Cw20Contract>>((acc, entry) => {
+        const [key, contract] = entry
+        const address = key.toLowerCase()
         if (!address) return acc
         acc[address] = {
           protocol: contract.protocol?.trim() || undefined,

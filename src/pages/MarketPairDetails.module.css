@@ -740,6 +740,26 @@
   align-content: start;
 }
 
+.tradingUnavailable {
+  min-height: 180px;
+  padding: 24px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.tradingUnavailable strong {
+  color: rgba(244, 255, 244, 0.92);
+  font-size: 14px;
+}
+
+.tradingUnavailable span {
+  color: rgba(234, 245, 235, 0.62);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .sidePanelTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

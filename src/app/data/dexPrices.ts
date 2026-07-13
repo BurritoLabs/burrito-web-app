@@ -3,14 +3,14 @@ import { useQuery } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import { CLASSIC_SWAP_DEXES } from "./dexFactories"
-import { HEXXAGON_DEX_PAIRS_URL } from "../config/externalServices"
-import { parseCommonJsArray } from "../utils/cjsRegistry"
+import { ASSET_DEX_PAIRS_URL } from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import { pickChainAssets } from "./terraAssets"
 
 const PAIR_INDEX_TTL = 60 * 60 * 1000
 const POOL_TTL = 2 * 60 * 1000
 
-type HexxagonDexPair = {
+type RegistryDexPair = {
   token?: string
   dex?: string
   type?: string
@@ -45,7 +45,8 @@ type PoolResponse = {
 
 type CachedPairIndex = {
   ts: number
-  items: HexxagonDexPair[]
+  chainId: string
+  items: RegistryDexPair[]
 }
 
 type CachedPool = {
@@ -121,29 +122,38 @@ const toUnits = (amount: bigint, decimals: number) =>
   Number(amount) / 10 ** Math.max(0, decimals)
 
 const fetchPairIndex = async () => {
-  if (pairIndexCache && Date.now() - pairIndexCache.ts < PAIR_INDEX_TTL) {
+  const chainId = CLASSIC_CHAIN.chainId
+  if (
+    pairIndexCache &&
+    pairIndexCache.chainId === chainId &&
+    Date.now() - pairIndexCache.ts < PAIR_INDEX_TTL
+  ) {
     return pairIndexCache.items
   }
-  const response = await fetch(HEXXAGON_DEX_PAIRS_URL)
+  const response = await fetch(ASSET_DEX_PAIRS_URL)
   if (!response.ok) {
     throw new Error(`Failed to load dex pairs: ${response.status}`)
   }
-  const source = await response.text()
-  const parsed = parseCommonJsArray<HexxagonDexPair>(
-    source,
-    "hexxagon CJS"
-  ).filter(
-    (item) =>
-      Boolean(item?.token) &&
-      Array.isArray(item?.assets) &&
-      (item.assets?.length ?? 0) >= 2
-  )
-  pairIndexCache = { ts: Date.now(), items: parsed }
+  const registry = (await response.json()) as Record<
+    string,
+    Record<string, Omit<RegistryDexPair, "token">>
+  >
+  const chainPairs = pickChainAssets(registry, CLASSIC_CHAIN.name, chainId) ?? {}
+  const parsed = Object.entries(chainPairs)
+    .map(([token, item]) => ({ ...item, token }))
+    .filter(
+      (item) =>
+        Boolean(item.token) &&
+        Array.isArray(item.assets) &&
+        (item.assets?.length ?? 0) >= 2
+    )
+  pairIndexCache = { ts: Date.now(), chainId, items: parsed }
   return parsed
 }
 
 const fetchPairPool = async (pair: string) => {
-  const cached = poolCache.get(pair)
+  const cacheKey = `${CLASSIC_CHAIN.chainId}:${pair}`
+  const cached = poolCache.get(cacheKey)
   if (cached && Date.now() - cached.ts < POOL_TTL) {
     return cached.assets
   }
@@ -169,7 +179,7 @@ const fetchPairPool = async (pair: string) => {
         ]
       : undefined)
   if (!Array.isArray(assets) || !assets.length) return undefined
-  poolCache.set(pair, { ts: Date.now(), assets })
+  poolCache.set(cacheKey, { ts: Date.now(), assets })
   return assets
 }
 
@@ -332,6 +342,9 @@ export const fetchDexEstimatedPrices = async (
 export const fetchDirectAnchorDexPrices = async (
   assetMetas: DexAssetMeta[]
 ): Promise<Record<string, DexEstimatedPrice>> => {
+  if (CLASSIC_CHAIN.chainId !== "columbus-5") {
+    return fetchDexEstimatedPrices(assetMetas)
+  }
   const normalized = assetMetas
     .map((item) => ({
       key: normalizeAssetKey(item.key),
@@ -435,6 +448,7 @@ export const useDexEstimatedPrices = (
   return useQuery({
     queryKey: [
       "dex-estimated-prices",
+      CLASSIC_CHAIN.chainId,
       normalized.map((item) => `${item.key}:${item.decimals}`).join("|")
     ],
     queryFn: () => fetchDexEstimatedPrices(normalized),
@@ -463,6 +477,7 @@ export const useDirectAnchorDexPrices = (
   return useQuery({
     queryKey: [
       "dex-direct-anchor-prices",
+      CLASSIC_CHAIN.chainId,
       normalized.map((item) => `${item.key}:${item.decimals}`).join("|")
     ],
     queryFn: () => fetchDirectAnchorDexPrices(normalized),

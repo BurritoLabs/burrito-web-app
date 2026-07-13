@@ -1,5 +1,6 @@
 import styles from "./Aside.module.css"
 import BlockStatus from "./BlockStatus"
+import { useAppChain } from "../appChainContext"
 
 const DocsIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -28,10 +29,14 @@ const DocsIcon = () => (
 )
 
 const Aside = () => {
+  const { chainKey } = useAppChain()
   const links = [
     {
       label: "Documentation",
-      href: "https://terra-classic.io/docs",
+      href:
+        chainKey === "lunc"
+          ? "https://terra-classic.io/docs"
+          : "https://docs.terra.money/",
       icon: <DocsIcon />
     }
   ]

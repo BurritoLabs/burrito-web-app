@@ -11,7 +11,10 @@ import MarketLiquidityPanel from "./MarketLiquidityPanel"
 import MarketRecentTrades from "./MarketRecentTrades"
 import styles from "../MarketPairDetails.module.css"
 import { fetchPrices } from "../../app/data/classic"
-import { fetchCirculatingSnapshot } from "../../app/data/dashboard"
+import {
+  fetchCirculatingSnapshot,
+  fetchCurrentPhoenixDashboardSnapshot
+} from "../../app/data/dashboard"
 import { useCw20Supplies } from "../../app/data/cw20"
 import {
   type PairCandle,
@@ -61,6 +64,8 @@ import {
 } from "../../app/market/pairChart"
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
+import { useAppChain } from "../../app/appChainContext"
+import { getAddressExplorerUrl } from "../../app/explorer"
 
 type MarketDetailLocationState = {
   fromMarket?: boolean
@@ -178,6 +183,7 @@ const buildDetailCopyItem = (
 }
 
 const MarketPairDetails = () => {
+  const { chain, chainKey } = useAppChain()
   const params = useParams<{ pairId?: string; dexId?: string; pair?: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -258,14 +264,19 @@ const MarketPairDetails = () => {
   }, [params.dexId, params.pair, params.pairId])
 
   const { data: pairs = [], isLoading: isPairsLoading } = useQuery({
-    queryKey: ["market", "pairs"],
+    queryKey: ["market", chain.chainId, "pairs"],
     queryFn: fetchMarketDexPairs,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000
   })
 
   const { data: pools = [], isLoading: isPoolsLoading } = useQuery({
-    queryKey: ["market", "pools", pairs.map((pair) => pair.pair).join(",")],
+    queryKey: [
+      "market",
+      chain.chainId,
+      "pools",
+      pairs.map((pair) => pair.pair).join(",")
+    ],
     queryFn: () => fetchMarketPools(pairs),
     enabled: pairs.length > 0,
     staleTime: 2 * 60 * 1000,
@@ -295,6 +306,7 @@ const MarketPairDetails = () => {
   const { data: liveSelectedPool } = useQuery({
     queryKey: [
       "market",
+      chain.chainId,
       "pool-live",
       selectedPairForLivePool?.dexId,
       selectedPairForLivePool?.pair
@@ -359,15 +371,19 @@ const MarketPairDetails = () => {
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(cw20Contracts)
 
   const { data: prices } = useQuery({
-    queryKey: ["prices"],
+    queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
   })
+  const nativePrice = chainKey === "luna" ? prices?.luna : prices?.lunc
 
   const { data: dashboardSnapshot } = useQuery({
-    queryKey: ["dashboard", "circulating", "market-pair"],
-    queryFn: fetchCirculatingSnapshot,
+    queryKey: ["dashboard", chain.chainId, "circulating", "market-pair"],
+    queryFn: () =>
+      chainKey === "luna"
+        ? fetchCurrentPhoenixDashboardSnapshot()
+        : fetchCirculatingSnapshot(),
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000
   })
@@ -425,12 +441,12 @@ const MarketPairDetails = () => {
           return 6
         },
         getSeedUsdPrice: (_assetId, normalizedKey) => {
-          if (normalizedKey === "uluna") return prices?.lunc?.usd
+          if (normalizedKey === "uluna") return nativePrice?.usd
           if (normalizedKey === "uusd") return prices?.ustc?.usd
           return undefined
         }
       }),
-    [cw20Whitelist, ibcWhitelist, nativeWhitelist, pools, prices?.lunc?.usd, prices?.ustc?.usd]
+    [cw20Whitelist, ibcWhitelist, nativePrice?.usd, nativeWhitelist, pools, prices?.ustc?.usd]
   )
 
   const resolveAsset = (assetId: string): ResolvedAsset => {
@@ -489,25 +505,25 @@ const MarketPairDetails = () => {
   }
 
   const getAssetUsdPrice = (asset: ResolvedAsset) => {
-    if (asset.isLunc) return prices?.lunc?.usd
+    if (asset.isLunc) return nativePrice?.usd
     if (asset.isUstc) return prices?.ustc?.usd
     const upperSymbol = asset.symbol.trim().toUpperCase()
-    if (upperSymbol === "LUNC") return prices?.lunc?.usd
+    if (upperSymbol === "LUNC" || upperSymbol === "LUNA") return nativePrice?.usd
     if (upperSymbol === "USTC") return prices?.ustc?.usd
     const graphUsdPrice = poolGraphUsdPrices[asset.key]
     if (graphUsdPrice !== undefined) return graphUsdPrice
     const estimate = dexEstimatedPrices?.[asset.key]
     if (!estimate) return undefined
-    const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : prices?.lunc?.usd
+    const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : nativePrice?.usd
     if (quoteUsd === undefined) return undefined
     return estimate.priceInQuote * quoteUsd
   }
 
   const getAssetChange = (asset: ResolvedAsset, tf: Timeframe) => {
     if (asset.isLunc) {
-      if (tf === "1h") return prices?.lunc?.usd_1h_change
-      if (tf === "7d") return prices?.lunc?.usd_7d_change
-      return prices?.lunc?.usd_24h_change
+      if (tf === "1h") return nativePrice?.usd_1h_change
+      if (tf === "7d") return nativePrice?.usd_7d_change
+      return nativePrice?.usd_24h_change
     }
     if (asset.isUstc) {
       if (tf === "1h") return prices?.ustc?.usd_1h_change
@@ -567,9 +583,9 @@ const MarketPairDetails = () => {
     let marketCapUsd: number | undefined
     if (priceBase.isLunc) {
       marketCapUsd =
-        prices?.lunc?.usd_market_cap ??
-        (prices?.lunc?.usd !== undefined && dashboardSnapshot?.circulatingLunc
-          ? prices.lunc.usd * dashboardSnapshot.circulatingLunc
+        nativePrice?.usd_market_cap ??
+        (nativePrice?.usd !== undefined && dashboardSnapshot?.circulatingLunc
+          ? nativePrice.usd * dashboardSnapshot.circulatingLunc
           : undefined)
     } else if (priceBase.isUstc) {
       marketCapUsd =
@@ -661,6 +677,7 @@ const MarketPairDetails = () => {
   const { data: tradesData, isLoading: isTradesLoading } = useQuery({
     queryKey: [
       "market",
+      chain.chainId,
       "pair-trades",
       detail?.pool.pair,
       detail?.left.key,
@@ -691,6 +708,7 @@ const MarketPairDetails = () => {
   const { data: traderStatsData } = useQuery({
     queryKey: [
       "market",
+      chain.chainId,
       "pair-trader-stats",
       detail?.pool.pair,
       detail?.left.key,
@@ -735,6 +753,7 @@ const MarketPairDetails = () => {
   const { data: candlesData = [], isLoading: isCandlesLoading } = useQuery({
     queryKey: [
       "market",
+      chain.chainId,
       "pair-candles",
       detail?.pool.pair,
       detail?.left.key,
@@ -1268,7 +1287,7 @@ const MarketPairDetails = () => {
             <em>Pool</em>
             <a
               className={styles.poolLink}
-              href={`https://finder.burrito.money/classic/address/${detail.pool.pair}`}
+              href={getAddressExplorerUrl(chainKey, detail.pool.pair)}
               target="_blank"
               rel="noreferrer"
               title={detail.pool.pair}
@@ -1314,6 +1333,13 @@ const MarketPairDetails = () => {
 
         <aside className={styles.marketRight}>
           <section className={styles.swapEmbed}>
+            {!chain.features.swap ? (
+              <div className={`card ${styles.tradingUnavailable}`}>
+                <strong>Trading is not available on {chain.name} yet</strong>
+                <span>Pool data, price history, and recent transactions remain live.</span>
+              </div>
+            ) : (
+              <>
             <div
               className={`${styles.sidePanelTabs} ${
                 isBondingCurve ? styles.sidePanelTabsSingle : ""
@@ -1414,6 +1440,8 @@ const MarketPairDetails = () => {
                 tokenIconCandidates={liquidityTokenAsset?.iconCandidates}
                 tokenSymbol={liquidityTokenAsset?.symbol}
               />
+            )}
+              </>
             )}
           </section>
         </aside>

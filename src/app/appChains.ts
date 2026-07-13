@@ -51,7 +51,7 @@ export const APP_CHAINS = {
     logoSrc: "/system/luna.svg",
     accentRgb: "249, 115, 22",
     runtime: CHAIN_RUNTIME_CONFIG.luna,
-    features: { swap: false, market: false, launchpad: false }
+    features: { swap: false, market: true, launchpad: false }
   }
 } as const satisfies Record<AppChainKey, AppChainConfig>
 

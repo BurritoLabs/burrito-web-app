@@ -1416,45 +1416,69 @@ export const fetchStakingPool = async (): Promise<StakingPool> => {
   return {}
 }
 
-export const fetchTxs = async (address: string, limit = 75) => {
-  if (!address) return []
-  const EVENTS = [
-    "message.sender",
-    "transfer.recipient",
-    "transfer.sender"
-  ]
+const TX_HISTORY_EVENTS = [
+  "message.sender",
+  "transfer.recipient",
+  "transfer.sender",
+  "coin_received.receiver",
+  "coin_spent.spender",
+  "wasm.to",
+  "wasm.recipient",
+  "fungible_token_packet.receiver"
+] as const
+
+type TxHistoryResponse = {
+  txs?: TxRecord[]
+  tx_responses?: Array<{
+    txhash?: string
+    timestamp?: string
+    height?: string
+    code?: number
+    raw_log?: string
+    logs?: Array<{
+      msg_index?: number
+      log?: string
+      events?: Array<{
+        type?: string
+        attributes?: Array<{ key?: string; value?: string }>
+      }>
+    }>
+    events?: Array<{
+      type?: string
+      attributes?: Array<{ key?: string; value?: string }>
+    }>
+  }>
+  total?: string
+  pagination?: {
+    total?: string
+  }
+}
+
+export type TxHistoryPage = {
+  items: TxItem[]
+  page: number
+  hasMore: boolean
+}
+
+export const fetchTxHistoryPage = async (
+  address: string,
+  page = 1,
+  pageSize = 25
+): Promise<TxHistoryPage> => {
+  if (!address) return { items: [], page, hasMore: false }
+
   const requests = await Promise.all(
-    EVENTS.map(async (event) => {
+    TX_HISTORY_EVENTS.map(async (event) => {
       const queryTxs = async (params: Record<string, string>) => {
         const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/tx/v1beta1/txs", params)
-        return fetchJson<{
-          txs?: TxRecord[]
-          tx_responses?: Array<{
-            txhash?: string
-            timestamp?: string
-            height?: string
-            code?: number
-            raw_log?: string
-            logs?: Array<{
-              msg_index?: number
-              log?: string
-              events?: Array<{
-                type?: string
-                attributes?: Array<{ key?: string; value?: string }>
-              }>
-            }>
-            events?: Array<{
-              type?: string
-              attributes?: Array<{ key?: string; value?: string }>
-            }>
-          }>
-        }>(url)
+        return fetchJson<TxHistoryResponse>(url)
       }
 
       const commonParams = {
-        page: "1",
-        limit: String(limit),
-        "pagination.count_total": "false"
+        page: String(page),
+        limit: String(pageSize),
+        order_by: "ORDER_BY_DESC",
+        "pagination.count_total": "true"
       }
 
       try {
@@ -1480,10 +1504,17 @@ export const fetchTxs = async (address: string, limit = 75) => {
   }
 
   const merged = new Map<string, TxItem>()
+  let hasMore = false
   requests.forEach((data) => {
     if (!data) return
     const txs = data.txs ?? []
     const responses = data.tx_responses ?? []
+    const rawTotal = data.total ?? data.pagination?.total
+    const total = Number(rawTotal)
+    const hasKnownTotal = rawTotal !== undefined && Number.isFinite(total)
+    hasMore = hasMore || (hasKnownTotal
+      ? total > page * pageSize
+      : responses.length >= pageSize)
     const length = Math.max(txs.length, responses.length)
     for (let index = 0; index < length; index += 1) {
       const response = responses[index]
@@ -1513,15 +1544,20 @@ export const fetchTxs = async (address: string, limit = 75) => {
     }
   })
 
-  const list = Array.from(merged.values())
-  return list
+  const items = Array.from(merged.values())
     .sort((a, b) => {
       const aTime = new Date(a.timestamp ?? 0).getTime()
       const bTime = new Date(b.timestamp ?? 0).getTime()
       if (aTime && bTime) return bTime - aTime
       return Number(b.height ?? 0) - Number(a.height ?? 0)
     })
-    .slice(0, limit)
+
+  return { items, page, hasMore }
+}
+
+export const fetchTxs = async (address: string, limit = 75) => {
+  const result = await fetchTxHistoryPage(address, 1, limit)
+  return result.items.slice(0, limit)
 }
 
 export const fetchContractInfo = async (address: string) => {

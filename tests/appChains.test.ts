@@ -26,7 +26,7 @@ describe("app chain runtime", () => {
   it("keeps unconfigured Phoenix contract features disabled", () => {
     expect(APP_CHAINS.luna.features).toEqual({
       swap: false,
-      market: false,
+      market: true,
       launchpad: false
     })
   })
