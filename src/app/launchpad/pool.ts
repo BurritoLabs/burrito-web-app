@@ -1,11 +1,11 @@
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
-import { CLASSIC_DENOMS } from "../chain"
+import { getLaunchpadConfig } from "../config/launchpadConfig"
 import { queryContractSmart } from "../data/classic"
 import { parseTokenAmountToBaseUnits } from "./cw20"
 
-export const TERRASWAP_FACTORY_ADDRESS =
-  "terra1jkndu9w5attpz09ut02sgey5dd3e8sq5watzm0"
+export const getTerraswapFactoryAddress = () =>
+  getLaunchpadConfig().terraswapFactoryAddress
 
 type NativeAssetInfo = {
   native_token: {
@@ -60,7 +60,7 @@ export const buildLuncPairAssetInfos = (tokenAddress: string) => [
   },
   {
     native_token: {
-      denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+      denom: getLaunchpadConfig().nativeDenom
     }
   }
 ]
@@ -83,9 +83,10 @@ const isMissingPairError = (error: unknown) => {
 }
 
 export const fetchTerraswapLuncPair = async (tokenAddress: string) => {
+  const config = getLaunchpadConfig()
   try {
     return await queryContractSmart<TerraswapPairInfo>(
-      TERRASWAP_FACTORY_ADDRESS,
+      config.terraswapFactoryAddress,
       {
         pair: {
           asset_infos: buildLuncPairAssetInfos(tokenAddress)
@@ -118,27 +119,30 @@ export const waitForTerraswapLuncPair = async (
 export const buildCreateTerraswapLuncPairMessage = (
   sender: string,
   tokenAddress: string
-) => ({
-  typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
-  value: MsgExecuteContract.fromPartial({
-    sender,
-    contract: TERRASWAP_FACTORY_ADDRESS,
-    msg: toUtf8(
-      JSON.stringify({
-        create_pair: {
-          assets: buildLuncPairCreationAssets(tokenAddress)
-        }
-      })
-    ),
-    funds: []
-  })
-})
+) => {
+  const config = getLaunchpadConfig()
+  return {
+    typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+    value: MsgExecuteContract.fromPartial({
+      sender,
+      contract: config.terraswapFactoryAddress,
+      msg: toUtf8(
+        JSON.stringify({
+          create_pair: {
+            assets: buildLuncPairCreationAssets(tokenAddress)
+          }
+        })
+      ),
+      funds: []
+    })
+  }
+}
 
 export const parseLuncAmountToBaseUnits = (value: string) =>
   parseTokenAmountToBaseUnits(
     value,
-    CLASSIC_DENOMS.lunc.coinDecimals,
-    "LUNC amount"
+    6,
+    `${getLaunchpadConfig().nativeSymbol} amount`
   )
 
 export const formatSlippageTolerance = (percentValue: string) => {
@@ -197,6 +201,7 @@ export const buildProvideTerraswapLiquidityMessage = ({
   luncAmount: string
   slippageTolerance?: string
 }) => {
+  const config = getLaunchpadConfig()
   const msg: TerraswapProvideLiquidityMsg = {
     provide_liquidity: {
       assets: [
@@ -211,7 +216,7 @@ export const buildProvideTerraswapLiquidityMessage = ({
         {
           info: {
             native_token: {
-              denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+              denom: config.nativeDenom
             }
           },
           amount: luncAmount
@@ -231,8 +236,8 @@ export const buildProvideTerraswapLiquidityMessage = ({
       contract: pairAddress,
       msg: toUtf8(JSON.stringify(msg)),
       funds: [
-        {
-          denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+          {
+            denom: config.nativeDenom,
           amount: luncAmount
         }
       ]

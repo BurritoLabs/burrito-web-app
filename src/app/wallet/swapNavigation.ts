@@ -1,5 +1,6 @@
 import { TERRA_ADDRESS_PATTERN } from "./walletPanelUtils"
 import { CLASSIC_DENOMS } from "../chain"
+import { getActiveAppChainKey } from "../activeChain"
 
 type WalletSwapAsset = {
   denom: string
@@ -19,15 +20,20 @@ export const getWalletSwapAssetId = (asset: WalletSwapAsset) => {
 
 export const getWalletSwapCounterAssetId = (asset: WalletSwapAsset) => {
   const fromAssetId = getWalletSwapAssetId(asset)
+  if (
+    getActiveAppChainKey() === "luna" &&
+    fromAssetId === `native:${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
+  ) {
+    return undefined
+  }
   return fromAssetId === `native:${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
     ? `native:${CLASSIC_DENOMS.ustc.coinMinimalDenom}`
     : `native:${CLASSIC_DENOMS.lunc.coinMinimalDenom}`
 }
 
 export const getWalletSwapPath = (asset: WalletSwapAsset) => {
-  const searchParams = new URLSearchParams({
-    from: getWalletSwapAssetId(asset),
-    to: getWalletSwapCounterAssetId(asset)
-  })
+  const searchParams = new URLSearchParams({ from: getWalletSwapAssetId(asset) })
+  const counterAssetId = getWalletSwapCounterAssetId(asset)
+  if (counterAssetId) searchParams.set("to", counterAssetId)
   return `/swap?${searchParams.toString()}`
 }

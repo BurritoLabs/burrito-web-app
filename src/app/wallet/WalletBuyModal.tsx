@@ -13,6 +13,12 @@ const BUY_OPTIONS = {
     venue: "Binance",
     pair: "USTC / USDT",
     href: "https://www.binance.com/en/trade/USTC_USDT?type=spot"
+  },
+  LUNA: {
+    label: "Buy LUNA",
+    venue: "Binance",
+    pair: "LUNA / USDT",
+    href: "https://www.binance.com/en/trade/LUNA_USDT?type=spot"
   }
 } as const
 

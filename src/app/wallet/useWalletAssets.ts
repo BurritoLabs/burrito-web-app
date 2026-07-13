@@ -256,7 +256,7 @@ export const useWalletAssets = (accountAddress?: string) => {
   const { data: launchpadCw20Contracts = [] } = useQuery({
     queryKey: ["wallet", chain.chainId, "launchpad-cw20-contracts"],
     queryFn: async () => {
-      if (!isLaunchRegistryConfigured) return []
+      if (!isLaunchRegistryConfigured()) return []
       const launches = await fetchLaunchRegistryLaunches()
       return Array.from(
         new Set(
@@ -266,7 +266,7 @@ export const useWalletAssets = (accountAddress?: string) => {
         )
       )
     },
-    enabled: isClassic && isLaunchRegistryConfigured,
+    enabled: isLaunchRegistryConfigured(),
     staleTime: 5 * 60 * 1000
   })
   const { data: launchpadCw20Whitelist = {} } =
@@ -732,7 +732,7 @@ export const useWalletAssets = (accountAddress?: string) => {
             value,
             chainCount: 1,
             whitelisted: true,
-            isBuyable: isClassic,
+            isBuyable: true,
             iconCandidates: buildWalletIconCandidates({
               denom: coin.denom,
               symbol: chain.displayDenom,
@@ -742,7 +742,7 @@ export const useWalletAssets = (accountAddress?: string) => {
           }
         }
 
-        if (coin.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) {
+        if (isClassic && coin.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) {
           const value =
             ustcPrice !== undefined
               ? toUnitAmount(coin.amount, CLASSIC_DENOMS.ustc.coinDecimals) * ustcPrice
@@ -870,7 +870,7 @@ export const useWalletAssets = (accountAddress?: string) => {
         value: luncPrice !== undefined ? unitAmount * luncPrice : undefined,
         chainCount: 1,
         whitelisted: true,
-        isBuyable: isClassic,
+        isBuyable: true,
         iconCandidates: buildWalletIconCandidates({
           denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
           symbol: chain.displayDenom,
@@ -933,12 +933,12 @@ export const useWalletAssets = (accountAddress?: string) => {
         }
       })
 
-    const luncRow = nativeRows.find(
+    const nativeRow = nativeRows.find(
       (row) => row.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
     )
-    const ustcRow = nativeRows.find(
+    const ustcRow = isClassic ? nativeRows.find(
       (row) => row.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
-    )
+    ) : undefined
     const nativeNonIbc = nativeRows.filter(
       (row) =>
         row.denom !== CLASSIC_DENOMS.lunc.coinMinimalDenom &&
@@ -949,7 +949,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     const tokenRows = [...cw20Rows, ...ibcRows].sort(sortByValueDesc)
 
     return [
-      luncRow,
+      nativeRow,
       ustcRow,
       ...nativeNonIbc.sort(sortByValueDesc),
       ...tokenRows

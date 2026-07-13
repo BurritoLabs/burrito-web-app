@@ -1,5 +1,7 @@
 import styles from "../Launchpad.module.css"
-import { LAUNCHPAD_CREATION_FEE_LABEL } from "../../app/config/launchpadConfig"
+import { getLaunchpadCreationFeeLabel } from "../../app/config/launchpadConfig"
+import { useAppChain } from "../../app/appChainContext"
+import { getAddressExplorerUrl, getTxExplorerUrl } from "../../app/explorer"
 import { truncateHash } from "../../app/utils/format"
 import {
   formatCompact,
@@ -38,7 +40,12 @@ const LaunchCreatePreview = ({
   readinessPercent,
   createError,
   createdToken
-}: LaunchCreatePreviewProps) => (
+}: LaunchCreatePreviewProps) => {
+  const { chainKey, chain } = useAppChain()
+  const nativeSymbol = chain.displayDenom
+  const creationFeeLabel = getLaunchpadCreationFeeLabel(chainKey)
+
+  return (
   <aside className={styles.previewStack}>
     <article className={`card ${styles.previewCard}`}>
       <div className={styles.launchTokenHeader}>
@@ -49,14 +56,18 @@ const LaunchCreatePreview = ({
         />
         <div>
           <span>Launch preview</span>
-          <strong>{isCw20Only ? tokenSymbol : `${tokenSymbol} / LUNC`}</strong>
+          <strong>
+            {isCw20Only ? tokenSymbol : `${tokenSymbol} / ${nativeSymbol}`}
+          </strong>
         </div>
       </div>
       <div className={styles.previewStats}>
         <div>
           <span>Start price</span>
           <strong>
-            {isCw20Only ? "--" : `${formatPrice(startPriceLunc)} LUNC`}
+            {isCw20Only
+              ? "--"
+              : `${formatPrice(startPriceLunc)} ${nativeSymbol}`}
           </strong>
         </div>
         <div>
@@ -65,7 +76,7 @@ const LaunchCreatePreview = ({
         </div>
         <div>
           <span>Mcap</span>
-          <strong>{formatCompact(startingMcapLunc)} LUNC</strong>
+          <strong>{formatCompact(startingMcapLunc)} {nativeSymbol}</strong>
         </div>
       </div>
       <div className={styles.lockStrip}>
@@ -76,7 +87,7 @@ const LaunchCreatePreview = ({
       </div>
       <div className={styles.lockStrip}>
         <span>Creation fee</span>
-        <strong>{LAUNCHPAD_CREATION_FEE_LABEL}</strong>
+        <strong>{creationFeeLabel}</strong>
       </div>
       <div className={styles.progressHeader}>
         <div>
@@ -93,7 +104,7 @@ const LaunchCreatePreview = ({
           <div>
             <span>Tx</span>
             <a
-              href={`https://finder.burrito.money/classic/tx/${createdToken.hash}`}
+              href={getTxExplorerUrl(chainKey, createdToken.hash)}
               target="_blank"
               rel="noreferrer"
             >
@@ -104,7 +115,10 @@ const LaunchCreatePreview = ({
             <div>
               <span>Token</span>
               <a
-                href={`https://finder.burrito.money/classic/address/${createdToken.contractAddress}`}
+                href={getAddressExplorerUrl(
+                  chainKey,
+                  createdToken.contractAddress
+                )}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -116,6 +130,7 @@ const LaunchCreatePreview = ({
       ) : null}
     </article>
   </aside>
-)
+  )
+}
 
 export default LaunchCreatePreview

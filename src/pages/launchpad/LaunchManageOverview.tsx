@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom"
+import { useAppChain } from "../../app/appChainContext"
+import { getAddressExplorerUrl } from "../../app/explorer"
 import {
   getLaunchpadMarketPath,
   isLuncPairLabel,
@@ -67,8 +69,11 @@ const LaunchManageOverview = ({
   onSelectOwnerId,
   onSetManageSection,
   onSyncOwnerLaunches
-}: LaunchManageOverviewProps) => (
-  <>
+}: LaunchManageOverviewProps) => {
+  const { chainKey } = useAppChain()
+
+  return (
+    <>
     <article className={`card ${styles.ownerIntro}`}>
       <div>
         <span>Manage</span>
@@ -234,7 +239,10 @@ const LaunchManageOverview = ({
           {activeOwnerLaunch.contractAddress ? (
             <a
               className="uiButton uiButtonOutline"
-              href={`https://finder.burrito.money/classic/address/${activeOwnerLaunch.contractAddress}`}
+              href={getAddressExplorerUrl(
+                chainKey,
+                activeOwnerLaunch.contractAddress
+              )}
               target="_blank"
               rel="noreferrer"
             >
@@ -342,7 +350,8 @@ const LaunchManageOverview = ({
         </div>
       </article>
     ) : null}
-  </>
-)
+    </>
+  )
+}
 
 export default LaunchManageOverview

@@ -1,5 +1,8 @@
+import { getActiveAppChainKey } from "../activeChain"
+
 const TX_DIAGNOSTICS_STORAGE_KEY = "burrito:tx-diagnostics:v1"
 const MAX_STORED_TX_DIAGNOSTICS = 50
+const TX_DIAGNOSTICS_ENDPOINT = import.meta.env.VITE_TX_DIAGNOSTICS_ENDPOINT?.trim()
 
 export type TxDiagnosticPhase = "start" | "success" | "failure"
 
@@ -32,6 +35,43 @@ export type TxDiagnosticEvent = {
 export type StoredTxDiagnosticEvent = TxDiagnosticEvent & {
   id: string
   at: string
+}
+
+const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
+  if (!TX_DIAGNOSTICS_ENDPOINT || typeof window === "undefined") return
+
+  const payload = JSON.stringify({
+    version: 1,
+    chainKey: getActiveAppChainKey(),
+    path: window.location.pathname,
+    phase: event.phase,
+    label: event.label,
+    connectorId: event.connectorId,
+    category: event.category,
+    message: event.message?.slice(0, 300),
+    gasUsed: event.gasUsed,
+    gasWanted: event.gasWanted,
+    at: event.at
+  })
+
+  try {
+    if (typeof navigator.sendBeacon === "function") {
+      navigator.sendBeacon(
+        TX_DIAGNOSTICS_ENDPOINT,
+        new Blob([payload], { type: "text/plain;charset=UTF-8" })
+      )
+      return
+    }
+
+    void fetch(TX_DIAGNOSTICS_ENDPOINT, {
+      method: "POST",
+      body: payload,
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      keepalive: true
+    }).catch(() => undefined)
+  } catch {
+    // Remote diagnostics must never affect transaction execution.
+  }
 }
 
 const toRawMessage = (error: unknown, fallback: string) => {
@@ -229,16 +269,17 @@ export const classifyTxError = (
 export const recordTxDiagnostic = (event: TxDiagnosticEvent) => {
   if (typeof window === "undefined") return
 
+  const next: StoredTxDiagnosticEvent = {
+    ...event,
+    id: createDiagnosticId(),
+    at: new Date().toISOString()
+  }
+
   try {
     const raw = window.localStorage.getItem(TX_DIAGNOSTICS_STORAGE_KEY)
     const previous = raw
       ? (JSON.parse(raw) as StoredTxDiagnosticEvent[])
       : []
-    const next: StoredTxDiagnosticEvent = {
-      ...event,
-      id: createDiagnosticId(),
-      at: new Date().toISOString()
-    }
     window.localStorage.setItem(
       TX_DIAGNOSTICS_STORAGE_KEY,
       JSON.stringify([next, ...previous].slice(0, MAX_STORED_TX_DIAGNOSTICS))
@@ -246,6 +287,8 @@ export const recordTxDiagnostic = (event: TxDiagnosticEvent) => {
   } catch {
     // Diagnostics must never affect transaction execution.
   }
+
+  reportRemoteDiagnostic(next)
 }
 
 export const getStoredTxDiagnostics = () => {

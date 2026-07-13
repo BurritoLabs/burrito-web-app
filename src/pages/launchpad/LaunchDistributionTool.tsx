@@ -1,4 +1,6 @@
 import type { FormEvent } from "react"
+import { useAppChain } from "../../app/appChainContext"
+import { getTxExplorerUrl } from "../../app/explorer"
 import { truncateHash } from "../../app/utils/format"
 import styles from "../Launchpad.module.css"
 import type {
@@ -41,6 +43,8 @@ function LaunchDistributionTool({
   onDistributionInputChange,
   onSubmit
 }: LaunchDistributionToolProps) {
+  const { chainKey } = useAppChain()
+
   return (
     <article
       id="launchpad-distribution"
@@ -104,7 +108,7 @@ function LaunchDistributionTool({
             <div>
               <span>Distribution tx</span>
               <a
-                href={`https://finder.burrito.money/classic/tx/${distributionTxHash}`}
+                href={getTxExplorerUrl(chainKey, distributionTxHash)}
                 target="_blank"
                 rel="noreferrer"
               >

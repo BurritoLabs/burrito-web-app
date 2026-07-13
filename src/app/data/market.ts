@@ -1,4 +1,5 @@
 import { CLASSIC_CHAIN } from "../chain"
+import { getActiveAppChainKey } from "../activeChain"
 import {
   fetchLaunchRegistryLaunches,
   isLaunchRegistryConfigured
@@ -14,7 +15,7 @@ import {
 } from "./binodes"
 import { queryContractSmart } from "./classic"
 import { fetchWithEndpointFallback } from "./endpointFallback"
-import { CLASSIC_SWAP_DEXES } from "./dexFactories"
+import { getSwapDexes, type SwapDex } from "./dexFactories"
 import { pickChainAssets } from "./terraAssets"
 
 type AssetDexPair = {
@@ -201,9 +202,10 @@ let factoryPairDexCache:
       map: Map<string, { dexId: string; dexLabel: string }>
     }
   | null = null
-let factoryPairDexInFlight:
-  | Promise<Map<string, { dexId: string; dexLabel: string }>>
-  | null = null
+let factoryPairDexInFlight: {
+  chainId: string
+  promise: Promise<Map<string, { dexId: string; dexLabel: string }>>
+} | null = null
 let localMarketIndexCache:
   | {
       at: number
@@ -726,7 +728,10 @@ const evaluateCandleQuality = ({
 }
 
 const ACTIVE_DEX_LABEL_BY_ID = new Map(
-  CLASSIC_SWAP_DEXES.map((dex) => [dex.id.toLowerCase(), dex.label])
+  [...getSwapDexes("lunc"), ...getSwapDexes("luna")].map((dex) => [
+    dex.id.toLowerCase(),
+    dex.label
+  ])
 )
 
 const pickDexLabel = (dexId: string) => {
@@ -1056,8 +1061,7 @@ const fetchLocalMarketIndex = async () => {
 }
 
 const fetchLaunchpadMarketPairs = async (): Promise<MarketDexPair[]> => {
-  if (CLASSIC_CHAIN.chainId !== "columbus-5") return []
-  if (!isLaunchRegistryConfigured) return []
+  if (!isLaunchRegistryConfigured()) return []
 
   try {
     const launches = await fetchLaunchRegistryLaunches()
@@ -1197,7 +1201,7 @@ const fetchPairCandlesFromLocal = async ({
   return freshCandles.slice(-maxCandles)
 }
 
-const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) => {
+const loadFactoryPairsForDex = async (dex: SwapDex) => {
   const pairContracts = new Set<string>()
   const limit = 30
 
@@ -1291,9 +1295,9 @@ const loadFactoryPairsForDex = async (dex: (typeof CLASSIC_SWAP_DEXES)[number]) 
 
 const fetchPairDexMapFromFactories = async () => {
   const map = new Map<string, { dexId: string; dexLabel: string }>()
-  if (CLASSIC_CHAIN.chainId !== "columbus-5") return map
+  const dexes = getSwapDexes(getActiveAppChainKey())
   await Promise.all(
-    CLASSIC_SWAP_DEXES.map(async (dex) => {
+    dexes.map(async (dex) => {
       const pairs = await loadFactoryPairsForDex(dex)
       pairs.forEach((pairAddress) => {
         map.set(pairAddress, { dexId: dex.id, dexLabel: dex.label })
@@ -1305,7 +1309,6 @@ const fetchPairDexMapFromFactories = async () => {
 
 const getPairDexMap = async () => {
   const chainId = CLASSIC_CHAIN.chainId
-  if (chainId !== "columbus-5") return new Map()
   if (
     factoryPairDexCache &&
     factoryPairDexCache.chainId === chainId &&
@@ -1313,18 +1316,23 @@ const getPairDexMap = async () => {
   ) {
     return factoryPairDexCache.map
   }
-  if (factoryPairDexInFlight) return factoryPairDexInFlight
+  if (factoryPairDexInFlight?.chainId === chainId) {
+    return factoryPairDexInFlight.promise
+  }
 
-  factoryPairDexInFlight = fetchPairDexMapFromFactories()
+  const promise = fetchPairDexMapFromFactories()
     .then((map) => {
       factoryPairDexCache = { at: Date.now(), chainId, map }
       return map
     })
     .finally(() => {
-      factoryPairDexInFlight = null
+      if (factoryPairDexInFlight?.promise === promise) {
+        factoryPairDexInFlight = null
+      }
     })
+  factoryPairDexInFlight = { chainId, promise }
 
-  return factoryPairDexInFlight
+  return promise
 }
 
 export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {

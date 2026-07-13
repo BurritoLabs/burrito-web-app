@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setActiveAppChainKey } from "../src/app/activeChain"
 import { CLASSIC_DENOMS } from "../src/app/chain"
 import {
   getWalletSwapAssetId,
   getWalletSwapCounterAssetId,
   getWalletSwapPath
 } from "../src/app/wallet/swapNavigation"
+
+afterEach(() => setActiveAppChainKey("lunc"))
 
 describe("wallet swap navigation", () => {
   it("routes LUNC to USTC", () => {
@@ -53,5 +56,13 @@ describe("wallet swap navigation", () => {
     expect(getWalletSwapPath(asset)).toBe(
       "/swap?from=native%3Aibc%2FABCDEF123&to=native%3Auluna"
     )
+  })
+
+  it("does not force LUNA into a Classic USTC route", () => {
+    setActiveAppChainKey("luna")
+    const asset = { denom: "uluna", kind: "native" }
+
+    expect(getWalletSwapCounterAssetId(asset)).toBeUndefined()
+    expect(getWalletSwapPath(asset)).toBe("/swap?from=native%3Auluna")
   })
 })

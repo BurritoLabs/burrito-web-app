@@ -1,8 +1,7 @@
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
-import { CLASSIC_DENOMS } from "../chain"
 import {
-  LAUNCHPAD_CREATION_FEE_MICRO,
-  LAUNCHPAD_FEE_RECIPIENT
+  getLaunchpadConfig,
+  getLaunchpadStorageKeys
 } from "../config/launchpadConfig"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
 import {
@@ -164,8 +163,12 @@ export const initialDraft: DraftLaunch = {
   logoUrl: ""
 }
 
-export const DRAFT_STORAGE_KEY = "burrito.launchpad.draft.v1"
-export const CREATED_LAUNCHES_STORAGE_KEY = "burrito.launchpad.created.v1"
+const LEGACY_DRAFT_STORAGE_KEY = "burrito.launchpad.draft.v1"
+const LEGACY_CREATED_LAUNCHES_STORAGE_KEY = "burrito.launchpad.created.v1"
+
+export const getDraftStorageKey = () => getLaunchpadStorageKeys().draft
+export const getCreatedLaunchesStorageKey = () =>
+  getLaunchpadStorageKeys().created
 
 export const tabs: Array<{ id: LaunchTab; label: string }> = [
   { id: "create", label: "Create" },
@@ -189,7 +192,8 @@ export const getLaunchpadDeepLink = (launchId: string) => {
 export const getLaunchpadMarketPath = (pairContract: string) =>
   `/market/pair/terraswap/${encodeURIComponent(pairContract)}?from=launchpad`
 
-export const isLuncPairLabel = (pair: string) => /\/\s*LUNC$/i.test(pair.trim())
+export const isLuncPairLabel = (pair: string) =>
+  /\/\s*(LUNC|LUNA)$/i.test(pair.trim())
 
 export const createSteps: Array<{ id: CreateStep; label: string; eyebrow: string }> = [
   { id: "token", label: "Token", eyebrow: "01" },
@@ -250,7 +254,12 @@ export const ownerLaunches: OwnerLaunchRecord[] = []
 export const loadStoredDraft = () => {
   if (typeof window === "undefined") return initialDraft
   try {
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
+    const config = getLaunchpadConfig()
+    const raw =
+      window.localStorage.getItem(getDraftStorageKey()) ??
+      (config.chainKey === "lunc"
+        ? window.localStorage.getItem(LEGACY_DRAFT_STORAGE_KEY)
+        : null)
     if (!raw) return initialDraft
     const parsed = JSON.parse(raw) as Partial<DraftLaunch>
     return {
@@ -266,7 +275,12 @@ export const loadStoredDraft = () => {
 export const loadCreatedLaunches = (): OwnerLaunchRecord[] => {
   if (typeof window === "undefined") return []
   try {
-    const raw = window.localStorage.getItem(CREATED_LAUNCHES_STORAGE_KEY)
+    const config = getLaunchpadConfig()
+    const raw =
+      window.localStorage.getItem(getCreatedLaunchesStorageKey()) ??
+      (config.chainKey === "lunc"
+        ? window.localStorage.getItem(LEGACY_CREATED_LAUNCHES_STORAGE_KEY)
+        : null)
     if (!raw) return []
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return []
@@ -286,7 +300,7 @@ export const saveCreatedLaunches = (records: OwnerLaunchRecord[]) => {
   if (typeof window === "undefined") return
   try {
     window.localStorage.setItem(
-      CREATED_LAUNCHES_STORAGE_KEY,
+      getCreatedLaunchesStorageKey(),
       JSON.stringify(records.slice(0, 25))
     )
   } catch {
@@ -320,19 +334,22 @@ export const formatPrice = (value: number) => {
 export const formatDateTime = (value: string | number | Date) =>
   new Date(value).toLocaleString()
 
-export const buildLaunchpadCreationFeeMessage = (sender: string) => ({
-  typeUrl: "/cosmos.bank.v1beta1.MsgSend",
-  value: MsgSend.fromPartial({
-    fromAddress: sender,
-    toAddress: LAUNCHPAD_FEE_RECIPIENT,
-    amount: [
-      {
-        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-        amount: LAUNCHPAD_CREATION_FEE_MICRO.toString()
-      }
-    ]
-  })
-})
+export const buildLaunchpadCreationFeeMessage = (sender: string) => {
+  const config = getLaunchpadConfig()
+  return {
+    typeUrl: "/cosmos.bank.v1beta1.MsgSend",
+    value: MsgSend.fromPartial({
+      fromAddress: sender,
+      toAddress: config.feeRecipient,
+      amount: [
+        {
+          denom: config.nativeDenom,
+          amount: config.creationFeeMicro.toString()
+        }
+      ]
+    })
+  }
+}
 
 export const normalizeOptionalHttpUrl = (value: string, field: string) => {
   const trimmed = value.trim()
@@ -434,6 +451,7 @@ export const buildOwnerRecordFromRegistryLaunch = (
   launch: LaunchRegistryLaunch,
   tokenInfo?: Cw20TokenInfo | null
 ): OwnerLaunchRecord => {
+  const config = getLaunchpadConfig()
   const symbol = (
     launch.metadata?.symbol ||
     tokenInfo?.symbol ||
@@ -452,7 +470,7 @@ export const buildOwnerRecordFromRegistryLaunch = (
     id: launch.token_contract,
     symbol,
     name,
-    pair: `${symbol} / LUNC`,
+    pair: `${symbol} / ${config.nativeSymbol}`,
     liquidity: "On-chain LP",
     lockExpiry: formatDateTime(unlockAt),
     infoStatus: "Published",

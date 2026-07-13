@@ -4,11 +4,7 @@ import {
   buildClassicNativeIconCandidates,
   buildCw20IconCandidates
 } from "../../app/utils/assetIcons"
-
-const luncIconCandidates = buildClassicNativeIconCandidates({
-  denom: "uluna",
-  symbol: "LUNC"
-})
+import { useAppChain } from "../../app/appChainContext"
 
 const LaunchTokenLogoInner = ({
   candidates
@@ -53,7 +49,12 @@ const LaunchTokenLogo = ({
   logoUrl?: string | null
   pairedWithLunc?: boolean
 }) => {
+  const { chain } = useAppChain()
   const candidates = buildCw20IconCandidates(logoUrl ?? undefined, symbol)
+  const nativeIconCandidates = buildClassicNativeIconCandidates({
+    denom: chain.nativeDenom,
+    symbol: chain.displayDenom
+  })
   if (pairedWithLunc) {
     return (
       <div className={styles.launchPairLogo}>
@@ -61,7 +62,7 @@ const LaunchTokenLogo = ({
           <LaunchTokenLogoInner candidates={candidates} />
         </span>
         <span className={styles.launchPairSecondary}>
-          <LaunchTokenLogoInner candidates={luncIconCandidates} />
+          <LaunchTokenLogoInner candidates={nativeIconCandidates} />
         </span>
       </div>
     )

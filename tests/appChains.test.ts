@@ -29,11 +29,11 @@ describe("app chain runtime", () => {
     expect(CLASSIC_DENOMS.lunc.coinDenom).toBe("LUNA")
   })
 
-  it("keeps unconfigured Phoenix contract features disabled", () => {
+  it("enables the Phoenix product surfaces with contract steps guarded in-page", () => {
     expect(APP_CHAINS.luna.features).toEqual({
-      swap: false,
+      swap: true,
       market: true,
-      launchpad: false
+      launchpad: true
     })
   })
 })

@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom"
+import { useAppChain } from "../../app/appChainContext"
+import { getAddressExplorerUrl } from "../../app/explorer"
 import { truncateHash } from "../../app/utils/format"
 import {
   getLaunchpadDeepLink,
@@ -49,8 +51,11 @@ const LaunchExplorePanel = ({
   onSearchChange,
   onSelectLaunch,
   onSortChange
-}: LaunchExplorePanelProps) => (
-  <section className={styles.exploreGrid}>
+}: LaunchExplorePanelProps) => {
+  const { chainKey } = useAppChain()
+
+  return (
+    <section className={styles.exploreGrid}>
     <article className={`card ${styles.exploreIntro}`}>
       <div>
         <span>Explore</span>
@@ -173,7 +178,10 @@ const LaunchExplorePanel = ({
           {selectedLaunch.tokenContract ? (
             <a
               className="uiButton uiButtonOutline"
-              href={`https://finder.burrito.money/classic/address/${selectedLaunch.tokenContract}`}
+              href={getAddressExplorerUrl(
+                chainKey,
+                selectedLaunch.tokenContract
+              )}
               target="_blank"
               rel="noreferrer"
             >
@@ -260,7 +268,7 @@ const LaunchExplorePanel = ({
             ) : item.tokenContract ? (
               <a
                 className="uiButton uiButtonOutline"
-                href={`https://finder.burrito.money/classic/address/${item.tokenContract}`}
+                href={getAddressExplorerUrl(chainKey, item.tokenContract)}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -282,7 +290,8 @@ const LaunchExplorePanel = ({
         <strong>{exploreEmptyText}</strong>
       </article>
     ) : null}
-  </section>
-)
+    </section>
+  )
+}
 
 export default LaunchExplorePanel

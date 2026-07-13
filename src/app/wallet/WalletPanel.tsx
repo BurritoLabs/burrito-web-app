@@ -1457,7 +1457,7 @@ const WalletPanel = () => {
       <WalletBuyModal
         open={buyModalOpen}
         onClose={() => setBuyModalOpen(false)}
-        assets={isClassic ? ["LUNC", "USTC"] : []}
+        assets={isClassic ? ["LUNC", "USTC"] : ["LUNA"]}
       />
     </>
   )

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import styles from "../Swap.module.css"
+import { useAppChain } from "../../app/appChainContext"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import {
   cacheNativeBalances,
@@ -9,7 +10,7 @@ import {
   fetchPrices,
   getCachedNativeBalances
 } from "../../app/data/classic"
-import { CLASSIC_SWAP_DEXES } from "../../app/data/dexFactories"
+import { getSwapDexes } from "../../app/data/dexFactories"
 import {
   fetchCw20Balance,
   getCachedCw20ContractBalances,
@@ -25,6 +26,7 @@ import {
 } from "../../app/data/terraAssets"
 import { formatTokenAmount, formatUsd, toUnitAmount } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
+import { getTxExplorerUrl } from "../../app/explorer"
 import {
   buildClassicNativeIconCandidates,
   buildCw20IconCandidates,
@@ -47,7 +49,6 @@ import {
   FALLBACK_GAS_CW20_SWAP,
   FALLBACK_GAS_NATIVE_FEE,
   FALLBACK_GAS_NATIVE_SWAP,
-  GAS_PRICE_MICRO_LUNC,
   PLATFORM_FEE_BPS,
   PLATFORM_FEE_RECIPIENT,
   SLIPPAGE_OPTIONS,
@@ -99,6 +100,7 @@ type DexConfig = {
 type SwapMessage = Parameters<ClassicStargateClient["simulate"]>[1][number]
 
 type DexQuote = DexConfig & {
+  routeId: string
   pair: string
   returnAmount: bigint
   spreadAmount: bigint
@@ -122,8 +124,12 @@ const asCw20Id = (contract: string) => `cw20:${contract}`
 const buildNativeIconCandidates = (denom: string, symbol: string) =>
   buildClassicNativeIconCandidates({ denom, symbol })
 
-const formatSwapNativeSymbol = (denom: string) => {
-  if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) return CLASSIC_DENOMS.lunc.coinDenom
+const formatSwapNativeSymbol = (
+  denom: string,
+  nativeDenom: string,
+  nativeSymbol: string
+) => {
+  if (denom === nativeDenom) return nativeSymbol
   if (denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) return CLASSIC_DENOMS.ustc.coinDenom
   if (denom.startsWith("ibc/")) return "IBC"
   if (denom.startsWith("u") && denom.length > 1) {
@@ -136,33 +142,6 @@ const formatSwapNativeSymbol = (denom: string) => {
   return denom.split("/").pop()?.toUpperCase() || denom.toUpperCase()
 }
 
-const NATIVE_ASSETS: readonly SwapAsset[] = [
-  {
-    id: asNativeId(CLASSIC_DENOMS.lunc.coinMinimalDenom),
-    type: "native",
-    symbol: CLASSIC_DENOMS.lunc.coinDenom,
-    name: CLASSIC_DENOMS.lunc.coinDenom,
-    denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-    decimals: CLASSIC_DENOMS.lunc.coinDecimals,
-    iconCandidates: buildNativeIconCandidates(
-      CLASSIC_DENOMS.lunc.coinMinimalDenom,
-      CLASSIC_DENOMS.lunc.coinDenom
-    )
-  },
-  {
-    id: asNativeId(CLASSIC_DENOMS.ustc.coinMinimalDenom),
-    type: "native",
-    symbol: CLASSIC_DENOMS.ustc.coinDenom,
-    name: CLASSIC_DENOMS.ustc.coinDenom,
-    denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
-    decimals: CLASSIC_DENOMS.ustc.coinDecimals,
-    iconCandidates: buildNativeIconCandidates(
-      CLASSIC_DENOMS.ustc.coinMinimalDenom,
-      CLASSIC_DENOMS.ustc.coinDenom
-    )
-  }
-]
-
 type SwapPanelProps = {
   defaultFromAssetId?: string
   defaultToAssetId?: string
@@ -170,24 +149,9 @@ type SwapPanelProps = {
   assetOverrides?: SwapAssetOverride[]
   pairOnly?: PairOnlySwapConfig
 }
-const DEFAULT_FROM_ASSET_ID = NATIVE_ASSETS[0].id
-const DEFAULT_TO_ASSET_ID = NATIVE_ASSETS[1].id
 const SWAP_BROADCAST_TIMEOUT_MS = 60_000
 const SWAP_BROADCAST_POLL_INTERVAL_MS = 2_000
 const normalizeDexName = (name: string) => name.toLowerCase().split("-")[0]
-const ROUTED_SWAP_DEXES = CLASSIC_SWAP_DEXES.filter(
-  (item) =>
-    item.factory &&
-    (!item.mode || item.mode === "terraswap" || item.mode === "garuda")
-)
-const ACTIVE_DEX_IDS = new Set(ROUTED_SWAP_DEXES.map((item) => normalizeDexName(item.id)))
-
-const DEXES: readonly DexConfig[] = ROUTED_SWAP_DEXES.map((dex) => ({
-  ...dex,
-  factory: dex.factory ?? "",
-  mode: dex.mode === "garuda" ? "garuda" : "terraswap"
-}))
-
 const FACTORY_PAIR_CACHE = new Map<string, string>()
 
 const encodeJsonBytes = (value: unknown) =>
@@ -210,18 +174,20 @@ const encodeBase64Json = (value: unknown) => bytesToBase64(encodeJsonBytes(value
 const formatAssetUsdText = ({
   asset,
   amountMicro,
-  luncUsd,
+  nativeDenom,
+  nativeUsd,
   ustcUsd
 }: {
   asset: SwapAsset
   amountMicro: bigint
-  luncUsd?: number
+  nativeDenom: string
+  nativeUsd?: number
   ustcUsd?: number
 }) => {
   const price =
     asset.type === "native"
-      ? asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
-        ? luncUsd
+      ? asset.denom === nativeDenom
+        ? nativeUsd
         : asset.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
           ? ustcUsd
           : undefined
@@ -254,6 +220,26 @@ const toAssetInfo = (asset: SwapAsset) => {
     return { token: { contract_addr: asset.contract } }
   }
   throw new Error("invalid asset")
+}
+
+const toRegistryAssetKey = (asset: SwapAsset) => {
+  if (asset.type === "native") return asset.denom?.toLowerCase() ?? ""
+  return asset.contract?.toLowerCase() ?? ""
+}
+
+const pairMatchesAssets = (
+  pairAssets: readonly string[],
+  offerAsset: SwapAsset,
+  askAsset: SwapAsset
+) => {
+  const expected = new Set([
+    toRegistryAssetKey(offerAsset),
+    toRegistryAssetKey(askAsset)
+  ])
+  const actual = new Set(
+    pairAssets.map((asset) => asset.trim().toLowerCase()).filter(Boolean)
+  )
+  return expected.size === 2 && actual.size === 2 && [...expected].every((id) => actual.has(id))
 }
 
 const toGarudaAsset = (asset: SwapAsset) => {
@@ -353,6 +339,7 @@ const simulatePairSwapQuote = async (
     dex.mode === "garuda" ? undefined : ratioToDecimal(amount, returnAmount)
   return {
     ...dex,
+    routeId: `${dex.id}:${pair}`,
     pair,
     returnAmount,
     spreadAmount: parseBigInt(result.spread_amount),
@@ -522,17 +509,22 @@ const estimateFallbackGas = (
 
 const estimateFallbackFeeMicro = (
   offerAsset: SwapAsset,
-  includePlatformFee: boolean
+  includePlatformFee: boolean,
+  gasPrice: number
 ) => {
   const gas = estimateFallbackGas(offerAsset, includePlatformFee)
-  return BigInt(Math.ceil(gas * GAS_PRICE_MICRO_LUNC))
+  return BigInt(Math.ceil(gas * gasPrice))
 }
 
-const buildSwapFee = (gasLimit: number) => ({
+const buildSwapFee = (
+  gasLimit: number,
+  gasPrice: number,
+  feeDenom: string
+) => ({
   amount: [
     {
-      amount: Math.max(1, Math.ceil(gasLimit * GAS_PRICE_MICRO_LUNC)).toString(),
-      denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+      amount: Math.max(1, Math.ceil(gasLimit * gasPrice)).toString(),
+      denom: feeDenom
     }
   ],
   gas: String(gasLimit)
@@ -541,11 +533,15 @@ const buildSwapFee = (gasLimit: number) => ({
 const estimateSwapFee = async ({
   client,
   fallbackGas,
+  feeDenom,
+  gasPrice,
   messages,
   signerAddress
 }: {
   client: ClassicStargateClient
   fallbackGas: number
+  feeDenom: string
+  gasPrice: number
   messages: readonly SwapMessage[]
   signerAddress: string
 }) => {
@@ -557,17 +553,23 @@ const estimateSwapFee = async ({
     gasLimit = Math.ceil(fallbackGas * 1.15)
   }
 
-  return buildSwapFee(gasLimit)
+  return buildSwapFee(gasLimit, gasPrice, feeDenom)
 }
 
 const signAndBroadcastSwapFast = async ({
   client,
+  chainId,
   fallbackGas,
+  feeDenom,
+  gasPrice,
   messages,
   signerAddress
 }: {
   client: ClassicStargateClient
+  chainId: string
   fallbackGas: number
+  feeDenom: string
+  gasPrice: number
   messages: readonly SwapMessage[]
   signerAddress: string
 }) => {
@@ -578,6 +580,8 @@ const signAndBroadcastSwapFast = async ({
       const fee = await estimateSwapFee({
         client,
         fallbackGas,
+        feeDenom,
+        gasPrice,
         messages,
         signerAddress
       })
@@ -590,7 +594,7 @@ const signAndBroadcastSwapFast = async ({
         {
           accountNumber: signerState.accountNumber,
           sequence: sequenceHint ?? signerState.sequence,
-          chainId: CLASSIC_CHAIN.chainId
+          chainId
         }
       )
       const txBytes = TxRaw.encode(signed).finish()
@@ -640,12 +644,13 @@ const getAmountDensity = (value?: string) => {
 }
 
 const SwapPanel = ({
-  defaultFromAssetId = DEFAULT_FROM_ASSET_ID,
-  defaultToAssetId = DEFAULT_TO_ASSET_ID,
+  defaultFromAssetId,
+  defaultToAssetId,
   embedded = false,
   assetOverrides = [],
   pairOnly
 }: SwapPanelProps) => {
+  const { chainKey, chain } = useAppChain()
   const {
     account,
     connectorId,
@@ -657,8 +662,49 @@ const SwapPanel = ({
   } = useWallet()
   const accountAddress = account?.address
 
-  const [fromAssetId, setFromAssetId] = useState<string>(DEFAULT_FROM_ASSET_ID)
-  const [toAssetId, setToAssetId] = useState<string>(DEFAULT_TO_ASSET_ID)
+  const nativeAssets = useMemo<SwapAsset[]>(() => {
+    const native = chain.runtime.nativeDenom
+    const rows: SwapAsset[] = [
+      {
+        id: asNativeId(native.coinMinimalDenom),
+        type: "native",
+        symbol: native.coinDenom,
+        name: native.coinDenom,
+        denom: native.coinMinimalDenom,
+        decimals: native.coinDecimals,
+        iconCandidates: buildNativeIconCandidates(
+          native.coinMinimalDenom,
+          native.coinDenom
+        )
+      }
+    ]
+    if (chainKey === "lunc") {
+      rows.push({
+        id: asNativeId(CLASSIC_DENOMS.ustc.coinMinimalDenom),
+        type: "native",
+        symbol: CLASSIC_DENOMS.ustc.coinDenom,
+        name: CLASSIC_DENOMS.ustc.coinDenom,
+        denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
+        decimals: CLASSIC_DENOMS.ustc.coinDecimals,
+        iconCandidates: buildNativeIconCandidates(
+          CLASSIC_DENOMS.ustc.coinMinimalDenom,
+          CLASSIC_DENOMS.ustc.coinDenom
+        )
+      })
+    }
+    return rows
+  }, [chain.runtime.nativeDenom, chainKey])
+  const resolvedDefaultFromAssetId =
+    defaultFromAssetId ?? nativeAssets[0]?.id ?? "native:uluna"
+  const resolvedDefaultToAssetId =
+    defaultToAssetId ?? nativeAssets[1]?.id ?? ""
+
+  const [fromAssetId, setFromAssetId] = useState<string>(
+    resolvedDefaultFromAssetId
+  )
+  const [toAssetId, setToAssetId] = useState<string>(
+    resolvedDefaultToAssetId
+  )
   const [amountIn, setAmountIn] = useState("")
   const [slippageBps, setSlippageBps] = useState<bigint>(DEFAULT_SLIPPAGE_BPS)
   const [quotes, setQuotes] = useState<DexQuote[]>([])
@@ -675,10 +721,31 @@ const SwapPanel = ({
   const [pickerQuery, setPickerQuery] = useState("")
   const appliedDefaultPairRef = useRef<string | null>(null)
   const isPairOnly = Boolean(pairOnly)
+  const dexes = useMemo<readonly DexConfig[]>(
+    () =>
+      getSwapDexes(chainKey)
+        .filter(
+          (item) =>
+            !item.mode || item.mode === "terraswap" || item.mode === "garuda"
+        )
+        .map((dex) => ({
+          ...dex,
+          factory: dex.factory ?? "",
+          mode: dex.mode === "garuda" ? "garuda" : "terraswap"
+        })),
+    [chainKey]
+  )
+  const activeDexIds = useMemo(
+    () => new Set(dexes.map((item) => normalizeDexName(item.id))),
+    [dexes]
+  )
   const pairOnlyDex = useMemo<DexConfig | undefined>(() => {
     if (!pairOnly) return undefined
     const dexId = pairOnly.dexId.toLowerCase()
-    const matched = DEXES.find((dex) => dex.id === dexId)
+    const matched = dexes.find(
+      (dex) =>
+        dex.id === dexId || normalizeDexName(dex.id) === normalizeDexName(dexId)
+    )
     return {
       factory: matched?.factory ?? "",
       id: dexId,
@@ -687,24 +754,24 @@ const SwapPanel = ({
         matched?.mode ??
         (dexId.startsWith("garuda") ? "garuda" : "terraswap")
     }
-  }, [pairOnly])
+  }, [dexes, pairOnly])
 
   const { data: dexPairs = [] } = useQuery({
-    queryKey: ["swap-dex-pairs", "classic"],
+    queryKey: ["swap-dex-pairs", chain.chainId],
     queryFn: fetchMarketDexPairs,
     enabled: !isPairOnly,
     staleTime: 60 * 60 * 1000
   })
 
   const defaultCw20Contracts = useMemo(() => {
-    return [defaultFromAssetId, defaultToAssetId]
+    return [resolvedDefaultFromAssetId, resolvedDefaultToAssetId]
       .filter((id) => id.startsWith("cw20:"))
       .map((id) => id.slice("cw20:".length).toLowerCase())
-  }, [defaultFromAssetId, defaultToAssetId])
+  }, [resolvedDefaultFromAssetId, resolvedDefaultToAssetId])
 
   const defaultNativeDenoms = useMemo(() => {
-    const builtInNativeIds = new Set(NATIVE_ASSETS.map((asset) => asset.id))
-    return [defaultFromAssetId, defaultToAssetId]
+    const builtInNativeIds = new Set(nativeAssets.map((asset) => asset.id))
+    return [resolvedDefaultFromAssetId, resolvedDefaultToAssetId]
       .filter((id) => id.startsWith("native:") && !builtInNativeIds.has(id))
       .map((id) => {
         const denom = id.slice("native:".length)
@@ -713,13 +780,13 @@ const SwapPanel = ({
           : denom
       })
       .filter(Boolean)
-  }, [defaultFromAssetId, defaultToAssetId])
+  }, [nativeAssets, resolvedDefaultFromAssetId, resolvedDefaultToAssetId])
 
   const tradableCw20Set = useMemo(() => {
     const set = new Set<string>()
     dexPairs.forEach((entry) => {
       const dexName = normalizeDexName(entry.dexId)
-      if (dexName && !ACTIVE_DEX_IDS.has(dexName)) return
+      if (dexName && !activeDexIds.has(dexName)) return
       ;(entry.assets ?? []).forEach((asset) => {
         if (asset.startsWith("terra1")) {
           set.add(asset)
@@ -728,13 +795,13 @@ const SwapPanel = ({
     })
     defaultCw20Contracts.forEach((contract) => set.add(contract))
     return set
-  }, [defaultCw20Contracts, dexPairs])
+  }, [activeDexIds, defaultCw20Contracts, dexPairs])
 
   const tradableNativeDenoms = useMemo(() => {
     const set = new Set<string>()
     dexPairs.forEach((entry) => {
       const dexName = normalizeDexName(entry.dexId)
-      if (dexName && !ACTIVE_DEX_IDS.has(dexName)) return
+      if (dexName && !activeDexIds.has(dexName)) return
       ;(entry.assets ?? []).forEach((asset) => {
         if (!asset || asset.startsWith("terra1")) return
         set.add(asset.startsWith("ibc/") ? `ibc/${asset.slice(4).toUpperCase()}` : asset)
@@ -742,7 +809,7 @@ const SwapPanel = ({
     })
     defaultNativeDenoms.forEach((denom) => set.add(denom))
     return Array.from(set)
-  }, [defaultNativeDenoms, dexPairs])
+  }, [activeDexIds, defaultNativeDenoms, dexPairs])
 
   const tradableBankDenoms = useMemo(
     () => tradableNativeDenoms.filter((denom) => !denom.startsWith("ibc/")),
@@ -791,7 +858,13 @@ const SwapPanel = ({
       if (denom.startsWith("ibc/")) {
         const hash = denom.slice(4).toUpperCase()
         const token = ibcWhitelist[hash]
-        const symbol = token?.symbol || formatSwapNativeSymbol(denom)
+        const symbol =
+          token?.symbol ||
+          formatSwapNativeSymbol(
+            denom,
+            chain.nativeDenom,
+            chain.displayDenom
+          )
         return {
           id: asNativeId(denom),
           type: "native" as const,
@@ -807,7 +880,13 @@ const SwapPanel = ({
       }
 
       const token = nativeWhitelist[denom.toLowerCase()]
-      const symbol = token?.symbol || formatSwapNativeSymbol(denom)
+      const symbol =
+        token?.symbol ||
+        formatSwapNativeSymbol(
+          denom,
+          chain.nativeDenom,
+          chain.displayDenom
+        )
       return {
         id: asNativeId(denom),
         type: "native" as const,
@@ -822,7 +901,13 @@ const SwapPanel = ({
         })
       }
     })
-  }, [ibcWhitelist, nativeWhitelist, tradableNativeDenoms])
+  }, [
+    chain.displayDenom,
+    chain.nativeDenom,
+    ibcWhitelist,
+    nativeWhitelist,
+    tradableNativeDenoms
+  ])
 
   const overrideNativeAssets = useMemo<SwapAsset[]>(() => {
     return assetOverrides
@@ -868,7 +953,7 @@ const SwapPanel = ({
     }
 
     const nativeRows = new Map(
-      NATIVE_ASSETS.map((asset) => [asset.id, applyOverride(asset)] as const)
+      nativeAssets.map((asset) => [asset.id, applyOverride(asset)] as const)
     )
     dexNativeAssets.forEach((asset) => {
       nativeRows.set(asset.id, applyOverride(asset))
@@ -907,6 +992,7 @@ const SwapPanel = ({
     assetOverrides,
     dexNativeAssets,
     isPairOnly,
+    nativeAssets,
     overrideNativeAssets,
     swapCw20Whitelist,
     tradableCw20Set
@@ -933,36 +1019,59 @@ const SwapPanel = ({
   }, [assets, fromAssetId, toAssetId])
 
   useEffect(() => {
+    appliedDefaultPairRef.current = null
+    setFromAssetId(resolvedDefaultFromAssetId)
+    setToAssetId(resolvedDefaultToAssetId)
+    setAmountIn("")
+    setQuotes([])
+    setSelectedDexId(undefined)
+    setQuoteError(undefined)
+    setSubmitError(undefined)
+    setLastTxHash(undefined)
+  }, [chainKey, resolvedDefaultFromAssetId, resolvedDefaultToAssetId])
+
+  useEffect(() => {
     if (!assets.length) return
 
-    const defaultPairKey = `${defaultFromAssetId}:${defaultToAssetId}`
+    const defaultPairKey = `${resolvedDefaultFromAssetId}:${resolvedDefaultToAssetId}`
     if (appliedDefaultPairRef.current === defaultPairKey) return
 
-    const hasDefaultFrom = assets.some((asset) => asset.id === defaultFromAssetId)
+    const hasDefaultFrom = assets.some(
+      (asset) => asset.id === resolvedDefaultFromAssetId
+    )
     const hasDefaultTo = assets.some(
-      (asset) => asset.id === defaultToAssetId && asset.id !== defaultFromAssetId
+      (asset) =>
+        asset.id === resolvedDefaultToAssetId &&
+        asset.id !== resolvedDefaultFromAssetId
     )
 
     if (!hasDefaultFrom || !hasDefaultTo) return
 
     appliedDefaultPairRef.current = defaultPairKey
-    setFromAssetId(defaultFromAssetId)
-    setToAssetId(defaultToAssetId)
+    setFromAssetId(resolvedDefaultFromAssetId)
+    setToAssetId(resolvedDefaultToAssetId)
     setQuotes([])
     setSelectedDexId(undefined)
     setQuoteError(undefined)
-  }, [assets, defaultFromAssetId, defaultToAssetId])
+  }, [assets, resolvedDefaultFromAssetId, resolvedDefaultToAssetId])
 
   const fromAsset = useMemo(
-    () => assets.find((asset) => asset.id === fromAssetId) ?? assets[0] ?? NATIVE_ASSETS[0],
-    [assets, fromAssetId]
+    () =>
+      assets.find((asset) => asset.id === fromAssetId) ??
+      assets[0] ??
+      nativeAssets[0],
+    [assets, fromAssetId, nativeAssets]
   )
 
   const toAsset = useMemo(() => {
     const candidate = assets.find((asset) => asset.id === toAssetId && asset.id !== fromAsset.id)
     if (candidate) return candidate
-    return assets.find((asset) => asset.id !== fromAsset.id) ?? NATIVE_ASSETS[1]
-  }, [assets, toAssetId, fromAsset.id])
+    return (
+      assets.find((asset) => asset.id !== fromAsset.id) ??
+      nativeAssets.find((asset) => asset.id !== fromAsset.id) ??
+      fromAsset
+    )
+  }, [assets, toAssetId, fromAsset, nativeAssets])
 
   const quoteFromAsset = useMemo(
     () =>
@@ -1028,7 +1137,7 @@ const SwapPanel = ({
     [accountAddress]
   )
   const balancesQuery = useQuery({
-    queryKey: ["swap-balances", accountAddress],
+    queryKey: ["swap-balances", chain.chainId, accountAddress],
     queryFn: () => fetchBalances(accountAddress ?? ""),
     enabled: Boolean(accountAddress),
     initialData: cachedNativeBalances?.data,
@@ -1044,7 +1153,7 @@ const SwapPanel = ({
   }, [accountAddress, balancesQuery.data])
 
   const { data: prices } = useQuery({
-    queryKey: ["prices"],
+    queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
@@ -1064,6 +1173,7 @@ const SwapPanel = ({
   const { data: focusedCw20Balances = {} } = useQuery({
     queryKey: [
       "swap-focused-cw20-balances",
+      chain.chainId,
       accountAddress,
       focusedCw20Contracts.join(",")
     ],
@@ -1109,7 +1219,7 @@ const SwapPanel = ({
   const toBalanceMicro = useMemo(() => {
     return assetBalanceMap.get(toAsset.id) ?? 0n
   }, [assetBalanceMap, toAsset.id])
-  const luncUsd = prices?.lunc?.usd
+  const nativeUsd = chainKey === "luna" ? prices?.luna?.usd : prices?.lunc?.usd
   const ustcUsd = prices?.ustc?.usd
 
   const fromAmountUsdText = useMemo(
@@ -1117,10 +1227,11 @@ const SwapPanel = ({
       formatAssetUsdText({
         asset: fromAsset,
         amountMicro: amountInMicro,
-        luncUsd,
+        nativeDenom: chain.nativeDenom,
+        nativeUsd,
         ustcUsd
       }),
-    [fromAsset, amountInMicro, luncUsd, ustcUsd]
+    [amountInMicro, chain.nativeDenom, fromAsset, nativeUsd, ustcUsd]
   )
 
   const insufficientBalance = amountInMicro > 0n && amountInMicro > fromBalanceMicro
@@ -1136,7 +1247,7 @@ const SwapPanel = ({
   const selectedQuote = useMemo(() => {
     if (!quotes.length) return undefined
     if (!selectedDexId) return bestQuote
-    return quotes.find((item) => item.id === selectedDexId) ?? bestQuote
+    return quotes.find((item) => item.routeId === selectedDexId) ?? bestQuote
   }, [bestQuote, quotes, selectedDexId])
 
   const selectedQuotePair = selectedQuote?.pair ?? ""
@@ -1163,10 +1274,11 @@ const SwapPanel = ({
       formatAssetUsdText({
         asset: toAsset,
         amountMicro: selectedQuote?.returnAmount ?? 0n,
-        luncUsd,
+        nativeDenom: chain.nativeDenom,
+        nativeUsd,
         ustcUsd
       }),
-    [toAsset, selectedQuote?.returnAmount, luncUsd, ustcUsd]
+    [chain.nativeDenom, nativeUsd, selectedQuote?.returnAmount, toAsset, ustcUsd]
   )
 
   const toAmountDisplay = useMemo(
@@ -1186,12 +1298,12 @@ const SwapPanel = ({
     if (previewPending) {
       return isPairOnly
         ? "Fetching quote from this pool..."
-        : "Fetching quotes across Classic DEX routes..."
+        : `Fetching quotes across ${chain.name} DEX routes...`
     }
     return isPairOnly
       ? "Pool quote will appear here once available."
       : "Route details will appear here once a quote is available."
-  }, [hasAmountInput, isPairOnly, previewPending])
+  }, [chain.name, hasAmountInput, isPairOnly, previewPending])
 
   const amountInDensity = useMemo(() => getAmountDensity(amountIn), [amountIn])
   const toAmountDensity = useMemo(() => getAmountDensity(toAmountDisplay), [toAmountDisplay])
@@ -1219,7 +1331,7 @@ const SwapPanel = ({
   const priceImpactDisplay = useMemo(() => {
     if (isPairOnly && selectedQuote) return "Current pool"
     if (!selectedQuote || !bestQuote || bestQuote.returnAmount === 0n) return "--"
-    if (selectedQuote.id === bestQuote.id) return "Best"
+    if (selectedQuote.routeId === bestQuote.routeId) return "Best"
     const ratio =
       Number(bestQuote.returnAmount - selectedQuote.returnAmount) /
       Number(bestQuote.returnAmount)
@@ -1232,7 +1344,7 @@ const SwapPanel = ({
     if (!quotes.length || !bestQuote || bestQuote.returnAmount <= 0n) return []
     return quotes.map((quote) => {
       const lossBps =
-        quote.id === bestQuote.id
+          quote.routeId === bestQuote.routeId
           ? 0
           : Number(
               ((bestQuote.returnAmount - quote.returnAmount) * 10_000n) /
@@ -1313,6 +1425,68 @@ const SwapPanel = ({
       setQuoteLoading(true)
       setQuoteError(undefined)
       try {
+        const directRoutes = dexPairs
+          .filter((entry) => {
+            const dexName = normalizeDexName(entry.dexId)
+            return (
+              activeDexIds.has(dexName) &&
+              pairMatchesAssets(entry.assets, quoteFromAsset, quoteToAsset)
+            )
+          })
+          .map((entry) => {
+            const exact = dexes.find(
+              (dex) => dex.id.toLowerCase() === entry.dexId.toLowerCase()
+            )
+            const matched =
+              exact ??
+              dexes.find(
+                (dex) =>
+                  normalizeDexName(dex.id) === normalizeDexName(entry.dexId)
+              )
+            return {
+              dex: {
+                factory: matched?.factory ?? "",
+                id: entry.dexId.toLowerCase(),
+                label: entry.dexLabel || matched?.label || entry.dexId,
+                mode:
+                  matched?.mode ??
+                  (entry.dexId.toLowerCase().startsWith("garuda")
+                    ? "garuda"
+                    : "terraswap")
+              } satisfies DexConfig,
+              pair: entry.pair
+            }
+          })
+          .filter(
+            (entry, index, rows) =>
+              rows.findIndex(
+                (candidate) =>
+                  candidate.dex.id === entry.dex.id &&
+                  candidate.pair === entry.pair
+              ) === index
+          )
+
+        const quoteTasks =
+          directRoutes.length > 0
+            ? directRoutes.map(({ dex, pair }) =>
+                simulatePairSwapQuote(
+                  dex,
+                  pair,
+                  quoteFromAsset,
+                  swapAmountMicro
+                )
+              )
+            : dexes
+                .filter((dex) => Boolean(dex.factory))
+                .map((dex) =>
+                  simulateSwapQuote(
+                    dex,
+                    quoteFromAsset,
+                    quoteToAsset,
+                    swapAmountMicro
+                  )
+                )
+
         const settled = await Promise.allSettled(
           isPairOnly && pairOnly && pairOnlyDex
             ? [
@@ -1323,9 +1497,7 @@ const SwapPanel = ({
                   swapAmountMicro
                 )
               ]
-            : DEXES.map((dex) =>
-                simulateSwapQuote(dex, quoteFromAsset, quoteToAsset, swapAmountMicro)
-              )
+            : quoteTasks
         )
         const nextQuotes = settled
           .filter((item): item is PromiseFulfilledResult<DexQuote> => item.status === "fulfilled")
@@ -1347,10 +1519,13 @@ const SwapPanel = ({
 
         setQuotes(nextQuotes)
         setSelectedDexId((current) => {
-          if (current && nextQuotes.some((quote) => quote.id === current)) {
+          if (
+            current &&
+            nextQuotes.some((quote) => quote.routeId === current)
+          ) {
             return current
           }
-          return nextQuotes[0].id
+          return nextQuotes[0].routeId
         })
       } catch (error) {
         if (cancelled) return
@@ -1367,7 +1542,17 @@ const SwapPanel = ({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [isPairOnly, pairOnly, pairOnlyDex, quoteFromAsset, quoteToAsset, swapAmountMicro])
+  }, [
+    activeDexIds,
+    dexPairs,
+    dexes,
+    isPairOnly,
+    pairOnly,
+    pairOnlyDex,
+    quoteFromAsset,
+    quoteToAsset,
+    swapAmountMicro
+  ])
 
   useEffect(() => {
     if (!feeQuote || swapAmountMicro <= 0n) {
@@ -1377,14 +1562,20 @@ const SwapPanel = ({
     }
 
     const fallbackFee = `${formatTokenAmount(
-      estimateFallbackFeeMicro(quoteFromAsset, platformFeeMicro > 0n).toString(),
+      estimateFallbackFeeMicro(
+        quoteFromAsset,
+        platformFeeMicro > 0n,
+        chain.runtime.gasPriceStep.average
+      ).toString(),
       6,
       6
-    )} LUNC`
+    )} ${chain.displayDenom}`
 
     setFeeDisplay((current) => (current === fallbackFee ? current : fallbackFee))
     setFeeLoading(false)
   }, [
+    chain.displayDenom,
+    chain.runtime.gasPriceStep.average,
     feeQuote,
     platformFeeMicro,
     quoteFromAsset,
@@ -1451,11 +1642,11 @@ const SwapPanel = ({
     try {
       startTx("Swap")
       if (!connectorId) throw new Error("Wallet not connected")
-      const { connectClassicSigningClientForConnector } = await import(
+      const { connectSigningClientForConnector } = await import(
         "../../app/wallet/walletAdapters"
       )
       const signerAddress = accountAddress
-      const client = await connectClassicSigningClientForConnector(connectorId)
+      const client = await connectSigningClientForConnector(connectorId)
 
       const feeMsg = await buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
       const msg = await buildSwapMessage(
@@ -1472,7 +1663,10 @@ const SwapPanel = ({
       const messages = feeMsg ? [feeMsg, msg] : [msg]
       const hash = await signAndBroadcastSwapFast({
         client,
+        chainId: chain.chainId,
         fallbackGas: estimateFallbackGas(fromAsset, platformFeeMicro > 0n),
+        feeDenom: chain.nativeDenom,
+        gasPrice: chain.runtime.gasPriceStep.average,
         messages,
         signerAddress
       })
@@ -1498,7 +1692,7 @@ const SwapPanel = ({
               <p className={styles.formHint}>
                 {isPairOnly
                   ? "Swap directly through this pool."
-                  : "Aggregated on-chain quotes across Classic DEX routes."}
+                  : `Aggregated on-chain quotes across ${chain.name} DEX routes.`}
               </p>
               <div className={styles.slippageControl}>
                 {SLIPPAGE_OPTIONS.map((item) => (
@@ -1771,13 +1965,14 @@ const SwapPanel = ({
                       </div>
                       <div className={styles.routeList}>
                         {routeRows.map((quote, index) => {
-                          const selected = selectedQuote?.id === quote.id
+                          const selected =
+                            selectedQuote?.routeId === quote.routeId
                           return (
                             <button
-                              key={quote.id}
+                              key={quote.routeId}
                               type="button"
                               className={`${styles.routeItem} ${selected ? styles.routeItemActive : ""}`}
-                              onClick={() => setSelectedDexId(quote.id)}
+                              onClick={() => setSelectedDexId(quote.routeId)}
                             >
                               <div className={styles.routeName}>
                                 {quote.label}
@@ -1832,7 +2027,7 @@ const SwapPanel = ({
               <p className={styles.success}>
                 Submitted:{" "}
                 <a
-                  href={`https://finder.burrito.money/classic/tx/${lastTxHash}`}
+                  href={getTxExplorerUrl(chainKey, lastTxHash)}
                   target="_blank"
                   rel="noreferrer"
                 >

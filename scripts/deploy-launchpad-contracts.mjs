@@ -21,15 +21,44 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
-const DEFAULT_RPC = "https://terra-classic-rpc.publicnode.com:443";
-const DEFAULT_GAS_PRICE = "28.325uluna";
 const DEFAULT_STORE_GAS = 5_000_000;
 const DEFAULT_INSTANTIATE_GAS = 600_000;
 
 const env = process.env;
 
-const args = new Set(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+const args = new Set(rawArgs);
+const options = Object.fromEntries(
+  rawArgs
+    .filter((arg) => arg.includes("="))
+    .map((arg) => {
+      const [key, ...parts] = arg.replace(/^--/, "").split("=");
+      return [key, parts.join("=")];
+    })
+);
 const isDryRun = args.has("--dry-run") || env.DEPLOY_DRY_RUN === "1";
+
+const chainKey = (options.chain || env.DEPLOY_CHAIN || "lunc").toLowerCase();
+if (chainKey !== "lunc" && chainKey !== "luna") {
+  throw new Error('chain must be "lunc" or "luna".');
+}
+
+const chainConfig =
+  chainKey === "luna"
+    ? {
+        chainId: "phoenix-1",
+        rpc: "https://terra-rpc.publicnode.com:443",
+        gasPrice: "0.015uluna",
+        envPrefix: "VITE_LUNA_LAUNCHPAD",
+        rpcEnv: "LUNA_RPC"
+      }
+    : {
+        chainId: "columbus-5",
+        rpc: "https://terra-classic-rpc.publicnode.com:443",
+        gasPrice: "28.325uluna",
+        envPrefix: "VITE_LUNC_LAUNCHPAD",
+        rpcEnv: "CLASSIC_RPC"
+      };
 
 const required = (name) => {
   const value = env[name]?.trim();
@@ -58,10 +87,15 @@ const launchRegistryWasm = resolveFromRoot(
   )
 );
 const outputPath = resolveFromRoot(
-  optional("DEPLOY_OUTPUT", "artifacts/launchpad/deploy-result.json")
+  optional("DEPLOY_OUTPUT", `artifacts/launchpad/deploy-result-${chainKey}.json`)
 );
-const rpc = optional("CLASSIC_RPC", DEFAULT_RPC);
-const gasPrice = GasPrice.fromString(optional("DEPLOY_GAS_PRICE", DEFAULT_GAS_PRICE));
+const rpc = optional(
+  "DEPLOY_RPC",
+  optional(chainConfig.rpcEnv, chainConfig.rpc)
+);
+const gasPrice = GasPrice.fromString(
+  optional("DEPLOY_GAS_PRICE", chainConfig.gasPrice)
+);
 const storeGas = Number(optional("STORE_GAS", String(DEFAULT_STORE_GAS)));
 const instantiateGas = Number(
   optional("INSTANTIATE_GAS", String(DEFAULT_INSTANTIATE_GAS))
@@ -197,6 +231,8 @@ const main = async () => {
       JSON.stringify(
         {
           dryRun: true,
+          chainKey,
+          chainId: chainConfig.chainId,
           rpc,
           lpLockerWasm,
           launchRegistryWasm,
@@ -261,7 +297,8 @@ const main = async () => {
   );
 
   const output = {
-    chainId: "columbus-5",
+    chainKey,
+    chainId: chainConfig.chainId,
     rpc,
     deployer: address,
     owner,
@@ -279,8 +316,8 @@ const main = async () => {
       instantiateTxHash: launchRegistry.txHash
     },
     cloudflare: {
-      VITE_LAUNCHPAD_LP_LOCKER_ADDRESS: lpLocker.contractAddress,
-      VITE_LAUNCHPAD_REGISTRY_ADDRESS: launchRegistry.contractAddress
+      [`${chainConfig.envPrefix}_LP_LOCKER_ADDRESS`]: lpLocker.contractAddress,
+      [`${chainConfig.envPrefix}_REGISTRY_ADDRESS`]: launchRegistry.contractAddress
     }
   };
 

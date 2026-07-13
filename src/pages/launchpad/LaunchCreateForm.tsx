@@ -3,7 +3,8 @@ import {
   type Dispatch,
   type SetStateAction
 } from "react"
-import { LAUNCHPAD_CREATION_FEE_LABEL } from "../../app/config/launchpadConfig"
+import { getLaunchpadCreationFeeLabel } from "../../app/config/launchpadConfig"
+import { useAppChain } from "../../app/appChainContext"
 import {
   createSteps,
   modeOptions,
@@ -59,7 +60,12 @@ const LaunchCreateForm = ({
   onRiskAcknowledgedChange,
   onSetActiveCreateStep,
   onSetDraft
-}: LaunchCreateFormProps) => (
+}: LaunchCreateFormProps) => {
+  const { chain, chainKey } = useAppChain()
+  const creationFeeLabel = getLaunchpadCreationFeeLabel(chainKey)
+  const nativeSymbol = chain.displayDenom
+
+  return (
   <form className={`card ${styles.formCard}`}>
     <div className={styles.formHeader}>
       <div>
@@ -143,7 +149,7 @@ const LaunchCreateForm = ({
           </label>
         </div>
         <div className={styles.noticeBox}>
-          Fixed supply CW20. Decimals are fixed to 6 on Terra Classic.
+          Fixed supply CW20. Decimals are fixed to 6 on {chain.name}.
         </div>
       </div>
     ) : null}
@@ -181,7 +187,7 @@ const LaunchCreateForm = ({
             />
           </label>
           <label className={styles.field}>
-            <span>LUNC liquidity</span>
+            <span>{nativeSymbol} liquidity</span>
             <input
               value={draft.luncLiquidity}
               onChange={onDraftFieldChange("luncLiquidity")}
@@ -263,7 +269,7 @@ const LaunchCreateForm = ({
         </label>
         <div className={styles.feeNotice}>
           <span>Creation fee</span>
-          <strong>{LAUNCHPAD_CREATION_FEE_LABEL}</strong>
+          <strong>{creationFeeLabel}</strong>
           <small>
             Charged once when the token contract is created. Network gas is
             separate.
@@ -299,6 +305,7 @@ const LaunchCreateForm = ({
       </button>
     </div>
   </form>
-)
+  )
+}
 
 export default LaunchCreateForm

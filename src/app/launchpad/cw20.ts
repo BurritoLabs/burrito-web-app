@@ -3,12 +3,7 @@ import {
   MsgExecuteContract,
   MsgInstantiateContract
 } from "cosmjs-types/cosmwasm/wasm/v1/tx"
-import {
-  LAUNCHPAD_CW20_CODE_ID,
-  LAUNCHPAD_CW20_CODE_ID_LABEL
-} from "../config/launchpadConfig"
-
-export { LAUNCHPAD_CW20_CODE_ID, LAUNCHPAD_CW20_CODE_ID_LABEL }
+import { getLaunchpadConfig } from "../config/launchpadConfig"
 
 export type Cw20InstantiateInput = {
   creatorAddress: string
@@ -124,17 +119,20 @@ export const buildCw20InstantiatePayload = ({
 export const buildCw20InstantiateMessage = (
   input: Cw20InstantiateInput,
   label: string
-) => ({
-  typeUrl: "/cosmwasm.wasm.v1.MsgInstantiateContract",
-  value: MsgInstantiateContract.fromPartial({
-    sender: input.creatorAddress,
-    admin: "",
-    codeId: LAUNCHPAD_CW20_CODE_ID,
-    label,
-    msg: toUtf8(JSON.stringify(buildCw20InstantiatePayload(input))),
-    funds: []
-  })
-})
+) => {
+  const config = getLaunchpadConfig()
+  return {
+    typeUrl: "/cosmwasm.wasm.v1.MsgInstantiateContract",
+    value: MsgInstantiateContract.fromPartial({
+      sender: input.creatorAddress,
+      admin: "",
+      codeId: config.cw20CodeId,
+      label,
+      msg: toUtf8(JSON.stringify(buildCw20InstantiatePayload(input))),
+      funds: []
+    })
+  }
+}
 
 export const buildCw20TransferMessage = ({
   sender,

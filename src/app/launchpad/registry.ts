@@ -2,11 +2,11 @@ import { toUtf8 } from "@cosmjs/encoding"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { queryContractSmart } from "../data/classic"
 import {
-  LAUNCHPAD_REGISTRY_ADDRESS,
+  getLaunchpadConfig,
   isLaunchRegistryConfigured
 } from "../config/launchpadConfig"
 
-export { LAUNCHPAD_REGISTRY_ADDRESS, isLaunchRegistryConfigured }
+export { isLaunchRegistryConfigured }
 
 export type LaunchRegistryMetadata = {
   name: string
@@ -63,7 +63,8 @@ const isLaunchRecord = (value: unknown): value is LaunchRegistryLaunch =>
   )
 
 export const fetchLaunchRegistryLaunches = async () => {
-  if (!isLaunchRegistryConfigured) return []
+  const config = getLaunchpadConfig()
+  if (!isLaunchRegistryConfigured()) return []
   const launches: LaunchRegistryLaunch[] = []
   const limit = 100
   let startAfter: number | undefined
@@ -78,7 +79,7 @@ export const fetchLaunchRegistryLaunches = async () => {
       query.launches.start_after = startAfter
     }
     const response = await queryContractSmart<LaunchesResponse>(
-      LAUNCHPAD_REGISTRY_ADDRESS,
+      config.registryAddress,
       query
     )
     const pageLaunches = response.launches ?? []
@@ -92,10 +93,11 @@ export const fetchLaunchRegistryLaunches = async () => {
 }
 
 export const fetchLaunchRegistryLaunch = async (tokenContract: string) => {
-  if (!isLaunchRegistryConfigured) return null
+  const config = getLaunchpadConfig()
+  if (!isLaunchRegistryConfigured()) return null
   try {
     const response = await queryContractSmart<LaunchResponse>(
-      LAUNCHPAD_REGISTRY_ADDRESS,
+      config.registryAddress,
       {
         launch: {
           token_contract: tokenContract
@@ -142,7 +144,8 @@ export const buildRegisterLaunchMessage = ({
     description: string
   }
 }) => {
-  if (!isLaunchRegistryConfigured) {
+  const config = getLaunchpadConfig()
+  if (!isLaunchRegistryConfigured()) {
     throw new Error("Launch registry contract is not configured.")
   }
 
@@ -150,7 +153,7 @@ export const buildRegisterLaunchMessage = ({
     typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
     value: MsgExecuteContract.fromPartial({
       sender,
-      contract: LAUNCHPAD_REGISTRY_ADDRESS,
+      contract: config.registryAddress,
       msg: toUtf8(
         JSON.stringify({
           register_launch: {
@@ -196,7 +199,8 @@ export const buildUpdateLaunchMessage = ({
   lpLockId?: string
   lpUnlockTime?: number
 }) => {
-  if (!isLaunchRegistryConfigured) {
+  const config = getLaunchpadConfig()
+  if (!isLaunchRegistryConfigured()) {
     throw new Error("Launch registry contract is not configured.")
   }
 
@@ -204,7 +208,7 @@ export const buildUpdateLaunchMessage = ({
     typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
     value: MsgExecuteContract.fromPartial({
       sender,
-      contract: LAUNCHPAD_REGISTRY_ADDRESS,
+      contract: config.registryAddress,
       msg: toUtf8(
         JSON.stringify({
           update_launch: {

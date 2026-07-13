@@ -29,6 +29,9 @@ export type AppChainConfig = {
 export const APP_CHAIN_STORAGE_KEY = "burrito:web-app:chain"
 export const DEFAULT_APP_CHAIN: AppChainKey = "lunc"
 
+const isFeatureEnabled = (value: string | undefined) =>
+  !/^(1|true|yes)$/i.test(value?.trim() ?? "")
+
 export const APP_CHAINS = {
   lunc: {
     key: "lunc",
@@ -44,7 +47,11 @@ export const APP_CHAINS = {
     accentStrong: "#0284c7",
     accentSoft: "#bae6fd",
     runtime: CHAIN_RUNTIME_CONFIG.lunc,
-    features: { swap: true, market: true, launchpad: true }
+    features: {
+      swap: isFeatureEnabled(import.meta.env.VITE_DISABLE_LUNC_SWAP),
+      market: isFeatureEnabled(import.meta.env.VITE_DISABLE_LUNC_MARKET),
+      launchpad: isFeatureEnabled(import.meta.env.VITE_DISABLE_LUNC_LAUNCHPAD)
+    }
   },
   luna: {
     key: "luna",
@@ -60,7 +67,11 @@ export const APP_CHAINS = {
     accentStrong: "#ea580c",
     accentSoft: "#fed7aa",
     runtime: CHAIN_RUNTIME_CONFIG.luna,
-    features: { swap: false, market: true, launchpad: false }
+    features: {
+      swap: isFeatureEnabled(import.meta.env.VITE_DISABLE_LUNA_SWAP),
+      market: isFeatureEnabled(import.meta.env.VITE_DISABLE_LUNA_MARKET),
+      launchpad: isFeatureEnabled(import.meta.env.VITE_DISABLE_LUNA_LAUNCHPAD)
+    }
   }
 } as const satisfies Record<AppChainKey, AppChainConfig>
 

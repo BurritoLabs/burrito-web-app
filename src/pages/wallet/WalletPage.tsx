@@ -47,14 +47,14 @@ const Wallet = () => {
       hideLowBalance
     })
 
-  const luncBalance = balances.find(
-    (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+  const nativeBalance = balances.find(
+    (coin) => coin.denom === chain.nativeDenom
   )
   const showCoinsWarning =
     Boolean(account?.address) &&
     !isBalanceLoading &&
     !isBalanceError &&
-    Number(luncBalance?.amount ?? 0) === 0
+    Number(nativeBalance?.amount ?? 0) === 0
 
   const handleToggleLowBalance = useCallback(() => {
     setHideLowBalance((prev) => !prev)
@@ -83,9 +83,8 @@ const Wallet = () => {
   }, [])
 
   const handleBuyAsset = useCallback((asset: WalletAsset) => {
-    if (!isClassic) return
-    if (asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
-      setBuyAsset("LUNC")
+    if (asset.denom === chain.nativeDenom) {
+      setBuyAsset(isClassic ? "LUNC" : "LUNA")
       setBuyModalOpen(true)
       return
     }
@@ -93,7 +92,7 @@ const Wallet = () => {
       setBuyAsset("USTC")
       setBuyModalOpen(true)
     }
-  }, [isClassic])
+  }, [chain.nativeDenom, isClassic])
 
   const handleSwapAsset = useCallback(
     (asset: WalletAsset) => {

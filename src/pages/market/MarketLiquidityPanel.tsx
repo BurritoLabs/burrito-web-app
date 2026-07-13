@@ -114,6 +114,7 @@ const STANDARD_LIQUIDITY_DEX_IDS = new Set([
   "terraswap",
   "terraswap-legacy",
   "astroport",
+  "phoenix",
   "terraport-v2",
   "terraport-cpmm",
   "terraport-v3"
@@ -272,7 +273,7 @@ const MarketLiquidityPanel = ({
   tokenIconCandidates = EMPTY_ICON_CANDIDATES,
   tokenSymbol: fallbackTokenSymbol = "TOKEN"
 }: MarketLiquidityPanelProps) => {
-  const { chainKey } = useAppChain()
+  const { chain, chainKey } = useAppChain()
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const queryClient = useQueryClient()
   const [tokenAmount, setTokenAmount] = useState("")
@@ -366,6 +367,7 @@ const MarketLiquidityPanel = ({
       "market",
       "liquidity",
       "pair-info",
+      chain.chainId,
       normalizedDexId,
       normalizedPairAddress
     ],
@@ -402,7 +404,13 @@ const MarketLiquidityPanel = ({
     CLASSIC_DENOMS.lunc.coinDecimals
 
   const { data: livePoolInfo, refetch: refetchPoolInfo } = useQuery({
-    queryKey: ["market", "liquidity", "pool", resolvedPairAddress],
+    queryKey: [
+      "market",
+      "liquidity",
+      "pool",
+      chain.chainId,
+      resolvedPairAddress
+    ],
     queryFn: () =>
       queryContractSmart<TerraswapPoolResponse | GarudaPoolResponse>(
         resolvedPairAddress,
@@ -440,7 +448,13 @@ const MarketLiquidityPanel = ({
     !unsupportedWesoPool
 
   const { data: lpTokenInfo } = useQuery({
-    queryKey: ["market", "liquidity", "lp-token-info", lpTokenAddress],
+    queryKey: [
+      "market",
+      "liquidity",
+      chain.chainId,
+      "lp-token-info",
+      lpTokenAddress
+    ],
     queryFn: () =>
       queryContractSmart<Cw20TokenInfo>(lpTokenAddress, { token_info: {} }),
     enabled: Boolean(lpTokenAddress),
@@ -539,7 +553,13 @@ const MarketLiquidityPanel = ({
   }, [lpDecimals, luncDecimals, poolRatio, poolReserves.totalShare, tokenDecimals])
 
   const { data: nativeBalances = {}, refetch: refetchNativeBalances } = useQuery({
-    queryKey: ["market", "liquidity", "native-balances", accountAddress],
+    queryKey: [
+      "market",
+      "liquidity",
+      chain.chainId,
+      "native-balances",
+      accountAddress
+    ],
     queryFn: async () => {
       const balances = await fetchBalances(accountAddress)
       return Object.fromEntries(
@@ -568,6 +588,7 @@ const MarketLiquidityPanel = ({
     queryKey: [
       "market",
       "liquidity",
+      chain.chainId,
       "cw20-balances",
       accountAddress,
       cw20BalanceContracts.join(",")
@@ -602,6 +623,7 @@ const MarketLiquidityPanel = ({
     queryKey: [
       "market",
       "liquidity",
+      chain.chainId,
       "lp-balance",
       accountAddress,
       lpTokenAddress
@@ -894,10 +916,16 @@ const MarketLiquidityPanel = ({
       refetchLpBalance(),
       refetchPoolInfo(),
       queryClient.invalidateQueries({
-        queryKey: ["market", "pool-live", dexId, pairAddress]
+        queryKey: ["market", chain.chainId, "pool-live", dexId, pairAddress]
       }),
       queryClient.invalidateQueries({
-        queryKey: ["market", "liquidity", "pool", resolvedPairAddress]
+        queryKey: [
+          "market",
+          "liquidity",
+          "pool",
+          chain.chainId,
+          resolvedPairAddress
+        ]
       }),
       queryClient.invalidateQueries({ queryKey: ["market", "pools"] })
     ])

@@ -87,13 +87,15 @@ export const CLASSIC_DEX_FACTORIES: readonly ClassicDexFactory[] = [
   }
 ]
 
-export type ClassicSwapDex = {
+export type SwapDex = {
   id: string
   label: string
   factory?: string
   mode?: "terraswap" | "garuda" | "code-id" | "terrapump" | "luncpump" | "weso-defi"
   pairCodeIds?: readonly number[]
 }
+
+export type ClassicSwapDex = SwapDex
 
 /**
  * Active DEX sources used by the market index and route-aware swap flows.
@@ -177,3 +179,29 @@ export const CLASSIC_SWAP_DEXES: readonly ClassicSwapDex[] = [
     pairCodeIds: [11102, 11151, 10996, 11213, 11329]
   }
 ]
+
+/**
+ * Phoenix DEX protocols represented in the Terra assets registry. Global swap
+ * routing uses registry pair addresses directly, while the factory addresses
+ * remain available for pair creation and fallback lookup.
+ */
+export const LUNA_SWAP_DEXES: readonly SwapDex[] = [
+  {
+    id: "astroport",
+    label: "Astroport",
+    factory: "terra14x9fr055x5hvr48hzy2t4q7kvjvfttsvxusa4xsdcy702mnzsvuqprer8r"
+  },
+  {
+    id: "terraswap",
+    label: "Terraswap",
+    factory: "terra1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqxl5qul"
+  },
+  {
+    id: "phoenix",
+    label: "Phoenix",
+    factory: "terra1pewdsxywmwurekjwrgvjvxvv0dv2pf8xtdl9ykfce2z0q3gf0k3qr8nezy"
+  }
+]
+
+export const getSwapDexes = (chainKey: "lunc" | "luna") =>
+  chainKey === "luna" ? LUNA_SWAP_DEXES : CLASSIC_SWAP_DEXES

@@ -1,6 +1,6 @@
 # Launchpad Deploy Runbook
 
-This runbook is for Burrito Launchpad V1 on Terra Classic.
+This runbook covers Burrito Launchpad on Terra Classic and Terra Phoenix.
 
 ## Contracts
 
@@ -47,24 +47,27 @@ frontend source code.
 The project includes a deploy helper:
 
 ```bash
-npm run deploy:launchpad -- --dry-run
+npm run deploy:launchpad -- chain=lunc --dry-run
+npm run deploy:launchpad -- chain=luna --dry-run
 ```
 
-For the real deployment, run it locally with a funded Terra Classic deployer
-wallet. Do not paste the mnemonic into chat or commit it to the repo.
+For the real deployment, run it locally with a funded deployer wallet on the
+target chain. Do not paste the mnemonic into chat or commit it to the repo.
 
 PowerShell example:
 
 ```powershell
 $env:DEPLOYER_MNEMONIC="your local deployer mnemonic"
-npm run deploy:launchpad
+npm run deploy:launchpad -- chain=luna
 Remove-Item Env:\DEPLOYER_MNEMONIC
 ```
 
 Optional variables:
 
 ```text
-CLASSIC_RPC=https://terra-classic-rpc.publicnode.com:443
+DEPLOY_CHAIN=lunc
+DEPLOY_RPC=https://terra-classic-rpc.publicnode.com:443
+# CLASSIC_RPC and LUNA_RPC are also accepted as chain-specific overrides.
 LP_LOCKER_WASM=artifacts/launchpad/burrito_lp_locker.wasm
 LAUNCH_REGISTRY_WASM=artifacts/launchpad/burrito_launch_registry.wasm
 DEPLOY_OWNER_ADDRESS=terra1...
@@ -75,10 +78,11 @@ INSTANTIATE_GAS=600000
 ```
 
 The script stores and instantiates `lp-locker`, then stores and instantiates
-`launch-registry` with the `lp-locker` address. It writes the result to:
+`launch-registry` with the `lp-locker` address. It writes separate results to:
 
 ```text
-artifacts/launchpad/deploy-result.json
+artifacts/launchpad/deploy-result-lunc.json
+artifacts/launchpad/deploy-result-luna.json
 ```
 
 Use the `cloudflare` values from that file as the Cloudflare Pages variables.
@@ -111,8 +115,10 @@ The `locker_contract` value must be the instantiated `lp-locker` address.
 Set these on the `app.burrito.money` Cloudflare Pages project:
 
 ```text
-VITE_LAUNCHPAD_LP_LOCKER_ADDRESS=terra1...
-VITE_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
+VITE_LUNC_LAUNCHPAD_LP_LOCKER_ADDRESS=terra1...
+VITE_LUNC_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
+VITE_LUNA_LAUNCHPAD_LP_LOCKER_ADDRESS=terra1...
+VITE_LUNA_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
 ```
 
 Then redeploy. Vite reads these at build time, so changing the variables without
@@ -126,7 +132,7 @@ After redeploying:
 2. Confirm the status strip shows `LP locker: Configured` and
    `Registry: Configured`.
 3. Create a launch or use `Sync my launches` for an already published launch.
-4. Create/find the Terraswap LUNC pair.
+4. Create/find the Terraswap LUNC or LUNA pair for the selected chain.
 5. Open the market page from `Manage` and provide liquidity.
 6. Lock LP.
 7. Publish to Launchpad.

@@ -3,14 +3,12 @@ import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { queryContractSmart } from "../data/classic"
 import { parseTokenAmountToBaseUnits } from "./cw20"
 import {
-  LAUNCHPAD_LP_LOCKER_ADDRESS,
   LP_LOCK_CHAIN_TIME_BUFFER_SECONDS,
   MAX_LP_LOCK_SECONDS,
   MIN_LP_LOCK_SECONDS,
+  getLaunchpadConfig,
   isLpLockerConfigured
 } from "../config/launchpadConfig"
-
-export { LAUNCHPAD_LP_LOCKER_ADDRESS, isLpLockerConfigured }
 
 export type LpLockResponse = {
   id: number
@@ -65,7 +63,8 @@ export const buildLockLpMessage = ({
   amount: string
   unlockTimestamp: number
 }) => {
-  if (!isLpLockerConfigured) {
+  const config = getLaunchpadConfig()
+  if (!isLpLockerConfigured()) {
     throw new Error("LP locker contract is not configured.")
   }
 
@@ -77,7 +76,7 @@ export const buildLockLpMessage = ({
       msg: toUtf8(
         JSON.stringify({
           send: {
-            contract: LAUNCHPAD_LP_LOCKER_ADDRESS,
+            contract: config.lpLockerAddress,
             amount,
             msg: toBase64(
               toUtf8(
@@ -105,7 +104,8 @@ export const buildWithdrawLockedLpMessage = ({
   sender: string
   lockId: number
 }) => {
-  if (!isLpLockerConfigured) {
+  const config = getLaunchpadConfig()
+  if (!isLpLockerConfigured()) {
     throw new Error("LP locker contract is not configured.")
   }
   if (!Number.isSafeInteger(lockId) || lockId <= 0) {
@@ -116,7 +116,7 @@ export const buildWithdrawLockedLpMessage = ({
     typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
     value: MsgExecuteContract.fromPartial({
       sender,
-      contract: LAUNCHPAD_LP_LOCKER_ADDRESS,
+      contract: config.lpLockerAddress,
       msg: toUtf8(
         JSON.stringify({
           withdraw: {
@@ -130,12 +130,13 @@ export const buildWithdrawLockedLpMessage = ({
 }
 
 export const fetchLpLock = async (lockId: string | number) => {
-  if (!isLpLockerConfigured) return null
+  const config = getLaunchpadConfig()
+  if (!isLpLockerConfigured()) return null
   const normalized =
     typeof lockId === "number" ? String(lockId) : lockId.trim()
   if (!/^\d+$/.test(normalized)) return null
 
-  return queryContractSmart<LpLockResponse>(LAUNCHPAD_LP_LOCKER_ADDRESS, {
+  return queryContractSmart<LpLockResponse>(config.lpLockerAddress, {
     lock: {
       lock_id: Number(normalized)
     }

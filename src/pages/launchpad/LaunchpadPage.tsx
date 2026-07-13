@@ -17,7 +17,6 @@ import {
 import {
   buildCreateTerraswapLuncPairMessage,
   fetchTerraswapLuncPair,
-  TERRASWAP_FACTORY_ADDRESS,
   waitForTerraswapLuncPair
 } from "../../app/launchpad/pool"
 import {
@@ -26,8 +25,6 @@ import {
   extractLpLockIdFromEvents,
   fetchLpLock,
   getLpUnlockTimestampSeconds,
-  isLpLockerConfigured,
-  LAUNCHPAD_LP_LOCKER_ADDRESS,
   parseLpAmountToBaseUnits,
   type LpLockResponse
 } from "../../app/launchpad/locker"
@@ -36,10 +33,14 @@ import {
   buildUpdateLaunchMessage,
   extractRegistryLaunchIdFromEvents,
   fetchLaunchRegistryLaunches,
-  isLaunchRegistryConfigured,
-  LAUNCHPAD_REGISTRY_ADDRESS,
   type LaunchRegistryLaunch
 } from "../../app/launchpad/registry"
+import { useAppChain } from "../../app/appChainContext"
+import {
+  getLaunchpadConfig,
+  isLaunchRegistryConfigured as getIsLaunchRegistryConfigured,
+  isLpLockerConfigured as getIsLpLockerConfigured
+} from "../../app/config/launchpadConfig"
 import { useWallet } from "../../app/wallet/WalletContext"
 import { useResolvedCw20Whitelist } from "../../app/data/terraAssets"
 import {
@@ -48,6 +49,7 @@ import {
 } from "../../app/wallet/walletAdapters"
 import { truncateHash } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
+import { getAddressExplorerUrl, getTxExplorerUrl } from "../../app/explorer"
 import { queryContractSmart } from "../../app/data/classic"
 import LaunchCreateForm from "./LaunchCreateForm"
 import LaunchCreatePreview from "./LaunchCreatePreview"
@@ -57,7 +59,6 @@ import LaunchManageOverview from "./LaunchManageOverview"
 import LaunchpadTabs from "./LaunchpadTabs"
 import {
   CW20_SYMBOL_PATTERN,
-  DRAFT_STORAGE_KEY,
   TERRA_TOKEN_DECIMALS,
   buildLaunchpadCreationFeeMessage,
   buildOwnerRecordFromRegistryLaunch,
@@ -66,6 +67,7 @@ import {
   formatDateTime,
   formatNumber,
   getDistributionTotalAmount,
+  getDraftStorageKey,
   getLaunchpadMarketPath,
   getManageSectionFromTarget,
   initialDraft,
@@ -99,6 +101,16 @@ import {
 } from "../../app/launchpad/pageModel"
 
 const Launchpad = () => {
+  const { chainKey, chain } = useAppChain()
+  const launchpadConfig = getLaunchpadConfig(chainKey)
+  const nativeSymbol = chain.displayDenom
+  const isLpLockerConfigured = getIsLpLockerConfigured(chainKey)
+  const isLaunchRegistryConfigured =
+    getIsLaunchRegistryConfigured(chainKey)
+  const LAUNCHPAD_LP_LOCKER_ADDRESS = launchpadConfig.lpLockerAddress
+  const LAUNCHPAD_REGISTRY_ADDRESS = launchpadConfig.registryAddress
+  const TERRASWAP_FACTORY_ADDRESS =
+    launchpadConfig.terraswapFactoryAddress
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<LaunchTab>(
@@ -382,7 +394,7 @@ const Launchpad = () => {
   useEffect(() => {
     if (typeof window === "undefined") return
     try {
-      window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
+      window.localStorage.setItem(getDraftStorageKey(), JSON.stringify(draft))
     } catch {
       // Local draft persistence is a convenience layer, not a blocker.
     }
@@ -391,6 +403,14 @@ const Launchpad = () => {
   useEffect(() => {
     saveCreatedLaunches(createdLaunches)
   }, [createdLaunches])
+
+  useEffect(() => {
+    setDraft(loadStoredDraft())
+    setCreatedLaunches(loadCreatedLaunches())
+    setSelectedLaunchId("")
+    setCreatedToken(undefined)
+    setCreateError(undefined)
+  }, [chainKey])
 
   useEffect(() => {
     const urlTab = normalizeLaunchTab(searchParams.get("tab")) ?? "create"
@@ -424,7 +444,7 @@ const Launchpad = () => {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [chainKey, isLaunchRegistryConfigured])
 
   useEffect(() => {
     if (!isLpLockerConfigured || !registryLaunches.length) return
@@ -457,7 +477,7 @@ const Launchpad = () => {
     return () => {
       cancelled = true
     }
-  }, [registryLaunches, registryLpLocks])
+  }, [chainKey, isLpLockerConfigured, registryLaunches, registryLpLocks])
 
   const resetDraft = () => {
     setDraft(initialDraft)
@@ -528,10 +548,10 @@ const Launchpad = () => {
         symbol: tokenSymbol,
         name: draft.name.trim(),
         pair: isLaunchWithPool
-          ? `${tokenSymbol} / LUNC`
+          ? `${tokenSymbol} / ${nativeSymbol}`
           : `${tokenSymbol} standalone`,
         liquidity: isLaunchWithPool
-          ? `${formatCompact(launchMath.luncLiquidity)} LUNC planned`
+          ? `${formatCompact(launchMath.luncLiquidity)} ${nativeSymbol} planned`
           : "--",
         lockExpiry: isLaunchWithPool
           ? `${formatNumber(lockDays, 0)} days planned`
@@ -714,7 +734,7 @@ const Launchpad = () => {
             id: `registry-${launch.id}`,
             symbol,
             name,
-            pair: `${symbol} / LUNC`,
+            pair: `${symbol} / ${nativeSymbol}`,
             state,
             status,
             liquidity: lockedLpAmount ?? "On-chain LP",
@@ -742,7 +762,7 @@ const Launchpad = () => {
             unlockTime: launch.lp_unlock_time
           }
         }),
-    [registryLaunches, registryLpLocks, registryTokenMetadata.data]
+    [nativeSymbol, registryLaunches, registryLpLocks, registryTokenMetadata.data]
   )
   const launchSource = registeredLaunchCards
   const normalizedLaunchSearch = launchSearch.trim().toLowerCase()
@@ -1090,8 +1110,8 @@ const Launchpad = () => {
       }
     : !activePairAddress
     ? {
-        title: "Create the LUNC pair",
-        text: "A token has no launch market until the Terraswap Token / LUNC pair exists.",
+        title: `Create the ${nativeSymbol} pair`,
+        text: `A token has no launch market until the Terraswap Token / ${nativeSymbol} pair exists.`,
         actionLabel: "Open pair setup",
         targetId: "launchpad-pool"
       }
@@ -1105,7 +1125,7 @@ const Launchpad = () => {
     : !isLpLockerConfigured
     ? {
         title: "Configure LP locker",
-        text: "Set VITE_LAUNCHPAD_LP_LOCKER_ADDRESS and redeploy before creators can lock LP.",
+        text: `Set VITE_${chainKey === "luna" ? "LUNA" : "LUNC"}_LAUNCHPAD_LP_LOCKER_ADDRESS and redeploy before creators can lock LP.`,
         actionLabel: "View lock panel",
         targetId: "launchpad-lock"
       }
@@ -1119,7 +1139,7 @@ const Launchpad = () => {
     : !isLaunchRegistryConfigured
     ? {
         title: "Configure registry",
-        text: "Set VITE_LAUNCHPAD_REGISTRY_ADDRESS and redeploy before public listing.",
+        text: `Set VITE_${chainKey === "luna" ? "LUNA" : "LUNC"}_LAUNCHPAD_REGISTRY_ADDRESS and redeploy before public listing.`,
         actionLabel: "View publish panel",
         targetId: "launchpad-listing"
       }
@@ -1338,7 +1358,9 @@ const Launchpad = () => {
       return
     }
     if (activePairAddress) {
-      setCreatePairError("This token already has a Terraswap LUNC pair.")
+      setCreatePairError(
+        `This token already has a Terraswap ${nativeSymbol} pair.`
+      )
       return
     }
     if (!connectorId || !account?.address) {
@@ -1350,7 +1372,7 @@ const Launchpad = () => {
       setCreatePairSubmitting(true)
       setCreatePairError(undefined)
       setCreatePairTxHash("")
-      startTx(`Create ${activeOwnerLaunch.symbol} / LUNC pair`)
+      startTx(`Create ${activeOwnerLaunch.symbol} / ${nativeSymbol} pair`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const message = buildCreateTerraswapLuncPairMessage(
@@ -1361,7 +1383,7 @@ const Launchpad = () => {
         signerAddress,
         [message],
         "auto",
-        "Burrito create LUNC pair"
+        `Burrito create ${nativeSymbol} pair`
       )
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Create pair failed")
@@ -1382,7 +1404,7 @@ const Launchpad = () => {
             record.id === activeOwnerLaunch.id
               ? {
                   ...record,
-                  pair: `${record.symbol} / LUNC`,
+                  pair: `${record.symbol} / ${nativeSymbol}`,
                   mode: "CW20 + Pair",
                   ownerStatus: "Pair created, liquidity not added",
                   pairAddress: pair.contract_addr,
@@ -1419,7 +1441,7 @@ const Launchpad = () => {
     }
     if (!isLpLockerConfigured) {
       setLockLpError(
-        "LP locker contract is not configured. Add VITE_LAUNCHPAD_LP_LOCKER_ADDRESS after deploying the locker."
+        `LP locker contract is not configured. Add VITE_${chainKey === "luna" ? "LUNA" : "LUNC"}_LAUNCHPAD_LP_LOCKER_ADDRESS after deploying the locker.`
       )
       return
     }
@@ -1435,7 +1457,7 @@ const Launchpad = () => {
       const amount = parseLpAmountToBaseUnits(lockLpAmount, activeLpDecimals)
       const unlockTimestamp = getLpUnlockTimestampSeconds(lockLpDays)
 
-      startTx(`Lock ${activeOwnerLaunch.symbol} / LUNC LP`)
+      startTx(`Lock ${activeOwnerLaunch.symbol} / ${nativeSymbol} LP`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -1579,7 +1601,7 @@ const Launchpad = () => {
       setWithdrawLpSubmitting(true)
       setWithdrawLpError(undefined)
       setWithdrawLpTxHash("")
-      startTx(`Withdraw ${activeOwnerLaunch.symbol} / LUNC LP`)
+      startTx(`Withdraw ${activeOwnerLaunch.symbol} / ${nativeSymbol} LP`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -2027,7 +2049,7 @@ const Launchpad = () => {
             <article id="launchpad-pool" className={`card ${styles.poolSetup}`}>
               <div className={styles.planHeader}>
                 <span>Step 1</span>
-                <h3>LUNC pair</h3>
+                <h3>{nativeSymbol} pair</h3>
               </div>
               <div className={styles.poolStatusGrid}>
                 <div>
@@ -2054,7 +2076,7 @@ const Launchpad = () => {
                 <div className={styles.ownerLinkGrid}>
                   {activePairAddress ? (
                     <a
-                      href={`https://finder.burrito.money/classic/address/${activePairAddress}`}
+                      href={getAddressExplorerUrl(chainKey, activePairAddress)}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -2064,7 +2086,10 @@ const Launchpad = () => {
                   ) : null}
                   {activeLiquidityToken ? (
                     <a
-                      href={`https://finder.burrito.money/classic/address/${activeLiquidityToken}`}
+                      href={getAddressExplorerUrl(
+                        chainKey,
+                        activeLiquidityToken
+                      )}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -2074,9 +2099,10 @@ const Launchpad = () => {
                   ) : null}
                   {activeOwnerLaunch.pairTxHash || createPairTxHash ? (
                     <a
-                      href={`https://finder.burrito.money/classic/tx/${
+                      href={getTxExplorerUrl(
+                        chainKey,
                         activeOwnerLaunch.pairTxHash || createPairTxHash
-                      }`}
+                      )}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -2090,7 +2116,10 @@ const Launchpad = () => {
                   ) : null}
                   {activeOwnerLaunch.liquidityTxHash ? (
                     <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.liquidityTxHash}`}
+                      href={getTxExplorerUrl(
+                        chainKey,
+                        activeOwnerLaunch.liquidityTxHash
+                      )}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -2102,7 +2131,10 @@ const Launchpad = () => {
                   ) : null}
                   {activeOwnerLaunch.liquidityWithdrawTxHash ? (
                     <a
-                      href={`https://finder.burrito.money/classic/tx/${activeOwnerLaunch.liquidityWithdrawTxHash}`}
+                      href={getTxExplorerUrl(
+                        chainKey,
+                        activeOwnerLaunch.liquidityWithdrawTxHash
+                      )}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -2132,7 +2164,7 @@ const Launchpad = () => {
                   <div>
                     <span>Pair tx</span>
                     <a
-                      href={`https://finder.burrito.money/classic/tx/${createPairTxHash}`}
+                      href={getTxExplorerUrl(chainKey, createPairTxHash)}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -2152,7 +2184,7 @@ const Launchpad = () => {
                   ? "Broadcasting..."
                   : activePairAddress
                   ? "Pair already exists"
-                  : "Create LUNC pair"}
+                  : `Create ${nativeSymbol} pair`}
               </button>
 
               {activePairAddress ? (
@@ -2202,7 +2234,7 @@ const Launchpad = () => {
               ) : !isLpLockerConfigured ? (
                 <div className={styles.noticeBox}>
                   LP lock is wired but disabled until the locker contract is
-                  deployed and `VITE_LAUNCHPAD_LP_LOCKER_ADDRESS` is configured.
+                  deployed and the chain-specific LP locker address is configured.
                 </div>
               ) : (
                 <>
@@ -2278,7 +2310,7 @@ const Launchpad = () => {
                         <div>
                           <span>LP lock tx</span>
                           <a
-                            href={`https://finder.burrito.money/classic/tx/${lockLpTxHash}`}
+                            href={getTxExplorerUrl(chainKey, lockLpTxHash)}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -2344,10 +2376,12 @@ const Launchpad = () => {
                           <div>
                             <span>Public lock tx</span>
                             <a
-                              href={`https://finder.burrito.money/classic/tx/${
+                              href={getTxExplorerUrl(
+                                chainKey,
                                 lockRegistryTxHash ||
-                                activeOwnerLaunch.lpLockUpdateTxHash
-                              }`}
+                                  activeOwnerLaunch.lpLockUpdateTxHash ||
+                                  ""
+                              )}
                               target="_blank"
                               rel="noreferrer"
                             >
@@ -2382,7 +2416,10 @@ const Launchpad = () => {
                           <div>
                             <span>Withdraw tx</span>
                             <a
-                              href={`https://finder.burrito.money/classic/tx/${withdrawLpTxHash}`}
+                              href={getTxExplorerUrl(
+                                chainKey,
+                                withdrawLpTxHash
+                              )}
                               target="_blank"
                               rel="noreferrer"
                             >
@@ -2449,7 +2486,7 @@ const Launchpad = () => {
               {!isLaunchRegistryConfigured ? (
                 <div className={styles.noticeBox}>
                   Public listing is wired but disabled until the registry
-                  contract is deployed and `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is
+                  contract is deployed and the chain-specific registry address is
                   configured.
                 </div>
               ) : !hasPublicListingPrerequisites && !isActiveListingPublished ? (
@@ -2505,7 +2542,7 @@ const Launchpad = () => {
                           {isActiveListingPublished ? "Update tx" : "Publish tx"}
                         </span>
                         <a
-                          href={`https://finder.burrito.money/classic/tx/${publishTxHash}`}
+                          href={getTxExplorerUrl(chainKey, publishTxHash)}
                           target="_blank"
                           rel="noreferrer"
                         >
@@ -2547,7 +2584,10 @@ const Launchpad = () => {
                           <div>
                             <span>Status tx</span>
                             <a
-                              href={`https://finder.burrito.money/classic/tx/${listingStatusTxHash}`}
+                              href={getTxExplorerUrl(
+                                chainKey,
+                                listingStatusTxHash
+                              )}
                               target="_blank"
                               rel="noreferrer"
                             >
