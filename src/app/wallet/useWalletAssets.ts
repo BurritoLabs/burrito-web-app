@@ -27,6 +27,7 @@ import {
   useResolvedIbcWhitelist
 } from "../data/terraAssets"
 import { toUnitAmount } from "../utils/format"
+import { formatNativeSymbol } from "../utils/assetIdentity"
 import {
   buildClassicNativeIconCandidates,
   buildCw20IconCandidates,
@@ -62,14 +63,9 @@ const isWalletAssetRow = (
 
 const formatWalletDenom = (denom: string, isClassic?: boolean) => {
   if (!denom) return ""
-  if (denom.startsWith("u")) {
-    const suffix = denom.slice(1)
-    if (suffix.length > 3) {
-      return suffix === "luna" ? (isClassic ? "LUNC" : "Luna") : suffix.toUpperCase()
-    }
-    return `${suffix.slice(0, 2).toUpperCase()}T${isClassic ? "C" : ""}`
-  }
-  return denom
+  if (denom === "uluna") return isClassic ? "LUNC" : "LUNA"
+  if (denom === "uusd") return isClassic ? "USTC" : "USD"
+  return formatNativeSymbol(denom)
 }
 
 const buildWalletIconCandidates = ({
@@ -371,7 +367,7 @@ export const useWalletAssets = (accountAddress?: string) => {
       const swaprate = swapRateMap.get(denom)
       if (swaprate && Number.isFinite(swaprate) && swaprate > 0) {
         const unitValue = 1 / swaprate
-        const isClassicStable = formatWalletDenom(denom, true).endsWith("TC")
+        const isClassicStable = formatWalletDenom(denom, isClassic).endsWith("TC")
         if (isClassicStable) {
           return ustcPrice !== undefined ? unitValue * ustcPrice : undefined
         }
@@ -504,6 +500,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     fxRates?.MNT,
     fxRates?.TWD,
     ibcWhitelist,
+    isClassic,
     luncPrice,
     marketPools,
     nativeWhitelist,
@@ -701,7 +698,7 @@ export const useWalletAssets = (accountAddress?: string) => {
       .filter((coin) => Number(coin.amount) > 0)
       .map((coin): WalletAssetRow => {
         const swaprate = swapRateMap.get(coin.denom)
-        const classicSymbol = formatWalletDenom(coin.denom, true)
+        const classicSymbol = formatWalletDenom(coin.denom, isClassic)
         const isClassicStable = classicSymbol.endsWith("TC")
         const valueFromSwaprate =
           calcValueFromSwaprate(coin.amount, swaprate, isClassicStable) ??
@@ -784,7 +781,7 @@ export const useWalletAssets = (accountAddress?: string) => {
           const decimals = ibcToken?.decimals ?? 6
           const unitAmount = toUnitAmount(coin.amount, decimals)
           const baseDenom = ibcToken?.base_denom ?? coin.denom
-          const isClassicStableIbc = formatWalletDenom(baseDenom, true).endsWith("TC")
+          const isClassicStableIbc = formatWalletDenom(baseDenom, isClassic).endsWith("TC")
           const value =
             calcValueFromSwaprate(coin.amount, swaprate, isClassicStableIbc) ??
             calcFxFallback(coin.amount, baseDenom) ??
@@ -813,7 +810,7 @@ export const useWalletAssets = (accountAddress?: string) => {
           }
         }
 
-        const displaySymbol = formatWalletDenom(coin.denom, true)
+        const displaySymbol = formatWalletDenom(coin.denom, isClassic)
         const nativeToken = nativeWhitelist[coin.denom.toLowerCase()]
         const symbol = nativeToken?.symbol ?? displaySymbol
         const name = nativeToken?.name ?? symbol
@@ -836,7 +833,7 @@ export const useWalletAssets = (accountAddress?: string) => {
           change: marketStyleChangeByAsset.get(`native:${coin.denom}`)?.change,
           value,
           chainCount: 1,
-          whitelisted: false,
+          whitelisted: Boolean(nativeToken),
           isBuyable: false,
           iconCandidates: buildWalletIconCandidates({
             icon: nativeToken?.icon,
@@ -1032,6 +1029,21 @@ export const useWalletAssets = (accountAddress?: string) => {
       })
     }))
 
+    const nativeTokenItems = Object.entries(nativeWhitelist)
+      .filter(([denom]) => denom !== CLASSIC_DENOMS.lunc.coinMinimalDenom)
+      .map(([denom, token]) => ({
+        key: denom,
+        symbol: token.symbol,
+        name: token.name,
+        iconCandidates: buildWalletIconCandidates({
+          icon: token.icon,
+          denom,
+          symbol: token.symbol,
+          isClassic,
+          fallback: "/system/cw20.svg"
+        })
+      }))
+
     const cw20Items = Object.entries(cw20Whitelist ?? {}).map(([address, token]) => ({
       key: address,
       symbol: token.symbol,
@@ -1039,10 +1051,10 @@ export const useWalletAssets = (accountAddress?: string) => {
       iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
     }))
 
-    return [...nativeItems, ...ibcItems, ...cw20Items].sort((a, b) =>
+    return [...nativeItems, ...nativeTokenItems, ...ibcItems, ...cw20Items].sort((a, b) =>
       a.symbol.localeCompare(b.symbol)
     )
-  }, [chain.displayDenom, chain.name, cw20Whitelist, ibcWhitelist, isClassic])
+  }, [chain.displayDenom, chain.name, cw20Whitelist, ibcWhitelist, isClassic, nativeWhitelist])
 
   const netWorth = useMemo(
     () => assetRows.reduce((sum, asset) => sum + (asset.value ?? 0), 0),

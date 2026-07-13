@@ -3,7 +3,12 @@ import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import { getActiveAppChainKey } from "../activeChain"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
-import { ASSET_URL } from "../config/externalServices"
+import { formatBaseDenomSymbol } from "../utils/assetIdentity"
+import {
+  ASSET_URL,
+  COSMOS_SOURCE_ASSETLIST_URLS,
+  COSMOS_TERRA_ASSETLIST_URL
+} from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 
 export type Cw20Token = {
@@ -102,15 +107,52 @@ type NativeTokenCacheEntry = {
   token: NativeToken
 }
 
-const IBC_CACHE_KEY = "burritoIbcTraceCacheV1"
+type CosmosRegistryAsset = {
+  base?: string
+  display?: string
+  name?: string
+  symbol?: string
+  denom_units?: Array<{
+    denom?: string
+    exponent?: number
+  }>
+  logo_URIs?: {
+    png?: string
+    svg?: string
+  }
+  traces?: Array<{
+    chain?: { channel_id?: string; path?: string }
+    counterparty?: { base_denom?: string }
+  }>
+}
+
+type CosmosRegistryAssetList = {
+  assets?: CosmosRegistryAsset[]
+}
+
+export type CosmosRegistryAssets = {
+  cw20: Record<string, Cw20Token>
+  ibc: Record<string, IbcToken>
+  native: Record<string, NativeToken>
+}
+
+const EMPTY_COSMOS_REGISTRY_ASSETS: CosmosRegistryAssets = {
+  cw20: {},
+  ibc: {},
+  native: {}
+}
+
+const IBC_CACHE_KEY = "burritoIbcTraceCacheV3"
 const IBC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV1"
+const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV2"
 const NATIVE_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV2"
 const CW20_TOKEN_INFO_CACHE_TTL = 24 * 60 * 60 * 1000
 let ibcCache: Record<string, IbcCacheEntry> | null = null
 let nativeTokenCache: Record<string, NativeTokenCacheEntry> | null = null
 let cw20TokenInfoCache: Record<string, Cw20TokenInfoCacheEntry> | null = null
+let cosmosRegistryAssetsPromise: Promise<CosmosRegistryAssets> | null = null
+let cosmosSourceAssetAliasesPromise: Promise<Record<string, NativeToken>> | null = null
 
 export const fetchAsset = async <T,>(path: string): Promise<T> => {
   const res = await fetch(`${ASSET_URL}/${path}`)
@@ -325,15 +367,33 @@ const deriveSymbolFromDenom = (denom?: string) => {
   if (!denom) return "IBC"
   if (denom === "uluna") return getActiveAppChainKey() === "lunc" ? "LUNC" : "LUNA"
   if (denom === "uusd") return "USTC"
-  if (denom.startsWith("u")) {
-    const base = denom.slice(1)
-    if (base.length === 3) {
-      return `${base.slice(0, 2).toUpperCase()}TC`
-    }
-    return base.toUpperCase()
+  return formatBaseDenomSymbol(denom) || "IBC"
+}
+
+const resolveDisplaySymbol = (candidate: string | undefined, denom: string) => {
+  const symbol = candidate?.trim()
+  if (
+    !symbol ||
+    symbol.length > 24 ||
+    /^(?:ibc|factory)[/:]/i.test(symbol) ||
+    /^0x[0-9a-f]{40}$/i.test(symbol)
+  ) {
+    return deriveSymbolFromDenom(denom)
   }
-  const leaf = denom.split("/").pop() ?? denom
-  return leaf.toUpperCase()
+  return symbol
+}
+
+const resolveDisplayName = (candidate: string | undefined, symbol: string) => {
+  const name = candidate?.trim()
+  if (
+    !name ||
+    name.length > 64 ||
+    /^(?:ibc|factory)[/:]/i.test(name) ||
+    /^0x[0-9a-f]{40}$/i.test(name)
+  ) {
+    return symbol
+  }
+  return name
 }
 
 const CLASSIC_NATIVE_DEFAULTS: Record<string, NativeToken> = {
@@ -369,6 +429,152 @@ const getDecimalsFromMetadata = (metadata?: BankMetadataResponse["metadata"]) =>
   return undefined
 }
 
+const getRegistryAssetDecimals = (asset: CosmosRegistryAsset) => {
+  const displayUnit = asset.denom_units?.find((unit) => unit.denom === asset.display)
+  if (Number.isFinite(displayUnit?.exponent)) return Number(displayUnit?.exponent)
+  const exponents = (asset.denom_units ?? [])
+    .map((unit) => Number(unit.exponent))
+    .filter((exponent) => Number.isFinite(exponent) && exponent >= 0)
+  return exponents.length ? Math.max(...exponents) : 6
+}
+
+export const mapCosmosRegistryAssets = (
+  payload: CosmosRegistryAssetList
+): CosmosRegistryAssets => {
+  const result: CosmosRegistryAssets = { cw20: {}, ibc: {}, native: {} }
+
+  ;(payload.assets ?? []).forEach((asset) => {
+    const base = asset.base?.trim()
+    const symbol = asset.symbol?.trim()
+    if (!base || !symbol) return
+
+    const name = asset.name?.trim() || symbol
+    const decimals = getRegistryAssetDecimals(asset)
+    const icon = sanitizeAssetIconUrl(asset.logo_URIs?.svg ?? asset.logo_URIs?.png)
+
+    if (base.startsWith("cw20:terra1")) {
+      const token = base.slice("cw20:".length).toLowerCase()
+      result.cw20[token] = { token, symbol, name, decimals, icon }
+      return
+    }
+
+    if (base.startsWith("ibc/")) {
+      const hash = base.slice(4).toUpperCase()
+      if (!hash) return
+      const trace = asset.traces?.[0]
+      result.ibc[hash] = {
+        denom: `ibc/${hash}`,
+        base_denom: trace?.counterparty?.base_denom?.trim() || base,
+        symbol,
+        name,
+        decimals,
+        icon,
+        path: trace?.chain?.channel_id
+          ? `transfer/${trace.chain.channel_id}`
+          : undefined
+      }
+      return
+    }
+
+    const denom = base.toLowerCase()
+    result.native[denom] = { denom, symbol, name, decimals, icon }
+  })
+
+  return result
+}
+
+export const mapCosmosRegistryAssetAliases = (
+  payloads: CosmosRegistryAssetList[]
+) => {
+  const aliases: Record<string, NativeToken> = {}
+
+  payloads.forEach((payload) => {
+    ;(payload.assets ?? []).forEach((asset) => {
+      const base = asset.base?.trim()
+      const symbol = asset.symbol?.trim()
+      if (!base || !symbol) return
+
+      const token: NativeToken = {
+        denom: base,
+        symbol,
+        name: asset.name?.trim() || symbol,
+        decimals: getRegistryAssetDecimals(asset),
+        icon: sanitizeAssetIconUrl(asset.logo_URIs?.svg ?? asset.logo_URIs?.png)
+      }
+      const keys = new Set([
+        base,
+        ...(asset.denom_units ?? []).map((unit) => unit.denom ?? ""),
+        ...(asset.traces ?? []).flatMap((trace) => [
+          trace.counterparty?.base_denom ?? "",
+          trace.chain?.path ?? ""
+        ])
+      ])
+      keys.forEach((key) => {
+        const normalized = key.trim().toLowerCase()
+        if (normalized && !aliases[normalized]) aliases[normalized] = token
+      })
+    })
+  })
+
+  return aliases
+}
+
+const fetchCosmosRegistryAssets = async () => {
+  if (getActiveAppChainKey() !== "luna") return EMPTY_COSMOS_REGISTRY_ASSETS
+  if (!cosmosRegistryAssetsPromise) {
+    cosmosRegistryAssetsPromise = fetch(COSMOS_TERRA_ASSETLIST_URL)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Failed to load Terra asset list: ${response.status}`)
+        return mapCosmosRegistryAssets((await response.json()) as CosmosRegistryAssetList)
+      })
+      .catch(() => EMPTY_COSMOS_REGISTRY_ASSETS)
+  }
+  return cosmosRegistryAssetsPromise
+}
+
+const fetchCosmosSourceAssetAliases = async () => {
+  if (getActiveAppChainKey() !== "luna") return {}
+  if (!cosmosSourceAssetAliasesPromise) {
+    cosmosSourceAssetAliasesPromise = Promise.all(
+      COSMOS_SOURCE_ASSETLIST_URLS.map(async (url) => {
+        try {
+          const response = await fetch(url)
+          if (!response.ok) return { assets: [] }
+          return (await response.json()) as CosmosRegistryAssetList
+        } catch {
+          return { assets: [] }
+        }
+      })
+    ).then(mapCosmosRegistryAssetAliases)
+  }
+  return cosmosSourceAssetAliasesPromise
+}
+
+const getBaseDenomLookupCandidates = (baseDenom: string) => {
+  const candidates = new Set<string>()
+  let current = baseDenom.trim().toLowerCase()
+  if (!current) return []
+  candidates.add(current)
+
+  while (current.startsWith("transfer/")) {
+    const segments = current.split("/")
+    if (segments.length < 3) break
+    current = segments.slice(2).join("/")
+    candidates.add(current)
+  }
+
+  const leaf = current.split("/").at(-1)
+  if (leaf) candidates.add(leaf)
+  return Array.from(candidates)
+}
+
+const fetchSourceRegistryToken = async (baseDenom: string) => {
+  const aliases = await fetchCosmosSourceAssetAliases()
+  return getBaseDenomLookupCandidates(baseDenom)
+    .map((candidate) => aliases[candidate])
+    .find(Boolean)
+}
+
 const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> => {
   const cached = getCachedIbcToken(hash)
   if (cached) return cached
@@ -381,32 +587,37 @@ const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> =
   const baseDenom = tracePayload?.denom_trace?.base_denom
   if (!baseDenom) return undefined
 
+  const sourceToken = await fetchSourceRegistryToken(baseDenom)
   let metadata: BankMetadataResponse["metadata"] | undefined
-  try {
-    const metadataRes = await fetchWithEndpointFallback(
-      `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(
-        baseDenom
-      )}`
-    )
-    if (metadataRes.ok) {
-      const payload = (await metadataRes.json()) as BankMetadataResponse
-      metadata = payload?.metadata
+  if (!sourceToken) {
+    try {
+      const metadataRes = await fetchWithEndpointFallback(
+        `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(
+          baseDenom
+        )}`
+      )
+      if (metadataRes.ok) {
+        const payload = (await metadataRes.json()) as BankMetadataResponse
+        metadata = payload?.metadata
+      }
+    } catch {
+      metadata = undefined
     }
-  } catch {
-    metadata = undefined
   }
 
-  const symbol = metadata?.symbol?.trim() || deriveSymbolFromDenom(baseDenom)
-  const name = metadata?.name?.trim() || symbol
+  const symbol = resolveDisplaySymbol(sourceToken?.symbol ?? metadata?.symbol, baseDenom)
+  const name = resolveDisplayName(sourceToken?.name ?? metadata?.name, symbol)
   const token: IbcToken = {
     denom: `ibc/${hash}`,
     base_denom: baseDenom,
     symbol,
     name,
-    icon: looksLikeHttpUrl(metadata?.uri)
-      ? sanitizeAssetIconUrl(metadata?.uri) ?? "/system/ibc.svg"
-      : "/system/ibc.svg",
-    decimals: getDecimalsFromMetadata(metadata) ?? 6,
+    icon:
+      sourceToken?.icon ??
+      (looksLikeHttpUrl(metadata?.uri)
+        ? sanitizeAssetIconUrl(metadata?.uri) ?? "/system/ibc.svg"
+        : "/system/ibc.svg"),
+    decimals: sourceToken?.decimals ?? getDecimalsFromMetadata(metadata) ?? 6,
     path: tracePayload?.denom_trace?.path
   }
   cacheIbcToken(hash, token)
@@ -436,6 +647,12 @@ const fetchNativeMetadataToken = async (
   const cached = getCachedNativeToken(normalized)
   if (cached) return cached
 
+  const registryToken = (await fetchCosmosRegistryAssets()).native[normalized]
+  if (registryToken) {
+    cacheNativeToken(normalized, registryToken)
+    return registryToken
+  }
+
   const response = await fetchWithEndpointFallback(
     `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
   )
@@ -444,8 +661,8 @@ const fetchNativeMetadataToken = async (
   const metadata = payload?.metadata
   if (!metadata) return undefined
 
-  const symbol = metadata.symbol?.trim() || deriveSymbolFromDenom(normalized)
-  const name = metadata.name?.trim() || symbol
+  const symbol = resolveDisplaySymbol(metadata.symbol, normalized)
+  const name = resolveDisplayName(metadata.name, symbol)
   const token: NativeToken = {
     denom: normalized,
     symbol,
@@ -512,8 +729,11 @@ export const useCw20Whitelist = () => {
         }
         return acc
       }, {})
+      const supplemental = (await fetchCosmosRegistryAssets()).cw20
       return Object.fromEntries(
-        Object.entries(mapped).filter(([, token]) => Boolean(token.symbol && token.token))
+        Object.entries({ ...mapped, ...supplemental }).filter(([, token]) =>
+          Boolean(token.symbol && token.token)
+        )
       )
     },
     staleTime: 60 * 60 * 1000
@@ -703,9 +923,10 @@ export const useIbcWhitelist = () => {
       const data = await fetchAsset<Record<string, Record<string, IbcToken>>>(
         "ibc/tokens.json"
       )
-      return (
+      const tokens =
         pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
-      )
+      const supplemental = (await fetchCosmosRegistryAssets()).ibc
+      return { ...tokens, ...supplemental }
     },
     staleTime: 60 * 60 * 1000
   })

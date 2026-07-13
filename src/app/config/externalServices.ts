@@ -9,6 +9,13 @@ export const COINPAPRIKA_USTC_URL =
 
 export const ASSET_URL = "https://assets.terra.dev"
 export const ASSET_DEX_PAIRS_URL = `${ASSET_URL}/cw20/pairs.dex.json`
+export const COSMOS_TERRA_ASSETLIST_URL =
+  "https://raw.githubusercontent.com/cosmos/chain-registry/master/terra2/assetlist.json"
+export const COSMOS_SOURCE_ASSETLIST_URLS = [
+  "https://raw.githubusercontent.com/cosmos/chain-registry/master/axelar/assetlist.json",
+  "https://raw.githubusercontent.com/cosmos/chain-registry/master/gravitybridge/assetlist.json",
+  "https://raw.githubusercontent.com/cosmos/chain-registry/master/neutron/assetlist.json"
+] as const
 export const HEXXAGON_REGISTRY_URL =
   "https://raw.githubusercontent.com/hexxagon-io/chain-registry/main"
 export const HEXXAGON_DEX_PAIRS_URL = `${HEXXAGON_REGISTRY_URL}/cw20/dex_pairs/mainnet/terra.js`
