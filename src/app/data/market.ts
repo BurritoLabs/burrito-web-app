@@ -17,6 +17,11 @@ import { queryContractSmart } from "./classic"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 import { getSwapDexes, type SwapDex } from "./dexFactories"
 import { pickChainAssets } from "./terraAssets"
+import {
+  getFactoryPairCursor,
+  parseFactoryPairRecord,
+  type FactoryPairRecord
+} from "../market/factoryPairs"
 
 type AssetDexPair = {
   dex?: string
@@ -171,19 +176,8 @@ export type PairTradesResult = {
   hasMore: boolean
 }
 
-type FactoryPairEntry =
-  | {
-      contract_addr?: string
-      asset_infos?: unknown[]
-    }
-  | {
-      contract?: string
-      asset1?: unknown
-      asset2?: unknown
-    }
-
 type FactoryPairsResponse = {
-  pairs?: FactoryPairEntry[]
+  pairs?: FactoryPairRecord[]
 }
 
 type CodeContractsResponse = {
@@ -1293,6 +1287,52 @@ const loadFactoryPairsForDex = async (dex: SwapDex) => {
   return pairContracts
 }
 
+const loadFactoryMarketPairsForDex = async (
+  dex: SwapDex
+): Promise<MarketDexPair[]> => {
+  if (!dex.factory || (dex.mode && dex.mode !== "terraswap")) return []
+
+  const pairsByAddress = new Map<string, MarketDexPair>()
+  const seenCursors = new Set<string>()
+  let startAfter: FactoryPairRecord["asset_infos"]
+
+  for (let page = 0; page < 100; page += 1) {
+    try {
+      const query = startAfter
+        ? { pairs: { limit: 30, start_after: startAfter } }
+        : { pairs: { limit: 30 } }
+      const data = await queryContractSmart<FactoryPairsResponse>(dex.factory, query)
+      const records = data?.pairs ?? []
+      if (!records.length) break
+
+      records.forEach((record) => {
+        const pair = parseFactoryPairRecord(record, dex)
+        if (pair) pairsByAddress.set(pair.pair, pair)
+      })
+
+      const nextCursor = getFactoryPairCursor(records[records.length - 1])
+      if (!nextCursor || records.length < 30) break
+
+      const cursorKey = JSON.stringify(nextCursor)
+      if (seenCursors.has(cursorKey)) break
+      seenCursors.add(cursorKey)
+      startAfter = nextCursor
+    } catch {
+      break
+    }
+  }
+
+  return Array.from(pairsByAddress.values())
+}
+
+const fetchPhoenixFactoryMarketPairs = async () => {
+  if (getActiveAppChainKey() !== "luna") return []
+  const results = await Promise.all(
+    getSwapDexes("luna").map(loadFactoryMarketPairsForDex)
+  )
+  return results.flat()
+}
+
 const fetchPairDexMapFromFactories = async () => {
   const map = new Map<string, { dexId: string; dexLabel: string }>()
   const dexes = getSwapDexes(getActiveAppChainKey())
@@ -1344,7 +1384,10 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
     return mergeMarketPairs(local.pairs, launchpadPairs)
   }
 
-  const response = await fetch(ASSET_DEX_PAIRS_URL)
+  const [response, factoryPairs] = await Promise.all([
+    fetch(ASSET_DEX_PAIRS_URL),
+    fetchPhoenixFactoryMarketPairs()
+  ])
   if (!response.ok) {
     throw new Error(`Failed to load DEX pairs: ${response.status}`)
   }
@@ -1371,7 +1414,10 @@ export const fetchMarketDexPairs = async (): Promise<MarketDexPair[]> => {
       assets: [item.assets![0], item.assets![1]] as [string, string]
     }))
 
-  return mergeMarketPairs(externalPairs, launchpadPairs)
+  return mergeMarketPairs(
+    mergeMarketPairs(externalPairs, factoryPairs),
+    launchpadPairs
+  )
 }
 
 const fetchPoolForPair = async (

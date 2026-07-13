@@ -200,6 +200,11 @@ export const LUNA_SWAP_DEXES: readonly SwapDex[] = [
     id: "phoenix",
     label: "Phoenix",
     factory: "terra1pewdsxywmwurekjwrgvjvxvv0dv2pf8xtdl9ykfce2z0q3gf0k3qr8nezy"
+  },
+  {
+    id: "white-whale",
+    label: "White Whale",
+    factory: "terra1f4cr4sr5eulp3f2us8unu6qv8a5rhjltqsg7ujjx6f2mrlqh923sljwhn3"
   }
 ]
 

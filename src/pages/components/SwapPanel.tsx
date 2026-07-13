@@ -129,6 +129,9 @@ type SmartSimulateResponse = {
   return_amount?: string
   spread_amount?: string
   commission_amount?: string
+  swap_fee_amount?: string
+  protocol_fee_amount?: string
+  burn_fee_amount?: string
 }
 
 type PairQueryResponse = {
@@ -338,6 +341,11 @@ const simulatePairSwapQuote = async (
     throw new Error(`${dex.label} quote unavailable`)
   }
   const returnAmount = parseBigInt(result.return_amount)
+  const commissionAmount = result.commission_amount
+    ? parseBigInt(result.commission_amount)
+    : parseBigInt(result.swap_fee_amount) +
+      parseBigInt(result.protocol_fee_amount) +
+      parseBigInt(result.burn_fee_amount)
   const beliefPrice =
     dex.mode === "garuda" ? undefined : ratioToDecimal(amount, returnAmount)
   return {
@@ -346,7 +354,7 @@ const simulatePairSwapQuote = async (
     pair,
     returnAmount,
     spreadAmount: parseBigInt(result.spread_amount),
-    commissionAmount: parseBigInt(result.commission_amount),
+    commissionAmount,
     beliefPrice,
     pathSymbols: [offerAsset.symbol, askAsset.symbol],
     hops: [

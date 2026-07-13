@@ -23,11 +23,12 @@ const tokenInput = {
 }
 
 describe("chain-specific DEX configuration", () => {
-  it("uses the three Phoenix registry DEXes", () => {
+  it("uses the four active Phoenix factory DEXes", () => {
     expect(getSwapDexes("luna").map((dex) => dex.id)).toEqual([
       "astroport",
       "terraswap",
-      "phoenix"
+      "phoenix",
+      "white-whale"
     ])
     expect(getSwapDexes("luna").every((dex) => dex.factory?.startsWith("terra1"))).toBe(true)
   })
