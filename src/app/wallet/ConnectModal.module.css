@@ -97,9 +97,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(82, 196, 26, 0.2);
-  border: 1px solid rgba(82, 196, 26, 0.45);
-  color: #52c41a;
+  background: rgba(var(--active-chain-rgb), 0.2);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.45);
+  color: var(--chain-accent);
   font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
@@ -135,12 +135,12 @@
 .actionLink,
 .actionButton {
   font-size: var(--font-size-small);
-  color: #52c41a;
+  color: var(--chain-accent);
   text-decoration: none;
-  border: 1px solid rgba(82, 196, 26, 0.4);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.4);
   border-radius: 999px;
   padding: 6px 12px;
-  background: rgba(82, 196, 26, 0.12);
+  background: rgba(var(--active-chain-rgb), 0.12);
 }
 
 .actionButton {

@@ -58,14 +58,14 @@
 
 .chainPill:hover {
   color: var(--text);
-  border-color: rgba(82, 196, 26, 0.7);
-  box-shadow: inset 0 0 0 0.5px rgba(82, 196, 26, 0.7);
+  border-color: rgba(var(--active-chain-rgb), 0.7);
+  box-shadow: inset 0 0 0 0.5px rgba(var(--active-chain-rgb), 0.7);
   opacity: 1;
 }
 
 .chainPillActive {
-  background-color: rgba(82, 196, 26, 0.95);
-  border-color: rgba(82, 196, 26, 0.95);
+  background-color: rgba(var(--active-chain-rgb), 0.95);
+  border-color: rgba(var(--active-chain-rgb), 0.95);
   color: #0c1411;
   opacity: 1;
   box-shadow: none;
@@ -275,7 +275,7 @@
 }
 
 .stakeTabActive {
-  background: rgba(82, 196, 26, 0.12);
+  background: rgba(var(--active-chain-rgb), 0.12);
   color: #ffffff;
 }
 
@@ -426,8 +426,8 @@
   height: 32px;
   padding: 0 20px;
   border-radius: 16px;
-  border: 1px solid rgba(82, 196, 26, 0.6);
-  background: rgba(82, 196, 26, 0.15);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.6);
+  background: rgba(var(--active-chain-rgb), 0.15);
   color: #eaffea;
   font-size: 12px;
   font-weight: 600;
@@ -498,7 +498,7 @@
 }
 
 .activeToggle input {
-  accent-color: #52c41a;
+  accent-color: var(--chain-accent);
 }
 
 .validatorListBody {
@@ -604,8 +604,8 @@
   min-height: 34px;
   padding: 0 18px;
   border-radius: 17px;
-  border: 1px solid rgba(82, 196, 26, 0.55);
-  background: rgba(82, 196, 26, 0.14);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.55);
+  background: rgba(var(--active-chain-rgb), 0.14);
   color: #eaffea;
   font-size: 12px;
   font-weight: 600;
@@ -618,8 +618,8 @@
 }
 
 .validatorLoadMoreButton:hover {
-  border-color: rgba(82, 196, 26, 0.8);
-  background: rgba(82, 196, 26, 0.2);
+  border-color: rgba(var(--active-chain-rgb), 0.8);
+  background: rgba(var(--active-chain-rgb), 0.2);
 }
 
 .validatorLoadMoreCount {
@@ -711,8 +711,8 @@
   height: 28px;
   padding: 0 16px;
   border-radius: 14px;
-  border: 1px solid rgba(82, 196, 26, 0.6);
-  background: rgba(82, 196, 26, 0.18);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.6);
+  background: rgba(var(--active-chain-rgb), 0.18);
   color: #eaffea;
   font-size: 12px;
   font-weight: 600;

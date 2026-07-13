@@ -199,7 +199,7 @@
   min-width: 62.31px;
   padding: 8px 16px;
   border-radius: 8px;
-  background: var(--green);
+  background: var(--chain-accent);
   color: #0c1411;
   font-size: 12px;
   font-weight: var(--bold);
@@ -235,7 +235,7 @@
   border-radius: 8px;
   font-size: var(--font-size);
   letter-spacing: 0.02em;
-  background: rgba(82, 196, 26, 0.9);
+  background: rgba(var(--active-chain-rgb), 0.9);
   color: #0c1411;
   font-weight: var(--bold);
 }

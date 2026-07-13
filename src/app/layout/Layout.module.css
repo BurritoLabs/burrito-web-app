@@ -37,8 +37,8 @@
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(1100px 740px at 70% 26%, rgba(104, 216, 63, 0.13), transparent 62%),
-    radial-gradient(980px 620px at 52% 44%, rgba(104, 216, 63, 0.075), transparent 66%);
+    radial-gradient(1100px 740px at 70% 26%, rgba(var(--active-chain-rgb), 0.13), transparent 62%),
+    radial-gradient(980px 620px at 52% 44%, rgba(var(--active-chain-rgb), 0.075), transparent 66%);
   filter: none;
   opacity: 0.72;
   animation: none;
@@ -67,9 +67,9 @@
   grid-area: banner;
   background: linear-gradient(
     90deg,
-    rgba(104, 216, 63, 0.18),
+    rgba(var(--active-chain-rgb), 0.18),
     rgba(255, 255, 255, 0.06),
-    rgba(104, 216, 63, 0.12)
+    rgba(var(--active-chain-rgb), 0.12)
   );
   color: var(--fg);
   font-size: var(--font-size-small);
@@ -254,8 +254,8 @@
   .globalGlow::before {
     inset: -10vh -12vw;
     background:
-      radial-gradient(720px 420px at 65% 22%, rgba(104, 216, 63, 0.11), transparent 62%),
-      radial-gradient(600px 360px at 48% 38%, rgba(104, 216, 63, 0.06), transparent 66%);
+      radial-gradient(720px 420px at 65% 22%, rgba(var(--active-chain-rgb), 0.11), transparent 62%),
+      radial-gradient(600px 360px at 48% 38%, rgba(var(--active-chain-rgb), 0.06), transparent 66%);
     filter: blur(10px);
     opacity: 0.72;
   }

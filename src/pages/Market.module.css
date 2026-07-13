@@ -67,9 +67,9 @@
 }
 
 .directionButton:hover {
-  border-color: rgba(82, 196, 26, 0.3);
+  border-color: rgba(var(--active-chain-rgb), 0.3);
   background:
-    linear-gradient(180deg, rgba(82, 196, 26, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.08), rgba(255, 255, 255, 0.02)),
     rgba(18, 29, 22, 0.96);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
@@ -147,9 +147,9 @@
 
 .sortButton:hover,
 .sortButtonOpen {
-  border-color: rgba(82, 196, 26, 0.3);
+  border-color: rgba(var(--active-chain-rgb), 0.3);
   background:
-    linear-gradient(180deg, rgba(82, 196, 26, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.08), rgba(255, 255, 255, 0.02)),
     rgba(18, 29, 22, 0.96);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
@@ -211,8 +211,8 @@
 }
 
 .sortOptionActive {
-  background: rgba(82, 196, 26, 0.14);
-  color: rgba(153, 239, 102, 0.98);
+  background: rgba(var(--active-chain-rgb), 0.14);
+  color: var(--chain-accent-soft);
 }
 
 .toolbarFooter {
@@ -256,7 +256,7 @@
 
 .timeButtonActive {
   color: #0e1a12;
-  background: rgba(82, 196, 26, 0.95);
+  background: rgba(var(--active-chain-rgb), 0.95);
 }
 
 .dexFilters {
@@ -287,13 +287,13 @@
 }
 
 .dexFilterButton:hover {
-  border-color: rgba(82, 196, 26, 0.28);
+  border-color: rgba(var(--active-chain-rgb), 0.28);
   color: rgba(246, 255, 246, 0.94);
 }
 
 .dexFilterButtonOpen {
-  border-color: rgba(82, 196, 26, 0.34);
-  background: rgba(82, 196, 26, 0.1);
+  border-color: rgba(var(--active-chain-rgb), 0.34);
+  background: rgba(var(--active-chain-rgb), 0.1);
 }
 
 .dexFilterButton strong {
@@ -311,13 +311,13 @@
 }
 
 .dexFilterButtonActive {
-  border-color: rgba(82, 196, 26, 0.44);
-  background: rgba(82, 196, 26, 0.16);
-  color: rgba(153, 239, 102, 0.98);
+  border-color: rgba(var(--active-chain-rgb), 0.44);
+  background: rgba(var(--active-chain-rgb), 0.16);
+  color: var(--chain-accent-soft);
 }
 
 .dexFilterButtonActive strong {
-  background: rgba(82, 196, 26, 0.94);
+  background: rgba(var(--active-chain-rgb), 0.94);
   color: #0e1a12;
 }
 
@@ -388,12 +388,12 @@
 }
 
 .dexMoreOptionActive {
-  background: rgba(82, 196, 26, 0.14);
-  color: rgba(153, 239, 102, 0.98);
+  background: rgba(var(--active-chain-rgb), 0.14);
+  color: var(--chain-accent-soft);
 }
 
 .dexMoreOptionActive strong {
-  color: rgba(153, 239, 102, 0.98);
+  color: var(--chain-accent-soft);
 }
 
 .empty {
@@ -429,7 +429,7 @@
 .poolCardLink:hover .poolCard,
 .poolCardLink:focus-visible .poolCard {
   transform: translateY(-1px);
-  border-color: rgba(82, 196, 26, 0.38);
+  border-color: rgba(var(--active-chain-rgb), 0.38);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
 
@@ -505,7 +505,7 @@
   font-size: 10px;
   font-weight: var(--bold);
   color: #0e1a12;
-  background: rgba(82, 196, 26, 0.88);
+  background: rgba(var(--active-chain-rgb), 0.88);
 }
 
 .pairTitle {
@@ -562,8 +562,8 @@
 
 .dexVersionTag {
   border-radius: 999px;
-  border: var(--border-width) solid rgba(82, 196, 26, 0.34);
-  background: rgba(82, 196, 26, 0.14);
+  border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.34);
+  background: rgba(var(--active-chain-rgb), 0.14);
   color: rgba(133, 230, 91, 0.92);
   font-size: 10px;
   line-height: 1;

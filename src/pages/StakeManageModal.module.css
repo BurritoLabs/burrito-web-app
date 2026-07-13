@@ -92,9 +92,9 @@
 }
 
 .tabActive {
-  background: rgba(82, 196, 26, 0.9);
+  background: rgba(var(--active-chain-rgb), 0.9);
   color: #0c1411;
-  border-color: rgba(82, 196, 26, 0.9);
+  border-color: rgba(var(--active-chain-rgb), 0.9);
 }
 
 .tabDisabled {
@@ -209,7 +209,7 @@
 }
 
 .dropdownOptionActive {
-  background: rgba(82, 196, 26, 0.12);
+  background: rgba(var(--active-chain-rgb), 0.12);
   color: #ffffff;
   border-color: transparent;
 }
@@ -228,7 +228,7 @@
 .maxButton {
   border: 0;
   background: transparent;
-  color: rgba(82, 196, 26, 0.9);
+  color: rgba(var(--active-chain-rgb), 0.9);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -298,7 +298,7 @@
   height: 40px;
   border-radius: 999px;
   border: 0;
-  background: rgba(82, 196, 26, 0.95);
+  background: rgba(var(--active-chain-rgb), 0.95);
   color: #0c1411;
   font-weight: 700;
   cursor: pointer;

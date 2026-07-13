@@ -21,6 +21,7 @@ import {
 } from "../../app/utils/format"
 import { CLASSIC_DENOMS } from "../../app/chain"
 import { useAppChain } from "../../app/appChainContext"
+import { getValidatorExplorerUrl } from "../../app/explorer"
 import { KEYBASE_PROXY_URL } from "../../app/config/externalServices"
 import {
   DEFAULT_VALIDATOR_LOGO,
@@ -46,9 +47,7 @@ const Stake = () => {
   const { chain, chainKey } = useAppChain()
   const nativeSymbol = chain.displayDenom
   const validatorExplorerUrl = (operatorAddress: string) =>
-    chainKey === "luna"
-      ? `https://www.mintscan.io/terra/validators/${operatorAddress}`
-      : `https://finder.burrito.money/classic/validator/${operatorAddress}`
+    getValidatorExplorerUrl(chainKey, operatorAddress)
 
   const { data: delegations = [] } = useQuery({
     queryKey: ["delegations", chain.chainId, account?.address],

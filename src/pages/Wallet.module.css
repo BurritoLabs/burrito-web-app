@@ -39,7 +39,7 @@
 }
 
 .filterToggle input {
-  accent-color: var(--green);
+  accent-color: var(--chain-accent);
   width: 14px;
   height: 14px;
 }
@@ -207,10 +207,10 @@
 }
 
 .retryButton {
-  border: 1px solid rgba(82, 196, 26, 0.7);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.7);
   border-radius: 999px;
-  background: rgba(82, 196, 26, 0.14);
-  color: var(--green);
+  background: rgba(var(--active-chain-rgb), 0.14);
+  color: var(--chain-accent);
   font: inherit;
   font-weight: var(--bold);
   padding: 7px 14px;
@@ -218,7 +218,7 @@
 }
 
 .retryButton:hover {
-  background: rgba(82, 196, 26, 0.22);
+  background: rgba(var(--active-chain-rgb), 0.22);
 }
 
 .assetLoadingRows {
@@ -295,8 +295,8 @@
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: rgba(82, 196, 26, 0.12);
-  color: var(--green);
+  background: rgba(var(--active-chain-rgb), 0.12);
+  color: var(--chain-accent);
   display: grid;
   place-items: center;
 }
@@ -319,7 +319,7 @@
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--green);
+  color: var(--chain-accent);
   font-weight: var(--bold);
   cursor: pointer;
 }

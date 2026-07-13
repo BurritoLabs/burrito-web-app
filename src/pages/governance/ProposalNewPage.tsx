@@ -29,6 +29,7 @@ import { fetchBalances } from "../../app/data/classic"
 import { getOfflineSignerForConnector } from "../../app/wallet/walletAdapters"
 import { formatTxError } from "../../app/utils/txError"
 import { useAppChain } from "../../app/appChainContext"
+import { getTxExplorerUrl } from "../../app/explorer"
 
 type ProposalType = "TEXT" | "SPEND" | "PARAMS" | "EXECUTE"
 
@@ -836,7 +837,7 @@ const ProposalNew = () => {
           {error ? <div className={styles.error}>{error}</div> : null}
           {txHash ? (
             <div className={styles.success}>
-              Submitted. Tx: <a href={chainKey === "lunc" ? `https://finder.burrito.money/classic/tx/${txHash}` : `https://www.mintscan.io/terra/tx/${txHash}`} target="_blank" rel="noreferrer">{txHash}</a>
+              Submitted. Tx: <a href={getTxExplorerUrl(chainKey, txHash)} target="_blank" rel="noreferrer">{txHash}</a>
             </div>
           ) : null}
 

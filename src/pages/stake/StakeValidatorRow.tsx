@@ -3,6 +3,7 @@ import type { ValidatorItem } from "../../app/data/classic"
 import { formatPercentPlain } from "../../app/stake/stakeFormat"
 import styles from "../Stake.module.css"
 import { getActiveAppChainKey } from "../../app/activeChain"
+import { getValidatorExplorerUrl } from "../../app/explorer"
 
 export type StakeValidatorRowTarget = {
   validator: string
@@ -45,11 +46,10 @@ const StakeValidatorRow = ({
         </span>
         <a
           className={styles.validatorRowLink}
-          href={
-            getActiveAppChainKey() === "lunc"
-              ? `https://finder.burrito.money/classic/validator/${validator.operator_address}`
-              : `https://www.mintscan.io/terra/validators/${validator.operator_address}`
-          }
+          href={getValidatorExplorerUrl(
+            getActiveAppChainKey(),
+            validator.operator_address
+          )}
           target="_blank"
           rel="noreferrer"
         >

@@ -43,6 +43,18 @@ export const AppChainProvider = ({ children }: { children: ReactNode }) => {
       "--active-chain-rgb",
       APP_CHAINS[chainKey].accentRgb
     )
+    document.documentElement.style.setProperty(
+      "--chain-accent",
+      APP_CHAINS[chainKey].accent
+    )
+    document.documentElement.style.setProperty(
+      "--chain-accent-strong",
+      APP_CHAINS[chainKey].accentStrong
+    )
+    document.documentElement.style.setProperty(
+      "--chain-accent-soft",
+      APP_CHAINS[chainKey].accentSoft
+    )
   }, [chainKey])
 
   const value = useMemo(

@@ -33,7 +33,7 @@
 
 .timeButtonActive {
   color: #0e1a12;
-  background: rgba(82, 196, 26, 0.95);
+  background: rgba(var(--active-chain-rgb), 0.95);
 }
 
 .hero {
@@ -105,7 +105,7 @@
   font-size: 12px;
   font-weight: var(--bold);
   color: #0e1a12;
-  background: rgba(82, 196, 26, 0.88);
+  background: rgba(var(--active-chain-rgb), 0.88);
 }
 
 .pairTitle {
@@ -305,8 +305,8 @@
 
 .dexVersionTag {
   border-radius: 999px;
-  border: var(--border-width) solid rgba(82, 196, 26, 0.34);
-  background: rgba(82, 196, 26, 0.14);
+  border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.34);
+  background: rgba(var(--active-chain-rgb), 0.14);
   color: rgba(133, 230, 91, 0.92);
   font-size: 10px;
   line-height: 1;
@@ -848,7 +848,7 @@
 
 .liquiditySlippageButtonActive {
   color: #0e1a12;
-  background: var(--green);
+  background: var(--chain-accent);
 }
 
 .liquidityHeader {
@@ -917,8 +917,8 @@
 .liquidityAssetTop button {
   border: 0;
   border-radius: 999px;
-  background: rgba(82, 196, 26, 0.14);
-  color: var(--green);
+  background: rgba(var(--active-chain-rgb), 0.14);
+  color: var(--chain-accent);
   font-family: var(--font-ui);
   font-size: 11px;
   font-weight: var(--bold);
@@ -1097,7 +1097,7 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.04);
-  color: var(--green);
+  color: var(--chain-accent);
   line-height: 1;
   font-weight: var(--bold);
 }
@@ -1140,7 +1140,7 @@
 
 .liquidityDetailsToggle {
   flex: 0 0 auto;
-  color: rgba(82, 196, 26, 0.95);
+  color: rgba(var(--active-chain-rgb), 0.95);
   font-size: 11px;
   font-weight: var(--bold);
   white-space: nowrap;

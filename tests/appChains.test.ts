@@ -5,7 +5,8 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../src/app/chain"
 import {
   getAddressExplorerUrl,
   getBlockExplorerUrl,
-  getTxExplorerUrl
+  getTxExplorerUrl,
+  getValidatorExplorerUrl
 } from "../src/app/explorer"
 
 afterEach(() => setActiveAppChainKey("lunc"))
@@ -15,6 +16,11 @@ describe("app chain runtime", () => {
     expect(APP_CHAINS.luna.chainId).toBe("phoenix-1")
     expect(APP_CHAINS.luna.runtime.nativeDenom.coinDenom).toBe("LUNA")
     expect(APP_CHAINS.luna.runtime.gasPriceStep.average).toBe(0.015)
+  })
+
+  it("uses the same chain accents as Burrito AI and Monitor", () => {
+    expect(APP_CHAINS.lunc.accent).toBe("#38bdf8")
+    expect(APP_CHAINS.luna.accent).toBe("#f97316")
   })
 
   it("switches compatibility reads to the active chain", () => {
@@ -40,15 +46,18 @@ describe("chain explorers", () => {
     )
   })
 
-  it("uses Mintscan for Phoenix", () => {
+  it("uses Burrito Finder mainnet routes for Phoenix", () => {
     expect(getTxExplorerUrl("luna", "ABC")).toBe(
-      "https://www.mintscan.io/terra/tx/ABC"
+      "https://finder.burrito.money/mainnet/tx/ABC"
     )
     expect(getAddressExplorerUrl("luna", "terra1abc")).toBe(
-      "https://www.mintscan.io/terra/accounts/terra1abc"
+      "https://finder.burrito.money/mainnet/address/terra1abc"
     )
     expect(getBlockExplorerUrl("luna", 123)).toBe(
-      "https://www.mintscan.io/terra/block/123"
+      "https://finder.burrito.money/mainnet/blocks/123"
+    )
+    expect(getValidatorExplorerUrl("luna", "terravaloper1abc")).toBe(
+      "https://finder.burrito.money/mainnet/validator/terravaloper1abc"
     )
   })
 })

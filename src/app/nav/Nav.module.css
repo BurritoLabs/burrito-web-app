@@ -125,7 +125,7 @@
   left: -275px;
   bottom: 225px;
   transform: rotate(65deg);
-  background-color: rgba(82, 196, 26, 0.4);
+  background-color: rgba(var(--active-chain-rgb), 0.4);
   filter: blur(42px);
   transition: opacity 0.2s ease;
 }
@@ -144,7 +144,7 @@
   width: 100px;
   bottom: -15px;
   left: -15px;
-  background-color: rgba(82, 196, 26, 0.28);
+  background-color: rgba(var(--active-chain-rgb), 0.28);
   filter: blur(24px);
   transition: opacity 0.2s ease;
 }
@@ -163,7 +163,7 @@
   right: -50px;
   bottom: 10px;
   transform: rotate(50deg);
-  background-color: rgba(82, 196, 26, 0.2);
+  background-color: rgba(var(--active-chain-rgb), 0.2);
   filter: blur(34px);
 }
 

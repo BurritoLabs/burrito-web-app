@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletContext"
 import { useAppChain } from "../appChainContext"
+import { getAddressExplorerUrl } from "../explorer"
 import { CLASSIC_DENOMS } from "../chain"
 import {
   fetchBurnTaxRate,
@@ -373,9 +374,7 @@ const WalletPanel = () => {
   )
   const receiveAddress = account?.address ?? ""
   const receiveFinderUrl = receiveAddress
-    ? isClassic
-      ? `https://finder.burrito.money/classic/address/${receiveAddress}`
-      : `https://www.mintscan.io/terra/accounts/${receiveAddress}`
+    ? getAddressExplorerUrl(chainKey, receiveAddress)
     : undefined
   const receiveAddressPreview = receiveAddress
     ? formatShortAddress(receiveAddress)

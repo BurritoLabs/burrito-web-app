@@ -42,7 +42,7 @@
 }
 
 .searchInput:focus {
-  border-color: rgba(82, 196, 26, 0.48);
+  border-color: rgba(var(--active-chain-rgb), 0.48);
 }
 
 .stateCard {
@@ -276,7 +276,7 @@
 
 .queryInput:focus {
   outline: none;
-  border-color: rgba(82, 196, 26, 0.48);
+  border-color: rgba(var(--active-chain-rgb), 0.48);
 }
 
 .queryError {
@@ -376,7 +376,7 @@
 .txInput:focus,
 .txTextarea:focus {
   outline: none;
-  border-color: rgba(82, 196, 26, 0.48);
+  border-color: rgba(var(--active-chain-rgb), 0.48);
 }
 
 .txHint {
@@ -407,15 +407,15 @@
 
 .txToggle input {
   margin: 0;
-  accent-color: var(--green);
+  accent-color: var(--chain-accent);
 }
 
 .txResult {
   display: grid;
   gap: 4px;
-  border: var(--border-width) solid rgba(82, 196, 26, 0.28);
+  border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.28);
   border-radius: var(--radius-lg);
-  background: rgba(82, 196, 26, 0.08);
+  background: rgba(var(--active-chain-rgb), 0.08);
   color: rgba(234, 245, 235, 0.9);
   padding: 10px 12px;
   font-size: var(--font-size-small);

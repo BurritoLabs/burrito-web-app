@@ -119,7 +119,7 @@
 }
 
 .checkbox input {
-  accent-color: #52c41a;
+  accent-color: var(--chain-accent);
 }
 
 .list {
@@ -213,7 +213,7 @@
 }
 
 .toggleOn {
-  background: #52c41a;
+  background: var(--chain-accent);
   color: #0c1411;
 }
 

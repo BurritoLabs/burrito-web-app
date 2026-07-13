@@ -203,12 +203,12 @@
 }
 
 .feeOption:hover {
-  background: rgba(82, 196, 26, 0.16);
+  background: rgba(var(--active-chain-rgb), 0.16);
   color: #ffffff;
 }
 
 .feeOptionActive {
-  background: rgba(82, 196, 26, 0.24);
+  background: rgba(var(--active-chain-rgb), 0.24);
   color: #ffffff;
 }
 
@@ -229,7 +229,7 @@
   width: 100%;
   border: 0;
   border-radius: 999px;
-  background: var(--green);
+  background: var(--chain-accent);
   color: #0c1411;
   font-size: 14px;
   font-weight: var(--bold);

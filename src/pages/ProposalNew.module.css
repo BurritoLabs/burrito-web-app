@@ -22,8 +22,8 @@
 }
 
 .noticeInfo {
-  background: rgba(82, 196, 26, 0.12);
-  border: 1px solid rgba(82, 196, 26, 0.35);
+  background: rgba(var(--active-chain-rgb), 0.12);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.35);
   color: rgba(234, 245, 235, 0.9);
 }
 
@@ -162,8 +162,8 @@ select.input {
 .input:focus,
 .textarea:focus,
 select.input:focus {
-  border-color: rgba(82, 196, 26, 0.6);
-  box-shadow: 0 0 0 1px rgba(82, 196, 26, 0.35);
+  border-color: rgba(var(--active-chain-rgb), 0.6);
+  box-shadow: 0 0 0 1px rgba(var(--active-chain-rgb), 0.35);
 }
 
 .textarea {
@@ -238,8 +238,8 @@ select.input:focus {
 .success {
   padding: 10px 14px;
   border-radius: var(--radius-lg);
-  background: rgba(82, 196, 26, 0.12);
-  border: 1px solid rgba(82, 196, 26, 0.45);
+  background: rgba(var(--active-chain-rgb), 0.12);
+  border: 1px solid rgba(var(--active-chain-rgb), 0.45);
   color: #bff5c0;
   font-size: var(--font-size-small);
 }
@@ -386,7 +386,7 @@ select.input:focus {
 .submitButton:disabled:hover,
 .submitButton[disabled]:hover {
   border-color: rgba(255, 255, 255, 0.16);
-  background: #52c41a;
+  background: var(--chain-accent);
   color: #0c1411;
 }
 
@@ -463,7 +463,7 @@ select.input option {
 }
 
 .selectButton:hover {
-  border-color: rgba(82, 196, 26, 0.35);
+  border-color: rgba(var(--active-chain-rgb), 0.35);
 }
 
 .selectChevron {

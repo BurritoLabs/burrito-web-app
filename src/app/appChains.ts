@@ -15,6 +15,9 @@ export type AppChainConfig = {
   displayDenom: string
   logoSrc: string
   accentRgb: string
+  accent: string
+  accentStrong: string
+  accentSoft: string
   runtime: (typeof CHAIN_RUNTIME_CONFIG)[AppChainKey]
   features: {
     swap: boolean
@@ -36,7 +39,10 @@ export const APP_CHAINS = {
     nativeDenom: "uluna",
     displayDenom: "LUNC",
     logoSrc: "/system/lunc.svg",
-    accentRgb: "82, 196, 26",
+    accentRgb: "56, 189, 248",
+    accent: "#38bdf8",
+    accentStrong: "#0284c7",
+    accentSoft: "#bae6fd",
     runtime: CHAIN_RUNTIME_CONFIG.lunc,
     features: { swap: true, market: true, launchpad: true }
   },
@@ -50,6 +56,9 @@ export const APP_CHAINS = {
     displayDenom: "LUNA",
     logoSrc: "/system/luna.svg",
     accentRgb: "249, 115, 22",
+    accent: "#f97316",
+    accentStrong: "#ea580c",
+    accentSoft: "#fed7aa",
     runtime: CHAIN_RUNTIME_CONFIG.luna,
     features: { swap: false, market: true, launchpad: false }
   }
