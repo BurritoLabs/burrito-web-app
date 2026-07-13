@@ -1,54 +1,19 @@
 import { useQuery } from "@tanstack/react-query"
-import { CLASSIC_CHAIN } from "../chain"
-import { fetchWithEndpointFallback } from "../data/endpointFallback"
 import styles from "./Aside.module.css"
 import { useAppChain } from "../appChainContext"
 import { getBlockExplorerUrl } from "../explorer"
+import { fetchLatestBlock } from "./blockStatusData"
 
 const BLOCK_REFRESH_MS = 6_000
 const LIVE_BLOCK_MAX_AGE_MS = 30_000
 const STALE_BLOCK_MAX_AGE_MS = 90_000
 
-type LatestBlock = {
-  endpoint: string
-  fetchedAt: number
-  height: number
-  timeMs: number
-}
-
-const fetchLatestBlock = async (): Promise<LatestBlock> => {
-  const response = await fetchWithEndpointFallback(
-    `${CLASSIC_CHAIN.lcd}/cosmos/base/tendermint/v1beta1/blocks/latest`
-  )
-  if (!response.ok) {
-    throw new Error("Failed to fetch latest block")
-  }
-  const data = (await response.json()) as {
-    block?: { header?: { height?: string; time?: string } }
-  }
-  const height = Number(data?.block?.header?.height)
-  if (!Number.isFinite(height)) {
-    throw new Error("Invalid block height")
-  }
-
-  const timeMs = Date.parse(data?.block?.header?.time ?? "")
-  if (!Number.isFinite(timeMs)) {
-    throw new Error("Invalid block time")
-  }
-
-  return {
-    endpoint: response.url || CLASSIC_CHAIN.lcd,
-    fetchedAt: Date.now(),
-    height,
-    timeMs
-  }
-}
-
 const BlockStatus = () => {
   const { chain, chainKey } = useAppChain()
+  const lcd = chain.runtime.chain.lcd
   const { data: latestBlock, isError } = useQuery({
     queryKey: ["latest-block-height", chain.chainId],
-    queryFn: fetchLatestBlock,
+    queryFn: () => fetchLatestBlock(lcd),
     refetchInterval: BLOCK_REFRESH_MS,
     refetchIntervalInBackground: true,
     staleTime: BLOCK_REFRESH_MS - 1_000,
@@ -88,7 +53,7 @@ const BlockStatus = () => {
     ? `${statusLabel}: block ${latestBlock.height.toLocaleString()} · ${Math.round(
         blockAgeMs / 1_000
       )}s old · LCD: ${latestBlock.endpoint}`
-    : `${statusLabel}: LCD ${CLASSIC_CHAIN.lcd}`
+    : `${statusLabel}: LCD ${lcd}`
   const height = latestBlock?.height
 
   return (
