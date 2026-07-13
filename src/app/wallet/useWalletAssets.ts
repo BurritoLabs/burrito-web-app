@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_DENOMS } from "../chain"
+import { useAppChain } from "../appChainContext"
 import {
   fetchBalances,
   fetchFxRates,
@@ -164,27 +165,35 @@ const normalizeWalletAssetKey = (assetKey: string) => {
 
 const EMPTY_BALANCES: CoinBalance[] = []
 export const useWalletAssets = (accountAddress?: string) => {
+  const { chain, chainKey } = useAppChain()
+  const isClassic = chainKey === "lunc"
   const { data: marketPairs = [] } = useQuery({
-    queryKey: ["market", "pairs"],
+    queryKey: ["market", chain.chainId, "pairs"],
     queryFn: fetchMarketDexPairs,
+    enabled: isClassic,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000
   })
 
   const { data: marketPools = [] } = useQuery({
-    queryKey: ["market", "pools", marketPairs.map((pair) => pair.pair).join(",")],
+    queryKey: [
+      "market",
+      chain.chainId,
+      "pools",
+      marketPairs.map((pair) => pair.pair).join(",")
+    ],
     queryFn: () => fetchMarketPools(marketPairs),
-    enabled: marketPairs.length > 0,
+    enabled: isClassic && marketPairs.length > 0,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 4 * 60 * 1000
   })
 
   const cachedNativeBalances = useMemo(
-    () => getCachedNativeBalances(accountAddress),
-    [accountAddress]
+    () => getCachedNativeBalances(accountAddress, chain.chainId),
+    [accountAddress, chain.chainId]
   )
   const balancesQuery = useQuery({
-    queryKey: ["wallet", "balances", accountAddress],
+    queryKey: ["wallet", chain.chainId, "balances", accountAddress],
     queryFn: () => fetchBalances(accountAddress ?? ""),
     enabled: Boolean(accountAddress),
     initialData: cachedNativeBalances?.data,
@@ -205,12 +214,12 @@ export const useWalletAssets = (accountAddress?: string) => {
     Boolean(accountAddress) && !hasBalanceSnapshot && balancesQuery.isError
 
   useEffect(() => {
-    cacheNativeBalances(accountAddress, balancesQuery.data)
-  }, [accountAddress, balancesQuery.data])
+    cacheNativeBalances(accountAddress, balancesQuery.data, chain.chainId)
+  }, [accountAddress, balancesQuery.data, chain.chainId])
 
   const cachedPrices = useMemo(() => getCachedPrices(), [])
   const { data: prices } = useQuery({
-    queryKey: ["prices"],
+    queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
@@ -229,8 +238,13 @@ export const useWalletAssets = (accountAddress?: string) => {
   })
 
   const { data: swapRates = [] } = useQuery({
-    queryKey: ["swaprates", CLASSIC_DENOMS.ustc.coinMinimalDenom],
+    queryKey: [
+      "swaprates",
+      chain.chainId,
+      CLASSIC_DENOMS.ustc.coinMinimalDenom
+    ],
     queryFn: () => fetchSwapRates(CLASSIC_DENOMS.ustc.coinMinimalDenom),
+    enabled: isClassic,
     staleTime: 300_000
   })
   const swapRateMap = useMemo(
@@ -240,7 +254,7 @@ export const useWalletAssets = (accountAddress?: string) => {
 
   const { data: cw20WhitelistBase = {} } = useCw20Whitelist()
   const { data: launchpadCw20Contracts = [] } = useQuery({
-    queryKey: ["wallet", "launchpad-cw20-contracts"],
+    queryKey: ["wallet", chain.chainId, "launchpad-cw20-contracts"],
     queryFn: async () => {
       if (!isLaunchRegistryConfigured) return []
       const launches = await fetchLaunchRegistryLaunches()
@@ -252,7 +266,7 @@ export const useWalletAssets = (accountAddress?: string) => {
         )
       )
     },
-    enabled: isLaunchRegistryConfigured,
+    enabled: isClassic && isLaunchRegistryConfigured,
     staleTime: 5 * 60 * 1000
   })
   const { data: launchpadCw20Whitelist = {} } =
@@ -331,16 +345,21 @@ export const useWalletAssets = (accountAddress?: string) => {
     }))
   }, [balances, cw20Balances, ibcWhitelist])
 
-  const { data: dexEstimatedPrices } = useDexEstimatedPrices(dexAssetMetas)
+  const { data: dexEstimatedPrices } = useDexEstimatedPrices(
+    dexAssetMetas,
+    isClassic
+  )
 
   const getBalance = useMemo(() => {
     const map = new Map(balances.map((coin) => [coin.denom, coin.amount]))
     return (denom: string) => map.get(denom)
   }, [balances])
 
-  const luncPrice = prices?.lunc?.usd
+  const luncPrice = isClassic ? prices?.lunc?.usd : prices?.luna?.usd
   const ustcPrice = prices?.ustc?.usd
-  const luncChange = prices?.lunc?.usd_24h_change
+  const luncChange = isClassic
+    ? prices?.lunc?.usd_24h_change
+    : prices?.luna?.usd_24h_change
   const ustcChange = prices?.ustc?.usd_24h_change
 
   const marketUsdPriceByAsset = useMemo(() => {
@@ -509,7 +528,10 @@ export const useWalletAssets = (accountAddress?: string) => {
     [dexAssetMetas, dexEstimatedPrices, marketUsdPriceByAsset]
   )
 
-  const { data: directAnchorDexPrices } = useDirectAnchorDexPrices(unresolvedDexAssetMetas)
+  const { data: directAnchorDexPrices } = useDirectAnchorDexPrices(
+    unresolvedDexAssetMetas,
+    isClassic
+  )
 
   const resolveDexUsdValue = useCallback(
     (assetKey: string, amount: string, decimals: number) => {
@@ -678,7 +700,6 @@ export const useWalletAssets = (accountAddress?: string) => {
     const nativeRows = balances
       .filter((coin) => Number(coin.amount) > 0)
       .map((coin): WalletAssetRow => {
-        const isClassic = true
         const swaprate = swapRateMap.get(coin.denom)
         const classicSymbol = formatWalletDenom(coin.denom, true)
         const isClassicStable = classicSymbol.endsWith("TC")
@@ -702,8 +723,8 @@ export const useWalletAssets = (accountAddress?: string) => {
           return {
             kind: "native",
             denom: coin.denom,
-            symbol: "LUNC",
-            name: "Terra Classic",
+            symbol: chain.displayDenom,
+            name: chain.name,
             decimals: CLASSIC_DENOMS.lunc.coinDecimals,
             amount: coin.amount,
             price,
@@ -711,9 +732,10 @@ export const useWalletAssets = (accountAddress?: string) => {
             value,
             chainCount: 1,
             whitelisted: true,
-            isBuyable: true,
+            isBuyable: isClassic,
             iconCandidates: buildWalletIconCandidates({
               denom: coin.denom,
+              symbol: chain.displayDenom,
               isClassic,
               fallback: "/system/cw20.svg"
             })
@@ -829,7 +851,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     const hasLunc = nativeRows.some(
       (row) => row.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
     )
-    const hasUstc = nativeRows.some(
+    const hasUstc = isClassic && nativeRows.some(
       (row) => row.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
     )
 
@@ -839,8 +861,8 @@ export const useWalletAssets = (accountAddress?: string) => {
       nativeRows.push({
         kind: "native",
         denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-        symbol: "LUNC",
-        name: "Terra Classic",
+        symbol: chain.displayDenom,
+        name: chain.name,
         decimals: CLASSIC_DENOMS.lunc.coinDecimals,
         amount,
         price: luncPrice,
@@ -848,16 +870,17 @@ export const useWalletAssets = (accountAddress?: string) => {
         value: luncPrice !== undefined ? unitAmount * luncPrice : undefined,
         chainCount: 1,
         whitelisted: true,
-        isBuyable: true,
+        isBuyable: isClassic,
         iconCandidates: buildWalletIconCandidates({
           denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-          isClassic: true,
+          symbol: chain.displayDenom,
+          isClassic,
           fallback: "/system/cw20.svg"
         })
       })
     }
 
-    if (!hasUstc) {
+    if (isClassic && !hasUstc) {
       const amount = getBalance(CLASSIC_DENOMS.ustc.coinMinimalDenom) ?? "0"
       const unitAmount = toUnitAmount(amount, CLASSIC_DENOMS.ustc.coinDecimals)
       nativeRows.push({
@@ -933,6 +956,8 @@ export const useWalletAssets = (accountAddress?: string) => {
     ].filter(isWalletAssetRow)
   }, [
     balances,
+    chain.displayDenom,
+    chain.name,
     cw20Balances,
     fxRates?.MNT,
     fxRates?.TWD,
@@ -940,6 +965,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     ibcWhitelist,
     isBalanceError,
     isBalanceLoading,
+    isClassic,
     luncChange,
     luncPrice,
     marketStyleChangeByAsset,
@@ -971,15 +997,17 @@ export const useWalletAssets = (accountAddress?: string) => {
     const nativeItems: WalletTokenCatalogItem[] = [
       {
         key: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-        symbol: "LUNC",
-        name: "Luna Classic",
+        symbol: chain.displayDenom,
+        name: chain.name,
         iconCandidates: buildWalletIconCandidates({
           denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-          isClassic: true,
+          symbol: chain.displayDenom,
+          isClassic,
           fallback: "/system/cw20.svg"
         })
       },
-      {
+      ...(isClassic
+        ? [{
         key: CLASSIC_DENOMS.ustc.coinMinimalDenom,
         symbol: "USTC",
         name: "TerraClassicUSD",
@@ -988,7 +1016,8 @@ export const useWalletAssets = (accountAddress?: string) => {
           isClassic: true,
           fallback: "/system/cw20.svg"
         })
-      }
+      }]
+        : [])
     ]
 
     const ibcItems = Object.entries(ibcWhitelist ?? {}).map(([hash, token]) => ({
@@ -998,7 +1027,7 @@ export const useWalletAssets = (accountAddress?: string) => {
       iconCandidates: buildWalletIconCandidates({
         icon: token.icon,
         denom: token.base_denom,
-        isClassic: true,
+        isClassic,
         fallback: "/system/ibc.svg"
       })
     }))
@@ -1013,7 +1042,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     return [...nativeItems, ...ibcItems, ...cw20Items].sort((a, b) =>
       a.symbol.localeCompare(b.symbol)
     )
-  }, [cw20Whitelist, ibcWhitelist])
+  }, [chain.displayDenom, chain.name, cw20Whitelist, ibcWhitelist, isClassic])
 
   const netWorth = useMemo(
     () => assetRows.reduce((sum, asset) => sum + (asset.value ?? 0), 0),

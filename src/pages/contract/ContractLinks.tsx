@@ -1,5 +1,7 @@
 import { truncateHash } from "../../app/utils/format"
 import styles from "../Contract.module.css"
+import { getActiveAppChainKey } from "../../app/activeChain"
+import { getAddressExplorerUrl } from "../../app/explorer"
 
 type IconProps = {
   className?: string
@@ -46,7 +48,7 @@ export const FinderAddressLink = ({
 }) => (
   <a
     className={`${styles.addressLink} ${className ?? ""}`.trim()}
-    href={`https://finder.burrito.money/classic/address/${address}`}
+    href={getAddressExplorerUrl(getActiveAppChainKey(), address)}
     target="_blank"
     rel="noreferrer"
   >

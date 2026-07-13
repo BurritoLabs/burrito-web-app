@@ -14,7 +14,11 @@ import {
 } from "@cosmjs/stargate"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
-import { CLASSIC_READ_ENDPOINTS_CONFIG } from "../config/chainConfig"
+import {
+  CHAIN_RUNTIME_CONFIG,
+  CLASSIC_READ_ENDPOINTS_CONFIG,
+  type ChainRuntimeConfig
+} from "../config/chainConfig"
 import {
   isTxAlreadyInCacheError,
   parseSequenceMismatchExpected
@@ -95,6 +99,7 @@ export type ClassicSigningClient = {
 
 type ClassicClientOptions = {
   feeDenom?: string
+  runtime?: ChainRuntimeConfig
 }
 
 const unique = <T,>(items: readonly T[]) => Array.from(new Set(items))
@@ -103,6 +108,9 @@ export const CLASSIC_SIGNING_RPC_ENDPOINTS = unique([
   CLASSIC_CHAIN.rpc,
   ...CLASSIC_READ_ENDPOINTS_CONFIG.rpc
 ])
+
+export const getSigningRpcEndpoints = (runtime: ChainRuntimeConfig) =>
+  unique([runtime.chain.rpc, ...runtime.endpoints.rpc])
 
 export const isClassicEndpointRetryableError = (error: unknown) => {
   const message =
@@ -158,9 +166,12 @@ export const getClassicAminoTypes = () =>
   })
 
 const getClassicClientOptions = ({
-  feeDenom = CLASSIC_DENOMS.lunc.coinMinimalDenom
+  runtime = CHAIN_RUNTIME_CONFIG.lunc,
+  feeDenom = runtime.nativeDenom.coinMinimalDenom
 }: ClassicClientOptions = {}) => ({
-  gasPrice: GasPrice.fromString(`28.325${feeDenom}`),
+  gasPrice: GasPrice.fromString(
+    `${runtime.gasPriceStep.average}${feeDenom}`
+  ),
   registry: getClassicRegistry(),
   aminoTypes: getClassicAminoTypes()
 })
@@ -179,8 +190,10 @@ const connectClassicEndpointWithFallback = async (
   options?: ClassicClientOptions
 ) => {
   let lastError: unknown
+  const runtime = options?.runtime ?? CHAIN_RUNTIME_CONFIG.lunc
+  const endpoints = getSigningRpcEndpoints(runtime)
 
-  for (const [index, endpoint] of CLASSIC_SIGNING_RPC_ENDPOINTS.entries()) {
+  for (const [index, endpoint] of endpoints.entries()) {
     try {
       return {
         client: await connectClassicEndpoint(signer, endpoint, options),
@@ -204,18 +217,20 @@ const connectClassicClientWithFallback = async (
   options?: ClassicClientOptions
 ): Promise<ClassicSigningClient> => {
   const initial = await connectClassicEndpointWithFallback(signer, options)
+  const runtime = options?.runtime ?? CHAIN_RUNTIME_CONFIG.lunc
+  const endpoints = getSigningRpcEndpoints(runtime)
   let endpointIndex = initial.endpointIndex
   let client = initial.client
 
   const reconnectNext = async () => {
     let lastError: unknown
 
-    for (let offset = 1; offset <= CLASSIC_SIGNING_RPC_ENDPOINTS.length; offset += 1) {
-      const nextIndex = (endpointIndex + offset) % CLASSIC_SIGNING_RPC_ENDPOINTS.length
+    for (let offset = 1; offset <= endpoints.length; offset += 1) {
+      const nextIndex = (endpointIndex + offset) % endpoints.length
       try {
         const nextClient = await connectClassicEndpoint(
           signer,
-          CLASSIC_SIGNING_RPC_ENDPOINTS[nextIndex],
+          endpoints[nextIndex],
           options
         )
         endpointIndex = nextIndex
@@ -239,14 +254,14 @@ const connectClassicClientWithFallback = async (
   ) => {
     let lastError: unknown
 
-    for (let attempt = 0; attempt < CLASSIC_SIGNING_RPC_ENDPOINTS.length; attempt += 1) {
+    for (let attempt = 0; attempt < endpoints.length; attempt += 1) {
       try {
         return await action(client)
       } catch (error) {
         lastError = error
         if (
           !isClassicEndpointRetryableError(error) ||
-          attempt === CLASSIC_SIGNING_RPC_ENDPOINTS.length - 1
+          attempt === endpoints.length - 1
         ) {
           throw error
         }
@@ -301,7 +316,7 @@ const connectClassicClientWithFallback = async (
           const txRaw = await signingClient.sign(signerAddress, messages, fee, memo, {
             accountNumber,
             sequence: sequenceHint ?? sequence,
-            chainId: CLASSIC_CHAIN.chainId
+            chainId: runtime.chain.chainId
           })
           const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
           try {
@@ -392,6 +407,7 @@ const connectClassicClientWithFallback = async (
 
 export const connectClassicSigningClient = async (signer: OfflineSigner) =>
   connectClassicClientWithFallback(signer, {
+    runtime: CHAIN_RUNTIME_CONFIG.lunc,
     feeDenom: CLASSIC_DENOMS.lunc.coinMinimalDenom
   })
 
@@ -400,5 +416,25 @@ export const connectClassicStargateClient = async (
   feeDenom: string = CLASSIC_DENOMS.lunc.coinMinimalDenom
 ) =>
   connectClassicClientWithFallback(signer, {
+    runtime: CHAIN_RUNTIME_CONFIG.lunc,
+    feeDenom
+  })
+
+export const connectSigningClient = async (
+  signer: OfflineSigner,
+  runtime: ChainRuntimeConfig
+) =>
+  connectClassicClientWithFallback(signer, {
+    runtime,
+    feeDenom: runtime.nativeDenom.coinMinimalDenom
+  })
+
+export const connectStargateClient = async (
+  signer: OfflineSigner,
+  runtime: ChainRuntimeConfig,
+  feeDenom: string = runtime.nativeDenom.coinMinimalDenom
+) =>
+  connectClassicClientWithFallback(signer, {
+    runtime,
     feeDenom
   })

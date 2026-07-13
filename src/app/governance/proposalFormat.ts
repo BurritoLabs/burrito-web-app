@@ -1,5 +1,6 @@
 import type { CoinBalance } from "../data/classic"
 import { formatTokenAmount, toUnitAmount } from "../utils/format"
+import { getActiveAppChainKey } from "../activeChain"
 
 export type SummaryMap = Record<string, unknown>
 export type SummaryCoin = { denom: string; amount: string | number | bigint }
@@ -49,7 +50,7 @@ export const VOTE_OPTION_VALUES: Record<VoteChoice, number> = {
 
 export const formatDenom = (denom: string) => {
   if (!denom) return "--"
-  if (denom === "uluna") return "LUNC"
+  if (denom === "uluna") return getActiveAppChainKey() === "lunc" ? "LUNC" : "LUNA"
   if (denom === "uusd") return "USTC"
   if (denom.startsWith("u")) {
     const f = denom.slice(1)

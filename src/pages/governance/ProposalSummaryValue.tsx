@@ -8,6 +8,8 @@ import {
   isSummaryCoin
 } from "../../app/governance/proposalFormat"
 import styles from "../ProposalDetails.module.css"
+import { getActiveAppChainKey } from "../../app/activeChain"
+import { getAddressExplorerUrl } from "../../app/explorer"
 
 export const renderProposalSummaryValue = (
   key: string,
@@ -34,7 +36,7 @@ export const renderProposalSummaryValue = (
   const isAddress =
     /^terra1[0-9a-z]{38,}$/.test(text) || /^terra[0-9a-z]{38,}$/.test(text)
   if (isAddress) {
-    const href = `https://finder.burrito.money/classic/address/${text}`
+    const href = getAddressExplorerUrl(getActiveAppChainKey(), text)
     return (
       <a
         className={styles.summaryLink}
@@ -47,7 +49,7 @@ export const renderProposalSummaryValue = (
     )
   }
   if (key.toLowerCase() === "recipient" && text) {
-    const href = `https://finder.burrito.money/classic/address/${text}`
+    const href = getAddressExplorerUrl(getActiveAppChainKey(), text)
     return (
       <a
         className={styles.summaryLink}

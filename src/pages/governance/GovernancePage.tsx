@@ -21,10 +21,12 @@ import {
   type GovernanceTabKey
 } from "../../app/governance/governanceList"
 import GovernanceProposalCard from "./GovernanceProposalCard"
+import { useAppChain } from "../../app/appChainContext"
 
 const Governance = () => {
+  const { chain } = useAppChain()
   const { data: proposals = [] } = useQuery<ProposalItem[]>({
-    queryKey: ["proposals"],
+    queryKey: ["proposals", chain.chainId],
     queryFn: fetchProposals,
     staleTime: 15_000,
     refetchInterval: 15_000,
@@ -32,25 +34,25 @@ const Governance = () => {
   })
 
   const { data: stakingPool } = useQuery({
-    queryKey: ["stakingPool"],
+    queryKey: ["stakingPool", chain.chainId],
     queryFn: fetchStakingPool,
     staleTime: 5 * 60 * 1000
   })
 
   const { data: tallyParams } = useQuery({
-    queryKey: ["govTallyParams"],
+    queryKey: ["govTallyParams", chain.chainId],
     queryFn: fetchTallyParams,
     staleTime: 10 * 60 * 1000
   })
 
   const { data: depositParams } = useQuery<GovDepositParams>({
-    queryKey: ["govDepositParams"],
+    queryKey: ["govDepositParams", chain.chainId],
     queryFn: fetchDepositParams,
     staleTime: 10 * 60 * 1000
   })
 
   const { data: votingParams } = useQuery<GovVotingParams>({
-    queryKey: ["govVotingParams"],
+    queryKey: ["govVotingParams", chain.chainId],
     queryFn: fetchVotingParams,
     staleTime: 10 * 60 * 1000
   })
@@ -150,7 +152,7 @@ const Governance = () => {
         <div className={styles.rulesLabel}>Minimum deposit</div>
         <div className={styles.rulesValue}>
           {minDepositMicro > 0n
-            ? `${formatTokenAmount(minDepositMicro.toString(), 6, 0)} LUNC`
+            ? `${formatTokenAmount(minDepositMicro.toString(), 6, 0)} ${chain.displayDenom}`
             : "--"}
         </div>
       </div>

@@ -12,6 +12,7 @@ import {
   formatTokenAmount
 } from "../../app/utils/format"
 import styles from "../Governance.module.css"
+import { useAppChain } from "../../app/appChainContext"
 
 type GovernanceProposalCardProps = {
   actionLabel?: string
@@ -36,8 +37,9 @@ const GovernanceProposalCard = ({
   statusLabel,
   tallyThreshold
 }: GovernanceProposalCardProps) => {
+  const { chain } = useAppChain()
   const { data: liveTally } = useQuery({
-    queryKey: ["proposalTally", proposal.id],
+    queryKey: ["proposalTally", chain.chainId, proposal.id],
     queryFn: () => fetchProposalTally(proposal.id),
     enabled: Boolean(proposal.id) && enableLiveTally,
     staleTime: 10_000,
@@ -130,7 +132,7 @@ const GovernanceProposalCard = ({
             <div className={styles.depositMeta}>
               <span>
                 {formatTokenAmount(currentDepositBig.toString(), 6, 2)} /{" "}
-                {formatTokenAmount(minDepositMicro.toString(), 6, 2)} LUNC
+                {formatTokenAmount(minDepositMicro.toString(), 6, 2)} {chain.displayDenom}
               </span>
               <span>
                 {remainingDepositBig > 0n
@@ -138,7 +140,7 @@ const GovernanceProposalCard = ({
                       remainingDepositBig.toString(),
                       6,
                       2
-                    )} LUNC remaining`
+                    )} ${chain.displayDenom} remaining`
                   : "Minimum reached"}
               </span>
             </div>

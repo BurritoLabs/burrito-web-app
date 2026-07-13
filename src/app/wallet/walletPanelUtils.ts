@@ -96,5 +96,7 @@ export const formatShortAddress = (value: string) => {
   return `${value.slice(0, 8)}...${value.slice(-6)}`
 }
 
-export const getRecentRecipientsStorageKey = (address: string) =>
-  `burritoRecentRecipients:${address}:classic`
+export const getRecentRecipientsStorageKey = (
+  address: string,
+  chainId = "columbus-5"
+) => `burritoRecentRecipients:${address}:${chainId}`

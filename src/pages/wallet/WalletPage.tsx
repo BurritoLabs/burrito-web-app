@@ -5,6 +5,7 @@ import PageShell from "../PageShell"
 import styles from "../Wallet.module.css"
 import { useWallet } from "../../app/wallet/WalletContext"
 import { CLASSIC_DENOMS } from "../../app/chain"
+import { useAppChain } from "../../app/appChainContext"
 import WalletBuyModal, {
   type WalletBuyAsset
 } from "../../app/wallet/WalletBuyModal"
@@ -25,6 +26,8 @@ type WalletAsset = WalletAssetRow
 
 const Wallet = () => {
   const { account } = useWallet()
+  const { chain, chainKey } = useAppChain()
+  const isClassic = chainKey === "lunc"
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [hideLowBalance, setHideLowBalance] =
@@ -60,12 +63,12 @@ const Wallet = () => {
   const handleRetryBalances = useCallback(() => {
     if (!accountAddress) return
     void queryClient.invalidateQueries({
-      queryKey: ["wallet", "balances", accountAddress]
+      queryKey: ["wallet", chain.chainId, "balances", accountAddress]
     })
     void queryClient.invalidateQueries({
-      queryKey: ["cw20-balances", accountAddress]
+      queryKey: ["cw20-balances", chain.chainId, accountAddress]
     })
-  }, [accountAddress, queryClient])
+  }, [accountAddress, chain.chainId, queryClient])
 
   const handleSendAsset = useCallback((asset: WalletAsset) => {
     openWalletPanel({
@@ -80,6 +83,7 @@ const Wallet = () => {
   }, [])
 
   const handleBuyAsset = useCallback((asset: WalletAsset) => {
+    if (!isClassic) return
     if (asset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
       setBuyAsset("LUNC")
       setBuyModalOpen(true)
@@ -89,7 +93,7 @@ const Wallet = () => {
       setBuyAsset("USTC")
       setBuyModalOpen(true)
     }
-  }, [])
+  }, [isClassic])
 
   const handleSwapAsset = useCallback(
     (asset: WalletAsset) => {
@@ -151,7 +155,9 @@ const Wallet = () => {
               </svg>
             </div>
             <div className={styles.sideTitle}>Staking rewards</div>
-            <div className={styles.sideText}>Stake LUNC and earn rewards</div>
+            <div className={styles.sideText}>
+              Stake {chain.displayDenom} and earn rewards
+            </div>
             <button
               className={styles.sideLink}
               type="button"
@@ -186,7 +192,7 @@ const Wallet = () => {
             </div>
             <a
               className={styles.sideLink}
-              href="https://terra-classic.io/"
+              href={isClassic ? "https://terra-classic.io/" : "https://www.terra.money/"}
               target="_blank"
               rel="noreferrer"
             >

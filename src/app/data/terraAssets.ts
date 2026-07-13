@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
+import { getActiveAppChainKey } from "../activeChain"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
 import {
   ASSET_URL,
@@ -342,7 +343,7 @@ const extractCw20MarketingLogo = (logo?: Cw20MarketingLogo) => {
 
 const deriveSymbolFromDenom = (denom?: string) => {
   if (!denom) return "IBC"
-  if (denom === "uluna") return "LUNC"
+  if (denom === "uluna") return getActiveAppChainKey() === "lunc" ? "LUNC" : "LUNA"
   if (denom === "uusd") return "USTC"
   if (denom.startsWith("u")) {
     const base = denom.slice(1)
@@ -440,7 +441,16 @@ const fetchNativeMetadataToken = async (
     return undefined
   }
 
-  const predefined = CLASSIC_NATIVE_DEFAULTS[normalized]
+  const predefined =
+    normalized === "uluna" && getActiveAppChainKey() === "luna"
+      ? {
+          denom: "uluna",
+          symbol: "LUNA",
+          name: "Terra",
+          decimals: 6,
+          icon: "/system/luna.svg"
+        }
+      : CLASSIC_NATIVE_DEFAULTS[normalized]
   if (predefined) return predefined
 
   const cached = getCachedNativeToken(normalized)

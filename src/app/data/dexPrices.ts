@@ -416,7 +416,10 @@ export const fetchDirectAnchorDexPrices = async (
   return Object.fromEntries(bestMap)
 }
 
-export const useDexEstimatedPrices = (assetMetas: DexAssetMeta[]) => {
+export const useDexEstimatedPrices = (
+  assetMetas: DexAssetMeta[],
+  enabled = true
+) => {
   const normalized = useMemo(() => {
     const map = new Map<string, number>()
     assetMetas.forEach((item) => {
@@ -435,13 +438,16 @@ export const useDexEstimatedPrices = (assetMetas: DexAssetMeta[]) => {
       normalized.map((item) => `${item.key}:${item.decimals}`).join("|")
     ],
     queryFn: () => fetchDexEstimatedPrices(normalized),
-    enabled: normalized.length > 0,
+    enabled: enabled && normalized.length > 0,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 3 * 60 * 1000
   })
 }
 
-export const useDirectAnchorDexPrices = (assetMetas: DexAssetMeta[]) => {
+export const useDirectAnchorDexPrices = (
+  assetMetas: DexAssetMeta[],
+  enabled = true
+) => {
   const normalized = useMemo(() => {
     const map = new Map<string, number>()
     assetMetas.forEach((item) => {
@@ -460,7 +466,7 @@ export const useDirectAnchorDexPrices = (assetMetas: DexAssetMeta[]) => {
       normalized.map((item) => `${item.key}:${item.decimals}`).join("|")
     ],
     queryFn: () => fetchDirectAnchorDexPrices(normalized),
-    enabled: normalized.length > 0,
+    enabled: enabled && normalized.length > 0,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 3 * 60 * 1000
   })

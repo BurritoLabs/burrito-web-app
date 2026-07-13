@@ -1,4 +1,7 @@
-import { CLASSIC_READ_ENDPOINTS_CONFIG } from "../config/chainConfig"
+import {
+  CLASSIC_READ_ENDPOINTS_CONFIG,
+  LUNA_READ_ENDPOINTS_CONFIG
+} from "../config/chainConfig"
 
 const DEFAULT_READ_TIMEOUT_MS = 8_000
 const FALLBACK_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
@@ -10,7 +13,10 @@ type FallbackFetchInit = RequestInit & {
 const endpointGroups = [
   CLASSIC_READ_ENDPOINTS_CONFIG.lcd,
   CLASSIC_READ_ENDPOINTS_CONFIG.rpc,
-  CLASSIC_READ_ENDPOINTS_CONFIG.fcd
+  CLASSIC_READ_ENDPOINTS_CONFIG.fcd,
+  LUNA_READ_ENDPOINTS_CONFIG.lcd,
+  LUNA_READ_ENDPOINTS_CONFIG.rpc,
+  LUNA_READ_ENDPOINTS_CONFIG.fcd
 ]
 
 const unique = (values: string[]) => Array.from(new Set(values))
@@ -76,5 +82,5 @@ export const fetchWithEndpointFallback = async (
   if (lastResponse) return lastResponse
   throw lastError instanceof Error
     ? lastError
-    : new Error("Classic endpoint request failed")
+    : new Error("Chain endpoint request failed")
 }

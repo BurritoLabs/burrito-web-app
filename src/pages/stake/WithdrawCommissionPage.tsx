@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import PageShell from "../PageShell"
 import styles from "../WithdrawCommission.module.css"
 import { useWallet } from "../../app/wallet/WalletContext"
+import { useAppChain } from "../../app/appChainContext"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import {
   fetchValidator,
@@ -15,16 +16,10 @@ import { convertBech32Prefix } from "../../app/utils/bech32"
 import { formatTxError } from "../../app/utils/txError"
 import {
   WITHDRAW_COMMISSION_DEFAULT_FEE_GAS,
-  WITHDRAW_GAS_PRICE_MICRO_LUNC,
   WITHDRAW_SIMULATION_FALLBACK_GAS_MULTIPLIER,
   WITHDRAW_SUBMIT_GAS_ADJUSTMENT,
   buildWithdrawTxFee
 } from "../../app/stake/withdrawTx"
-
-const FEE_DENOM_OPTIONS = [
-  CLASSIC_DENOMS.lunc.coinMinimalDenom,
-  CLASSIC_DENOMS.ustc.coinMinimalDenom
-] as const
 
 const toSymbol = (denom: string) => {
   if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
@@ -136,9 +131,10 @@ const WithdrawCommission = () => {
     finishTx,
     failTx
   } = useWallet()
-  const [feeDenom, setFeeDenom] = useState<(typeof FEE_DENOM_OPTIONS)[number]>(
-    CLASSIC_DENOMS.lunc.coinMinimalDenom
-  )
+  const { chain } = useAppChain()
+  const gasPrice = chain.runtime.gasPriceStep.average
+  const feeDenomOptions = chain.runtime.feeDenoms
+  const [feeDenom, setFeeDenom] = useState<string>(chain.nativeDenom)
   const [feeOpen, setFeeOpen] = useState(false)
   const feeRef = useRef<HTMLDivElement | null>(null)
   const [fee, setFee] = useState("--")
@@ -148,6 +144,10 @@ const WithdrawCommission = () => {
   const [submitError, setSubmitError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    setFeeDenom(chain.nativeDenom)
+  }, [chain.chainId, chain.nativeDenom])
+
   const valoperAddress = account?.address
     ? convertBech32Prefix(
         account.address,
@@ -156,14 +156,14 @@ const WithdrawCommission = () => {
     : null
 
   const { data: validator } = useQuery({
-    queryKey: ["validator", valoperAddress],
+    queryKey: ["validator", chain.chainId, valoperAddress],
     queryFn: () => fetchValidator(valoperAddress ?? ""),
     enabled: Boolean(valoperAddress),
     staleTime: 60_000
   })
 
   const { data: commission = [] } = useQuery({
-    queryKey: ["validatorCommission", valoperAddress],
+    queryKey: ["validatorCommission", chain.chainId, valoperAddress],
     queryFn: () => fetchValidatorCommission(valoperAddress ?? ""),
     enabled: Boolean(valoperAddress && validator),
     staleTime: 20_000
@@ -205,7 +205,7 @@ const WithdrawCommission = () => {
     }
 
     const feeMicro = Math.ceil(
-      WITHDRAW_COMMISSION_DEFAULT_FEE_GAS * WITHDRAW_GAS_PRICE_MICRO_LUNC
+      WITHDRAW_COMMISSION_DEFAULT_FEE_GAS * gasPrice
     ).toString()
     const feeDisplay = formatTokenAmount(
       feeMicro,
@@ -217,7 +217,7 @@ const WithdrawCommission = () => {
     setFeeLoading(false)
     setFeeError(undefined)
     return undefined
-  }, [account?.address, valoperAddress, validator])
+  }, [account?.address, gasPrice, valoperAddress, validator])
 
   const submit = async () => {
     setSubmitError(undefined)
@@ -241,8 +241,8 @@ const WithdrawCommission = () => {
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         {
-          connectClassicSigningClientForConnector,
-          connectClassicStargateClientForConnector,
+          connectSigningClientForConnector,
+          connectStargateClientForConnector,
           getSignerAddressForConnector
         },
         { MsgWithdrawValidatorCommission }
@@ -260,8 +260,8 @@ const WithdrawCommission = () => {
       }
       const client =
         connectorId === "keplr-mobile"
-          ? await connectClassicSigningClientForConnector(connectorId)
-          : await connectClassicStargateClientForConnector(connectorId, feeDenom)
+          ? await connectSigningClientForConnector(connectorId)
+          : await connectStargateClientForConnector(connectorId, feeDenom)
       const msg = {
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission",
         value: MsgWithdrawValidatorCommission.fromPartial({
@@ -287,7 +287,7 @@ const WithdrawCommission = () => {
       const result = await client.signAndBroadcast(
         signerAddress,
         [msg],
-        buildWithdrawTxFee(txGas, feeDenom)
+        buildWithdrawTxFee(txGas, feeDenom, gasPrice)
       )
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
@@ -359,19 +359,21 @@ const WithdrawCommission = () => {
                         </button>
                         {feeOpen ? (
                           <div className={styles.feeDropdown}>
-                            {FEE_DENOM_OPTIONS.map((denom) => (
+                            {feeDenomOptions.map((denom) => (
                               <button
-                                key={denom}
+                                key={denom.coinMinimalDenom}
                                 type="button"
                                 className={`${styles.feeOption} ${
-                                  denom === feeDenom ? styles.feeOptionActive : ""
+                                  denom.coinMinimalDenom === feeDenom
+                                    ? styles.feeOptionActive
+                                    : ""
                                 }`}
                                 onClick={() => {
-                                  setFeeDenom(denom)
+                                  setFeeDenom(denom.coinMinimalDenom)
                                   setFeeOpen(false)
                                 }}
                               >
-                                {toSymbol(denom)}
+                                {denom.coinDenom}
                               </button>
                             ))}
                           </div>

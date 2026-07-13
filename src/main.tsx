@@ -33,13 +33,13 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AppErrorBoundary>
-        <WalletBoot>
-          <AppChainProvider>
+        <AppChainProvider>
+          <WalletBoot>
             <BrowserRouter>
               <App />
             </BrowserRouter>
-          </AppChainProvider>
-        </WalletBoot>
+          </WalletBoot>
+        </AppChainProvider>
       </AppErrorBoundary>
     </QueryClientProvider>
   </StrictMode>

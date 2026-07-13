@@ -1,9 +1,11 @@
 import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
-import { KEPLR_CHAIN_CONFIG } from "../chain"
+import { getActiveAppChainKey } from "../activeChain"
+import { getKeplrChainConfig } from "../chain"
+import { CHAIN_RUNTIME_CONFIG } from "../config/chainConfig"
 import {
-  connectClassicSigningClient,
-  connectClassicStargateClient
+  connectSigningClient,
+  connectStargateClient
 } from "./signingClient"
 import {
   connectGalaxyWallet,
@@ -212,12 +214,18 @@ const getRequiredKeplrProvider = () => {
   }
 }
 
+const getActiveChain = () => CHAIN_RUNTIME_CONFIG[getActiveAppChainKey()]
+
+const getActiveKeplrChainConfig = () =>
+  getKeplrChainConfig(getActiveAppChainKey())
+
 const enableKeplr = async (provider: InjectedWallet) => {
+  const config = getActiveKeplrChainConfig()
   if (provider.experimentalSuggestChain) {
-    await provider.experimentalSuggestChain(KEPLR_CHAIN_CONFIG)
+    await provider.experimentalSuggestChain(config)
   }
   if (provider.enable) {
-    await provider.enable(KEPLR_CHAIN_CONFIG.chainId)
+    await provider.enable(config.chainId)
   }
 }
 
@@ -225,17 +233,18 @@ const getOfflineSignerFromKeplr = async (
   provider: InjectedWallet,
   walletWindow: WalletWindow
 ) => {
+  const chainId = getActiveKeplrChainConfig().chainId
   if (provider.getOfflineSignerAuto) {
-    return await provider.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
+    return await provider.getOfflineSignerAuto(chainId)
   }
   if (provider.getOfflineSigner) {
-    return provider.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+    return provider.getOfflineSigner(chainId)
   }
   if (walletWindow.getOfflineSignerAuto) {
-    return await walletWindow.getOfflineSignerAuto(KEPLR_CHAIN_CONFIG.chainId)
+    return await walletWindow.getOfflineSignerAuto(chainId)
   }
   if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+    return walletWindow.getOfflineSigner(chainId)
   }
   return undefined
 }
@@ -244,14 +253,15 @@ const getAminoOfflineSignerFromKeplr = async (
   provider: InjectedWallet,
   walletWindow: WalletWindow
 ) => {
+  const chainId = getActiveKeplrChainConfig().chainId
   if (provider.getOfflineSignerOnlyAmino) {
-    return provider.getOfflineSignerOnlyAmino(KEPLR_CHAIN_CONFIG.chainId)
+    return provider.getOfflineSignerOnlyAmino(chainId)
   }
   if (provider.getOfflineSignerAmino) {
-    return provider.getOfflineSignerAmino(KEPLR_CHAIN_CONFIG.chainId)
+    return provider.getOfflineSignerAmino(chainId)
   }
   if (walletWindow.getOfflineSigner) {
-    return walletWindow.getOfflineSigner(KEPLR_CHAIN_CONFIG.chainId)
+    return walletWindow.getOfflineSigner(chainId)
   }
   return undefined
 }
@@ -275,7 +285,7 @@ const connectInjectedKeplr = async (): Promise<WalletAccount> => {
   await enableKeplr(provider)
 
   if (provider.getKey) {
-    const key = await provider.getKey(KEPLR_CHAIN_CONFIG.chainId)
+    const key = await provider.getKey(getActiveKeplrChainConfig().chainId)
     return {
       address: key.bech32Address,
       name: key.name
@@ -323,7 +333,7 @@ export const connectWalletConnector = async (id: WalletConnectorId) => {
   }
 
   if (id === "galaxy") {
-    return connectGalaxyWallet()
+    return connectGalaxyWallet(getActiveChain().chain.chainId)
   }
 
   return connectInjectedKeplr()
@@ -352,7 +362,7 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
   }
 
   if (id === "galaxy") {
-    return getGalaxyOfflineSigner()
+    return getGalaxyOfflineSigner(getActiveChain().chain.chainId)
   }
 
   const { provider, walletWindow } = getRequiredKeplrProvider()
@@ -386,7 +396,7 @@ export const connectClassicSigningClientForConnector = async (
     (await getAminoOfflineSignerForConnector(id)) ??
     (await getOfflineSignerForConnector(id))
   const signerAddress = await getSignerAddress(signer)
-  const client = await connectClassicSigningClient(signer)
+  const client = await connectSigningClient(signer, getActiveChain())
   return bindSignerAddress(client as ClassicStargateClient, signerAddress)
 }
 
@@ -400,7 +410,7 @@ export const connectClassicStargateClientForConnector = async (
       throw new Error("Keplr signer not available")
     }
     const signerAddress = await getSignerAddress(signer)
-    const client = await connectClassicStargateClient(signer, feeDenom)
+    const client = await connectStargateClient(signer, getActiveChain(), feeDenom)
     return bindSignerAddress(client, signerAddress)
   }
 
@@ -415,12 +425,22 @@ export const connectClassicStargateClientForConnector = async (
   const aminoSigner = await getAminoOfflineSignerForConnector(id)
   if (aminoSigner) {
     const signerAddress = await getSignerAddress(aminoSigner)
-    const client = await connectClassicStargateClient(aminoSigner, feeDenom)
+    const client = await connectStargateClient(
+      aminoSigner,
+      getActiveChain(),
+      feeDenom
+    )
     return bindSignerAddress(client, signerAddress)
   }
 
   const signer = await getOfflineSignerForConnector(id)
   const signerAddress = await getSignerAddress(signer)
-  const client = await connectClassicStargateClient(signer, feeDenom)
+  const client = await connectStargateClient(signer, getActiveChain(), feeDenom)
   return bindSignerAddress(client, signerAddress)
 }
+
+export const connectSigningClientForConnector =
+  connectClassicSigningClientForConnector
+
+export const connectStargateClientForConnector =
+  connectClassicStargateClientForConnector

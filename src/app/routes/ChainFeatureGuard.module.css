@@ -1,0 +1,22 @@
+.state {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+  padding: 24px;
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.detail {
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.action {
+  justify-self: start;
+}

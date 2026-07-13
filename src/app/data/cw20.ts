@@ -64,7 +64,7 @@ const normalizeContract = (contract: string | undefined) =>
 const buildSingleBalanceCacheKey = (address: string, contract: string) =>
   `cw20balance-single:${SINGLE_BALANCE_CACHE_VERSION}:${address
     .trim()
-    .toLowerCase()}:classic:${contract.trim().toLowerCase()}`
+    .toLowerCase()}:${CLASSIC_CHAIN.chainId}:${contract.trim().toLowerCase()}`
 
 const loadSingleBalanceCache = (
   address: string | undefined,
@@ -111,7 +111,7 @@ const saveSingleBalanceCache = (
 const buildActiveBalanceCacheKey = (address: string) =>
   `cw20balance-active:${ACTIVE_BALANCE_CACHE_VERSION}:${address
     .trim()
-    .toLowerCase()}:classic`
+    .toLowerCase()}:${CLASSIC_CHAIN.chainId}`
 
 const loadActiveBalanceContracts = (address: string | undefined) => {
   const normalizedAddress = normalizeAddress(address)
@@ -207,7 +207,7 @@ const buildBalanceCacheKey = (
   address: string,
   whitelist: Record<string, Cw20Token>
 ) =>
-  `cw20balance:${BALANCE_CACHE_VERSION}:${address}:classic:${buildWhitelistSignature(
+  `cw20balance:${BALANCE_CACHE_VERSION}:${address}:${CLASSIC_CHAIN.chainId}:${buildWhitelistSignature(
     whitelist
   )}`
 
@@ -395,7 +395,13 @@ export const useCw20Balances = (
   const cachedBalances = getCachedCw20Balances(address, whitelist ?? {})
 
   return useQuery({
-    queryKey: ["cw20-balances", address, whitelistSignature, forceSignature],
+    queryKey: [
+      "cw20-balances",
+      CLASSIC_CHAIN.chainId,
+      address,
+      whitelistSignature,
+      forceSignature
+    ],
     queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}, options),
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
     initialData: cachedBalances?.data,
@@ -439,7 +445,7 @@ export const fetchCw20Supplies = async (
   )
   if (!unique.length) return {}
 
-  const cacheKey = `cw20supply:classic:${unique.join(",")}`
+  const cacheKey = `cw20supply:${CLASSIC_CHAIN.chainId}:${unique.join(",")}`
   const cached = loadCache(cacheKey, SUPPLY_CACHE_TTL) as Record<string, string> | undefined
   if (cached) {
     const restored: Record<string, Cw20SupplyInfo> = {}
@@ -510,7 +516,7 @@ export const useCw20Supplies = (
   ).sort()
 
   return useQuery({
-    queryKey: ["cw20-supplies", normalized.join(",")],
+    queryKey: ["cw20-supplies", CLASSIC_CHAIN.chainId, normalized.join(",")],
     queryFn: () => fetchCw20Supplies(normalized, whitelist ?? {}),
     enabled: normalized.length > 0,
     staleTime: SUPPLY_CACHE_TTL

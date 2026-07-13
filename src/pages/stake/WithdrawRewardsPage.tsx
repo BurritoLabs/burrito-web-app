@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import PageShell from "../PageShell"
 import styles from "../WithdrawRewards.module.css"
 import { useWallet } from "../../app/wallet/WalletContext"
+import { useAppChain } from "../../app/appChainContext"
 import {
   fetchRewardsByValidator,
   fetchValidators,
@@ -17,7 +18,6 @@ import {
 } from "../../app/utils/assetIcons"
 import { formatTxError } from "../../app/utils/txError"
 import {
-  WITHDRAW_GAS_PRICE_MICRO_LUNC,
   WITHDRAW_REWARDS_DEFAULT_FEE_GAS,
   WITHDRAW_SIMULATION_FALLBACK_GAS_MULTIPLIER,
   WITHDRAW_SUBMIT_GAS_ADJUSTMENT,
@@ -113,7 +113,10 @@ const buildIconCandidates = (denom: string, icon?: string) => {
   }
   return buildClassicNativeIconCandidates({
     denom,
-    symbol: denom === "uluna" ? "LUNC" : formatDenom(denom),
+    symbol:
+      denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+        ? CLASSIC_DENOMS.lunc.coinDenom
+        : formatDenom(denom),
     primaryIcon: icon
   })
 }
@@ -157,14 +160,17 @@ const WithdrawRewards = () => {
     finishTx,
     failTx
   } = useWallet()
+  const { chain } = useAppChain()
+  const gasPrice = chain.runtime.gasPriceStep.average
+  const feeDenomOptions = chain.runtime.feeDenoms
   const accountAddress = account?.address
   const { data: rewardData } = useQuery({
-    queryKey: ["rewardsByValidator", accountAddress],
+    queryKey: ["rewardsByValidator", chain.chainId, accountAddress],
     queryFn: () => fetchRewardsByValidator(accountAddress ?? ""),
     enabled: Boolean(accountAddress)
   })
   const { data: validators = [] } = useQuery({
-    queryKey: ["validators"],
+    queryKey: ["validators", chain.chainId],
     queryFn: fetchValidators,
     staleTime: 60_000
   })
@@ -230,7 +236,7 @@ const WithdrawRewards = () => {
     })
 
   const [feeDenom, setFeeDenom] = useState<string>(
-    CLASSIC_DENOMS.lunc.coinMinimalDenom
+    chain.nativeDenom
   )
   const [feeOpen, setFeeOpen] = useState(false)
   const feeRef = useRef<HTMLDivElement | null>(null)
@@ -240,6 +246,10 @@ const WithdrawRewards = () => {
   const [feeError, setFeeError] = useState<string>()
   const [submitError, setSubmitError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    setFeeDenom(chain.nativeDenom)
+  }, [chain.chainId, chain.nativeDenom])
 
   useEffect(() => {
     if (!feeOpen) return
@@ -264,7 +274,7 @@ const WithdrawRewards = () => {
 
     const gasWanted = getRewardsFallbackGas(selected.length)
     const feeMicro = Math.ceil(
-      gasWanted * WITHDRAW_GAS_PRICE_MICRO_LUNC
+      gasWanted * gasPrice
     ).toString()
     const feeDisplay = formatTokenAmount(
       feeMicro,
@@ -276,7 +286,7 @@ const WithdrawRewards = () => {
     setFeeLoading(false)
     setFeeError(undefined)
     return undefined
-  }, [accountAddress, selected])
+  }, [accountAddress, gasPrice, selected])
 
   const toggleAll = (value: boolean) => {
     setSelected(value ? rewards.map((item) => item.validator_address) : [])
@@ -308,8 +318,8 @@ const WithdrawRewards = () => {
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         {
-          connectClassicSigningClientForConnector,
-          connectClassicStargateClientForConnector,
+          connectSigningClientForConnector,
+          connectStargateClientForConnector,
           getSignerAddressForConnector
         },
         { MsgWithdrawDelegatorReward }
@@ -320,8 +330,8 @@ const WithdrawRewards = () => {
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client =
         connectorId === "keplr-mobile"
-          ? await connectClassicSigningClientForConnector(connectorId)
-          : await connectClassicStargateClientForConnector(connectorId, feeDenom)
+          ? await connectSigningClientForConnector(connectorId)
+          : await connectStargateClientForConnector(connectorId, feeDenom)
       const msgs = selected.map((validator) => ({
         typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward",
         value: MsgWithdrawDelegatorReward.fromPartial({
@@ -345,7 +355,7 @@ const WithdrawRewards = () => {
       const result = await client.signAndBroadcast(
         signerAddress,
         msgs,
-        buildWithdrawTxFee(txGas, feeDenom)
+        buildWithdrawTxFee(txGas, feeDenom, gasPrice)
       )
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Transaction failed")
@@ -495,34 +505,23 @@ const WithdrawRewards = () => {
                     </button>
                     {feeOpen ? (
                       <div className={styles.feeDropdown}>
-                        <button
-                          type="button"
-                          className={`${styles.feeOption} ${
-                            feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
-                              ? styles.feeOptionActive
-                              : ""
-                          }`}
-                          onClick={() => {
-                            setFeeDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
-                            setFeeOpen(false)
-                          }}
-                        >
-                          LUNC
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.feeOption} ${
-                            feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom
-                              ? styles.feeOptionActive
-                              : ""
-                          }`}
-                          onClick={() => {
-                            setFeeDenom(CLASSIC_DENOMS.ustc.coinMinimalDenom)
-                            setFeeOpen(false)
-                          }}
-                        >
-                          USTC
-                        </button>
+                        {feeDenomOptions.map((denom) => (
+                          <button
+                            key={denom.coinMinimalDenom}
+                            type="button"
+                            className={`${styles.feeOption} ${
+                              feeDenom === denom.coinMinimalDenom
+                                ? styles.feeOptionActive
+                                : ""
+                            }`}
+                            onClick={() => {
+                              setFeeDenom(denom.coinMinimalDenom)
+                              setFeeOpen(false)
+                            }}
+                          >
+                            {denom.coinDenom}
+                          </button>
+                        ))}
                       </div>
                     ) : null}
                   </div>

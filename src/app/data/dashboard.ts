@@ -21,6 +21,7 @@ export type DashboardSnapshot = {
   unbondingTimeSec?: number
   blockHeight?: number
   blockTimeMs?: number
+  inflation?: number
 }
 
 export type CirculatingSnapshot = Pick<
@@ -580,6 +581,17 @@ const fetchStakingPoolAtHeight = async (height?: number) => {
   return toUnit(data?.pool?.bonded_tokens ?? "0")
 }
 
+const fetchInflation = async () => {
+  try {
+    const data = await fetchJson<{ inflation?: string }>(
+      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/mint/v1beta1/inflation")
+    )
+    return toNumber(data.inflation)
+  } catch {
+    return undefined
+  }
+}
+
 const fetchClassicCirculatingSupply = async (
   denom: "lunc" | "ustc",
   height?: number
@@ -685,6 +697,62 @@ export const fetchCurrentDashboardSnapshot = async (): Promise<DashboardSnapshot
   }
 
   setCachedSnapshot("current", snapshot)
+  return snapshot
+}
+
+export const fetchCurrentPhoenixDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
+  const cacheKey = `${CLASSIC_CHAIN.chainId}:current`
+  const cached = getCachedSnapshot(cacheKey, 60 * 1000)
+  if (cached) return cached
+
+  const nativeDenom = CLASSIC_DENOMS.lunc.coinMinimalDenom
+  const [
+    totalSupply,
+    community,
+    staked,
+    latestBlock,
+    stakingParams,
+    activeValidators,
+    inflation
+  ] = await Promise.all([
+    fetchSupplyByDenom(nativeDenom),
+    fetchCommunityPool(),
+    fetchStakingPoolAtHeight(),
+    fetchLatestBlock(),
+    fetchStakingParams(),
+    fetchActiveValidatorCount(),
+    fetchInflation()
+  ])
+  const previousBlock =
+    latestBlock.height > 1 ? await fetchBlockByHeight(latestBlock.height - 1) : null
+  const blockIntervalMs = previousBlock
+    ? Math.max(0, latestBlock.timeMs - previousBlock.timeMs)
+    : undefined
+  const circulating = Math.max(totalSupply - community.lunc - staked, 0)
+
+  const snapshot: DashboardSnapshot = {
+    timestamp: Date.now(),
+    luncSupply: totalSupply,
+    ustcSupply: 0,
+    luncCommunity: community.lunc,
+    ustcCommunity: 0,
+    luncOracle: 0,
+    ustcOracle: 0,
+    luncBurned: 0,
+    ustcBurned: 0,
+    circulatingLunc: circulating,
+    circulatingUstc: 0,
+    stakedLunc: staked,
+    stakingRatio: totalSupply ? staked / totalSupply : 0,
+    activeValidators,
+    maxValidators: stakingParams.maxValidators,
+    unbondingTimeSec: stakingParams.unbondingTimeSec,
+    blockHeight: latestBlock.height,
+    blockTimeMs: blockIntervalMs,
+    inflation
+  }
+
+  setCachedSnapshot(cacheKey, snapshot)
   return snapshot
 }
 

@@ -8,10 +8,14 @@ export const WITHDRAW_SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
 export const getRewardsFallbackGas = (validatorCount: number) =>
   WITHDRAW_REWARDS_DEFAULT_FEE_GAS + validatorCount * WITHDRAW_REWARD_MSG_GAS
 
-export const buildWithdrawTxFee = (gas: number, denom: string) => ({
+export const buildWithdrawTxFee = (
+  gas: number,
+  denom: string,
+  gasPrice = WITHDRAW_GAS_PRICE_MICRO_LUNC
+) => ({
   amount: [
     {
-      amount: Math.ceil(gas * WITHDRAW_GAS_PRICE_MICRO_LUNC).toString(),
+      amount: Math.ceil(gas * gasPrice).toString(),
       denom
     }
   ],

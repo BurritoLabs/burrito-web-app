@@ -1,3 +1,5 @@
+import { getActiveAppChainKey } from "../activeChain"
+
 export const normalizeAssetKey = (key: string) => {
   if (!key) return key
   if (key.startsWith("terra1")) return key.toLowerCase()
@@ -7,7 +9,7 @@ export const normalizeAssetKey = (key: string) => {
 
 export const formatNativeSymbol = (denom: string) => {
   if (!denom) return ""
-  if (denom === "uluna") return "LUNC"
+  if (denom === "uluna") return getActiveAppChainKey() === "lunc" ? "LUNC" : "LUNA"
   if (denom === "uusd") return "USTC"
   if (denom.startsWith("u")) {
     const f = denom.slice(1)

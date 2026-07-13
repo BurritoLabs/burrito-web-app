@@ -2,6 +2,7 @@ import { createPortal } from "react-dom"
 import { useEffect, useState } from "react"
 import styles from "./WalletAddressesModal.module.css"
 import { useWallet } from "./WalletContext"
+import { useAppChain } from "../appChainContext"
 
 type WalletAddressesModalProps = {
   open: boolean
@@ -12,6 +13,7 @@ const shortenAddress = (address: string) =>
   `${address.slice(0, 10)}...${address.slice(-6)}`
 
 const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
+  const { chain } = useAppChain()
   const { account } = useWallet()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
@@ -79,7 +81,7 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
         </div>
 
         <div className={styles.addressCard}>
-          <div className={styles.chainLabel}>Terra Classic</div>
+          <div className={styles.chainLabel}>{chain.name}</div>
           <div className={styles.addressRow}>
             <span className={styles.addressText}>
               {address ? shortenAddress(address) : "--"}

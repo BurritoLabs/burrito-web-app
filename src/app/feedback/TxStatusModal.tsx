@@ -3,11 +3,14 @@ import { useMemo, useState } from "react"
 import styles from "./TxStatusModal.module.css"
 import { useWallet } from "../wallet/WalletContext"
 import { buildTxDiagnosticsReport } from "../tx/txDiagnostics"
+import { useAppChain } from "../appChainContext"
+import { getTxExplorerUrl } from "../explorer"
 
 const formatHash = (hash: string) =>
   `${hash.slice(0, 10)}...${hash.slice(-8)}`
 
 const TxStatusModal = () => {
+  const { chainKey } = useAppChain()
   const { txState, clearTx } = useWallet()
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
 
@@ -103,7 +106,7 @@ const TxStatusModal = () => {
         {txState.hash ? (
           <a
             className={styles.hashLink}
-            href={`https://finder.burrito.money/classic/tx/${txState.hash}`}
+            href={getTxExplorerUrl(chainKey, txState.hash)}
             target="_blank"
             rel="noreferrer"
           >

@@ -20,6 +20,7 @@ import {
   toUnitAmount
 } from "../../app/utils/format"
 import { CLASSIC_DENOMS } from "../../app/chain"
+import { useAppChain } from "../../app/appChainContext"
 import { KEYBASE_PROXY_URL } from "../../app/config/externalServices"
 import {
   DEFAULT_VALIDATOR_LOGO,
@@ -42,9 +43,15 @@ const VALIDATOR_PAGE_SIZE = 30
 
 const Stake = () => {
   const { account } = useWallet()
+  const { chain, chainKey } = useAppChain()
+  const nativeSymbol = chain.displayDenom
+  const validatorExplorerUrl = (operatorAddress: string) =>
+    chainKey === "luna"
+      ? `https://www.mintscan.io/terra/validators/${operatorAddress}`
+      : `https://finder.burrito.money/classic/validator/${operatorAddress}`
 
   const { data: delegations = [] } = useQuery({
-    queryKey: ["delegations", account?.address],
+    queryKey: ["delegations", chain.chainId, account?.address],
     queryFn: () => fetchDelegations(account?.address ?? ""),
     enabled: Boolean(account?.address),
     staleTime: 60_000,
@@ -52,7 +59,7 @@ const Stake = () => {
   })
 
   const { data: rewards = [] } = useQuery({
-    queryKey: ["rewards", account?.address],
+    queryKey: ["rewards", chain.chainId, account?.address],
     queryFn: () => fetchRewards(account?.address ?? ""),
     enabled: Boolean(account?.address),
     staleTime: 60_000,
@@ -60,7 +67,7 @@ const Stake = () => {
   })
 
   const { data: spendable = [] } = useQuery({
-    queryKey: ["spendable-balances", account?.address],
+    queryKey: ["spendable-balances", chain.chainId, account?.address],
     queryFn: () => fetchSpendableBalances(account?.address ?? ""),
     enabled: Boolean(account?.address),
     staleTime: 60_000,
@@ -68,7 +75,7 @@ const Stake = () => {
   })
 
   const { data: unbonding = [] } = useQuery({
-    queryKey: ["unbonding", account?.address],
+    queryKey: ["unbonding", chain.chainId, account?.address],
     queryFn: () => fetchUnbonding(account?.address ?? ""),
     enabled: Boolean(account?.address),
     staleTime: 60_000,
@@ -76,7 +83,7 @@ const Stake = () => {
   })
 
   const { data: validators = [] } = useQuery({
-    queryKey: ["validators"],
+    queryKey: ["validators", chain.chainId],
     queryFn: fetchValidators,
     staleTime: 10 * 60_000,
     placeholderData: (previousData) => previousData
@@ -169,46 +176,50 @@ const Stake = () => {
         delegatedAmount,
         CLASSIC_DENOMS.lunc.coinDecimals,
         2
-      )} LUNC`
+      )} ${nativeSymbol}`
     : "--"
   const rewardsDisplay = account
     ? `${formatTokenAmount(
         rewardAmount,
         CLASSIC_DENOMS.lunc.coinDecimals,
         2
-      )} LUNC`
+      )} ${nativeSymbol}`
     : "--"
-  const rewardsUstcDisplay = account
-    ? `${formatTokenAmount(
+  const rewardsUstcDisplay = chainKey === "lunc"
+    ? account
+      ? `${formatTokenAmount(
         rewardAmountUstc,
         CLASSIC_DENOMS.ustc.coinDecimals,
         2
       )} USTC`
-    : "--"
+      : "--"
+    : undefined
   const unbondingDisplay = account
     ? `${formatTokenAmount(
         unbondingAmount,
         CLASSIC_DENOMS.lunc.coinDecimals,
         2
-      )} LUNC`
+      )} ${nativeSymbol}`
     : "--"
 
   const { data: prices } = useQuery({
-    queryKey: ["prices"],
+    queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 300_000
   })
+  const activeNativePrice =
+    chainKey === "luna" ? prices?.luna?.usd : prices?.lunc?.usd
 
   const stakedValueDisplay = useMemo(() => {
     if (!account) return "--"
-    const price = prices?.lunc?.usd
+    const price = activeNativePrice
     if (!price) return "--"
     const amount = toUnitAmount(
       delegatedAmount,
       CLASSIC_DENOMS.lunc.coinDecimals
     )
     return formatUsd(amount * price)
-  }, [account, delegatedAmount, prices?.lunc?.usd])
+  }, [account, activeNativePrice, delegatedAmount])
 
   const [activeTab, setActiveTab] = useState<"my" | "stake">("my")
 
@@ -532,7 +543,7 @@ const Stake = () => {
                       />
                       <a
                         className={styles.legendLink}
-                        href={`https://finder.burrito.money/classic/validator/${segment.validator}`}
+                        href={validatorExplorerUrl(segment.validator)}
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -568,7 +579,9 @@ const Stake = () => {
                 ["Staked", delegationsDisplay],
                 ["Value", stakedValueDisplay],
                 ["Rewards", rewardsDisplay],
-                ["Rewards", rewardsUstcDisplay],
+                ...(rewardsUstcDisplay
+                  ? [["Rewards", rewardsUstcDisplay]]
+                  : []),
                 ["Unstaking", unbondingDisplay]
               ].map(([label, value], index) => (
                 <div key={`${label}-${index}`} className="listRow">
@@ -632,7 +645,7 @@ const Stake = () => {
                           <div className={styles.validatorMeta}>
                             <a
                               className={styles.validatorNameLink}
-                              href={`https://finder.burrito.money/classic/validator/${item.validator}`}
+                              href={validatorExplorerUrl(item.validator)}
                               target="_blank"
                               rel="noreferrer"
                             >
@@ -654,7 +667,7 @@ const Stake = () => {
                       </div>
                       <div className={styles.myStakeAmounts}>
                         <div className={styles.amountBlock}>
-                          <span className={styles.amountLabel}>LUNC</span>
+                          <span className={styles.amountLabel}>{nativeSymbol}</span>
                           <span className={styles.amountValue}>
                             {formatTokenAmount(
                               item.amount.toString(),
@@ -666,12 +679,12 @@ const Stake = () => {
                         <div className={styles.amountBlock}>
                           <span className={styles.amountLabel}>Value</span>
                           <span className={styles.amountValue}>
-                            {prices?.lunc?.usd
+                            {activeNativePrice
                               ? formatUsd(
                                   toUnitAmount(
                                     item.amount,
                                     CLASSIC_DENOMS.lunc.coinDecimals
-                                  ) * prices.lunc.usd
+                                  ) * activeNativePrice
                                 )
                               : "--"}
                           </span>

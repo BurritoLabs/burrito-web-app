@@ -12,6 +12,7 @@ import { CLASSIC_CHAIN } from "../chain"
 import { fetchValidator } from "../data/classic"
 import { convertBech32Prefix } from "../utils/bech32"
 import BrandLogo from "../../components/brand/BrandLogo"
+import { getTxExplorerUrl } from "../explorer"
 
 const ConnectModal = lazy(() => import("../wallet/ConnectModal"))
 const WalletAddressesModal = lazy(() => import("../wallet/WalletAddressesModal"))
@@ -62,7 +63,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     : null
 
   const { data: validator } = useQuery({
-    queryKey: ["validator", valoperAddress],
+    queryKey: ["validator", chain.chainId, valoperAddress],
     queryFn: () => fetchValidator(valoperAddress ?? ""),
     enabled: Boolean(valoperAddress),
     staleTime: 60_000
@@ -417,7 +418,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         onClick={() => {
           if (txState.hash) {
             window.open(
-              `https://finder.burrito.money/classic/tx/${txState.hash}`,
+              getTxExplorerUrl(chainKey, txState.hash),
               "_blank",
               "noopener,noreferrer"
             )
@@ -428,7 +429,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         onKeyDown={(event) => {
           if (event.key === "Enter" && txState.hash) {
             window.open(
-              `https://finder.burrito.money/classic/tx/${txState.hash}`,
+              getTxExplorerUrl(chainKey, txState.hash),
               "_blank",
               "noopener,noreferrer"
             )

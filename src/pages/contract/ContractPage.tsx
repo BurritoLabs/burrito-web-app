@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toUtf8 } from "@cosmjs/encoding"
@@ -17,12 +17,11 @@ import {
   fetchContractInitMsg,
   queryContractSmart
 } from "../../app/data/classic"
-import { CLASSIC_DENOMS } from "../../app/chain"
 import { truncateHash } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
 import { useWallet } from "../../app/wallet/WalletContext"
 import {
-  connectClassicSigningClientForConnector,
+  connectSigningClientForConnector,
   getSignerAddressForConnector
 } from "../../app/wallet/walletAdapters"
 import {
@@ -35,6 +34,8 @@ import {
   toMicroAmount
 } from "../../app/contract/contractHelpers"
 import { FinderAddressLink, SearchIcon } from "./ContractLinks"
+import { useAppChain } from "../../app/appChainContext"
+import { getAddressExplorerUrl, getTxExplorerUrl } from "../../app/explorer"
 
 const CLOSE_ICON = (
   <>
@@ -44,6 +45,9 @@ const CLOSE_ICON = (
 )
 
 const Contract = () => {
+  const { chain, chainKey } = useAppChain()
+  const nativeDenom = chain.runtime.nativeDenom.coinMinimalDenom
+  const feeDenoms = chain.runtime.feeDenoms
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const queryClient = useQueryClient()
   const [address, setAddress] = useState("")
@@ -64,7 +68,7 @@ const Contract = () => {
   const [instantiateMsg, setInstantiateMsg] = useState(DEFAULT_INSTANTIATE_MSG)
   const [instantiateFunds, setInstantiateFunds] = useState("")
   const [instantiateFundsDenom, setInstantiateFundsDenom] = useState<string>(
-    CLASSIC_DENOMS.lunc.coinMinimalDenom
+    nativeDenom
   )
   const [instantiateSubmitting, setInstantiateSubmitting] = useState(false)
   const [instantiateError, setInstantiateError] = useState<string>()
@@ -73,7 +77,7 @@ const Contract = () => {
   const [executeMsg, setExecuteMsg] = useState(DEFAULT_EXECUTE_MSG)
   const [executeFunds, setExecuteFunds] = useState("")
   const [executeFundsDenom, setExecuteFundsDenom] = useState<string>(
-    CLASSIC_DENOMS.lunc.coinMinimalDenom
+    nativeDenom
   )
   const [executeSubmitting, setExecuteSubmitting] = useState(false)
   const [executeError, setExecuteError] = useState<string>()
@@ -101,14 +105,14 @@ const Contract = () => {
     isLoading: contractLoading,
     isError: contractError
   } = useQuery({
-    queryKey: ["contract", trimmedAddress],
+    queryKey: ["contract", chain.chainId, trimmedAddress],
     queryFn: () => fetchContractInfo(trimmedAddress),
     enabled: isValidAddress,
     retry: false
   })
 
   const { data: initMsg, isLoading: initMsgLoading } = useQuery({
-    queryKey: ["contract-init-msg", trimmedAddress],
+    queryKey: ["contract-init-msg", chain.chainId, trimmedAddress],
     queryFn: async () => {
       try {
         return await fetchContractInitMsg(trimmedAddress)
@@ -178,7 +182,7 @@ const Contract = () => {
     setInstantiateLabel("")
     setInstantiateMsg(DEFAULT_INSTANTIATE_MSG)
     setInstantiateFunds("")
-    setInstantiateFundsDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+    setInstantiateFundsDenom(nativeDenom)
     setInstantiateAdmin(account?.address ?? "")
     setTxModal("instantiate")
   }
@@ -188,7 +192,7 @@ const Contract = () => {
     setExecuteHash("")
     setExecuteMsg(DEFAULT_EXECUTE_MSG)
     setExecuteFunds("")
-    setExecuteFundsDenom(CLASSIC_DENOMS.lunc.coinMinimalDenom)
+    setExecuteFundsDenom(nativeDenom)
     setTxModal("execute")
   }
 
@@ -211,17 +215,23 @@ const Contract = () => {
 
   const invalidateContract = async () => {
     await queryClient.invalidateQueries({
-      queryKey: ["contract", trimmedAddress]
+      queryKey: ["contract", chain.chainId, trimmedAddress]
     })
     await queryClient.invalidateQueries({
-      queryKey: ["contract-init-msg", trimmedAddress]
+      queryKey: ["contract-init-msg", chain.chainId, trimmedAddress]
     })
   }
 
   const connectClient = async () => {
     if (!connectorId) throw new Error("Wallet not connected")
-    return connectClassicSigningClientForConnector(connectorId)
+    return connectSigningClientForConnector(connectorId)
   }
+
+  useEffect(() => {
+    setInstantiateFundsDenom(nativeDenom)
+    setExecuteFundsDenom(nativeDenom)
+    setAddress("")
+  }, [chain.chainId, nativeDenom])
 
   const handleUploadSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -505,7 +515,7 @@ const Contract = () => {
 
     const next = nextAdmin.trim()
     if (!clearAdmin && !/^terra1[0-9a-z]{38}$/.test(next)) {
-      setAdminError("Enter a valid Terra Classic address.")
+      setAdminError(`Enter a valid ${chain.name} address.`)
       return
     }
 
@@ -837,7 +847,7 @@ const Contract = () => {
                         <div>
                           Tx:{" "}
                           <a
-                            href={`https://finder.burrito.money/classic/tx/${uploadHash}`}
+                            href={getTxExplorerUrl(chainKey, uploadHash)}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -946,12 +956,11 @@ const Contract = () => {
                             setInstantiateFundsDenom(event.target.value)
                           }
                         >
-                          <option value={CLASSIC_DENOMS.lunc.coinMinimalDenom}>
-                            LUNC
-                          </option>
-                          <option value={CLASSIC_DENOMS.ustc.coinMinimalDenom}>
-                            USTC
-                          </option>
+                          {feeDenoms.map((denom) => (
+                            <option key={denom.coinMinimalDenom} value={denom.coinMinimalDenom}>
+                              {denom.coinDenom}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -964,7 +973,7 @@ const Contract = () => {
                         <div>
                           Tx:{" "}
                           <a
-                            href={`https://finder.burrito.money/classic/tx/${instantiateHash}`}
+                            href={getTxExplorerUrl(chainKey, instantiateHash)}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -975,7 +984,7 @@ const Contract = () => {
                           <div>
                             Contract:{" "}
                             <a
-                              href={`https://finder.burrito.money/classic/address/${instantiateAddress}`}
+                              href={getAddressExplorerUrl(chainKey, instantiateAddress)}
                               target="_blank"
                               rel="noreferrer"
                             >
@@ -1052,12 +1061,11 @@ const Contract = () => {
                             setExecuteFundsDenom(event.target.value)
                           }
                         >
-                          <option value={CLASSIC_DENOMS.lunc.coinMinimalDenom}>
-                            LUNC
-                          </option>
-                          <option value={CLASSIC_DENOMS.ustc.coinMinimalDenom}>
-                            USTC
-                          </option>
+                          {feeDenoms.map((denom) => (
+                            <option key={denom.coinMinimalDenom} value={denom.coinMinimalDenom}>
+                              {denom.coinDenom}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -1070,7 +1078,7 @@ const Contract = () => {
                         <div>
                           Tx:{" "}
                           <a
-                            href={`https://finder.burrito.money/classic/tx/${executeHash}`}
+                            href={getTxExplorerUrl(chainKey, executeHash)}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -1134,7 +1142,7 @@ const Contract = () => {
                         <div>
                           Tx:{" "}
                           <a
-                            href={`https://finder.burrito.money/classic/tx/${migrateHash}`}
+                            href={getTxExplorerUrl(chainKey, migrateHash)}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -1208,7 +1216,7 @@ const Contract = () => {
                         <div>
                           Tx:{" "}
                           <a
-                            href={`https://finder.burrito.money/classic/tx/${adminHash}`}
+                            href={getTxExplorerUrl(chainKey, adminHash)}
                             target="_blank"
                             rel="noreferrer"
                           >

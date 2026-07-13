@@ -3,11 +3,11 @@ import { createPortal } from "react-dom"
 import { useWallet } from "../../app/wallet/WalletContext"
 import styles from "../StakeManageModal.module.css"
 import { CLASSIC_DENOMS } from "../../app/chain"
+import { useAppChain } from "../../app/appChainContext"
 import { formatTokenAmount } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
 import {
   FALLBACK_GAS_BY_TAB,
-  GAS_PRICE_MICRO_LUNC,
   MAX_DELEGATE_BUFFER_MICRO,
   SUBMIT_GAS_ADJUSTMENT,
   estimateFallbackFeeMicro,
@@ -46,6 +46,11 @@ const StakeManageModal = ({
     finishTx,
     failTx
   } = useWallet()
+  const { chain, chainKey } = useAppChain()
+  const nativeSymbol = chain.displayDenom
+  const gasPrice = chain.runtime.gasPriceStep.average
+  const delegateBufferMicro =
+    chainKey === "lunc" ? MAX_DELEGATE_BUFFER_MICRO : 100_000n
   const accountAddress = account?.address
   const [tab, setTab] = useState<StakeAction>("Delegate")
   const [amount, setAmount] = useState("")
@@ -131,10 +136,11 @@ const StakeManageModal = ({
 
   const amountMicroValue = useMemo(() => BigInt(toMicroAmount(amount)), [amount])
   const effectiveFeeMicro = useMemo(
-    () => (feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab)),
-    [feeMicro, tab]
+    () =>
+      feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab, gasPrice),
+    [feeMicro, gasPrice, tab]
   )
-  const maxDelegateReserveMicro = effectiveFeeMicro + MAX_DELEGATE_BUFFER_MICRO
+  const maxDelegateReserveMicro = effectiveFeeMicro + delegateBufferMicro
   const maxAmount = useMemo(() => {
     if (tab !== "Delegate") return availableAmount
     return available > maxDelegateReserveMicro
@@ -151,10 +157,17 @@ const StakeManageModal = ({
     if (requiredLunc > available) {
       return tab === "Delegate"
         ? "Insufficient funds after network fee. Use Max or reduce the amount."
-        : "Insufficient LUNC for network fee."
+        : `Insufficient ${nativeSymbol} for network fee.`
     }
     return undefined
-  }, [amountMicroValue, available, availableAmount, effectiveFeeMicro, tab])
+  }, [
+    amountMicroValue,
+    available,
+    availableAmount,
+    effectiveFeeMicro,
+    nativeSymbol,
+    tab
+  ])
 
   const getInsufficientLuncMessage = (feeAmount: bigint) =>
     tab === "Delegate"
@@ -162,12 +175,12 @@ const StakeManageModal = ({
           feeAmount.toString(),
           CLASSIC_DENOMS.lunc.coinDecimals,
           6
-        )} LUNC for fees or reduce the amount.`
-      : `Insufficient LUNC for network fee. Need at least ${formatTokenAmount(
+        )} ${nativeSymbol} for fees or reduce the amount.`
+      : `Insufficient ${nativeSymbol} for network fee. Need at least ${formatTokenAmount(
           feeAmount.toString(),
           CLASSIC_DENOMS.lunc.coinDecimals,
           6
-        )} LUNC.`
+        )} ${nativeSymbol}.`
 
   useEffect(() => {
     if (!open) return
@@ -198,7 +211,7 @@ const StakeManageModal = ({
       return undefined
     }
 
-    const fallbackFeeMicro = estimateFallbackFeeMicro(tab)
+    const fallbackFeeMicro = estimateFallbackFeeMicro(tab, gasPrice)
     const fallbackFee = formatTokenAmount(
       fallbackFeeMicro.toString(),
       CLASSIC_DENOMS.lunc.coinDecimals,
@@ -214,6 +227,7 @@ const StakeManageModal = ({
     accountAddress,
     activeValidator?.validator,
     amount,
+    gasPrice,
     open,
     source,
     tab
@@ -253,14 +267,15 @@ const StakeManageModal = ({
       return
     }
     let txGasWanted = feeMicro > 0n ? gasWanted : FALLBACK_GAS_BY_TAB[tab]
-    let txFeeMicro = feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab)
+    let txFeeMicro =
+      feeMicro > 0n ? feeMicro : estimateFallbackFeeMicro(tab, gasPrice)
     const requiredLunc =
       tab === "Delegate" ? microAmountValue + txFeeMicro : txFeeMicro
     if (requiredLunc > available) {
       setSubmitError(
         tab === "Delegate"
           ? "Insufficient funds after network fee. Use Max or reduce the amount."
-          : "Insufficient LUNC for network fee."
+          : `Insufficient ${nativeSymbol} for network fee.`
       )
       return
     }
@@ -279,14 +294,14 @@ const StakeManageModal = ({
       startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        { connectClassicSigningClientForConnector },
+        { connectSigningClientForConnector },
         { MsgDelegate, MsgBeginRedelegate, MsgUndelegate }
       ] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmos/staking/v1beta1/tx")
       ])
       const signerAddress = accountAddress
-      const client = await connectClassicSigningClientForConnector(connectorId)
+      const client = await connectSigningClientForConnector(connectorId)
 
       const msg =
         tab === "Redelegate"
@@ -332,10 +347,10 @@ const StakeManageModal = ({
           FALLBACK_GAS_BY_TAB[tab],
           Math.ceil(simulatedGas * SUBMIT_GAS_ADJUSTMENT)
         )
-        txFeeMicro = BigInt(Math.ceil(txGasWanted * GAS_PRICE_MICRO_LUNC))
+        txFeeMicro = BigInt(Math.ceil(txGasWanted * gasPrice))
       } catch {
         txGasWanted = FALLBACK_GAS_BY_TAB[tab]
-        txFeeMicro = estimateFallbackFeeMicro(tab)
+        txFeeMicro = estimateFallbackFeeMicro(tab, gasPrice)
       }
 
       const finalRequiredLunc =
@@ -477,7 +492,7 @@ const StakeManageModal = ({
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
               />
-              <span className={styles.amountDenom}>LUNC</span>
+              <span className={styles.amountDenom}>{nativeSymbol}</span>
             </div>
             <div className={styles.amountHint}>
               {tab === "Delegate" ? "Max delegate: " : "Available: "}
@@ -485,7 +500,7 @@ const StakeManageModal = ({
                 maxAmount.toString(),
                 CLASSIC_DENOMS.lunc.coinDecimals,
                 2
-              )} LUNC`}
+              )} ${nativeSymbol}`}
               {tab === "Delegate" ? (
                 <span>
                   Fee reserve:{" "}
@@ -494,7 +509,7 @@ const StakeManageModal = ({
                     CLASSIC_DENOMS.lunc.coinDecimals,
                     2
                   )}{" "}
-                  LUNC
+                  {nativeSymbol}
                 </span>
               ) : null}
             </div>
@@ -505,7 +520,11 @@ const StakeManageModal = ({
           <div className={styles.feeRow}>
             <span>Fee</span>
             <span>
-              {feeLoading ? "..." : fee === "--" ? "--" : `${fee} LUNC`}
+              {feeLoading
+                ? "..."
+                : fee === "--"
+                  ? "--"
+                  : `${fee} ${nativeSymbol}`}
             </span>
           </div>
           <div className={styles.balanceRow}>
@@ -516,7 +535,7 @@ const StakeManageModal = ({
                 CLASSIC_DENOMS.lunc.coinDecimals,
                 2
               )}{" "}
-              LUNC
+              {nativeSymbol}
             </span>
           </div>
           <div className={styles.balanceRow}>
@@ -527,7 +546,7 @@ const StakeManageModal = ({
                 CLASSIC_DENOMS.lunc.coinDecimals,
                 2
               )}{" "}
-              LUNC
+              {nativeSymbol}
             </span>
           </div>
           {feeError ? <div className={styles.feeError}>{feeError}</div> : null}

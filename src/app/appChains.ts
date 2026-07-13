@@ -1,4 +1,9 @@
-export type AppChainKey = "lunc" | "luna"
+import {
+  CHAIN_RUNTIME_CONFIG,
+  type SupportedChainKey
+} from "./config/chainConfig"
+
+export type AppChainKey = SupportedChainKey
 
 export type AppChainConfig = {
   key: AppChainKey
@@ -10,6 +15,12 @@ export type AppChainConfig = {
   displayDenom: string
   logoSrc: string
   accentRgb: string
+  runtime: (typeof CHAIN_RUNTIME_CONFIG)[AppChainKey]
+  features: {
+    swap: boolean
+    market: boolean
+    launchpad: boolean
+  }
 }
 
 export const APP_CHAIN_STORAGE_KEY = "burrito:web-app:chain"
@@ -25,7 +36,9 @@ export const APP_CHAINS = {
     nativeDenom: "uluna",
     displayDenom: "LUNC",
     logoSrc: "/system/lunc.svg",
-    accentRgb: "82, 196, 26"
+    accentRgb: "82, 196, 26",
+    runtime: CHAIN_RUNTIME_CONFIG.lunc,
+    features: { swap: true, market: true, launchpad: true }
   },
   luna: {
     key: "luna",
@@ -36,7 +49,9 @@ export const APP_CHAINS = {
     nativeDenom: "uluna",
     displayDenom: "LUNA",
     logoSrc: "/system/luna.svg",
-    accentRgb: "249, 115, 22"
+    accentRgb: "249, 115, 22",
+    runtime: CHAIN_RUNTIME_CONFIG.luna,
+    features: { swap: false, market: false, launchpad: false }
   }
 } as const satisfies Record<AppChainKey, AppChainConfig>
 

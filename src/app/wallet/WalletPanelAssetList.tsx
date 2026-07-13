@@ -8,6 +8,7 @@ import {
   PriceUpIcon
 } from "./WalletPanelIcons"
 import type { SelectedAsset } from "./walletPanelUtils"
+import { getActiveAppChainRuntime } from "../activeChain"
 
 type WalletPanelAssetChainsProps = {
   accountConnected: boolean
@@ -31,7 +32,7 @@ export const WalletPanelAssetChains = ({
         <div className={styles.chainSectionList}>
           {[
             {
-              name: "columbus-5",
+              name: getActiveAppChainRuntime().chain.chainId,
               value: accountConnected ? formatUsd(selectedValue) : "--",
               amount: accountConnected
                 ? `${selectedAmountDisplay} ${selectedAsset.symbol}`

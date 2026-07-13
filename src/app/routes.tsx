@@ -12,6 +12,8 @@ import {
   WalletIcon
 } from "./icons"
 import RouteFallback from "./layout/RouteFallback"
+import ChainFeatureGuard from "./routes/ChainFeatureGuard"
+import type { AppChainConfig } from "./appChains"
 
 const ICON_SIZE = { width: 18, height: 18 }
 
@@ -33,6 +35,18 @@ const NotFound = lazy(() => import("../pages/NotFound"))
 const renderPage = (Component: ComponentType) => (
   <Suspense fallback={<RouteFallback />}>
     <Component />
+  </Suspense>
+)
+
+const renderFeaturePage = (
+  Component: ComponentType,
+  feature: keyof AppChainConfig["features"],
+  title: string
+) => (
+  <Suspense fallback={<RouteFallback />}>
+    <ChainFeatureGuard feature={feature} title={title}>
+      <Component />
+    </ChainFeatureGuard>
   </Suspense>
 )
 
@@ -83,17 +97,23 @@ const appRoutes = [
   { path: "/", element: renderPage(Dashboard) },
   {
     path: "/market/pair/:dexId/:pair",
-    element: renderPage(MarketPairDetails)
+    element: renderFeaturePage(MarketPairDetails, "market", "Market")
   },
-  { path: "/market/pair/:pairId", element: renderPage(MarketPairDetails) },
+  {
+    path: "/market/pair/:pairId",
+    element: renderFeaturePage(MarketPairDetails, "market", "Market")
+  },
   { path: "/proposal/new", element: renderPage(ProposalNew) },
   { path: "/proposal/:id", element: renderPage(ProposalDetails) },
   { path: "/rewards", element: renderPage(WithdrawRewards) },
   { path: "/commission", element: renderPage(WithdrawCommission) },
   { path: "/wallet", element: renderPage(Wallet) },
-  { path: "/swap", element: renderPage(Swap) },
-  { path: "/market", element: renderPage(Market) },
-  { path: "/launchpad", element: renderPage(Launchpad) },
+  { path: "/swap", element: renderFeaturePage(Swap, "swap", "Swap") },
+  { path: "/market", element: renderFeaturePage(Market, "market", "Market") },
+  {
+    path: "/launchpad",
+    element: renderFeaturePage(Launchpad, "launchpad", "Launchpad")
+  },
   { path: "/history", element: renderPage(History) },
   { path: "/stake", element: renderPage(Stake) },
   { path: "/gov", element: renderPage(Governance) },

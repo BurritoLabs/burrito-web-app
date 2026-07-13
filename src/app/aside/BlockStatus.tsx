@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import { fetchWithEndpointFallback } from "../data/endpointFallback"
 import styles from "./Aside.module.css"
+import { useAppChain } from "../appChainContext"
+import { getBlockExplorerUrl } from "../explorer"
 
 const BLOCK_REFRESH_MS = 6_000
 const LIVE_BLOCK_MAX_AGE_MS = 30_000
@@ -43,8 +45,9 @@ const fetchLatestBlock = async (): Promise<LatestBlock> => {
 }
 
 const BlockStatus = () => {
+  const { chain, chainKey } = useAppChain()
   const { data: latestBlock, isError } = useQuery({
-    queryKey: ["latest-block-height"],
+    queryKey: ["latest-block-height", chain.chainId],
     queryFn: fetchLatestBlock,
     refetchInterval: BLOCK_REFRESH_MS,
     refetchIntervalInBackground: true,
@@ -101,7 +104,7 @@ const BlockStatus = () => {
       {height ? (
         <a
           className={styles.blockHeight}
-          href={`https://finder.burrito.money/classic/blocks/${height}`}
+          href={getBlockExplorerUrl(chainKey, height)}
           target="_blank"
           rel="noreferrer"
           aria-label={`Open block ${height}`}

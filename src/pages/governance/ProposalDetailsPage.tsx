@@ -38,7 +38,6 @@ import {
 } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
 import { convertBech32Prefix } from "../../app/utils/bech32"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import { KEYBASE_PROXY_URL } from "../../app/config/externalServices"
 import {
   VOTE_OPTION_VALUES,
@@ -56,7 +55,7 @@ import {
 } from "../../app/governance/proposalFormat"
 import { useWallet } from "../../app/wallet/WalletContext"
 import {
-  connectClassicStargateClientForConnector,
+  connectStargateClientForConnector,
   getSignerAddressForConnector,
   type ClassicStargateClient
 } from "../../app/wallet/walletAdapters"
@@ -71,19 +70,23 @@ import type {
   StakingPool,
   ValidatorItem
 } from "../../app/data/classic"
+import { useAppChain } from "../../app/appChainContext"
 
-const GAS_PRICE_MICRO = 28.325
 const VOTE_GAS_LIMIT = 220000
 const DEPOSIT_GAS_LIMIT = 220000
 const GOV_GAS_ADJUSTMENT = 1.6
 const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
 const GOV_BROADCAST_TIMEOUT_MS = 60_000
 const GOV_BROADCAST_POLL_INTERVAL_MS = 2_000
-const buildGovFee = (gasLimit: number) => ({
+const buildGovFee = (
+  gasLimit: number,
+  feeDenom: string,
+  gasPriceMicro: number
+) => ({
   amount: [
     {
-      amount: Math.max(1, Math.ceil(gasLimit * GAS_PRICE_MICRO)).toString(),
-      denom: CLASSIC_DENOMS.lunc.coinMinimalDenom
+      amount: Math.max(1, Math.ceil(gasLimit * gasPriceMicro)).toString(),
+      denom: feeDenom
     }
   ],
   gas: String(gasLimit)
@@ -93,7 +96,9 @@ const estimateGovFee = async (
   client: ClassicStargateClient,
   signerAddress: string,
   messages: Parameters<ClassicStargateClient["simulate"]>[1],
-  fallbackGas: number
+  fallbackGas: number,
+  feeDenom: string,
+  gasPriceMicro: number
 ) => {
   let gasLimit = fallbackGas
   try {
@@ -106,7 +111,7 @@ const estimateGovFee = async (
     gasLimit = Math.ceil(fallbackGas * SIMULATION_FALLBACK_GAS_MULTIPLIER)
   }
 
-  return buildGovFee(gasLimit)
+  return buildGovFee(gasLimit, feeDenom, gasPriceMicro)
 }
 
 const ProposalDetails = () => {
@@ -114,6 +119,10 @@ const ProposalDetails = () => {
   const proposalId = params.id ?? ""
   const location = useLocation()
   const queryClient = useQueryClient()
+  const { chain } = useAppChain()
+  const nativeDenom = chain.runtime.nativeDenom.coinMinimalDenom
+  const nativeSymbol = chain.displayDenom
+  const gasPriceMicro = chain.runtime.gasPriceStep.average
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const [voteModalOpen, setVoteModalOpen] = useState(false)
   const [voteChoice, setVoteChoice] = useState<VoteChoice>("YES")
@@ -125,7 +134,7 @@ const ProposalDetails = () => {
   const [depositError, setDepositError] = useState<string>()
 
   const { data: proposal } = useQuery<ProposalItem>({
-    queryKey: ["proposal", proposalId],
+    queryKey: ["proposal", chain.chainId, proposalId],
     queryFn: () => fetchProposalById(proposalId),
     enabled: Boolean(proposalId),
     refetchInterval: 15_000,
@@ -133,7 +142,7 @@ const ProposalDetails = () => {
   })
 
   const { data: tally } = useQuery<GovTally>({
-    queryKey: ["proposalTally", proposalId],
+    queryKey: ["proposalTally", chain.chainId, proposalId],
     queryFn: () => fetchProposalTally(proposalId),
     enabled: Boolean(proposalId),
     staleTime: 10_000,
@@ -142,7 +151,7 @@ const ProposalDetails = () => {
   })
 
   const { data: votes = [] } = useQuery<ProposalVote[]>({
-    queryKey: ["proposalVotes", proposalId, proposal?.status],
+    queryKey: ["proposalVotes", chain.chainId, proposalId, proposal?.status],
     queryFn: () => fetchProposalVotes(proposalId, proposal?.status),
     enabled: Boolean(proposalId),
     refetchInterval: 15_000,
@@ -150,7 +159,7 @@ const ProposalDetails = () => {
   })
 
   const { data: deposits = [] } = useQuery<ProposalDeposit[]>({
-    queryKey: ["proposalDeposits", proposalId],
+    queryKey: ["proposalDeposits", chain.chainId, proposalId],
     queryFn: () => fetchProposalDeposits(proposalId),
     enabled: Boolean(proposalId),
     refetchInterval: 30_000,
@@ -158,31 +167,31 @@ const ProposalDetails = () => {
   })
 
   const { data: depositParams } = useQuery<GovDepositParams>({
-    queryKey: ["govDepositParams"],
+    queryKey: ["govDepositParams", chain.chainId],
     queryFn: fetchDepositParams,
     staleTime: 10 * 60 * 1000
   })
 
   const { data: balances = [] } = useQuery<CoinBalance[]>({
-    queryKey: ["balances", account?.address],
+    queryKey: ["balances", chain.chainId, account?.address],
     queryFn: () => fetchBalances(account?.address ?? ""),
     enabled: Boolean(account?.address)
   })
 
   const { data: validators = [] } = useQuery<ValidatorItem[]>({
-    queryKey: ["validators"],
+    queryKey: ["validators", chain.chainId],
     queryFn: fetchValidators,
     staleTime: 5 * 60 * 1000
   })
 
   const { data: tallyParams } = useQuery<GovTallyParams>({
-    queryKey: ["govTallyParams"],
+    queryKey: ["govTallyParams", chain.chainId],
     queryFn: fetchTallyParams,
     staleTime: 10 * 60 * 1000
   })
 
   const { data: stakingPool } = useQuery<StakingPool>({
-    queryKey: ["stakingPool"],
+    queryKey: ["stakingPool", chain.chainId],
     queryFn: fetchStakingPool,
     staleTime: 5 * 60 * 1000
   })
@@ -294,7 +303,7 @@ const ProposalDetails = () => {
 
   const { data: delegationsByVoter = new Map<string, DelegationResponse[]>() } =
     useQuery({
-      queryKey: ["proposalVoteDelegations", proposalId, delegatorKey],
+      queryKey: ["proposalVoteDelegations", chain.chainId, proposalId, delegatorKey],
       queryFn: () => fetchDelegationsForVoters(voterAddresses),
       enabled: voterAddresses.length > 0,
       staleTime: 5 * 60 * 1000
@@ -327,7 +336,7 @@ const ProposalDetails = () => {
       let total = 0n
       delegations.forEach((item) => {
         if (
-          item.balance?.denom !== CLASSIC_DENOMS.lunc.coinMinimalDenom ||
+          item.balance?.denom !== nativeDenom ||
           !item.balance?.amount
         )
           return
@@ -370,7 +379,7 @@ const ProposalDetails = () => {
     return enriched.sort((a, b) =>
       a.weight === b.weight ? 0 : a.weight > b.weight ? -1 : 1
     )
-  }, [validators, delegationsByVoter, validatorInfoMap, voterAddresses, votes])
+  }, [validators, delegationsByVoter, nativeDenom, validatorInfoMap, voterAddresses, votes])
 
   const [voteFilter, setVoteFilter] = useState("ALL")
   const [visibleVotes, setVisibleVotes] = useState(25)
@@ -402,7 +411,7 @@ const ProposalDetails = () => {
   )
 
   const { data: voteTxHashes = {} } = useQuery<Record<string, string>>({
-    queryKey: ["proposalVoteTxs", proposalId, visibleVoters.join("|")],
+    queryKey: ["proposalVoteTxs", chain.chainId, proposalId, visibleVoters.join("|")],
     queryFn: () => fetchProposalVoteTxHashes(proposalId, visibleVoters),
     enabled: Boolean(proposalId) && visibleVoters.length > 0,
     staleTime: 5 * 60 * 1000
@@ -544,10 +553,10 @@ const ProposalDetails = () => {
 
   const luncBalance = useMemo(() => {
     const item = balances.find(
-      (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+      (coin) => coin.denom === nativeDenom
     )
     return item?.amount ?? "0"
-  }, [balances])
+  }, [balances, nativeDenom])
 
   const minDepositCoins = useMemo(
     () => depositParams?.minDeposit ?? [],
@@ -565,20 +574,20 @@ const ProposalDetails = () => {
 
     const proposalDepositMicro = toSafeBigInt(proposal?.deposit)
     if (proposalDepositMicro > 0n) {
-      const current = totals.get(CLASSIC_DENOMS.lunc.coinMinimalDenom) ?? 0n
+      const current = totals.get(nativeDenom) ?? 0n
       if (proposalDepositMicro > current) {
-        totals.set(CLASSIC_DENOMS.lunc.coinMinimalDenom, proposalDepositMicro)
+        totals.set(nativeDenom, proposalDepositMicro)
       }
     }
     return totals
-  }, [deposits, proposal?.deposit])
+  }, [deposits, nativeDenom, proposal?.deposit])
 
   const primaryDepositDenom =
-    minDepositCoins[0]?.denom ?? CLASSIC_DENOMS.lunc.coinMinimalDenom
+    minDepositCoins[0]?.denom ?? nativeDenom
 
   const currentDepositMicro =
     depositTotals.get(primaryDepositDenom) ??
-    (primaryDepositDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+    (primaryDepositDenom === nativeDenom
       ? toSafeBigInt(proposal?.deposit)
       : 0n)
 
@@ -611,11 +620,11 @@ const ProposalDetails = () => {
     if (proposalDepositMicro <= 0n) return []
     return [
       {
-        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+        denom: nativeDenom,
         amount: proposalDepositMicro.toString()
       }
     ]
-  }, [depositTotals, proposal?.deposit])
+  }, [depositTotals, nativeDenom, proposal?.deposit])
 
   const minDepositLabel = useMemo(
     () =>
@@ -651,8 +660,8 @@ const ProposalDetails = () => {
         luncBalance,
         6,
         2
-      )} ${CLASSIC_DENOMS.lunc.coinDenom}`,
-    [luncBalance]
+      )} ${nativeSymbol}`,
+    [luncBalance, nativeSymbol]
   )
 
   const depositStats = useMemo(() => {
@@ -848,14 +857,16 @@ const ProposalDetails = () => {
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const client = await connectClassicStargateClientForConnector(
+          const client = await connectStargateClientForConnector(
             connectorId
           )
           const fee = await estimateGovFee(
             client,
             signerAddress,
             [msg],
-            VOTE_GAS_LIMIT
+            VOTE_GAS_LIMIT,
+            nativeDenom,
+            gasPriceMicro
           )
           const signerState = await client.getSequence(signerAddress)
           const sequenceToUse = sequenceHint ?? signerState.sequence
@@ -868,7 +879,7 @@ const ProposalDetails = () => {
             {
               accountNumber: signerState.accountNumber,
               sequence: Number(sequenceToUse),
-              chainId: CLASSIC_CHAIN.chainId
+              chainId: chain.chainId
             }
           )
           const txBytes = TxRaw.encode(signed).finish()
@@ -908,9 +919,9 @@ const ProposalDetails = () => {
       finishTx(result)
       setVoteModalOpen(false)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["proposal", proposalId] }),
-        queryClient.invalidateQueries({ queryKey: ["proposalTally", proposalId] }),
-        queryClient.invalidateQueries({ queryKey: ["proposalVotes", proposalId] })
+        queryClient.invalidateQueries({ queryKey: ["proposal", chain.chainId, proposalId] }),
+        queryClient.invalidateQueries({ queryKey: ["proposalTally", chain.chainId, proposalId] }),
+        queryClient.invalidateQueries({ queryKey: ["proposalVotes", chain.chainId, proposalId] })
       ])
     } catch (err) {
       const message = formatTxError(err, "Vote failed")
@@ -925,10 +936,10 @@ const ProposalDetails = () => {
     if (!account?.address) return "Please connect a wallet first."
     if (depositAmountMicro <= 0n) return "Enter an amount greater than zero."
     if (depositAmountMicro > toSafeBigInt(luncBalance)) {
-      return "Insufficient LUNC balance."
+      return `Insufficient ${nativeSymbol} balance.`
     }
     return undefined
-  }, [account?.address, depositAmountMicro, luncBalance])
+  }, [account?.address, depositAmountMicro, luncBalance, nativeSymbol])
 
   const submitDeposit = async () => {
     if (!proposalId) return
@@ -941,7 +952,7 @@ const ProposalDetails = () => {
       return
     }
     if (depositAmountMicro > toSafeBigInt(luncBalance)) {
-      setDepositError("Insufficient LUNC balance.")
+      setDepositError(`Insufficient ${nativeSymbol} balance.`)
       return
     }
 
@@ -966,7 +977,7 @@ const ProposalDetails = () => {
           depositor: signerAddress,
           amount: [
             {
-              denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+              denom: nativeDenom,
               amount: depositAmountMicro.toString()
             }
           ]
@@ -978,14 +989,16 @@ const ProposalDetails = () => {
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          const client = await connectClassicStargateClientForConnector(
+          const client = await connectStargateClientForConnector(
             connectorId
           )
           const fee = await estimateGovFee(
             client,
             signerAddress,
             [msg],
-            DEPOSIT_GAS_LIMIT
+            DEPOSIT_GAS_LIMIT,
+            nativeDenom,
+            gasPriceMicro
           )
           const signerState = await client.getSequence(signerAddress)
           const sequenceToUse = sequenceHint ?? signerState.sequence
@@ -998,7 +1011,7 @@ const ProposalDetails = () => {
             {
               accountNumber: signerState.accountNumber,
               sequence: Number(sequenceToUse),
-              chainId: CLASSIC_CHAIN.chainId
+              chainId: chain.chainId
             }
           )
           const txBytes = TxRaw.encode(signed).finish()
@@ -1039,13 +1052,13 @@ const ProposalDetails = () => {
       setDepositModalOpen(false)
       setDepositAmount("")
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["proposal", proposalId] }),
+        queryClient.invalidateQueries({ queryKey: ["proposal", chain.chainId, proposalId] }),
         queryClient.invalidateQueries({
-          queryKey: ["proposalDeposits", proposalId]
+          queryKey: ["proposalDeposits", chain.chainId, proposalId]
         }),
-        queryClient.invalidateQueries({ queryKey: ["proposals"] }),
+        queryClient.invalidateQueries({ queryKey: ["proposals", chain.chainId] }),
         queryClient.invalidateQueries({
-          queryKey: ["balances", account.address]
+          queryKey: ["balances", chain.chainId, account.address]
         })
       ])
     } catch (err) {

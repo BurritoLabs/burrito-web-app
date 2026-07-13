@@ -17,15 +17,23 @@ type NativeBalanceCache = {
   updatedAt: number
 }
 
-const getNativeBalanceCacheKey = (address: string) =>
-  `burrito:native-balances:classic:${address.trim().toLowerCase()}`
+const getNativeBalanceCacheKey = (
+  address: string,
+  chainId: string = CLASSIC_CHAIN.chainId
+) =>
+  `burrito:native-balances:${chainId}:${address
+    .trim()
+    .toLowerCase()}`
 
 export const getCachedNativeBalances = (
-  address: string | undefined
+  address: string | undefined,
+  chainId?: string
 ): NativeBalanceCache | undefined => {
   if (!address || typeof window === "undefined") return undefined
   try {
-    const raw = window.localStorage.getItem(getNativeBalanceCacheKey(address))
+    const raw = window.localStorage.getItem(
+      getNativeBalanceCacheKey(address, chainId)
+    )
     if (!raw) return undefined
     const parsed = JSON.parse(raw) as NativeBalanceCache
     if (!Array.isArray(parsed.data) || typeof parsed.updatedAt !== "number") {
@@ -42,12 +50,13 @@ export const getCachedNativeBalances = (
 
 export const cacheNativeBalances = (
   address: string | undefined,
-  balances: CoinBalance[] | undefined
+  balances: CoinBalance[] | undefined,
+  chainId?: string
 ) => {
   if (!address || !balances || typeof window === "undefined") return
   try {
     window.localStorage.setItem(
-      getNativeBalanceCacheKey(address),
+      getNativeBalanceCacheKey(address, chainId),
       JSON.stringify({ data: balances, updatedAt: Date.now() })
     )
   } catch {
@@ -297,6 +306,13 @@ type StakingPoolResponse = {
 type TxRecord = NonNullable<TxItem["tx"]>
 
 export type PriceMap = {
+  luna?: {
+    usd: number
+    usd_1h_change?: number
+    usd_24h_change?: number
+    usd_7d_change?: number
+    usd_market_cap?: number
+  }
   lunc?: {
     usd: number
     usd_1h_change?: number
@@ -1600,25 +1616,37 @@ const buildCoinPaprikaPriceEntry = (
 export const fetchPrices = async (): Promise<PriceMap> => {
   const base =
     import.meta.env.DEV ? "/coingecko" : "https://api.coingecko.com/api/v3"
-  const marketsUrl = `${base}/coins/markets?vs_currency=usd&ids=terra-luna,terraclassicusd,terrausd&price_change_percentage=1h,24h,7d&sparkline=false`
-  const simpleUrl = `${base}/simple/price?ids=terra-luna,terraclassicusd,terrausd&vs_currencies=usd&include_24hr_change=true`
+  const marketsUrl = `${base}/coins/markets?vs_currency=usd&ids=terra-luna-2,terra-luna,terraclassicusd,terrausd&price_change_percentage=1h,24h,7d&sparkline=false`
+  const simpleUrl = `${base}/simple/price?ids=terra-luna-2,terra-luna,terraclassicusd,terrausd&vs_currencies=usd&include_24hr_change=true`
   const cached = getCachedPrices()
   if (cached?.data && Date.now() - cached.ts < PRICE_CACHE_TTL_MS) {
     return cached.data
   }
 
   try {
-    const [luncTicker, ustcTicker] = await Promise.all([
+    const [luncTicker, ustcTicker, simple] = await Promise.all([
       fetchJson<CoinPaprikaTicker>(COINPAPRIKA_LUNC_URL),
-      fetchJson<CoinPaprikaTicker>(COINPAPRIKA_USTC_URL)
+      fetchJson<CoinPaprikaTicker>(COINPAPRIKA_USTC_URL),
+      fetchJson<Record<string, { usd: number; usd_24h_change?: number }>>(
+        simpleUrl
+      )
     ])
 
+    const lunaSimple = simple["terra-luna-2"]
+
     const result: PriceMap = {
+      luna: lunaSimple
+        ? {
+            usd: lunaSimple.usd,
+            usd_24h_change: lunaSimple.usd_24h_change,
+            usd_market_cap: cached?.data?.luna?.usd_market_cap
+          }
+        : cached?.data?.luna,
       lunc: buildCoinPaprikaPriceEntry(luncTicker, cached?.data?.lunc),
       ustc: buildCoinPaprikaPriceEntry(ustcTicker, cached?.data?.ustc)
     }
 
-    if (result.lunc || result.ustc) {
+    if (result.luna || result.lunc || result.ustc) {
       setCachedPrices(result)
       return result
     }
@@ -1642,10 +1670,22 @@ export const fetchPrices = async (): Promise<PriceMap> => {
       (marketRows ?? []).map((row) => [row?.id ?? "", row])
     )
 
+    const lunaRow = byId.get("terra-luna-2")
     const luncRow = byId.get("terra-luna")
     const ustcRow = byId.get("terraclassicusd") ?? byId.get("terrausd")
 
     const result: PriceMap = {
+      luna:
+        lunaRow?.current_price !== undefined
+          ? {
+              usd: lunaRow.current_price,
+              usd_1h_change: lunaRow.price_change_percentage_1h_in_currency,
+              usd_24h_change: lunaRow.price_change_percentage_24h,
+              usd_7d_change: lunaRow.price_change_percentage_7d_in_currency,
+              usd_market_cap:
+                lunaRow.market_cap ?? cached?.data?.luna?.usd_market_cap
+            }
+          : cached?.data?.luna,
       lunc:
         luncRow?.current_price !== undefined
           ? {
@@ -1669,10 +1709,17 @@ export const fetchPrices = async (): Promise<PriceMap> => {
     }
 
     // Fallback to simple/price if market endpoint doesn't return current price.
-    if (!result.lunc || !result.ustc) {
+    if (!result.luna || !result.lunc || !result.ustc) {
       const simple = await fetchJson<
         Record<string, { usd: number; usd_24h_change?: number }>
       >(simpleUrl)
+      if (!result.luna && simple["terra-luna-2"]) {
+        result.luna = {
+          usd: simple["terra-luna-2"].usd,
+          usd_24h_change: simple["terra-luna-2"].usd_24h_change,
+          usd_market_cap: cached?.data?.luna?.usd_market_cap
+        }
+      }
       if (!result.lunc && simple["terra-luna"]) {
         result.lunc = {
           usd: simple["terra-luna"].usd,
@@ -1709,7 +1756,7 @@ export const fetchPrices = async (): Promise<PriceMap> => {
         // ignore fallback failure
       }
     }
-    if (result.lunc || result.ustc) {
+    if (result.luna || result.lunc || result.ustc) {
       setCachedPrices(result)
     }
     return result

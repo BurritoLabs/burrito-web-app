@@ -4,6 +4,7 @@ import PageShell from "../PageShell"
 import styles from "../Dashboard.module.css"
 import {
   fetchCurrentDashboardSnapshot,
+  fetchCurrentPhoenixDashboardSnapshot,
   fetchHistoricalDashboardSnapshot,
   type DashboardSnapshot
 } from "../../app/data/dashboard"
@@ -31,6 +32,7 @@ import {
   DashboardMetricCard,
   DashboardMetricSkeletons
 } from "./DashboardMetricCard"
+import { useAppChain } from "../../app/appChainContext"
 
 const useDeferredHistoryEnabled = () => {
   const [enabled, setEnabled] = useState(() => !getIsMobileDashboard())
@@ -60,20 +62,24 @@ const useDeferredHistoryEnabled = () => {
 }
 
 const Dashboard = () => {
+  const { chain, chainKey } = useAppChain()
+  const isClassic = chainKey === "lunc"
   const [dashboardRange, setDashboardRange] =
     useState<DashboardRange>("24h")
   const activeRange = dashboardRanges[dashboardRange]
   const historyEnabled = useDeferredHistoryEnabled()
 
   const { data: currentSnapshot } = useQuery({
-    queryKey: ["dashboard", "snapshot", "current"],
-    queryFn: fetchCurrentDashboardSnapshot,
+    queryKey: ["dashboard", chain.chainId, "snapshot", "current"],
+    queryFn: isClassic
+      ? fetchCurrentDashboardSnapshot
+      : fetchCurrentPhoenixDashboardSnapshot,
     staleTime: 60 * 1000,
     refetchInterval: 90 * 1000
   })
 
   const { data: prices } = useQuery({
-    queryKey: ["prices"],
+    queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
@@ -81,14 +87,14 @@ const Dashboard = () => {
 
   const { data: previousSnapshot, isFetching: previousSnapshotLoading } =
     useQuery({
-      queryKey: ["dashboard", "snapshot", "historical", dashboardRange],
+      queryKey: ["dashboard", chain.chainId, "snapshot", "historical", dashboardRange],
       queryFn: () =>
         fetchHistoricalDashboardSnapshot(
           dashboardRange,
           activeRange.rangeMs,
           activeRange.ttlMs
         ),
-      enabled: Boolean(currentSnapshot) && historyEnabled,
+      enabled: isClassic && Boolean(currentSnapshot) && historyEnabled,
       staleTime: activeRange.ttlMs
     })
 
@@ -100,11 +106,13 @@ const Dashboard = () => {
     queryKey: [
       "binodes",
       "dashboard",
+      chain.chainId,
       "activity",
       activeRange.activityFrequency
     ],
     queryFn: () =>
       fetchBinodesDashboardActivity(activeRange.activityFrequency, 1),
+    enabled: isClassic,
     staleTime: activeRange.ttlMs,
     refetchInterval: 10 * 60 * 1000,
     retry: 1
@@ -127,6 +135,104 @@ const Dashboard = () => {
     const prev: DashboardSnapshot | undefined = previousSnapshot
     const deltaFromPrev = (current: number, previous?: number) =>
       previous === undefined ? undefined : current - previous
+
+    if (!isClassic) {
+      const lunaPrice = prices?.luna?.usd
+      const lunaChange = prices?.luna?.usd_24h_change
+      const lunaMarketCap = lunaPrice
+        ? lunaPrice * currentSnapshot.circulatingLunc
+        : undefined
+      return [
+        {
+          key: "lunaPrice",
+          label: "LUNA Price",
+          value: formatUsdSmart(lunaPrice),
+          delta: lunaChange === undefined ? undefined : formatPercent(lunaChange),
+          deltaRaw: lunaChange
+        },
+        {
+          key: "lunaMarketCap",
+          label: "LUNA Market Cap",
+          value: formatUsdStandard(lunaMarketCap),
+          delta: lunaChange === undefined ? undefined : formatPercent(lunaChange),
+          deltaRaw: lunaChange
+        },
+        {
+          key: "lunaCirc",
+          label: "LUNA Circulating Estimate",
+          value: formatValue(currentSnapshot.circulatingLunc, 0),
+          unit: "LUNA",
+          size: "large",
+          group: "lunc"
+        },
+        {
+          key: "lunaTotal",
+          label: "LUNA Total Supply",
+          value: formatValue(currentSnapshot.luncSupply, 0),
+          unit: "LUNA",
+          group: "lunc"
+        },
+        {
+          key: "communityPoolLuna",
+          label: "Community Pool (LUNA)",
+          value: formatValue(currentSnapshot.luncCommunity, 2),
+          unit: "LUNA"
+        },
+        {
+          key: "inflation",
+          label: "Inflation Rate",
+          value:
+            currentSnapshot.inflation === undefined
+              ? "--"
+              : formatValue(currentSnapshot.inflation * 100, 2),
+          unit: currentSnapshot.inflation === undefined ? undefined : "%"
+        },
+        {
+          key: "stakedLuna",
+          label: "Total Staked",
+          value: formatValue(currentSnapshot.stakedLunc, 0),
+          unit: "LUNA",
+          size: "large"
+        },
+        {
+          key: "stakingRatio",
+          label: "Staking Ratio",
+          value: formatValue(currentSnapshot.stakingRatio * 100, 2),
+          unit: "%"
+        },
+        {
+          key: "validators",
+          label: "Active Validators",
+          value: currentSnapshot.activeValidators
+            ? `${formatNumber(currentSnapshot.activeValidators, 0)} / ${formatNumber(
+                currentSnapshot.maxValidators ?? 0,
+                0
+              )}`
+            : "--"
+        },
+        {
+          key: "unbonding",
+          label: "Unbonding Period",
+          value: currentSnapshot.unbondingTimeSec
+            ? `${formatNumber(currentSnapshot.unbondingTimeSec / 86400, 0)} days`
+            : "--"
+        },
+        {
+          key: "blockHeight",
+          label: "Block Height",
+          value: currentSnapshot.blockHeight
+            ? formatNumber(currentSnapshot.blockHeight, 0)
+            : "--"
+        },
+        {
+          key: "blockTime",
+          label: "Block time",
+          value: currentSnapshot.blockTimeMs
+            ? formatBlockInterval(currentSnapshot.blockTimeMs)
+            : "--"
+        }
+      ]
+    }
 
     const luncPrice = prices?.lunc?.usd
     const ustcPrice = prices?.ustc?.usd
@@ -318,7 +424,10 @@ const Dashboard = () => {
   }, [
     currentSnapshot,
     dashboardRange,
+    isClassic,
     previousSnapshot,
+    prices?.luna?.usd,
+    prices?.luna?.usd_24h_change,
     prices?.lunc?.usd,
     prices?.lunc?.usd_1h_change,
     prices?.lunc?.usd_24h_change,
@@ -335,7 +444,7 @@ const Dashboard = () => {
     <PageShell
       title="Dashboard"
       extra={
-        <div className={styles.rangeSwitch} aria-label="Dashboard range">
+        isClassic ? <div className={styles.rangeSwitch} aria-label="Dashboard range">
           {dashboardRangeOptions.map((range) => (
             <button
               key={range}
@@ -348,7 +457,7 @@ const Dashboard = () => {
               {dashboardRanges[range].label}
             </button>
           ))}
-        </div>
+        </div> : null
       }
     >
       <div className={styles.page}>
@@ -357,8 +466,9 @@ const Dashboard = () => {
             <div>
               <div className={styles.sectionHeader}>Market</div>
               <p className={styles.sectionSubtext}>
-                Showing {activeRange.label} price changes and chain deltas
-                {previousSnapshotLoading ? "..." : "."}
+                {isClassic
+                  ? `Showing ${activeRange.label} price changes and chain deltas${previousSnapshotLoading ? "..." : "."}`
+                  : "Live Phoenix network market data."}
               </p>
             </div>
           </div>
@@ -370,7 +480,9 @@ const Dashboard = () => {
                   item.key === "luncPrice" ||
                   item.key === "ustcPrice" ||
                   item.key === "luncMarketCap" ||
-                  item.key === "ustcMarketCap"
+                  item.key === "ustcMarketCap" ||
+                  item.key === "lunaPrice" ||
+                  item.key === "lunaMarketCap"
               )
               .map((item) => (
                 <DashboardMetricCard key={item.key} item={item} forceLarge />
@@ -389,7 +501,9 @@ const Dashboard = () => {
                   item.key === "luncCirc" ||
                   item.key === "luncTotal" ||
                   item.key === "ustcCirc" ||
-                  item.key === "ustcTotal"
+                  item.key === "ustcTotal" ||
+                  item.key === "lunaCirc" ||
+                  item.key === "lunaTotal"
               )
               .map((item) => (
                 <DashboardMetricCard key={item.key} item={item} />
@@ -408,7 +522,9 @@ const Dashboard = () => {
                   item.key === "communityPoolLunc" ||
                   item.key === "communityPoolUstc" ||
                   item.key === "oraclePoolLunc" ||
-                  item.key === "oraclePoolUstc"
+                  item.key === "oraclePoolUstc" ||
+                  item.key === "communityPoolLuna" ||
+                  item.key === "inflation"
               )
               .map((item) => (
                 <DashboardMetricCard key={item.key} item={item} />
@@ -425,12 +541,13 @@ const Dashboard = () => {
               .filter(
                 (item) =>
                   item.key === "stakedLunc" ||
+                  item.key === "stakedLuna" ||
                   item.key === "stakingRatio" ||
                   item.key === "unbonding"
               )
               .sort((a, b) => {
                 const rank = (item: { key: string }) => {
-                  if (item.key === "stakedLunc") return 0
+                  if (item.key === "stakedLunc" || item.key === "stakedLuna") return 0
                   if (item.key === "stakingRatio") return 1
                   if (item.key === "unbonding") return 2
                   return 9
@@ -462,7 +579,7 @@ const Dashboard = () => {
           </div>
         </section>
 
-        <section className={styles.section}>
+        {isClassic ? <section className={styles.section}>
           <div className={styles.sectionTitleRow}>
             <div>
               <div className={styles.sectionHeader}>Network Activity</div>
@@ -508,7 +625,7 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-        </section>
+        </section> : null}
 
       </div>
     </PageShell>

@@ -7,6 +7,7 @@ import {
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import type { CoinBalance, TxItem } from "../data/classic"
 import { formatTokenAmount, truncateHash } from "../utils/format"
+import { getActiveAppChainKey } from "../activeChain"
 
 export const HISTORY_TX_LIMIT = 50
 export const CONTRACT_LABEL_LOOKUP_LIMIT = 36
@@ -95,7 +96,9 @@ export const sentenceCase = (value: string) => {
 
 export const formatDenom = (denom: string) => {
   if (!denom) return "--"
-  if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) return "LUNC"
+  if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
+    return getActiveAppChainKey() === "lunc" ? "LUNC" : "LUNA"
+  }
   if (denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) return "USTC"
   if (denom.startsWith("u")) {
     const base = denom.slice(1)

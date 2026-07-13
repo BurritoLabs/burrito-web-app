@@ -3,11 +3,11 @@ import type { ChainWalletBase } from "@cosmos-kit/core"
 import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { CLASSIC_CHAIN } from "../chain"
+import { useAppChain } from "../appChainContext"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import {
   COSMOS_CONNECTOR_CONFIGS,
-  COSMOS_KIT_CHAIN_NAME,
+  COSMOS_KIT_CHAIN_NAME_BY_KEY,
   COSMOS_WALLET_NAME_TO_CONNECTOR_ID,
   isCosmosConnectorId
 } from "./cosmosKit"
@@ -163,15 +163,21 @@ const getOfflineSignerAddress = async (signer: OfflineSigner) => {
 const getWalletConnectRuntime = (wallet: ChainWalletBase) =>
   wallet.client as WalletConnectRuntime | undefined
 
-const walletConnectSessionSupportsClassic = (session: WalletConnectSession) =>
+const walletConnectSessionSupportsChain = (
+  session: WalletConnectSession,
+  chainId: string
+) =>
   session.namespaces?.cosmos?.accounts?.some((account) =>
-    account.startsWith(`cosmos:${CLASSIC_CHAIN.chainId}:`)
+    account.startsWith(`cosmos:${chainId}:`)
   )
 
 const walletConnectRecordIsActive = (record?: { expiry?: number }) =>
   !record?.expiry || record.expiry * 1000 > Date.now() + 1000
 
-const getActiveWalletConnectSession = (wallet: ChainWalletBase) => {
+const getActiveWalletConnectSession = (
+  wallet: ChainWalletBase,
+  chainId: string
+) => {
   const client = getWalletConnectRuntime(wallet)
   if (!client?.signClient) {
     return undefined
@@ -198,12 +204,13 @@ const getActiveWalletConnectSession = (wallet: ChainWalletBase) => {
     (session) =>
       walletConnectRecordIsActive(session) &&
       session.pairingTopic === activePairing.topic &&
-      walletConnectSessionSupportsClassic(session)
+      walletConnectSessionSupportsChain(session, chainId)
   )
 }
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
-  const cosmosChain = useChain(COSMOS_KIT_CHAIN_NAME)
+  const { chainKey, chain } = useAppChain()
+  const cosmosChain = useChain(COSMOS_KIT_CHAIN_NAME_BY_KEY[chainKey])
   const [status, setStatus] = useState<WalletStatus>("disconnected")
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
   const [account, setAccount] = useState<WalletAccount>()
@@ -215,6 +222,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const connectorIdRef = useRef<WalletConnectorId | undefined>(undefined)
   const walletStatusRef = useRef<WalletStatus>("disconnected")
   const lastAutoConnectRetryAtRef = useRef(0)
+  const previousChainKeyRef = useRef(chainKey)
   const manualDisconnectRef = useRef(isWalletManualDisconnectStored())
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const [storedAutoConnectId, setStoredAutoConnectId] = useState<
@@ -241,6 +249,19 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const refreshConnectors = useCallback(() => {
     setConnectorRefreshNonce((current) => current + 1)
   }, [])
+
+  useEffect(() => {
+    if (previousChainKeyRef.current === chainKey) return
+
+    previousChainKeyRef.current = chainKey
+    setAccount(undefined)
+    setError(undefined)
+    setTxState({ status: "idle" })
+    setStatus("disconnected")
+    setAutoConnectAttempted(false)
+    lastAutoConnectRetryAtRef.current = 0
+    refreshConnectors()
+  }, [chainKey, refreshConnectors])
 
   useEffect(() => {
     accountAddressRef.current = account?.address
@@ -366,7 +387,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
       const wallet =
         getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
-      if (!wallet || wallet.isWalletNotExist || !getActiveWalletConnectSession(wallet)) {
+      if (
+        !wallet ||
+        wallet.isWalletNotExist ||
+        !getActiveWalletConnectSession(wallet, chain.chainId)
+      ) {
         return false
       }
 
@@ -414,7 +439,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         return false
       }
     },
-    [desktopKeplrAvailable, getCosmosWallet, syncCosmosWalletAccount]
+    [
+      chain.chainId,
+      desktopKeplrAvailable,
+      getCosmosWallet,
+      syncCosmosWalletAccount
+    ]
   )
 
   const getCosmosConnector = useCallback(
@@ -532,9 +562,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         if (isMobileWallet) {
           wallet.offlineSigner = undefined
         }
-        const aminoSigner = wallet.client?.getOfflineSignerAmino?.(
-          CLASSIC_CHAIN.chainId
-        )
+        const aminoSigner = wallet.client?.getOfflineSignerAmino?.(chain.chainId)
         if (aminoSigner) {
           return aminoSigner
         }
@@ -557,6 +585,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     [
       cosmosChain.address,
       cosmosChain.isWalletConnected,
+      chain.chainId,
       currentCosmosWallet,
       getCosmosWallet,
       runWithCosmosWalletSessionRetry

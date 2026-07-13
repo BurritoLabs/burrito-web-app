@@ -42,6 +42,9 @@ import {
   type TokenLookup,
   type TxMessage
 } from "../../app/history/historyFormat"
+import { useAppChain } from "../../app/appChainContext"
+import { getActiveAppChainKey } from "../../app/activeChain"
+import { getAddressExplorerUrl, getTxExplorerUrl } from "../../app/explorer"
 
 const renderCanonicalLine = (
   line: string,
@@ -120,7 +123,7 @@ const renderAddressLink = (address?: string, label?: string) => {
   return (
     <a
       className={styles.addressLink}
-      href={`https://finder.burrito.money/classic/address/${address}`}
+      href={getAddressExplorerUrl(getActiveAppChainKey(), address)}
       target="_blank"
       rel="noreferrer"
     >
@@ -428,6 +431,7 @@ const getTxMessages = (
 }
 
 const History = () => {
+  const { chain, chainKey } = useAppChain()
   const { account } = useWallet()
   const actionRuleSet = useMemo(() => createActionRuleSet("mainnet"), [])
   const logMatcher = useMemo(
@@ -440,7 +444,7 @@ const History = () => {
     isLoading,
     refetch: refetchTxs
   } = useQuery({
-    queryKey: ["txs", account?.address],
+    queryKey: ["txs", chain.chainId, account?.address],
     queryFn: () => fetchTxs(account?.address ?? "", HISTORY_TX_LIMIT),
     enabled: Boolean(account?.address),
     retry: 3,
@@ -478,7 +482,7 @@ const History = () => {
   const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
 
   const { data: validators = [] } = useQuery<ValidatorItem[]>({
-    queryKey: ["validators"],
+    queryKey: ["validators", chain.chainId],
     queryFn: () => fetchValidators(),
     enabled: Boolean(account?.address) && txs.length > 0,
     staleTime: 15 * 60_000,
@@ -509,7 +513,7 @@ const History = () => {
   }, [validators])
 
   const { data: contractLabels = {} } = useQuery<Record<string, string>>({
-    queryKey: ["contract-labels", account?.address, relevantCw20Contracts.join(",")],
+    queryKey: ["contract-labels", chain.chainId, account?.address, relevantCw20Contracts.join(",")],
     queryFn: async () => {
       const entries = relevantCw20Contracts
       if (!entries.length) return {}
@@ -711,7 +715,7 @@ const History = () => {
                     <div className={styles.hash}>
                       <a
                         className={styles.txLink}
-                        href={`https://finder.burrito.money/classic/tx/${item.hash}`}
+                        href={getTxExplorerUrl(chainKey, item.hash)}
                       target="_blank"
                       rel="noreferrer"
                     >

@@ -1,8 +1,11 @@
 import type { AssetList, Chain } from "@chain-registry/types"
 import type { MainWalletBase, WalletConnectOptions } from "@cosmos-kit/core"
 import { wallets as keplrMobileWallets } from "@cosmos-kit/keplr-mobile"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
-import { CLASSIC_READ_ENDPOINTS_CONFIG } from "../config/chainConfig"
+import {
+  CHAIN_RUNTIME_CONFIG,
+  type ChainRuntimeConfig,
+  type SupportedChainKey
+} from "../config/chainConfig"
 import {
   getBurritoAppOrigin,
   WALLETCONNECT_PROJECT_ID,
@@ -12,44 +15,34 @@ import type { WalletConnectorId } from "./WalletContext"
 
 export const COSMOS_KIT_CHAIN_NAME = "terra"
 
-const GAS_PRICE_STEP = {
-  low: 28.325,
-  average: 28.325,
-  high: 50
-} as const
+export const COSMOS_KIT_CHAIN_NAME_BY_KEY = {
+  lunc: COSMOS_KIT_CHAIN_NAME,
+  luna: "terra2"
+} as const satisfies Record<SupportedChainKey, string>
 
-export const COSMOS_KIT_CHAIN: Chain = {
-  chain_name: COSMOS_KIT_CHAIN_NAME,
+const createCosmosKitChain = (runtime: ChainRuntimeConfig): Chain => ({
+  chain_name: runtime.cosmosKitChainName,
   chain_type: "cosmos",
-  chain_id: CLASSIC_CHAIN.chainId,
-  pretty_name: CLASSIC_CHAIN.name,
+  chain_id: runtime.chain.chainId,
+  pretty_name: runtime.chain.name,
   status: "live",
   network_type: "mainnet",
-  bech32_prefix: CLASSIC_CHAIN.bech32Prefix,
+  bech32_prefix: runtime.chain.bech32Prefix,
   daemon_name: "terrad",
   node_home: "$HOME/.terra",
   key_algos: ["secp256k1"],
-  slip44: CLASSIC_CHAIN.coinType,
+  slip44: runtime.chain.coinType,
   fees: {
-    fee_tokens: [
-      {
-        denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-        fixed_min_gas_price: GAS_PRICE_STEP.average,
-        low_gas_price: GAS_PRICE_STEP.low,
-        average_gas_price: GAS_PRICE_STEP.average,
-        high_gas_price: GAS_PRICE_STEP.high
-      },
-      {
-        denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
-        fixed_min_gas_price: GAS_PRICE_STEP.average,
-        low_gas_price: GAS_PRICE_STEP.low,
-        average_gas_price: GAS_PRICE_STEP.average,
-        high_gas_price: GAS_PRICE_STEP.high
-      }
-    ]
+    fee_tokens: runtime.feeDenoms.map((denom) => ({
+      denom: denom.coinMinimalDenom,
+      fixed_min_gas_price: runtime.gasPriceStep.average,
+      low_gas_price: runtime.gasPriceStep.low,
+      average_gas_price: runtime.gasPriceStep.average,
+      high_gas_price: runtime.gasPriceStep.high
+    }))
   },
   staking: {
-    staking_tokens: [{ denom: CLASSIC_DENOMS.lunc.coinMinimalDenom }]
+    staking_tokens: [{ denom: runtime.nativeDenom.coinMinimalDenom }]
   },
   codebase: {
     binaries: {},
@@ -61,69 +54,80 @@ export const COSMOS_KIT_CHAIN: Chain = {
     }
   },
   apis: {
-    rpc: CLASSIC_READ_ENDPOINTS_CONFIG.rpc.map((address, index) => ({
+    rpc: runtime.endpoints.rpc.map((address, index) => ({
       address,
-      provider: index === 0 ? "publicnode" : "burrito-fallback"
+      provider: index === 0 ? "primary" : "burrito-fallback"
     })),
-    rest: CLASSIC_READ_ENDPOINTS_CONFIG.lcd.map((address, index) => ({
+    rest: runtime.endpoints.lcd.map((address, index) => ({
       address,
-      provider: index === 0 ? "publicnode" : "burrito-fallback"
+      provider: index === 0 ? "primary" : "burrito-fallback"
     }))
   }
-}
+})
 
-export const COSMOS_KIT_ASSET_LIST: AssetList = {
-  chain_name: COSMOS_KIT_CHAIN_NAME,
-  assets: [
+const createAsset = (
+  runtime: ChainRuntimeConfig,
+  denom: {
+    coinDenom: string
+    coinMinimalDenom: string
+    coinDecimals: number
+    coinGeckoId: string
+  },
+  logo: string
+) => ({
+  type_asset: "sdk.coin" as const,
+  base: denom.coinMinimalDenom,
+  name: denom.coinDenom,
+  display: denom.coinDenom,
+  symbol: denom.coinDenom,
+  denom_units: [
     {
-      type_asset: "sdk.coin",
-      base: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-      name: CLASSIC_DENOMS.lunc.coinDenom,
-      display: CLASSIC_DENOMS.lunc.coinDenom,
-      symbol: CLASSIC_DENOMS.lunc.coinDenom,
-      denom_units: [
-        {
-          denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
-          exponent: 0
-        },
-        {
-          denom: CLASSIC_DENOMS.lunc.coinDenom,
-          exponent: CLASSIC_DENOMS.lunc.coinDecimals
-        }
-      ],
-      logo_URIs: {
-        svg: "/system/lunc.svg"
-      },
-      coingecko_id: CLASSIC_DENOMS.lunc.coinGeckoId
+      denom: denom.coinMinimalDenom,
+      exponent: 0
     },
     {
-      type_asset: "sdk.coin",
-      base: CLASSIC_DENOMS.ustc.coinMinimalDenom,
-      name: CLASSIC_DENOMS.ustc.coinDenom,
-      display: CLASSIC_DENOMS.ustc.coinDenom,
-      symbol: CLASSIC_DENOMS.ustc.coinDenom,
-      denom_units: [
-        {
-          denom: CLASSIC_DENOMS.ustc.coinMinimalDenom,
-          exponent: 0
-        },
-        {
-          denom: CLASSIC_DENOMS.ustc.coinDenom,
-          exponent: CLASSIC_DENOMS.ustc.coinDecimals
-        }
-      ],
-      logo_URIs: {
-        svg: "/system/ustc.svg"
-      },
-      coingecko_id: CLASSIC_DENOMS.ustc.coinGeckoId
+      denom: denom.coinDenom,
+      exponent: denom.coinDecimals
     }
-  ]
-}
+  ],
+  logo_URIs: {
+    svg: logo
+  },
+  coingecko_id: denom.coinGeckoId,
+  keywords: [runtime.chain.chainId]
+})
+
+const createCosmosKitAssetList = (runtime: ChainRuntimeConfig): AssetList => ({
+  chain_name: runtime.cosmosKitChainName,
+  assets: runtime.feeDenoms.map((denom) =>
+    createAsset(
+      runtime,
+      denom,
+      denom.coinDenom === "USTC"
+        ? "/system/ustc.svg"
+        : runtime.key === "lunc"
+          ? "/system/lunc.svg"
+          : "/system/luna.svg"
+    )
+  )
+})
+
+export const COSMOS_KIT_CHAIN = createCosmosKitChain(CHAIN_RUNTIME_CONFIG.lunc)
+export const COSMOS_KIT_LUNA_CHAIN = createCosmosKitChain(CHAIN_RUNTIME_CONFIG.luna)
+export const COSMOS_KIT_ASSET_LIST = createCosmosKitAssetList(
+  CHAIN_RUNTIME_CONFIG.lunc
+)
+export const COSMOS_KIT_LUNA_ASSET_LIST = createCosmosKitAssetList(
+  CHAIN_RUNTIME_CONFIG.luna
+)
 
 export const COSMOS_KIT_WALLETS: MainWalletBase[] = [...keplrMobileWallets]
 
-export const COSMOS_KIT_CHAINS = [COSMOS_KIT_CHAIN]
-export const COSMOS_KIT_ASSET_LISTS = [COSMOS_KIT_ASSET_LIST]
+export const COSMOS_KIT_CHAINS = [COSMOS_KIT_CHAIN, COSMOS_KIT_LUNA_CHAIN]
+export const COSMOS_KIT_ASSET_LISTS = [
+  COSMOS_KIT_ASSET_LIST,
+  COSMOS_KIT_LUNA_ASSET_LIST
+]
 
 export const COSMOS_CONNECTOR_CONFIGS: Record<
   "keplr" | "keplr-mobile",
@@ -179,7 +183,7 @@ export const getWalletConnectOptions = (): WalletConnectOptions => {
       metadata: {
         name: "Burrito",
         description:
-          "Burrito Terra Classic wallet, swap, market, governance, and contracts.",
+          "Burrito wallet, staking, governance, and contracts for Terra and Terra Classic.",
         url: origin,
         icons: [`${origin}/apple-touch-icon.png`]
       }

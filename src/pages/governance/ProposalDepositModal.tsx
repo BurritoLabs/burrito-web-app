@@ -8,6 +8,7 @@ import {
   formatTokenAmount
 } from "../../app/utils/format"
 import styles from "../ProposalDetails.module.css"
+import { useAppChain } from "../../app/appChainContext"
 
 type ProposalDepositStats = {
   current: string
@@ -46,6 +47,7 @@ const ProposalDepositModal = ({
   onSubmit,
   onUpdateAmount
 }: ProposalDepositModalProps) => {
+  const { chain } = useAppChain()
   if (typeof document === "undefined") return null
 
   return createPortal(
@@ -128,7 +130,9 @@ const ProposalDepositModal = ({
                 placeholder="0.0"
                 disabled={depositSubmitting}
               />
-              <span className={styles.depositAmountDenom}>LUNC</span>
+              <span className={styles.depositAmountDenom}>
+                {chain.displayDenom}
+              </span>
             </div>
             <div className={styles.depositFieldHint}>
               Deposit end:{" "}
@@ -146,7 +150,7 @@ const ProposalDepositModal = ({
             <div className={styles.depositModalHint}>
               You will deposit{" "}
               {depositAmountValue > 0
-                ? `${formatTokenAmount(depositAmountMicro.toString(), 6, 6)} LUNC`
+                ? `${formatTokenAmount(depositAmountMicro.toString(), 6, 6)} ${chain.displayDenom}`
                 : "--"}
               .
             </div>

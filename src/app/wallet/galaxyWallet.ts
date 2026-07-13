@@ -140,8 +140,10 @@ export const getGalaxyConnector = () => {
   }
 }
 
-export const connectGalaxyWallet = async (): Promise<WalletAccount> => {
-  const { response, address } = await getConnectedResponse()
+export const connectGalaxyWallet = async (
+  chainId: string = CLASSIC_CHAIN.chainId
+): Promise<WalletAccount> => {
+  const { response, address } = await getConnectedResponse(chainId)
   return {
     address,
     name: response.name?.trim() || "Galaxy Station"
@@ -153,13 +155,15 @@ export const disconnectGalaxyWallet = async () => {
   await wallet.disconnect?.()
 }
 
-export const getGalaxyOfflineSigner = async () => {
+export const getGalaxyOfflineSigner = async (
+  chainId: string = CLASSIC_CHAIN.chainId
+) => {
   const wallet = getGalaxyProvider()
   await wallet.connect()
 
   if (wallet.getOfflineSigner) {
-    return wallet.getOfflineSigner(CLASSIC_CHAIN.chainId)
+    return wallet.getOfflineSigner(chainId)
   }
 
-  return new GalaxyOfflineSigner(wallet, CLASSIC_CHAIN.chainId)
+  return new GalaxyOfflineSigner(wallet, chainId)
 }

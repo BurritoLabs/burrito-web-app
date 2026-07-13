@@ -1,7 +1,9 @@
 import { ASSET_URL } from "../config/externalServices"
+import { getActiveAppChainKey } from "../activeChain"
 
 const KNOWN_STATIC_NATIVE_ICONS: Record<string, string> = {
   LUNC: "/system/lunc.svg",
+  LUNA: "/system/luna.svg",
   USTC: "/system/ustc.png",
   UST: "/system/ustc.png"
 }
@@ -159,7 +161,12 @@ export const buildClassicNativeIconCandidates = ({
     return unique([sanitizeAssetIconUrl(primaryIcon), staticIcon, fallback])
   }
 
-  const iconDenom = denom === "uluna" ? "LUNC" : symbol
+  const iconDenom =
+    denom === "uluna"
+      ? getActiveAppChainKey() === "lunc"
+        ? "LUNC"
+        : "LUNA"
+      : symbol
   const upper = iconDenom.toUpperCase()
   const lower = iconDenom.toLowerCase()
 

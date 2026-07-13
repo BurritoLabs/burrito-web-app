@@ -6,6 +6,8 @@ import {
   getWalletConnectorBadge,
   getWalletConnectorLabel
 } from "./walletMeta"
+import { useAppChain } from "../appChainContext"
+import { getAddressExplorerUrl } from "../explorer"
 
 type ConnectModalProps = {
   open: boolean
@@ -16,6 +18,7 @@ const shortenAddress = (address: string) =>
   `${address.slice(0, 6)}...${address.slice(-4)}`
 
 const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
+  const { chain, chainKey } = useAppChain()
   const { connectors, connect, status, account, connectorId, error, disconnect } =
     useWallet()
   const isConnecting = status === "connecting"
@@ -26,7 +29,7 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
     : getWalletConnectorLabel(connectorId)
   const walletBadge = getWalletConnectorBadge(connectorId)
   const finderUrl = account
-    ? `https://finder.burrito.money/classic/address/${account.address}`
+    ? getAddressExplorerUrl(chainKey, account.address)
     : ""
 
   if (!open) return null
@@ -46,7 +49,7 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
         <div className={styles.header}>
           <div>
             <div className={styles.title}>Connect wallet</div>
-            <div className={styles.subtitle}>Terra Classic</div>
+            <div className={styles.subtitle}>{chain.name}</div>
           </div>
           <button
             aria-label="Close"

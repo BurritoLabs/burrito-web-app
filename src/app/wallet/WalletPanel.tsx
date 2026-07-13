@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import styles from "./WalletPanel.module.css"
 import { useWallet } from "./WalletContext"
+import { useAppChain } from "../appChainContext"
 import { CLASSIC_DENOMS } from "../chain"
 import {
   fetchBurnTaxRate,
@@ -41,7 +42,6 @@ import {
   DEFAULT_SEND_ASSET,
   FALLBACK_SEND_GAS_CW20,
   FALLBACK_SEND_GAS_NATIVE,
-  GAS_PRICE_MICRO_LUNC,
   RECENT_RECIPIENT_LIMIT,
   TERRA_ADDRESS_PATTERN,
   encodeJsonBytes,
@@ -74,6 +74,10 @@ const WalletPanel = () => {
     finishTx,
     failTx
   } = useWallet()
+  const { chain, chainKey } = useAppChain()
+  const isClassic = chainKey === "lunc"
+  const nativeSymbol = chain.displayDenom
+  const gasPrice = chain.runtime.gasPriceStep.average
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(() => {
@@ -111,8 +115,9 @@ const WalletPanel = () => {
     tokenCatalog
   } = useWalletAssets(account?.address)
   const { data: burnTaxRate = 0 } = useQuery({
-    queryKey: ["burn-tax-rate"],
+    queryKey: ["burn-tax-rate", chain.chainId],
     queryFn: fetchBurnTaxRate,
+    enabled: isClassic,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000
   })
@@ -125,15 +130,32 @@ const WalletPanel = () => {
     setSendSubmitting(false)
   }, [])
 
+  useEffect(() => {
+    setSelectedAsset({
+      symbol: chain.displayDenom,
+      name: chain.name,
+      denom: chain.nativeDenom,
+      decimals: chain.runtime.nativeDenom.coinDecimals
+    })
+    resetSendForm()
+  }, [
+    chain.chainId,
+    chain.displayDenom,
+    chain.name,
+    chain.nativeDenom,
+    chain.runtime.nativeDenom.coinDecimals,
+    resetSendForm
+  ])
+
   const handleRetryBalances = useCallback(() => {
     if (!account?.address) return
     void queryClient.invalidateQueries({
-      queryKey: ["wallet", "balances", account.address]
+      queryKey: ["wallet", chain.chainId, "balances", account.address]
     })
     void queryClient.invalidateQueries({
-      queryKey: ["cw20-balances", account.address]
+      queryKey: ["cw20-balances", chain.chainId, account.address]
     })
-  }, [account?.address, queryClient])
+  }, [account?.address, chain.chainId, queryClient])
 
   const openSendView = useCallback(
     (asset?: WalletAssetRow | WalletPanelAssetSnapshot | SelectedAsset) => {
@@ -212,7 +234,7 @@ const WalletPanel = () => {
     }
 
     const stored = window.localStorage.getItem(
-      getRecentRecipientsStorageKey(account.address)
+      getRecentRecipientsStorageKey(account.address, chain.chainId)
     )
     if (!stored) {
       setRecentRecipients([])
@@ -234,15 +256,15 @@ const WalletPanel = () => {
     } catch {
       setRecentRecipients([])
     }
-  }, [account?.address])
+  }, [account?.address, chain.chainId])
 
   useEffect(() => {
     if (typeof window === "undefined" || !account?.address) return
     window.localStorage.setItem(
-      getRecentRecipientsStorageKey(account.address),
+      getRecentRecipientsStorageKey(account.address, chain.chainId),
       JSON.stringify(recentRecipients.slice(0, RECENT_RECIPIENT_LIMIT))
     )
-  }, [account?.address, recentRecipients])
+  }, [account?.address, chain.chainId, recentRecipients])
 
   useEffect(() => {
     let isMounted = true
@@ -351,13 +373,15 @@ const WalletPanel = () => {
   )
   const receiveAddress = account?.address ?? ""
   const receiveFinderUrl = receiveAddress
-    ? `https://finder.burrito.money/classic/address/${receiveAddress}`
+    ? isClassic
+      ? `https://finder.burrito.money/classic/address/${receiveAddress}`
+      : `https://www.mintscan.io/terra/accounts/${receiveAddress}`
     : undefined
   const receiveAddressPreview = receiveAddress
     ? formatShortAddress(receiveAddress)
     : "Connect wallet"
   const receiveAddressStatus = receiveAddress
-    ? "Terra Classic wallet address"
+    ? `${chain.name} wallet address`
     : "Connect a wallet to generate your address"
   const sendAsset = useMemo<SendAsset>(() => {
     if (selectedAssetRow) {
@@ -401,27 +425,37 @@ const WalletPanel = () => {
       BigInt(
         Math.ceil(
           (sendAsset.kind === "cw20" ? FALLBACK_SEND_GAS_CW20 : FALLBACK_SEND_GAS_NATIVE) *
-            GAS_PRICE_MICRO_LUNC
+            gasPrice
         )
       ),
-    [sendAsset.kind]
+    [gasPrice, sendAsset.kind]
   )
   const sendFeeDisplay = useMemo(
-    () => `${formatTokenAmount(sendFeeMicro.toString(), 6, 6)} LUNC`,
-    [sendFeeMicro]
+    () =>
+      `${formatTokenAmount(sendFeeMicro.toString(), 6, 6)} ${nativeSymbol}`,
+    [nativeSymbol, sendFeeMicro]
   )
   const luncBalanceMicro = useMemo(() => parseBigInt(luncAmount), [luncAmount])
   const requiresLuncFee = sendAsset.denom !== CLASSIC_DENOMS.lunc.coinMinimalDenom
   const recipient = sendRecipient.trim()
   const recipientIsValid = TERRA_ADDRESS_PATTERN.test(recipient)
   const canQuerySendTaxable =
-    Boolean(account?.address) && recipientIsValid && sendAsset.kind !== "cw20"
+    isClassic &&
+    Boolean(account?.address) &&
+    recipientIsValid &&
+    sendAsset.kind !== "cw20"
   const {
     data: sendTaxable,
     isFetching: sendTaxableFetching,
     isError: sendTaxableError
   } = useQuery({
-    queryKey: ["send-taxable", account?.address, recipient, sendAsset.kind],
+    queryKey: [
+      "send-taxable",
+      chain.chainId,
+      account?.address,
+      recipient,
+      sendAsset.kind
+    ],
     queryFn: () => fetchTaxableTransfer(account!.address, recipient),
     enabled: canQuerySendTaxable,
     staleTime: 30 * 1000
@@ -434,6 +468,7 @@ const WalletPanel = () => {
   } = useQuery({
     queryKey: [
       "send-compute-tax",
+      chain.chainId,
       account?.address,
       recipient,
       sendAsset.denom,
@@ -470,6 +505,7 @@ const WalletPanel = () => {
   const sendBurnTaxMode = useMemo<
     "pending" | "taxed" | "exempt" | "no-tax" | "cw20" | "error"
   >(() => {
+    if (!isClassic) return "no-tax"
     if (sendAsset.kind === "cw20") return "cw20"
     if (!account?.address || !recipient) return "pending"
     if (!recipientIsValid) return "pending"
@@ -490,7 +526,8 @@ const WalletPanel = () => {
     sendAmountMicro,
     sendTaxable,
     sendTaxableError,
-    sendTaxableFetching
+    sendTaxableFetching,
+    isClassic
   ])
   const sendAssetIconCandidates = selectedAssetRow?.iconCandidates ?? selectedIconCandidates
   const sendPrice = selectedAssetRow?.price ?? selectedPrice
@@ -538,11 +575,11 @@ const WalletPanel = () => {
     [sendAsset.decimals, sendAsset.symbol, sendRecipientReceivesMicro]
   )
   const recipientStatusText = useMemo(() => {
-    if (!sendRecipient.trim()) return "Only Terra Classic addresses are supported."
+    if (!sendRecipient.trim()) return `Only ${chain.name} addresses are supported.`
     return TERRA_ADDRESS_PATTERN.test(sendRecipient.trim())
-      ? "Valid Terra Classic address."
+      ? `Valid ${chain.name} address.`
       : "Address must start with terra1."
-  }, [sendRecipient])
+  }, [chain.name, sendRecipient])
   const recipientStatusLabel = useMemo(() => {
     if (!sendRecipient.trim()) return "Waiting"
     return recipientIsValid ? "Ready" : "Invalid"
@@ -607,6 +644,7 @@ const WalletPanel = () => {
     }
   }, [burnTaxRate, sendBurnTaxMode, taxRatePercentDisplay])
   const sendTaxStateLabel = useMemo(() => {
+    if (!isClassic) return "Not used on Terra"
     if (burnTaxRate <= 0) return "Burn tax disabled"
     switch (sendBurnTaxMode) {
       case "taxed":
@@ -622,7 +660,7 @@ const WalletPanel = () => {
       default:
         return "Enter recipient to evaluate"
     }
-  }, [burnTaxRate, sendBurnTaxMode])
+  }, [burnTaxRate, isClassic, sendBurnTaxMode])
   const sendNoticeTitle = useMemo(() => {
     switch (sendBurnTaxMode) {
       case "taxed":
@@ -640,6 +678,9 @@ const WalletPanel = () => {
     }
   }, [sendBurnTaxMode])
   const sendTaxWarningText = useMemo(() => {
+    if (!isClassic) {
+      return "Phoenix transactions do not use the Terra Classic burn tax module."
+    }
     if (burnTaxRate <= 0) {
       return "Burn tax is currently disabled on-chain."
     }
@@ -657,7 +698,7 @@ const WalletPanel = () => {
       default:
         return "Enter a valid Terra recipient to check whether burn tax applies on this route."
     }
-  }, [burnTaxRate, sendBurnTaxMode])
+  }, [burnTaxRate, isClassic, sendBurnTaxMode])
   const sendBurnTaxSummaryDisplay = useMemo(() => {
     switch (sendBurnTaxMode) {
       case "taxed":
@@ -700,11 +741,11 @@ const WalletPanel = () => {
   }, [sendBurnTaxMode])
   const sendSubmitDisabledReason = useMemo(() => {
     if (!account?.address) return "Please connect a wallet first."
-    if (!recipient) return "Enter a Terra Classic recipient."
-    if (!recipientIsValid) return "Enter a valid Terra Classic address."
+    if (!recipient) return `Enter a ${chain.name} recipient.`
+    if (!recipientIsValid) return `Enter a valid ${chain.name} address.`
     if (sendAmountMicro <= 0n) return "Enter an amount greater than zero."
     if (!canCoverSendFee) {
-      return `Need at least ${sendFeeDisplay} in LUNC to cover the network fee.`
+      return `Need at least ${sendFeeDisplay} to cover the network fee.`
     }
     if (sendAmountMicro > sendBalanceMicro) {
       return `Insufficient ${sendAsset.symbol} balance.`
@@ -713,7 +754,7 @@ const WalletPanel = () => {
       sendAsset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom &&
       sendAmountMicro + sendFeeMicro > sendBalanceMicro
     ) {
-      return `Leave at least ${sendFeeDisplay} in LUNC for network fees.`
+      return `Leave at least ${sendFeeDisplay} for network fees.`
     }
     if (sendBurnTaxMode === "pending" && sendAsset.kind !== "cw20") {
       return "Checking on-chain tax rules..."
@@ -725,6 +766,7 @@ const WalletPanel = () => {
   }, [
     account?.address,
     canCoverSendFee,
+    chain.name,
     recipient,
     recipientIsValid,
     sendAmountMicro,
@@ -778,7 +820,7 @@ const WalletPanel = () => {
     }
 
     if (!TERRA_ADDRESS_PATTERN.test(recipient)) {
-      setSendError("Enter a valid Terra Classic address.")
+      setSendError(`Enter a valid ${chain.name} address.`)
       return
     }
 
@@ -788,7 +830,7 @@ const WalletPanel = () => {
     }
 
     if (!canCoverSendFee) {
-      setSendError(`Need at least ${sendFeeDisplay} in LUNC to cover the network fee.`)
+      setSendError(`Need at least ${sendFeeDisplay} to cover the network fee.`)
       return
     }
 
@@ -801,7 +843,7 @@ const WalletPanel = () => {
       sendAsset.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom &&
       sendAmountMicro + sendFeeMicro > sendBalanceMicro
     ) {
-      setSendError(`Leave at least ${sendFeeDisplay} in LUNC for network fees.`)
+      setSendError(`Leave at least ${sendFeeDisplay} for network fees.`)
       return
     }
 
@@ -817,7 +859,7 @@ const WalletPanel = () => {
       startTx(`Send ${sendAsset.symbol}`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
-        { connectClassicSigningClientForConnector },
+        { connectSigningClientForConnector },
         { MsgExecuteContract },
         { MsgSend }
       ] = await Promise.all([
@@ -826,7 +868,7 @@ const WalletPanel = () => {
         import("cosmjs-types/cosmos/bank/v1beta1/tx")
       ])
       const signerAddress = account.address
-      const client = await connectClassicSigningClientForConnector(connectorId)
+      const client = await connectSigningClientForConnector(connectorId)
       const msg =
         sendAsset.kind === "cw20"
           ? {
@@ -868,7 +910,9 @@ const WalletPanel = () => {
       }
 
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem(`cw20balance:${account.address}:classic`)
+        window.localStorage.removeItem(
+          `cw20balance:${account.address}:${chain.chainId}`
+        )
       }
       setRecentRecipients((prev) => {
         const nextEntry: RecentRecipientEntry = {
@@ -884,9 +928,15 @@ const WalletPanel = () => {
         )
       })
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["wallet", "balances", account.address] }),
-        queryClient.invalidateQueries({ queryKey: ["cw20-balances", account.address] }),
-        queryClient.invalidateQueries({ queryKey: ["swap-balances", account.address] })
+        queryClient.invalidateQueries({
+          queryKey: ["wallet", chain.chainId, "balances", account.address]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["cw20-balances", chain.chainId, account.address]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["swap-balances", chain.chainId, account.address]
+        })
       ])
 
       finishTx(result.transactionHash)
@@ -902,6 +952,8 @@ const WalletPanel = () => {
   }, [
     account?.address,
     canCoverSendFee,
+    chain.chainId,
+    chain.name,
     connectorId,
     failTx,
     finishTx,
@@ -955,7 +1007,7 @@ const WalletPanel = () => {
                     <span className={styles.sendHeroName}>{sendAsset.name}</span>
                   </div>
                 </div>
-                <span className={styles.sendChainBadge}>Classic</span>
+                <span className={styles.sendChainBadge}>{chain.shortName}</span>
               </div>
               <div className={styles.sendHeroMeta}>
                 <div className={styles.sendHeroMetric}>
@@ -966,10 +1018,10 @@ const WalletPanel = () => {
                 <div className={styles.sendHeroMetric}>
                   <span>Network fee</span>
                   <strong>{sendFeeDisplay}</strong>
-                  <small>Paid in LUNC</small>
+                  <small>Paid in {nativeSymbol}</small>
                 </div>
                 <div className={styles.sendHeroMetric}>
-                  <span>Burn tax</span>
+                  <span>{isClassic ? "Burn tax" : "Network tax"}</span>
                   <strong>{sendTaxMetricDisplay}</strong>
                   <small>{sendTaxStateLabel}</small>
                 </div>
@@ -1081,8 +1133,8 @@ const WalletPanel = () => {
                   <span>{sendTaxStateLabel}</span>
                 </div>
                 <span className={styles.formNoticeText}>
-                  Check whether the recipient requires a memo. Network fees are paid in
-                  LUNC. Current on-chain burn tax rate: {taxRatePercentDisplay}.{" "}
+                  Check whether the recipient requires a memo. Network fees are paid in {nativeSymbol}.
+                  {isClassic ? ` Current on-chain burn tax rate: ${taxRatePercentDisplay}. ` : " "}
                   {sendTaxWarningText}
                 </span>
               </div>
@@ -1111,7 +1163,11 @@ const WalletPanel = () => {
                   <strong>{sendFeeDisplay}</strong>
                 </div>
                 <div className={styles.detailRow}>
-                  <span>Burn tax ({taxRatePercentDisplay})</span>
+                  <span>
+                    {isClassic
+                      ? `Burn tax (${taxRatePercentDisplay})`
+                      : "Network tax"}
+                  </span>
                   <strong>{sendBurnTaxSummaryDisplay}</strong>
                 </div>
               </div>
@@ -1176,7 +1232,7 @@ const WalletPanel = () => {
                     <span className={styles.sendHeroName}>{selectedAsset.name}</span>
                   </div>
                 </div>
-                <span className={styles.sendChainBadge}>Classic</span>
+                <span className={styles.sendChainBadge}>{chain.shortName}</span>
               </div>
               <div className={styles.sendHeroMeta}>
                 <div className={styles.sendHeroMetric}>
@@ -1186,8 +1242,8 @@ const WalletPanel = () => {
                 </div>
                 <div className={styles.sendHeroMetric}>
                   <span>Network</span>
-                  <strong>Terra Classic</strong>
-                  <small>Same address for Classic assets</small>
+                  <strong>{chain.name}</strong>
+                  <small>Same address format, different network</small>
                 </div>
                 <div className={styles.sendHeroMetric}>
                   <span>Address</span>
@@ -1248,7 +1304,7 @@ const WalletPanel = () => {
             <div className={styles.receiveAddressCard}>
               <span className={styles.receiveSectionLabel}>Address</span>
               <div className={styles.receiveAddressValue}>
-                {receiveAddress || "Connect wallet to reveal your Terra Classic address."}
+                {receiveAddress || `Connect wallet to reveal your ${chain.name} address.`}
               </div>
             </div>
 
@@ -1256,11 +1312,11 @@ const WalletPanel = () => {
               <span className={styles.warningIcon} aria-hidden="true" />
               <div className={styles.formNoticeContent}>
                 <div className={styles.formNoticeHeader}>
-                  <strong>Receive on Terra Classic only</strong>
+                  <strong>Receive on {chain.name} only</strong>
                   <span>Memo-sensitive routes</span>
                 </div>
                 <span className={styles.formNoticeText}>
-                  Only send Terra Classic assets supported by the sending wallet or exchange.
+                  Only send {chain.name} assets supported by the sending wallet or exchange.
                   Some services require a memo to credit deposits. When in doubt, confirm the
                   destination instructions before transferring funds.
                 </span>
@@ -1279,7 +1335,7 @@ const WalletPanel = () => {
               </div>
               <div className={styles.detailRow}>
                 <span>Contract tokens</span>
-                <strong>Only if sender supports Classic CW20</strong>
+                <strong>Only if sender supports {chain.shortName} CW20</strong>
               </div>
               <div className={styles.detailRow}>
                 <span>Exchange deposits</span>
@@ -1402,7 +1458,7 @@ const WalletPanel = () => {
       <WalletBuyModal
         open={buyModalOpen}
         onClose={() => setBuyModalOpen(false)}
-        assets={["LUNC", "USTC"]}
+        assets={isClassic ? ["LUNC", "USTC"] : []}
       />
     </>
   )

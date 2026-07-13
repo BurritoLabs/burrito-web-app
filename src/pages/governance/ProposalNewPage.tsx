@@ -24,11 +24,11 @@ import { ExecuteContractProposal } from "cosmjs-types/cosmwasm/wasm/v1/proposal_
 import PageShell from "../PageShell"
 import styles from "../ProposalNew.module.css"
 import { useWallet } from "../../app/wallet/WalletContext"
-import { CLASSIC_CHAIN, CLASSIC_DENOMS, KEPLR_CHAIN_CONFIG } from "../../app/chain"
 import { fetchDepositParams } from "../../app/data/classic"
 import { fetchBalances } from "../../app/data/classic"
 import { getOfflineSignerForConnector } from "../../app/wallet/walletAdapters"
 import { formatTxError } from "../../app/utils/txError"
+import { useAppChain } from "../../app/appChainContext"
 
 type ProposalType = "TEXT" | "SPEND" | "PARAMS" | "EXECUTE"
 
@@ -36,27 +36,9 @@ type ChangeItem = { subspace: string; key: string; value: string }
 
 type CoinInput = { denom: string; amount: string }
 
-const DENOMS = [
-  CLASSIC_DENOMS.lunc.coinMinimalDenom,
-  CLASSIC_DENOMS.ustc.coinMinimalDenom
-]
-
-const FEE_DENOM_OPTIONS = [
-  CLASSIC_DENOMS.lunc.coinMinimalDenom,
-  CLASSIC_DENOMS.ustc.coinMinimalDenom
-] as const
-
-const GAS_PRICE_MICRO = 28.325
 const PROPOSAL_GAS_ADJUSTMENT = 1.6
 const FALLBACK_GAS = 350_000
 const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
-
-const getGasPriceMicro = (denom: string) => {
-  const feeCurrency = KEPLR_CHAIN_CONFIG.feeCurrencies.find(
-    (item) => item.coinMinimalDenom === denom
-  )
-  return feeCurrency?.gasPriceStep?.average ?? GAS_PRICE_MICRO
-}
 
 const buildEstimatedFee = (gasUsed: number, gasPriceMicro: number) => {
   const gasWanted = Math.ceil(gasUsed * PROPOSAL_GAS_ADJUSTMENT)
@@ -93,6 +75,13 @@ const toMicroAmount = (value: string) => {
 const isTerraAddress = (value: string) => /^terra1[0-9a-z]{38}$/.test(value)
 
 const ProposalNew = () => {
+  const { chain, chainKey } = useAppChain()
+  const nativeDenom = chain.runtime.nativeDenom.coinMinimalDenom
+  const nativeSymbol = chain.displayDenom
+  const denoms = chain.runtime.feeDenoms.map((denom) => denom.coinMinimalDenom)
+  const feeDenomOptions = denoms
+  const secondaryDenom = chainKey === "lunc" ? "uusd" : undefined
+  const gasPriceMicro = chain.runtime.gasPriceStep.average
   const { account, connectorId, startTx, finishTx, failTx } = useWallet()
   const [proposalType, setProposalType] = useState<ProposalType>("TEXT")
   const [title, setTitle] = useState("")
@@ -100,7 +89,7 @@ const ProposalNew = () => {
   const [deposit, setDeposit] = useState("")
   const [spendRecipient, setSpendRecipient] = useState("")
   const [spendAmount, setSpendAmount] = useState("")
-  const [spendDenom, setSpendDenom] = useState(DENOMS[0])
+  const [spendDenom, setSpendDenom] = useState<string>(nativeDenom)
   const [changes, setChanges] = useState<ChangeItem[]>([
     { subspace: "", key: "", value: "" }
   ])
@@ -108,16 +97,14 @@ const ProposalNew = () => {
   const [contractAddress, setContractAddress] = useState("")
   const [executeMsg, setExecuteMsg] = useState("{}")
   const [funds, setFunds] = useState<CoinInput[]>([
-    { denom: DENOMS[0], amount: "" }
+    { denom: nativeDenom, amount: "" }
   ])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string>()
   const [txHash, setTxHash] = useState("")
   const [typeOpen, setTypeOpen] = useState(false)
   const typeRef = useRef<HTMLDivElement | null>(null)
-  const [feeDenom, setFeeDenom] = useState<(typeof FEE_DENOM_OPTIONS)[number]>(
-    CLASSIC_DENOMS.lunc.coinMinimalDenom
-  )
+  const [feeDenom, setFeeDenom] = useState<string>(nativeDenom)
   const [feeOpen, setFeeOpen] = useState(false)
   const feeRef = useRef<HTMLDivElement | null>(null)
   const [feeEstimate, setFeeEstimate] = useState<{
@@ -129,24 +116,24 @@ const ProposalNew = () => {
   const [feeError, setFeeError] = useState<string>()
 
   const { data: depositParams } = useQuery({
-    queryKey: ["govDepositParams"],
+    queryKey: ["govDepositParams", chain.chainId],
     queryFn: fetchDepositParams,
     staleTime: 5 * 60 * 1000
   })
 
   const { data: balances = [] } = useQuery({
-    queryKey: ["balances", account?.address],
+    queryKey: ["balances", chain.chainId, account?.address],
     queryFn: () => fetchBalances(account?.address ?? ""),
     enabled: !!account?.address
   })
 
   const minDeposit = useMemo(() => {
     const min = depositParams?.minDeposit?.find(
-      (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+      (coin) => coin.denom === nativeDenom
     )
     if (!min?.amount) return ""
     return (Number(min.amount) / 1_000_000).toFixed(0)
-  }, [depositParams])
+  }, [depositParams, nativeDenom])
 
   const proposalTypeOptions = useMemo(
     () => [
@@ -164,20 +151,26 @@ const ProposalNew = () => {
 
   const luncBalance = useMemo(() => {
     const item = balances.find(
-      (coin) => coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+      (coin) => coin.denom === nativeDenom
     )
     return item?.amount ?? "0"
-  }, [balances])
+  }, [balances, nativeDenom])
 
   const ustcBalance = useMemo(() => {
     const item = balances.find(
-      (coin) => coin.denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
+      (coin) => coin.denom === secondaryDenom
     )
     return item?.amount ?? "0"
-  }, [balances])
+  }, [balances, secondaryDenom])
 
   const getDenomLabel = (denom: string) =>
-    denom === CLASSIC_DENOMS.lunc.coinMinimalDenom ? "LUNC" : "USTC"
+    denom === nativeDenom ? nativeSymbol : denom === "uusd" ? "USTC" : denom
+
+  useEffect(() => {
+    setSpendDenom(nativeDenom)
+    setFunds([{ denom: nativeDenom, amount: "" }])
+    setFeeDenom(nativeDenom)
+  }, [chain.chainId, nativeDenom])
 
   const getRegistry = () => {
     const registry = new Registry()
@@ -255,7 +248,7 @@ const ProposalNew = () => {
     const initialDeposit = Number(deposit)
       ? [
           {
-            denom: CLASSIC_DENOMS.lunc.coinMinimalDenom,
+            denom: nativeDenom,
             amount: toMicroAmount(deposit)
           }
         ]
@@ -315,8 +308,8 @@ const ProposalNew = () => {
     // Keep fee behavior stable and close to Station page behavior.
     setFeeLoading(false)
     setFeeError(undefined)
-    setFeeEstimate(estimateFallbackFee(getGasPriceMicro(feeDenom)))
-  }, [account?.address, feeDenom])
+    setFeeEstimate(estimateFallbackFee(gasPriceMicro))
+  }, [account?.address, chain.chainId, feeDenom, gasPriceMicro])
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -361,7 +354,7 @@ const ProposalNew = () => {
   const luncBalanceMicro = BigInt(luncBalance || "0")
   const ustcBalanceMicro = BigInt(ustcBalance || "0")
   const maxSpendable =
-    feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom
+    feeDenom === nativeDenom
       ? luncBalanceMicro > feeMicro
         ? luncBalanceMicro - feeMicro
         : 0n
@@ -369,14 +362,14 @@ const ProposalNew = () => {
   const luncAfterTx =
     luncBalanceMicro -
     depositMicro -
-    (feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom ? feeMicro : 0n)
+    (feeDenom === nativeDenom ? feeMicro : 0n)
   const ustcAfterTx =
     ustcBalanceMicro -
-    (feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom ? feeMicro : 0n)
+    (secondaryDenom && feeDenom === secondaryDenom ? feeMicro : 0n)
   const hasBalanceError =
     depositMicro > luncBalanceMicro ||
-    (feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom && luncAfterTx < 0n) ||
-    (feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom && ustcAfterTx < 0n)
+    (feeDenom === nativeDenom && luncAfterTx < 0n) ||
+    (secondaryDenom === feeDenom && ustcAfterTx < 0n)
   const canSubmit =
     !!account?.address &&
     canEstimateFee &&
@@ -403,18 +396,18 @@ const ProposalNew = () => {
       return
     }
     if (depositMicro > luncBalanceMicro) {
-      setError("Initial deposit exceeds LUNC balance.")
+      setError(`Initial deposit exceeds ${nativeSymbol} balance.`)
       return
     }
     if (
-      feeDenom === CLASSIC_DENOMS.lunc.coinMinimalDenom &&
+      feeDenom === nativeDenom &&
       luncAfterTx < 0n
     ) {
-      setError("Insufficient LUNC balance for deposit + fee.")
+      setError(`Insufficient ${nativeSymbol} balance for deposit + fee.`)
       return
     }
     if (
-      feeDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom &&
+      secondaryDenom === feeDenom &&
       ustcAfterTx < 0n
     ) {
       setError("Insufficient USTC balance for fee.")
@@ -468,18 +461,18 @@ const ProposalNew = () => {
       const msg = buildMsg(registry, signerAddress)
 
       const client = await SigningStargateClient.connectWithSigner(
-        CLASSIC_CHAIN.rpc,
+        chain.runtime.chain.rpc,
         signer,
         {
           registry,
-          gasPrice: GasPrice.fromString(`${getGasPriceMicro(feeDenom)}${feeDenom}`)
+          gasPrice: GasPrice.fromString(`${gasPriceMicro}${feeDenom}`)
         }
       )
       const finalFee = await estimateSubmitFee(
         client,
         signerAddress,
         [msg],
-        getGasPriceMicro(feeDenom)
+        gasPriceMicro
       )
       const result = await client.signAndBroadcast(signerAddress, [msg], {
         amount: [{ amount: finalFee.feeAmount, denom: feeDenom }],
@@ -575,7 +568,7 @@ const ProposalNew = () => {
                 className={styles.textarea}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="We're proposing to spend 100,000 LUNC from the Community Pool to fund the creation of public goods for the Terra Classic ecosystem."
+                placeholder={`We're proposing to spend 100,000 ${nativeSymbol} from the Community Pool to fund public goods for the ${chain.name} ecosystem.`}
                 rows={6}
               />
             </label>
@@ -586,7 +579,7 @@ const ProposalNew = () => {
                   Initial deposit (optional)
                   <span
                     className={styles.tooltipIcon}
-                    data-tooltip={`To help push the proposal to the voting period, consider depositing more LUNC to reach the minimum ${minDeposit || "--"} LUNC (optional).`}
+                    data-tooltip={`To help push the proposal to the voting period, consider depositing more ${nativeSymbol} to reach the minimum ${minDeposit || "--"} ${nativeSymbol} (optional).`}
                     aria-label="Initial deposit info"
                   >
                     ?
@@ -622,7 +615,7 @@ const ProposalNew = () => {
                       />
                       <circle cx="17.5" cy="13" r="1.5" fill="currentColor" />
                     </svg>
-                    <span>{formatMicro(maxSpendable)} LUNC</span>
+                    <span>{formatMicro(maxSpendable)} {nativeSymbol}</span>
                   </button>
                 ) : null}
               </div>
@@ -639,7 +632,7 @@ const ProposalNew = () => {
                   inputMode="decimal"
                   autoComplete="off"
                 />
-                <span className={styles.suffix}>LUNC</span>
+                <span className={styles.suffix}>{nativeSymbol}</span>
               </div>
             </div>
           </div>
@@ -672,12 +665,12 @@ const ProposalNew = () => {
                       className={styles.input}
                       value={spendDenom}
                     onChange={(event) =>
-                      setSpendDenom(event.target.value as (typeof DENOMS)[number])
+                      setSpendDenom(event.target.value)
                     }
                     >
-                      {DENOMS.map((denom) => (
+                      {denoms.map((denom) => (
                         <option key={denom} value={denom}>
-                          {denom === "uluna" ? "LUNC" : "USTC"}
+                          {getDenomLabel(denom)}
                         </option>
                       ))}
                     </select>
@@ -805,14 +798,14 @@ const ProposalNew = () => {
                         const next = [...funds]
                         next[index] = {
                           ...next[index],
-                          denom: event.target.value as (typeof DENOMS)[number]
+                          denom: event.target.value
                         }
                         setFunds(next)
                       }}
                     >
-                      {DENOMS.map((denom) => (
+                      {denoms.map((denom) => (
                         <option key={denom} value={denom}>
-                          {denom === "uluna" ? "LUNC" : "USTC"}
+                          {getDenomLabel(denom)}
                         </option>
                       ))}
                     </select>
@@ -822,7 +815,7 @@ const ProposalNew = () => {
                       onClick={() => {
                         const next = [...funds]
                         next.splice(index, 1)
-                        setFunds(next.length ? next : [{ denom: DENOMS[0], amount: "" }])
+                        setFunds(next.length ? next : [{ denom: nativeDenom, amount: "" }])
                       }}
                     >
                       −
@@ -832,7 +825,7 @@ const ProposalNew = () => {
                 <button
                   type="button"
                   className={styles.secondaryButton}
-                  onClick={() => setFunds([...funds, { denom: DENOMS[0], amount: "" }])}
+                  onClick={() => setFunds([...funds, { denom: nativeDenom, amount: "" }])}
                 >
                   Add fund
                 </button>
@@ -843,7 +836,7 @@ const ProposalNew = () => {
           {error ? <div className={styles.error}>{error}</div> : null}
           {txHash ? (
             <div className={styles.success}>
-              Submitted. Tx: <a href={`https://finder.burrito.money/classic/tx/${txHash}`} target="_blank" rel="noreferrer">{txHash}</a>
+              Submitted. Tx: <a href={chainKey === "lunc" ? `https://finder.burrito.money/classic/tx/${txHash}` : `https://www.mintscan.io/terra/tx/${txHash}`} target="_blank" rel="noreferrer">{txHash}</a>
             </div>
           ) : null}
 
@@ -865,7 +858,7 @@ const ProposalNew = () => {
                     </button>
                     {feeOpen ? (
                       <div className={styles.feeSelectMenu} role="listbox">
-                        {FEE_DENOM_OPTIONS.map((denom) => {
+                        {feeDenomOptions.map((denom) => {
                           const active = denom === feeDenom
                           return (
                             <button
@@ -902,11 +895,11 @@ const ProposalNew = () => {
               <dl>
                 <dt>Balance</dt>
                 <dd>
-                  {formatMicro(luncBalanceMicro)} LUNC
+                  {formatMicro(luncBalanceMicro)} {nativeSymbol}
                 </dd>
                 <dt>Balance after tx</dt>
                 <dd className={luncAfterTx < 0n ? styles.feeNegative : ""}>
-                  {formatMicro(luncAfterTx)} LUNC
+                  {formatMicro(luncAfterTx)} {nativeSymbol}
                 </dd>
               </dl>
               {feeError ? <div className={styles.feeError}>{feeError}</div> : null}

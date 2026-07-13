@@ -12,6 +12,8 @@ import {
 } from "../../app/utils/format"
 import styles from "../ProposalDetails.module.css"
 import ProposalVoteFlag from "./ProposalVoteFlag"
+import { useAppChain } from "../../app/appChainContext"
+import { getTxExplorerUrl } from "../../app/explorer"
 
 type VoteRow = {
   amount: string
@@ -73,8 +75,11 @@ const ProposalVotesPanel = ({
   voteTxHashes,
   onChangeVoteFilter,
   onLoadMoreVotes
-}: ProposalVotesPanelProps) => (
-  <>
+}: ProposalVotesPanelProps) => {
+  const { chain, chainKey } = useAppChain()
+
+  return (
+    <>
     <div className={`card ${styles.sectionCard}`}>
       <div className={styles.sectionHeader}>Votes</div>
       <div className={`${styles.sectionBody} ${styles.votesBody}`}>
@@ -82,7 +87,7 @@ const ProposalVotesPanel = ({
           <div className={styles.voteTotals}>
             <div className={styles.voteTotalTitle}>Total voted</div>
             <div className={styles.voteTotalValue}>
-              {formatTokenAmount(tallyStats.total, 6, 0)} LUNC{" "}
+              {formatTokenAmount(tallyStats.total, 6, 0)} {chain.displayDenom}{" "}
               <span className={styles.voteTotalPercent}>
                 ({formatPercentPlain(tallyStats.ratio * 100)})
               </span>
@@ -119,7 +124,7 @@ const ProposalVotesPanel = ({
                   {formatPercentPlain(row.value * 100)}
                 </div>
                 <div className={styles.voteItemAmount}>
-                  {formatTokenAmount(row.amount, 6, 0)} LUNC
+                  {formatTokenAmount(row.amount, 6, 0)} {chain.displayDenom}
                 </div>
               </article>
             ))}
@@ -167,9 +172,7 @@ const ProposalVotesPanel = ({
               )
               const badgeRight = Math.min(98, Math.max(0, weightPercent + 1))
               const txHash = vote.txhash ?? voteTxHashes[vote.voter]
-              const txUrl = txHash
-                ? `https://finder.burrito.money/classic/tx/${txHash}`
-                : ""
+              const txUrl = txHash ? getTxExplorerUrl(chainKey, txHash) : ""
               return (
                 <div key={vote.voter}>
                   {txUrl ? (
@@ -288,7 +291,8 @@ const ProposalVotesPanel = ({
         </div>
       </div>
     ) : null}
-  </>
-)
+    </>
+  )
+}
 
 export default ProposalVotesPanel

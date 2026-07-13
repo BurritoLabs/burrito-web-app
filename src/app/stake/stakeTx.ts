@@ -37,7 +37,10 @@ export const formatMicroAmountForInput = (amount: bigint) => {
   return fraction ? `${whole.toString()}.${fraction}` : whole.toString()
 }
 
-export const estimateFallbackFeeMicro = (tab: StakeAction) => {
+export const estimateFallbackFeeMicro = (
+  tab: StakeAction,
+  gasPrice = GAS_PRICE_MICRO_LUNC
+) => {
   const gas = FALLBACK_GAS_BY_TAB[tab]
-  return BigInt(Math.ceil(gas * GAS_PRICE_MICRO_LUNC))
+  return BigInt(Math.ceil(gas * gasPrice))
 }
