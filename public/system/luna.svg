@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <defs>
+    <linearGradient id="luna-a" x1="18" y1="12" x2="62" y2="68" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f9d85e"/>
+      <stop offset=".55" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#c2410c"/>
+    </linearGradient>
+    <linearGradient id="luna-b" x1="22" y1="18" x2="56" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7ad"/>
+      <stop offset="1" stop-color="#facc15"/>
+    </linearGradient>
+  </defs>
+  <circle cx="40" cy="40" r="36" fill="#0c1411"/>
+  <path fill="url(#luna-a)" d="M71.6 34.4c-5.2-6.6-13.4-9.5-24.2-13.3C33.9 16.4 27.2 12 30.8 6.2A35.9 35.9 0 0 1 71.6 34.4Z"/>
+  <path fill="url(#luna-b)" d="M42.8 49.1C27 42 16.8 28.5 15.7 14.5a35.9 35.9 0 0 0 57.4 40.2 45.7 45.7 0 0 1-30.3-5.6Z"/>
+  <path fill="#fb923c" d="M71.7 34.6c.9 5.1.7 10.3-.6 15.1-7.9-5.8-14.3-10.6-17.9-21.1 7.9 2.8 13.8 5.1 18.5 6Z" opacity=".88"/>
+</svg>

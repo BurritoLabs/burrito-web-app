@@ -13,6 +13,7 @@
   margin: 0 auto;
   display: flex;
   align-items: center;
+  gap: 10px;
   height: 100%;
   transform: translateX(calc(var(--wallet-offset) / -2));
   transition:
@@ -32,6 +33,162 @@
 .mobileBrandLink {
   color: inherit;
   text-decoration: none;
+}
+
+.chainSwitcher {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  margin-left: 0;
+}
+
+.chainTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 9px 0 5px;
+  border: 1px solid rgba(234, 245, 235, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.026);
+  color: rgba(234, 245, 235, 0.76);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.chainTrigger:hover,
+.chainTriggerOpen {
+  border-color: rgba(var(--chain-rgb), 0.38);
+  background: rgba(var(--chain-rgb), 0.08);
+  color: #ffffff;
+}
+
+.chainTrigger:focus,
+.chainTrigger:focus-visible,
+.chainOption:focus,
+.chainOption:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.chainCurrent {
+  display: inline-flex;
+  align-items: center;
+  max-width: 5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.chainChevron {
+  width: 14px;
+  height: 14px;
+  color: rgba(234, 245, 235, 0.48);
+  transition: transform 180ms ease;
+}
+
+.chainChevronOpen {
+  transform: rotate(180deg);
+}
+
+.chainMenu {
+  z-index: 9999;
+  display: grid;
+  width: min(13rem, calc(100vw - 2rem));
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(8, 17, 15, 0.96);
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.35);
+}
+
+.chainOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(234, 245, 235, 0.68);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.chainOption:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.chainOptionActive {
+  color: #ffffff;
+  background: rgba(var(--chain-rgb), 0.1);
+}
+
+.chainLogo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  padding: 1.5px;
+  border-radius: 999px;
+  background: rgba(var(--chain-rgb), 0.14);
+  box-shadow: 0 0 0 1px rgba(var(--chain-rgb), 0.22);
+}
+
+.chainLogo span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 1.5px;
+  border-radius: 999px;
+  background: #0c1411;
+}
+
+.chainLogo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.chainName {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.chainName span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chainName span:last-child {
+  color: rgba(234, 245, 235, 0.44);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .chainBadge {
@@ -379,10 +536,6 @@
   .mobileBrand {
     display: inline-flex;
     min-width: max-content;
-  }
-
-  .chainBadge {
-    display: none;
   }
 
   .leftRail {

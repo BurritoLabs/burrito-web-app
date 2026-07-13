@@ -3,6 +3,8 @@ import { createPortal } from "react-dom"
 import { Link, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import styles from "./TopBar.module.css"
+import { SUPPORTED_APP_CHAINS, type AppChainKey } from "../appChains"
+import { useAppChain } from "../appChainContext"
 import { WalletIcon } from "../icons"
 import { useWallet } from "../wallet/WalletContext"
 import { getWalletConnectorLabel } from "../wallet/walletMeta"
@@ -22,9 +24,14 @@ type TopBarProps = {
 const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   const navigate = useNavigate()
   const { account, txState, connectorId, disconnect } = useWallet()
+  const { chainKey, chain, setChainKey } = useAppChain()
   const [connectOpen, setConnectOpen] = useState(false)
   const [addressesOpen, setAddressesOpen] = useState(false)
+  const [chainOpen, setChainOpen] = useState(false)
   const [walletMenuOpen, setWalletMenuOpen] = useState(false)
+  const chainMenuRef = useRef<HTMLDivElement | null>(null)
+  const chainMenuPortalRef = useRef<HTMLDivElement | null>(null)
+  const chainButtonRef = useRef<HTMLButtonElement | null>(null)
   const walletMenuRef = useRef<HTMLDivElement | null>(null)
   const walletMenuPortalRef = useRef<HTMLDivElement | null>(null)
   const walletButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -32,6 +39,13 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     | {
         top: number
         right: number
+      }
+    | null
+  >(null)
+  const [chainMenuPos, setChainMenuPos] = useState<
+    | {
+        top: number
+        left: number
       }
     | null
   >(null)
@@ -69,6 +83,47 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     : txState.label || txState.error || "Processing"
 
   useEffect(() => {
+    if (!chainOpen) return
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (
+        chainMenuRef.current?.contains(target) ||
+        chainMenuPortalRef.current?.contains(target)
+      ) {
+        return
+      }
+      if (!chainMenuRef.current?.contains(target)) {
+        setChainOpen(false)
+      }
+    }
+    window.addEventListener("mousedown", handleClick)
+    return () => window.removeEventListener("mousedown", handleClick)
+  }, [chainOpen])
+
+  useEffect(() => {
+    if (!chainOpen) return
+    const updatePosition = () => {
+      if (!chainButtonRef.current) return
+      const rect = chainButtonRef.current.getBoundingClientRect()
+      const menuWidth = Math.min(208, window.innerWidth - 32)
+      setChainMenuPos({
+        top: rect.bottom + 8,
+        left: Math.max(
+          16,
+          Math.min(rect.left, window.innerWidth - menuWidth - 16)
+        )
+      })
+    }
+    updatePosition()
+    window.addEventListener("resize", updatePosition)
+    window.addEventListener("scroll", updatePosition, true)
+    return () => {
+      window.removeEventListener("resize", updatePosition)
+      window.removeEventListener("scroll", updatePosition, true)
+    }
+  }, [chainOpen])
+
+  useEffect(() => {
     if (!walletMenuOpen) return
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node
@@ -85,6 +140,11 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     window.addEventListener("mousedown", handleClick)
     return () => window.removeEventListener("mousedown", handleClick)
   }, [walletMenuOpen])
+
+  const selectChain = (next: AppChainKey) => {
+    setChainKey(next)
+    setChainOpen(false)
+  }
 
   useEffect(() => {
     if (!walletMenuOpen) return
@@ -115,7 +175,93 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         >
           <BrandLogo textSize={20} iconSize={24} gap={6} />
         </Link>
-        <div className={styles.chainBadge}>Terra Classic</div>
+        <div
+          className={styles.chainSwitcher}
+          ref={chainMenuRef}
+          style={{ "--chain-rgb": chain.accentRgb } as React.CSSProperties}
+          aria-label="Network switcher"
+        >
+          <button
+            type="button"
+            className={`${styles.chainTrigger} ${
+              chainOpen ? styles.chainTriggerOpen : ""
+            }`}
+            aria-haspopup="menu"
+            aria-expanded={chainOpen}
+            aria-label="Switch network"
+            ref={chainButtonRef}
+            onClick={() => setChainOpen((open) => !open)}
+          >
+            <span className={styles.chainLogo}>
+              <span>
+                <img src={chain.logoSrc} alt="" />
+              </span>
+            </span>
+            <span className={styles.chainCurrent}>{chain.symbol}</span>
+            <svg
+              className={`${styles.chainChevron} ${
+                chainOpen ? styles.chainChevronOpen : ""
+              }`}
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+            >
+              <path
+                d="M4.25 6.25 8 10l3.75-3.75"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {chainOpen && chainMenuPos
+            ? createPortal(
+                <div
+                  className={styles.chainMenu}
+                  role="menu"
+                  ref={chainMenuPortalRef}
+                  style={{
+                    position: "fixed",
+                    top: chainMenuPos.top,
+                    left: chainMenuPos.left
+                  }}
+                >
+                  {SUPPORTED_APP_CHAINS.map((item) => {
+                    const active = item.key === chainKey
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        className={`${styles.chainOption} ${
+                          active ? styles.chainOptionActive : ""
+                        }`}
+                        style={
+                          {
+                            "--chain-rgb": item.accentRgb
+                          } as React.CSSProperties
+                        }
+                        role="menuitem"
+                        aria-current={active ? "true" : undefined}
+                        onClick={() => selectChain(item.key)}
+                      >
+                        <span className={styles.chainLogo}>
+                          <span>
+                            <img src={item.logoSrc} alt="" />
+                          </span>
+                        </span>
+                        <span className={styles.chainName}>
+                          <span>{item.symbol}</span>
+                          <span>{item.name}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>,
+                document.body
+              )
+            : null}
+        </div>
       </div>
       <div className={styles.actions}>
         {showValidator ? (
