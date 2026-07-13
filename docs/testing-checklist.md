@@ -8,6 +8,10 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Connect Galaxy Station on desktop.
 - Connect Keplr mobile from mobile browser.
 - Disconnect and reconnect without refreshing.
+- Switch Keplr accounts and confirm the app follows the new address on desktop
+  and mobile.
+- Refresh after disconnect and confirm the wallet stays disconnected.
+- Repeat connect, account switch, refresh, and disconnect on both chains.
 - Open the drawer wallet from at least two routes.
 - Confirm native, CW20, and IBC balances load.
 - Confirm balance values, token logos, and fallback logos display.
@@ -17,7 +21,10 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open `/market`.
 - Search by symbol, name, contract, and pool address.
 - Switch sort direction and sort field.
-- Switch each DEX filter: All, Terraport, Terraswap, Astroport, and Garuda.
+- On Terra Classic, switch through every visible DEX filter, including
+  Terraswap, Astroport, Terraport, Garuda, White Whale, LUNCSwap.fun, pump
+  venues, and WESO DeFi when present.
+- On Terra, switch through Astroport, Terraswap, Phoenix, and White Whale.
 - Open a TerraSwap pair detail page.
 - Open a Terraport pair detail page.
 - Open a Garuda pair detail page.
@@ -68,7 +75,8 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 - Create a CW20-only token.
 - Create a launch-with-pool token.
-- Create the LUNC pair.
+- Repeat the full flow on Terra Classic and Terra.
+- Create the native pair for the active chain (LUNC or LUNA).
 - Open market from Manage and provide initial liquidity.
 - Lock LP tokens.
 - Publish to launchpad registry.
@@ -102,4 +110,5 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 - Confirm `public/_redirects` exists.
 - Confirm a direct refresh works on `/wallet`, `/market`, `/swap`, `/proposal/:id`, and `/launchpad`.
-- Confirm production environment variables are configured for optional launchpad contracts.
+- Confirm chain-specific production launchpad overrides match the deployed
+  contracts when overrides are used.

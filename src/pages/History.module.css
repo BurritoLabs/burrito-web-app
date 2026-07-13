@@ -73,6 +73,13 @@
   --card-padding: var(--card-padding-small);
 }
 
+@supports (content-visibility: auto) {
+  .card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 150px;
+  }
+}
+
 .header {
   display: flex;
   align-items: center;

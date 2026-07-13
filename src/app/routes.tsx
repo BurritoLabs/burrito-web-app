@@ -17,19 +17,29 @@ import type { AppChainConfig } from "./appChains"
 
 const ICON_SIZE = { width: 18, height: 18 }
 
-const Wallet = lazy(() => import("../pages/Wallet"))
-const Market = lazy(() => import("../pages/Market"))
-const MarketPairDetails = lazy(() => import("../pages/MarketPairDetails"))
-const Launchpad = lazy(() => import("../pages/Launchpad"))
-const Swap = lazy(() => import("../pages/Swap"))
-const History = lazy(() => import("../pages/History"))
-const Stake = lazy(() => import("../pages/Stake"))
+const loadWallet = () => import("../pages/Wallet")
+const loadMarket = () => import("../pages/Market")
+const loadMarketPairDetails = () => import("../pages/MarketPairDetails")
+const loadLaunchpad = () => import("../pages/Launchpad")
+const loadSwap = () => import("../pages/Swap")
+const loadHistory = () => import("../pages/History")
+const loadStake = () => import("../pages/Stake")
+const loadGovernance = () => import("../pages/Governance")
+const loadContract = () => import("../pages/Contract")
+
+const Wallet = lazy(loadWallet)
+const Market = lazy(loadMarket)
+const MarketPairDetails = lazy(loadMarketPairDetails)
+const Launchpad = lazy(loadLaunchpad)
+const Swap = lazy(loadSwap)
+const History = lazy(loadHistory)
+const Stake = lazy(loadStake)
 const WithdrawRewards = lazy(() => import("../pages/WithdrawRewards"))
 const WithdrawCommission = lazy(() => import("../pages/WithdrawCommission"))
-const Governance = lazy(() => import("../pages/Governance"))
+const Governance = lazy(loadGovernance)
 const ProposalDetails = lazy(() => import("../pages/ProposalDetails"))
 const ProposalNew = lazy(() => import("../pages/ProposalNew"))
-const Contract = lazy(() => import("../pages/Contract"))
+const Contract = lazy(loadContract)
 const NotFound = lazy(() => import("../pages/NotFound"))
 
 const renderPage = (Component: ComponentType) => (
@@ -54,42 +64,50 @@ export const navMenu = [
   {
     path: "/wallet",
     title: "Wallet",
-    icon: <WalletIcon {...ICON_SIZE} />
+    icon: <WalletIcon {...ICON_SIZE} />,
+    preload: loadWallet
   },
   {
     path: "/swap",
     title: "Swap",
-    icon: <SwapIcon {...ICON_SIZE} />
+    icon: <SwapIcon {...ICON_SIZE} />,
+    preload: loadSwap
   },
   {
     path: "/market",
     title: "Market",
-    icon: <MarketIcon {...ICON_SIZE} />
+    icon: <MarketIcon {...ICON_SIZE} />,
+    preload: loadMarket
   },
   {
     path: "/launchpad",
     title: "Launchpad",
-    icon: <LaunchpadIcon {...ICON_SIZE} />
+    icon: <LaunchpadIcon {...ICON_SIZE} />,
+    preload: loadLaunchpad
   },
   {
     path: "/history",
     title: "History",
-    icon: <HistoryIcon {...ICON_SIZE} />
+    icon: <HistoryIcon {...ICON_SIZE} />,
+    preload: loadHistory
   },
   {
     path: "/stake",
     title: "Stake",
-    icon: <StakeIcon {...ICON_SIZE} />
+    icon: <StakeIcon {...ICON_SIZE} />,
+    preload: loadStake
   },
   {
     path: "/gov",
     title: "Governance",
-    icon: <GovIcon {...ICON_SIZE} />
+    icon: <GovIcon {...ICON_SIZE} />,
+    preload: loadGovernance
   },
   {
     path: "/contract",
     title: "Contract",
-    icon: <ContractIcon {...ICON_SIZE} />
+    icon: <ContractIcon {...ICON_SIZE} />,
+    preload: loadContract
   }
 ] as const
 

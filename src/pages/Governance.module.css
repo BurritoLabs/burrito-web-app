@@ -157,6 +157,13 @@
   align-content: start;
 }
 
+@supports (content-visibility: auto) {
+  .proposalLink {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 220px;
+  }
+}
+
 .proposalLink:hover .proposalCard {
   border-color: rgba(82, 196, 26, 0.6);
 }

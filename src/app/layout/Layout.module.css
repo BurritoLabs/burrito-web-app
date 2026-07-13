@@ -256,7 +256,7 @@
     background:
       radial-gradient(720px 420px at 65% 22%, rgba(var(--active-chain-rgb), 0.11), transparent 62%),
       radial-gradient(600px 360px at 48% 38%, rgba(var(--active-chain-rgb), 0.06), transparent 66%);
-    filter: blur(10px);
+    filter: none;
     opacity: 0.72;
   }
 

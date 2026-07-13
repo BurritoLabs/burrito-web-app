@@ -638,6 +638,13 @@
   background: transparent;
 }
 
+@supports (content-visibility: auto) {
+  .validatorRow {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 64px;
+  }
+}
+
 .validatorRow:hover {
   background: rgba(255, 255, 255, 0.03);
 }

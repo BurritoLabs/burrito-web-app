@@ -3,7 +3,7 @@
 Launchpad V1 is intentionally narrow:
 
 - create a fixed-supply CW20 token
-- create a Terraswap Token / LUNC pair
+- create a Terraswap Token / LUNC or Token / LUNA pair
 - provide initial liquidity
 - lock the LP CW20 token
 - publish launch facts to the Burrito registry
@@ -16,8 +16,8 @@ blacklists, hidden owner controls, or a custom DEX contract.
 1. Open `/launchpad`.
 2. Use `Create` to choose `Launch with pool` or `CW20 only`.
 3. Create the CW20 token contract.
-4. Use `Manage` to create/find the Terraswap LUNC pair.
-5. Open the market page from `Manage` and provide token + LUNC liquidity.
+4. Use `Manage` to create/find the Terraswap native pair for the active chain.
+5. Open the market page from `Manage` and provide token + native liquidity.
 6. Lock the minted LP token after the locker contract is configured.
 7. Publish the listing after the registry contract is configured.
 8. Use `Explore` to view on-chain registry launches.
@@ -32,7 +32,7 @@ blacklists, hidden owner controls, or a custom DEX contract.
 The frontend is wired to two Burrito-owned contracts:
 
 - `contracts/lp-locker`: receives LP CW20 tokens and blocks withdrawal until unlock time.
-- `contracts/launch-registry`: stores public launch records on Terra Classic.
+- `contracts/launch-registry`: stores public launch records on each deployment chain.
 
 Both contracts are built by `.github/workflows/lp-locker-contract.yml`.
 
@@ -45,8 +45,10 @@ After deploying the contracts, configure these Cloudflare Pages environment
 variables and redeploy:
 
 ```text
-VITE_LAUNCHPAD_LP_LOCKER_ADDRESS=terra1...
-VITE_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
+VITE_LUNC_LAUNCHPAD_LP_LOCKER_ADDRESS=terra1...
+VITE_LUNC_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
+VITE_LUNA_LAUNCHPAD_LP_LOCKER_ADDRESS=terra1...
+VITE_LUNA_LAUNCHPAD_REGISTRY_ADDRESS=terra1...
 ```
 
 Until those are set, the UI keeps LP locking and public publishing disabled.
@@ -78,15 +80,15 @@ not configured.
   locked LP amount plus withdrawn status when available.
 - Explore supports `/launchpad?tab=explore&launch=...` deep links and can copy
   a public launch link from the detail panel.
-- Pair lookup shows whether a Terraswap LUNC pair exists.
+- Pair lookup shows whether a Terraswap native pair exists on the active chain.
 - Pair creation stores pair contract and LP token after LCD indexing.
 - Market pair detail liquidity provision broadcasts `increase_allowance` and
   `provide_liquidity` in one transaction.
 - Market pair detail liquidity withdrawal sends unlocked LP CW20 tokens to the
   pair contract with the Terraswap `withdraw_liquidity` hook.
 - LP lock panel shows wallet LP balance and can fill the full balance.
-- LP lock stays disabled when `VITE_LAUNCHPAD_LP_LOCKER_ADDRESS` is empty.
-- Public listing stays disabled when `VITE_LAUNCHPAD_REGISTRY_ADDRESS` is empty.
+- LP lock stays disabled when the active chain has no configured locker address.
+- Public listing stays disabled when the active chain has no configured registry address.
 - Published listing metadata and visibility can be updated through the registry
   contract.
 - Published listing LP lock id and unlock time can be updated after a creator

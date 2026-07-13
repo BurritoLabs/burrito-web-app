@@ -116,13 +116,13 @@ const DeferredWalletPanel = () => {
 
   const prepareWalletPanel = () => {
     void loadWalletPanel()
+    void loadWalletAssetWarmup()
+    setWarmupRequested(true)
   }
 
   useEffect(() => {
     const cancel = scheduleIdleTask(() => {
       void loadWalletPanel()
-      void loadWalletAssetWarmup()
-      setWarmupRequested(true)
     })
     return cancel
   }, [])
@@ -133,6 +133,8 @@ const DeferredWalletPanel = () => {
     const handleNavigation = (event: Event) => {
       const detail = (event as CustomEvent<WalletPanelNavigationDetail>).detail
       void loadWalletPanel()
+      void loadWalletAssetWarmup()
+      setWarmupRequested(true)
       pendingDetailRef.current = detail ?? { view: "wallet" }
       window.localStorage.setItem("burritoWalletOpen", "true")
       setRequested(true)

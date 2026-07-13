@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run --exclude tests/e2e/**",
     "test:e2e": "playwright test",
-    "check:audit": "npm audit --omit=dev --audit-level=moderate",
+    "check:audit": "node scripts/check-dependency-audit.mjs",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "verify": "npm run lint && npm test && npm run check:audit && npm run build && npm run check:bundle",
     "preview": "vite preview",

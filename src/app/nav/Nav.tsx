@@ -44,11 +44,14 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
       </div>
 
       <div className={styles.links}>
-        {navMenu.map(({ path, title, icon }) => (
+        {navMenu.map(({ path, title, icon, preload }) => (
           <NavLink
             key={path}
             to={path}
             onClick={handleNavigate}
+            onFocus={() => void preload()}
+            onPointerEnter={() => void preload()}
+            onTouchStart={() => void preload()}
             className={({ isActive }) =>
               `${styles.link} ${isActive ? styles.active : ""}`
             }

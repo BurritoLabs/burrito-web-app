@@ -1,20 +1,18 @@
 # Burrito
 
-Burrito is a non-custodial Terra Classic application built for day-to-day
+Burrito is a non-custodial Terra application built for day-to-day
 wallet operations, market discovery, on-chain trading, staking, governance,
 CW20 launches, and advanced contract workflows.
 
-The app is designed as a focused Classic interface rather than a generic
-multi-chain dashboard. It combines wallet UX, indexed market data, direct pool
-execution, launchpad tooling, and operational contract utilities in one
-production-ready frontend.
+The app supports Terra Classic (`columbus-5`) and Terra (`phoenix-1`). It
+combines wallet UX, indexed market data, direct pool execution, launchpad
+tooling, and operational contract utilities in one frontend.
 
 ## Product Scope
 
-Burrito targets `columbus-5` and prioritizes workflows that matter on Terra
-Classic:
+Burrito targets `columbus-5` and `phoenix-1`:
 
-- Discover Classic liquidity across supported DEX venues.
+- Discover liquidity across supported DEX venues on the active chain.
 - Inspect pair-level market data, reserves, addresses, charts, and recent trades.
 - Swap through selected liquidity routes or directly through a specific pair.
 - Add and remove liquidity where the underlying DEX contract supports it.
@@ -46,7 +44,7 @@ Classic:
 
 ### Swap
 
-- On-chain quote discovery across supported Classic DEX routes.
+- On-chain quote discovery across supported routes on the active chain.
 - Pair-only mode for market detail pages.
 - Slippage controls.
 - Platform fee configuration.
@@ -67,7 +65,7 @@ Classic:
 ### Launchpad
 
 - CW20 token creation flow.
-- LUNC pair setup and initial liquidity.
+- LUNC or LUNA pair setup and initial liquidity.
 - LP lock integration when configured.
 - Public registry publishing when configured.
 - Explore and creator management views.
@@ -80,16 +78,11 @@ Classic:
 ## DEX And Market Coverage
 
 The market index is built from on-chain factory, pair, pool, and bonding-curve
-queries. Current coverage includes:
+queries. Current discovery coverage includes:
 
-- TerraSwap
-- Terraport
-- Astroport
-- Garuda DeFi
-- White Whale
-- LUNCSwap
-- Terra.pump
-- LUNCPump
+- Terra Classic: Terraswap, Astroport, Terraport, Garuda, White Whale,
+  LUNCSwap.fun, Terra.pump, LUNCPump.fun, and WESO DeFi.
+- Terra: Astroport, Terraswap, Phoenix, and White Whale.
 
 Not every DEX exposes the same contract interface. Burrito enables swap,
 liquidity, and bonding-curve actions only where the app has an implemented and
@@ -130,16 +123,27 @@ All variables are optional unless the related production feature is enabled.
 VITE_SWAP_PLATFORM_FEE_BPS=
 VITE_SWAP_PLATFORM_FEE_RECIPIENT=
 VITE_WALLETCONNECT_PROJECT_ID=
-VITE_LAUNCHPAD_LP_LOCKER_ADDRESS=
-VITE_LAUNCHPAD_REGISTRY_ADDRESS=
+VITE_LUNC_LAUNCHPAD_LP_LOCKER_ADDRESS=
+VITE_LUNC_LAUNCHPAD_REGISTRY_ADDRESS=
+VITE_LUNA_LAUNCHPAD_LP_LOCKER_ADDRESS=
+VITE_LUNA_LAUNCHPAD_REGISTRY_ADDRESS=
 ```
 
 `VITE_WALLETCONNECT_PROJECT_ID` is used for Keplr Mobile WalletConnect handoff.
 The app has a bundled fallback, but production deployments should configure a
 project id owned by Burrito.
 
-Launchpad LP locking and registry publishing remain disabled until their
-contract addresses are configured.
+Terra launchpad production addresses are bundled defaults. Chain-specific
+environment variables override the bundled values. Terra Classic LP locking
+and registry publishing remain disabled when its addresses are not configured.
+
+## Performance Behavior
+
+- Route chunks preload when a user points to or focuses a navigation item.
+- Wallet UI code can preload while idle, but wallet asset queries wait for
+  wallet intent instead of running on every page load.
+- Six-second block polling pauses while the browser tab is hidden.
+- Long market, history, stake, and governance lists skip off-screen rendering.
 
 ## Development
 
@@ -165,8 +169,8 @@ npm run build:release
 - Build command: `npm run build`
 - Output directory: `dist`
 - SPA fallback: keep `public/_redirects` with `/* /index.html 200`
-- Configure production launchpad contract addresses in Cloudflare Pages
-  environment variables before enabling registry publishing or LP locking.
+- Keep chain-specific launchpad overrides synchronized in Cloudflare Pages when
+  migrating either production contract.
 
 ## Security And Operational Boundaries
 
@@ -181,6 +185,7 @@ npm run build:release
 
 Maintenance notes:
 
+- `docs/dependency-audit.md`
 - `docs/maintenance-boundaries.md`
 - `docs/testing-checklist.md`
 - `docs/tx-standardization-plan.md`

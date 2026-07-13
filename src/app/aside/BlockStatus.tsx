@@ -15,7 +15,7 @@ const BlockStatus = () => {
     queryKey: ["latest-block-height", chain.chainId],
     queryFn: () => fetchLatestBlock(lcd),
     refetchInterval: BLOCK_REFRESH_MS,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
     staleTime: BLOCK_REFRESH_MS - 1_000,
     retry: false
   })

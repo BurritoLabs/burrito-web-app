@@ -419,6 +419,13 @@
   text-decoration: none;
 }
 
+@supports (content-visibility: auto) {
+  .poolCardLink {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 190px;
+  }
+}
+
 .poolCard {
   padding: 10px;
   display: grid;

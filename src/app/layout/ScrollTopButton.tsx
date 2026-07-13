@@ -35,6 +35,7 @@ const ScrollTopButton = () => {
   }, [])
 
   useEffect(() => {
+    const pageScroller = getPageScroller()
     const frame = window.requestAnimationFrame(syncVisibility)
     const handleScroll = () => {
       if (frameRef.current !== undefined) return
@@ -45,7 +46,7 @@ const ScrollTopButton = () => {
     }
 
     window.addEventListener("scroll", handleScroll, { passive: true })
-    document.addEventListener("scroll", handleScroll, true)
+    pageScroller?.addEventListener("scroll", handleScroll, { passive: true })
     window.addEventListener("resize", handleScroll, { passive: true })
 
     return () => {
@@ -55,7 +56,7 @@ const ScrollTopButton = () => {
         frameRef.current = undefined
       }
       window.removeEventListener("scroll", handleScroll)
-      document.removeEventListener("scroll", handleScroll, true)
+      pageScroller?.removeEventListener("scroll", handleScroll)
       window.removeEventListener("resize", handleScroll)
     }
   }, [location.pathname, location.search, syncVisibility])

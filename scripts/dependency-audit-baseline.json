@@ -1,0 +1,20 @@
+{
+  "reviewedAt": "2026-07-13",
+  "reviewBy": "2026-10-13",
+  "maxLow": 13,
+  "allowedLowPackages": [
+    "@chain-registry/keplr",
+    "@cosmos-kit/core",
+    "@cosmos-kit/keplr-extension",
+    "@cosmos-kit/keplr-mobile",
+    "@cosmos-kit/react",
+    "@cosmos-kit/react-lite",
+    "@cosmos-kit/walletconnect",
+    "@keplr-wallet/common",
+    "@keplr-wallet/cosmos",
+    "@keplr-wallet/crypto",
+    "bip32",
+    "elliptic",
+    "tiny-secp256k1"
+  ]
+}
