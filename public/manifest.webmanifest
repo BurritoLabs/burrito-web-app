@@ -1,0 +1,26 @@
+{
+  "name": "Burrito",
+  "short_name": "Burrito",
+  "description": "A non-custodial Terra and Terra Classic app for wallets, swaps, markets, staking, governance, and CW20 launches.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101b17",
+  "theme_color": "#101b17",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

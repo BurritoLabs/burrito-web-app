@@ -21,7 +21,7 @@ export default function BrandLogo({
       }}
     >
       <img
-        src="/brand/icon.png"
+        src="/brand/icon-192.png"
         alt="Burrito"
         style={{
           height: iconSize,

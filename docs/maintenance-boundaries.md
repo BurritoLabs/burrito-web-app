@@ -21,7 +21,7 @@ Use this before changing production behavior. Burrito App is live, so code clean
 
 ## Do Not Change Accidentally
 
-- Public routes such as `/market`, `/market/pair/...`, `/wallet`, `/swap`, `/stake`, `/governance`, `/proposal/:id`, `/launchpad`, and `/contract`.
+- Public routes such as `/market`, `/market/pair/...`, `/wallet`, `/swap`, `/stake`, `/gov`, `/proposal/:id`, `/launchpad`, and `/contract`.
 - Local storage keys used for launchpad drafts, created launches, wallet recipients, and token metadata caches.
 - Query keys used by wallet balances, market pools, proposal details, staking data, and launchpad registry reads.
 - Existing production defaults for platform fees, launchpad fees, gas fallback values, chain IDs, and RPC/LCD URLs.
@@ -44,4 +44,3 @@ For every production refactor batch:
 - Run `npm run build`.
 - Confirm `dist` is not included in source commits unless deployment artifacts are intentionally committed.
 - Update `docs/production-refactor-notes.md` with touched files and behavior-preservation notes.
-

@@ -10,6 +10,7 @@
     "build:market-index": "node scripts/build-market-index.mjs",
     "build:market-candles": "node scripts/build-market-candles.mjs",
     "build:market-all": "npm run build:market-index && npm run build:market-candles",
+    "build:brand-assets": "node scripts/build-brand-assets.mjs",
     "lint": "eslint .",
     "test": "vitest run --exclude tests/e2e/**",
     "test:e2e": "playwright test",

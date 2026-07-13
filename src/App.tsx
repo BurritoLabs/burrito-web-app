@@ -14,6 +14,7 @@ import Aside from "./app/aside/Aside"
 import LoadingBar from "./app/feedback/LoadingBar"
 import TxStatusModal from "./app/feedback/TxStatusModal"
 import ScrollTopButton from "./app/layout/ScrollTopButton"
+import RouteMetadata from "./app/metadata/RouteMetadata"
 
 function App() {
   const routes = useAppRoutes()
@@ -24,6 +25,7 @@ function App() {
 
   return (
     <Layout menuOpen={menuOpen}>
+      <RouteMetadata />
       <Sidebar>
         <Nav isOpen={menuOpen} onClose={closeMenu} />
         <Aside />

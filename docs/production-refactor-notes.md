@@ -188,3 +188,14 @@
 - `npm run build`: passed after final edits. Existing Vite warnings remain limited to dependency eval/PURE comments and large chunks.
 - `npm run lint`: passed after final edits.
 - `npx tsc -b`: passed after final edits.
+
+## Brand And Metadata Refresh
+
+- Replaced the single-chain social preview with a deterministic dual-chain asset.
+- Added route-aware page titles, descriptions, canonical URLs, and social metadata.
+- Added a web app manifest, sitemap, theme metadata, and sitemap discovery in robots.txt.
+- Replaced the retired Twitter bird with the current X mark.
+- Added a 192px runtime brand icon so small UI placements no longer load the 1024px source asset.
+- Corrected the mobile testing checklist to use the real `/gov` route.
+- Isolated Playwright mobile checks on port `4173` so an existing local `5173` session cannot produce false failures.
+- Wallet, transaction, chain, market, swap, staking, governance, and launchpad behavior were not changed.

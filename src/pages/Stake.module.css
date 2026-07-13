@@ -81,7 +81,7 @@
   border-radius: 50%;
   background-color: var(--card-bg-muted);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background-image: url("/brand/icon.png");
+  background-image: url("/brand/icon-192.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

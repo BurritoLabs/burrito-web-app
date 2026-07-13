@@ -93,7 +93,7 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Mobile
 
-- Open `/`, `/wallet`, `/market`, `/swap`, `/stake`, `/governance`, and `/launchpad`.
+- Open `/`, `/wallet`, `/market`, `/swap`, `/stake`, `/gov`, and `/launchpad`.
 - Confirm no horizontal overflow.
 - Confirm wallet drawer opens on first tap.
 - Confirm balance data appears without needing a manual refresh.

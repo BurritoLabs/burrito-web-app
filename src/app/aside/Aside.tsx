@@ -44,7 +44,7 @@ const Aside = () => {
   const community = [
     { label: "Discord", icon: "/community/Discord.svg" },
     { label: "Telegram", icon: "/community/Telegram.svg" },
-    { label: "X", href: "https://x.com/burrito__money", icon: "/community/Twitter.svg" },
+    { label: "X", href: "https://x.com/burrito__money", icon: "/community/X.svg" },
     { label: "GitHub", href: "https://github.com/BurritoLabs", icon: "/community/Github.svg" }
   ]
 
