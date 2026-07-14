@@ -41,6 +41,7 @@ import {
 } from "../../app/utils/numberDisplay"
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
+import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
 import {
   getMarketDexFilterOptions,
   type MarketDexFilter
@@ -523,6 +524,12 @@ const Market = () => {
     [poolGraphUsdPrices]
   )
 
+  const chainMarketCapUsd =
+    nativePrice?.usd_market_cap ??
+    (nativePrice?.usd !== undefined && dashboardSnapshot?.circulatingLunc
+      ? nativePrice.usd * dashboardSnapshot.circulatingLunc
+      : undefined)
+
   const getAssetChange = useCallback(
     (asset: ResolvedAsset, tf: Timeframe) => {
       if (asset.isLunc) {
@@ -591,10 +598,14 @@ const Market = () => {
       const priceConfidenceUsd = finiteConfidence.length
         ? Math.min(...finiteConfidence)
         : undefined
-      const liquidityUsd =
+      const confidenceLimitedLiquidityUsd =
         calculatedLiquidityUsd !== undefined && priceConfidenceUsd !== undefined
           ? Math.min(calculatedLiquidityUsd, priceConfidenceUsd)
           : calculatedLiquidityUsd
+      const liquidityUsd = guardChainRelativeValuation(
+        confidenceLimitedLiquidityUsd,
+        chainMarketCapUsd
+      )
 
       const priceQuoteUsd = getAssetUsdPrice(priceQuote)
       const priceUsd = priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined
@@ -636,6 +647,7 @@ const Market = () => {
     },
     [
       dashboardSnapshot,
+      chainMarketCapUsd,
       getAssetPriceConfidence,
       getAssetUsdPrice,
       nativePrice?.usd_market_cap,
@@ -827,16 +839,18 @@ const Market = () => {
       if (card.priceBase.id.startsWith("native:") && card.priceUsd !== undefined) {
         const denom = card.priceBase.id.slice(7)
         const units = nativeSupplies[denom]?.units
-        if (units !== undefined) return units * card.priceUsd
+        if (units !== undefined) {
+          return guardChainRelativeValuation(units * card.priceUsd, chainMarketCapUsd)
+        }
       }
       if (!card.priceBase.id.startsWith("cw20:")) return undefined
       if (card.priceUsd === undefined) return undefined
       const contract = card.priceBase.id.slice(5).toLowerCase()
       const supply = cw20Supplies[contract]?.units
       if (supply === undefined) return undefined
-      return supply * card.priceUsd
+      return guardChainRelativeValuation(supply * card.priceUsd, chainMarketCapUsd)
     },
-    [cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
+    [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
   )
 
   const filteredAndSorted = useMemo(() => {

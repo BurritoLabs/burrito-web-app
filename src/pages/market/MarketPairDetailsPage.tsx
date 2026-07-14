@@ -64,6 +64,7 @@ import {
 } from "../../app/market/pairChart"
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
+import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
 import { useAppChain } from "../../app/appChainContext"
 import { getAddressExplorerUrl } from "../../app/explorer"
 
@@ -586,10 +587,19 @@ const MarketPairDetails = () => {
           : poolGraphUsdPrices[asset.key]?.liquidity
       )
       .filter((value): value is number => value !== undefined && Number.isFinite(value))
-    const liquidityUsd =
+    const confidenceLimitedLiquidityUsd =
       calculatedLiquidityUsd !== undefined && finiteConfidence.length
         ? Math.min(calculatedLiquidityUsd, ...finiteConfidence)
         : calculatedLiquidityUsd
+    const chainMarketCapUsd =
+      nativePrice?.usd_market_cap ??
+      (nativePrice?.usd !== undefined && dashboardSnapshot?.circulatingLunc
+        ? nativePrice.usd * dashboardSnapshot.circulatingLunc
+        : undefined)
+    const liquidityUsd = guardChainRelativeValuation(
+      confidenceLimitedLiquidityUsd,
+      chainMarketCapUsd
+    )
 
     let marketCapUsd: number | undefined
     if (priceBase.isLunc) {
