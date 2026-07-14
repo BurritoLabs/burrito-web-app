@@ -41,4 +41,3 @@ const LUNA_DEX_FILTER_OPTIONS: readonly MarketDexFilterOption[] = [
 
 export const getMarketDexFilterOptions = (chainKey: SupportedChainKey) =>
   chainKey === "luna" ? LUNA_DEX_FILTER_OPTIONS : LUNC_DEX_FILTER_OPTIONS
-
