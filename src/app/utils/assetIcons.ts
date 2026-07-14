@@ -30,6 +30,7 @@ const EXTENSIONLESS_IMAGE_HOSTS = new Set([
 ])
 
 const IMAGE_EXT_RE = /\.(png|svg|webp|jpg|jpeg|gif|avif)$/i
+const SAFE_ICON_LOOKUP_RE = /^[a-z0-9._+-]{1,32}$/i
 
 const unique = (items: Array<string | undefined>) =>
   Array.from(new Set(items.filter(Boolean) as string[]))
@@ -61,6 +62,7 @@ const normalizeAssetsTerraUrl = (url: URL) => {
 
 const sanitizeSymbolText = (value?: string) => {
   const normalized = (value ?? "")
+    .slice(0, 64)
     .trim()
     .replace(/[^a-z0-9]/gi, "")
     .toUpperCase()
@@ -107,6 +109,7 @@ const buildGeneratedTokenIcon = (symbol?: string) => {
 export const sanitizeAssetIconUrl = (value?: string) => {
   const trimmed = value?.trim()
   if (!trimmed) return undefined
+  if (trimmed.length > 2_048 && !trimmed.startsWith("data:image/")) return undefined
   if (trimmed.startsWith("/")) return trimmed
   if (trimmed.startsWith("data:image/")) return trimmed
   if (!/^https?:\/\//i.test(trimmed)) return undefined
@@ -167,20 +170,22 @@ export const buildClassicNativeIconCandidates = ({
         ? "LUNC"
         : "LUNA"
       : symbol
+  if (!SAFE_ICON_LOOKUP_RE.test(iconDenom)) {
+    return unique([
+      sanitizeAssetIconUrl(primaryIcon),
+      buildGeneratedTokenIcon(symbol),
+      fallback
+    ])
+  }
   const upper = iconDenom.toUpperCase()
-  const lower = iconDenom.toLowerCase()
 
   return unique([
     sanitizeAssetIconUrl(primaryIcon),
     `${ASSET_URL}/icon/60/${iconDenom}.png`,
     `${ASSET_URL}/icon/svg/${iconDenom}.svg`,
     `${ASSET_URL}/icon/60/${upper}.png`,
-    `${ASSET_URL}/icon/svg/${upper}.svg`,
     legacyClassicStableSymbol ? `${ASSET_URL}/icon/60/${legacyClassicStableSymbol}.png` : undefined,
-    legacyClassicStableSymbol
-      ? `${ASSET_URL}/icon/svg/${legacyClassicStableSymbol}.svg`
-      : undefined,
-    `${ASSET_URL}/icon/60/${lower}.png`,
+    buildGeneratedTokenIcon(symbol),
     fallback
   ])
 }
@@ -196,7 +201,7 @@ const buildIbcStaticGuessCandidates = ({
   const tokens = new Set<string>()
   const addToken = (value?: string) => {
     const trimmed = value?.trim()
-    if (!trimmed) return
+    if (!trimmed || !SAFE_ICON_LOOKUP_RE.test(trimmed)) return
     tokens.add(trimmed)
     tokens.add(trimmed.toUpperCase())
     tokens.add(trimmed.toLowerCase())
@@ -216,7 +221,7 @@ const buildIbcStaticGuessCandidates = ({
     candidates.add(`${ASSET_URL}/icon/svg/${token}.svg`)
   })
 
-  return Array.from(candidates)
+  return Array.from(candidates).slice(0, 4)
 }
 
 export const buildIbcAssetIconCandidates = (
@@ -230,6 +235,7 @@ export const buildIbcAssetIconCandidates = (
   unique([
     ...icons.map((icon) => sanitizeAssetIconUrl(icon)),
     ...buildIbcStaticGuessCandidates(options ?? {}),
+    buildGeneratedTokenIcon(options?.symbol),
     fallback
   ])
 
@@ -237,4 +243,4 @@ export const buildCw20IconCandidates = (
   icon?: string,
   symbol?: string,
   fallback = "/system/cw20.svg"
-) => unique([sanitizeAssetIconUrl(icon), fallback, buildGeneratedTokenIcon(symbol)])
+) => unique([sanitizeAssetIconUrl(icon), buildGeneratedTokenIcon(symbol), fallback])

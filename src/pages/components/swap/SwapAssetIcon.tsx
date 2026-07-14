@@ -60,7 +60,8 @@ const SwapAssetIconInner = ({
     >
       {showFallback ? fallback : null}
       {!failed && src ? (
-        <img
+      <img
+        loading="lazy"
           src={src}
           alt={symbol}
           width={size}

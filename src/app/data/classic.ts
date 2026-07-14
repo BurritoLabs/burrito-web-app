@@ -1,5 +1,6 @@
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import {
+  BURRITO_REGISTRY_API_URL,
   COINPAPRIKA_LUNC_URL,
   COINPAPRIKA_USTC_URL
 } from "../config/externalServices"
@@ -1657,6 +1658,24 @@ export const fetchPrices = async (): Promise<PriceMap> => {
   const cached = getCachedPrices()
   if (cached?.data && Date.now() - cached.ts < PRICE_CACHE_TTL_MS) {
     return cached.data
+  }
+
+  if (BURRITO_REGISTRY_API_URL) {
+    try {
+      const response = await fetch(`${BURRITO_REGISTRY_API_URL}/v1/finder/prices`, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(5_000)
+      })
+      if (response.ok) {
+        const result = (await response.json()) as PriceMap
+        if (result.luna || result.lunc || result.ustc) {
+          setCachedPrices(result)
+          return result
+        }
+      }
+    } catch {
+      // Retain the existing public-provider fallback for local development.
+    }
   }
 
   try {

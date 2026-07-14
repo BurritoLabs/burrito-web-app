@@ -22,6 +22,10 @@ import {
   parseFactoryPairRecord,
   type FactoryPairRecord
 } from "../market/factoryPairs"
+import {
+  isTerraAddress,
+  normalizeSafeMarketAssetId
+} from "../utils/assetIdentity"
 
 type AssetDexPair = {
   dex?: string
@@ -737,25 +741,21 @@ const pickDexLabel = (dexId: string) => {
   return normalized
 }
 
-const looksLikeTerraAddress = (value: string) => value.toLowerCase().startsWith("terra1")
-
 const resolveAssetId = (info: PoolAssetInfo, fallback?: string) => {
   const nativeDenom =
     info?.native_token?.denom ??
     (typeof info?.native === "string" ? info.native : undefined)
-  if (nativeDenom) return `native:${nativeDenom}`
+  if (nativeDenom) return normalizeSafeMarketAssetId(`native:${nativeDenom}`)
 
   const cw20Contract =
     info?.token?.contract_addr ??
     (typeof info?.cw20 === "string" ? info.cw20 : undefined)
-  if (cw20Contract) return `cw20:${cw20Contract.toLowerCase()}`
+  if (cw20Contract) return normalizeSafeMarketAssetId(`cw20:${cw20Contract}`)
 
   if (fallback) {
-    return looksLikeTerraAddress(fallback)
-      ? `cw20:${fallback.toLowerCase()}`
-      : `native:${fallback}`
+    return normalizeSafeMarketAssetId(fallback)
   }
-  return "native:unknown"
+  return undefined
 }
 
 const parseBaseUnits = (value: unknown) => {
@@ -870,13 +870,7 @@ const toFallbackAsset = (assetId: string) => {
   return assetId
 }
 
-const normalizeMarketAssetId = (value: string) => {
-  if (!value) return "native:unknown"
-  if (value.startsWith("native:") || value.startsWith("cw20:")) return value
-  return looksLikeTerraAddress(value)
-    ? `cw20:${value.toLowerCase()}`
-    : `native:${value}`
-}
+const normalizeMarketAssetId = (value: string) => normalizeSafeMarketAssetId(value)
 
 type MarketIndexPayload = {
   generatedAt?: string
@@ -940,13 +934,14 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
 
   entries.forEach((entry) => {
     const pair = typeof entry?.pair === "string" ? entry.pair.toLowerCase() : ""
-    if (!pair) return
+    if (!isTerraAddress(pair)) return
 
     const poolAssets = Array.isArray(entry.poolAssets) ? entry.poolAssets : []
     if (poolAssets.length < 2) return
 
     const leftId = normalizeMarketAssetId(poolAssets[0]?.id ?? "")
     const rightId = normalizeMarketAssetId(poolAssets[1]?.id ?? "")
+    if (!leftId || !rightId || leftId === rightId) return
     const leftAmount = poolAssets[0]?.amount ?? "0"
     const rightAmount = poolAssets[1]?.amount ?? "0"
 
@@ -1082,18 +1077,16 @@ const mergeMarketPairs = (
   base: MarketDexPair[],
   additions: MarketDexPair[]
 ) => {
-  if (!additions.length) return base
   const map = new Map<string, MarketDexPair>()
-  base.forEach((pair) => {
-    map.set(pair.pair.toLowerCase(), {
+  ;[...base, ...additions].forEach((pair) => {
+    const address = pair.pair.trim().toLowerCase()
+    const leftId = normalizeSafeMarketAssetId(pair.assets[0] ?? "")
+    const rightId = normalizeSafeMarketAssetId(pair.assets[1] ?? "")
+    if (!isTerraAddress(address) || !leftId || !rightId || leftId === rightId) return
+    map.set(address, {
       ...pair,
-      pair: pair.pair.toLowerCase()
-    })
-  })
-  additions.forEach((pair) => {
-    map.set(pair.pair.toLowerCase(), {
-      ...pair,
-      pair: pair.pair.toLowerCase()
+      pair: address,
+      assets: [toFallbackAsset(leftId), toFallbackAsset(rightId)]
     })
   })
   return Array.from(map.values())
@@ -1434,6 +1427,9 @@ const fetchPoolForPair = async (
       if (!data?.asset1 || !data?.asset2) return null
 
       const matchedDex = pairDexMap.get(pair.pair.toLowerCase())
+      const leftId = resolveAssetId(data.asset1, pair.assets[0])
+      const rightId = resolveAssetId(data.asset2, pair.assets[1])
+      if (!leftId || !rightId || leftId === rightId) return null
       return {
         pair: pair.pair,
         dexId: matchedDex?.dexId ?? pair.dexId,
@@ -1441,11 +1437,11 @@ const fetchPoolForPair = async (
         type: pair.type,
         poolAssets: [
           {
-            id: resolveAssetId(data.asset1, pair.assets[0]),
+            id: leftId,
             amount: data.reserve1 ?? "0"
           },
           {
-            id: resolveAssetId(data.asset2, pair.assets[1]),
+            id: rightId,
             amount: data.reserve2 ?? "0"
           }
         ]
@@ -1458,6 +1454,9 @@ const fetchPoolForPair = async (
     const rightFallback = pair.assets[1]
 
     const matchedDex = pairDexMap.get(pair.pair.toLowerCase())
+    const leftId = resolveAssetId(left?.info, leftFallback)
+    const rightId = resolveAssetId(right?.info, rightFallback)
+    if (!leftId || !rightId || leftId === rightId) return null
 
     return {
       pair: pair.pair,
@@ -1466,11 +1465,11 @@ const fetchPoolForPair = async (
       type: pair.type,
       poolAssets: [
         {
-          id: resolveAssetId(left?.info, leftFallback),
+          id: leftId,
           amount: left?.amount ?? "0"
         },
         {
-          id: resolveAssetId(right?.info, rightFallback),
+          id: rightId,
           amount: right?.amount ?? "0"
         }
       ]

@@ -40,7 +40,7 @@ import {
   trimFractionByNonZeroDigits
 } from "../../app/utils/numberDisplay"
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
-import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
+import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import {
   getMarketDexFilterOptions,
   type MarketDexFilter
@@ -87,6 +87,7 @@ type MarketCard = {
   priceUsd?: number
   marketCapUsd?: number
   liquidityUsd?: number
+  priceConfidenceUsd?: number
   volumes?: Partial<Record<Timeframe, Record<string, number>>>
 }
 
@@ -272,6 +273,7 @@ const AssetIconInner = ({
       {fallback}
       {!failed && src ? (
         <img
+          loading="lazy"
           src={src}
           alt={symbol}
           width={size}
@@ -485,7 +487,7 @@ const Market = () => {
 
   const poolGraphUsdPrices = useMemo(
     () =>
-      deriveUsdPricesFromPools({
+      deriveUsdPriceGraphFromPools({
         pools,
         seedAssetIds: ["native:uluna", "native:uusd"],
         getDecimals: (assetId) => resolveAsset(assetId).decimals,
@@ -502,8 +504,8 @@ const Market = () => {
     (asset: ResolvedAsset) => {
       if (asset.isLunc) return nativePrice?.usd
       if (asset.isUstc) return prices?.ustc?.usd
-      const graphUsdPrice = poolGraphUsdPrices[asset.key]
-      if (graphUsdPrice !== undefined) return graphUsdPrice
+      const graphEntry = poolGraphUsdPrices[asset.key]
+      if (graphEntry !== undefined) return graphEntry.price
       const estimate = dexEstimatedPrices?.[asset.key]
       if (!estimate) return undefined
       const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : nativePrice?.usd
@@ -511,6 +513,14 @@ const Market = () => {
       return estimate.priceInQuote * quoteUsd
     },
     [dexEstimatedPrices, nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
+  )
+
+  const getAssetPriceConfidence = useCallback(
+    (asset: ResolvedAsset) => {
+      if (asset.isLunc || asset.isUstc) return Number.POSITIVE_INFINITY
+      return poolGraphUsdPrices[asset.key]?.liquidity
+    },
+    [poolGraphUsdPrices]
   )
 
   const getAssetChange = useCallback(
@@ -568,12 +578,23 @@ const Market = () => {
           : undefined
       const leftValue = leftUsd !== undefined ? leftUsd * leftAmount : undefined
       const rightValue = rightUsd !== undefined ? rightUsd * rightAmount : undefined
-      const liquidityUsd = calculatePoolLiquidityUsd({
+      const calculatedLiquidityUsd = calculatePoolLiquidityUsd({
         bondingLiquidityUsd,
         leftValue,
         pool,
         rightValue
       })
+      const finiteConfidence = [
+        getAssetPriceConfidence(left),
+        getAssetPriceConfidence(right)
+      ].filter((value): value is number => value !== undefined && Number.isFinite(value))
+      const priceConfidenceUsd = finiteConfidence.length
+        ? Math.min(...finiteConfidence)
+        : undefined
+      const liquidityUsd =
+        calculatedLiquidityUsd !== undefined && priceConfidenceUsd !== undefined
+          ? Math.min(calculatedLiquidityUsd, priceConfidenceUsd)
+          : calculatedLiquidityUsd
 
       const priceQuoteUsd = getAssetUsdPrice(priceQuote)
       const priceUsd = priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined
@@ -609,11 +630,13 @@ const Market = () => {
         priceLabel: `1 ${priceBase.symbol} ≈ ${formatNumber(priceValue, priceValue < 1 ? 6 : 4)} ${priceQuote.symbol}`,
         priceUsd,
         marketCapUsd,
-        liquidityUsd
+        liquidityUsd,
+        priceConfidenceUsd
       }
     },
     [
       dashboardSnapshot,
+      getAssetPriceConfidence,
       getAssetUsdPrice,
       nativePrice?.usd_market_cap,
       prices?.ustc?.usd_market_cap,
@@ -800,6 +823,7 @@ const Market = () => {
       }
 
       if (card.marketCapUsd !== undefined) return card.marketCapUsd
+      if ((card.priceConfidenceUsd ?? 0) < 1_000) return undefined
       if (card.priceBase.id.startsWith("native:") && card.priceUsd !== undefined) {
         const denom = card.priceBase.id.slice(7)
         const units = nativeSupplies[denom]?.units

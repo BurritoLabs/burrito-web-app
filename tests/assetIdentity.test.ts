@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from "vitest"
 import { setActiveAppChainKey } from "../src/app/activeChain"
 import {
   formatBaseDenomSymbol,
-  formatNativeSymbol
+  formatNativeSymbol,
+  isSafeDisplaySymbol,
+  isSafeNativeDenom,
+  normalizeSafeMarketAssetId,
+  resolveSafeDisplaySymbol
 } from "../src/app/utils/assetIdentity"
 
 afterEach(() => setActiveAppChainKey("lunc"))
@@ -31,5 +35,13 @@ describe("asset identity fallbacks", () => {
     setActiveAppChainKey("lunc")
     expect(formatNativeSymbol("ukrw")).toBe("KRTC")
     expect(formatNativeSymbol("ucre")).toBe("CRE")
+  })
+
+  it("rejects hostile market identifiers and display symbols", () => {
+    expect(normalizeSafeMarketAssetId("native:" + "X".repeat(6_000))).toBeUndefined()
+    expect(normalizeSafeMarketAssetId("native:native:uluna")).toBeUndefined()
+    expect(isSafeNativeDenom(`ibc/${"A".repeat(64)}`)).toBe(true)
+    expect(isSafeDisplaySymbol("TOKEN".repeat(20))).toBe(false)
+    expect(resolveSafeDisplaySymbol("\u0000BAD", "IBC")).toBe("IBC")
   })
 })

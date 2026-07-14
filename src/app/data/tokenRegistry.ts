@@ -1,6 +1,11 @@
 import type { AppChainKey } from "../appChains"
 import { BURRITO_REGISTRY_API_URL } from "../config/externalServices"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
+import {
+  isTerraAddress,
+  resolveSafeDisplayName,
+  resolveSafeDisplaySymbol
+} from "../utils/assetIdentity"
 import type { Cw20Token, IbcToken } from "./terraAssets"
 
 type VerifiedRegistryAsset = {
@@ -41,13 +46,13 @@ export const mapVerifiedRegistryAssets = (
 ): VerifiedTokenRegistry => {
   const result: VerifiedTokenRegistry = { cw20: {}, ibc: {} }
   assets.forEach((asset) => {
-    const symbol = asset.symbol?.trim()
-    const name = asset.name?.trim() || symbol
-    if (!symbol || !name) return
-    const icon = sanitizeAssetIconUrl(asset.logoUrl ?? undefined)
     if (asset.type === "cw20") {
       const contract = asset.assetKey.trim().toLowerCase()
-      if (!contract.startsWith("terra1")) return
+      if (!isTerraAddress(contract)) return
+      const fallback = `CW20-${contract.slice(6, 12).toUpperCase()}`
+      const symbol = resolveSafeDisplaySymbol(asset.symbol ?? undefined, fallback)
+      const name = resolveSafeDisplayName(asset.name ?? undefined, symbol)
+      const icon = sanitizeAssetIconUrl(asset.logoUrl ?? undefined)
       result.cw20[contract] = {
         token: contract,
         symbol,
@@ -59,6 +64,9 @@ export const mapVerifiedRegistryAssets = (
     }
     const hash = asset.assetKey.replace(/^ibc\//i, "").trim().toUpperCase()
     if (!/^[A-F0-9]{64}$/.test(hash)) return
+    const symbol = resolveSafeDisplaySymbol(asset.symbol ?? undefined, "IBC")
+    const name = resolveSafeDisplayName(asset.name ?? undefined, symbol)
+    const icon = sanitizeAssetIconUrl(asset.logoUrl ?? undefined)
     result.ibc[hash] = {
       denom: `ibc/${hash}`,
       base_denom: asset.baseDenom?.trim() || `ibc/${hash}`,

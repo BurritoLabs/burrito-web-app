@@ -63,7 +63,7 @@ import {
   type Timeframe
 } from "../../app/market/pairChart"
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
-import { deriveUsdPricesFromPools } from "../../app/market/priceGraph"
+import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { useAppChain } from "../../app/appChainContext"
 import { getAddressExplorerUrl } from "../../app/explorer"
 
@@ -420,7 +420,7 @@ const MarketPairDetails = () => {
 
   const poolGraphUsdPrices = useMemo(
     () =>
-      deriveUsdPricesFromPools({
+      deriveUsdPriceGraphFromPools({
         pools,
         seedAssetIds: ["native:uluna", "native:uusd"],
         getDecimals: (assetId) => {
@@ -510,8 +510,8 @@ const MarketPairDetails = () => {
     const upperSymbol = asset.symbol.trim().toUpperCase()
     if (upperSymbol === "LUNC" || upperSymbol === "LUNA") return nativePrice?.usd
     if (upperSymbol === "USTC") return prices?.ustc?.usd
-    const graphUsdPrice = poolGraphUsdPrices[asset.key]
-    if (graphUsdPrice !== undefined) return graphUsdPrice
+    const graphEntry = poolGraphUsdPrices[asset.key]
+    if (graphEntry !== undefined) return graphEntry.price
     const estimate = dexEstimatedPrices?.[asset.key]
     if (!estimate) return undefined
     const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : nativePrice?.usd
@@ -573,12 +573,23 @@ const MarketPairDetails = () => {
         : undefined
     const leftValue = leftUsd !== undefined ? leftUsd * leftAmount : undefined
     const rightValue = rightUsd !== undefined ? rightUsd * rightAmount : undefined
-    const liquidityUsd = calculatePoolLiquidityUsd({
+    const calculatedLiquidityUsd = calculatePoolLiquidityUsd({
       bondingLiquidityUsd,
       leftValue,
       pool: displayPool,
       rightValue
     })
+    const finiteConfidence = [left, right]
+      .map((asset) =>
+        asset.isLunc || asset.isUstc
+          ? Number.POSITIVE_INFINITY
+          : poolGraphUsdPrices[asset.key]?.liquidity
+      )
+      .filter((value): value is number => value !== undefined && Number.isFinite(value))
+    const liquidityUsd =
+      calculatedLiquidityUsd !== undefined && finiteConfidence.length
+        ? Math.min(calculatedLiquidityUsd, ...finiteConfidence)
+        : calculatedLiquidityUsd
 
     let marketCapUsd: number | undefined
     if (priceBase.isLunc) {

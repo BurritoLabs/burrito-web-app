@@ -5,15 +5,17 @@ import {
 } from "../src/app/market/factoryPairs"
 
 const dex = { id: "white-whale", label: "White Whale" }
+const pairAddress = `terra1${"q".repeat(38)}`
+const tokenAddress = `terra1${"p".repeat(38)}`
 
 describe("parseFactoryPairRecord", () => {
   it("parses White Whale native and CW20 pairs", () => {
     const pair = parseFactoryPairRecord(
       {
-        contract_addr: "terra1PAIR",
+        contract_addr: pairAddress,
         asset_infos: [
           { native_token: { denom: "uluna" } },
-          { token: { contract_addr: "terra1TOKEN" } }
+          { token: { contract_addr: tokenAddress } }
         ],
         pair_type: "constant_product"
       },
@@ -21,22 +23,22 @@ describe("parseFactoryPairRecord", () => {
     )
 
     expect(pair).toEqual({
-      pair: "terra1pair",
+      pair: pairAddress,
       dexId: "white-whale",
       dexLabel: "White Whale",
       type: "xyk",
-      assets: ["uluna", "terra1token"]
+      assets: ["uluna", tokenAddress]
     })
   })
 
   it("marks stable-swap pools and preserves the pagination cursor", () => {
     const assetInfos = [
-      { native_token: { denom: "ibc/AAA" } },
-      { native_token: { denom: "ibc/BBB" } }
+      { native_token: { denom: `ibc/${"A".repeat(64)}` } },
+      { native_token: { denom: `ibc/${"B".repeat(64)}` } }
     ]
     const pair = parseFactoryPairRecord(
       {
-        contract_addr: "terra1stable",
+        contract_addr: pairAddress,
         asset_infos: assetInfos,
         pair_type: { stable_swap: { amp: 85 } }
       },
@@ -51,7 +53,7 @@ describe("parseFactoryPairRecord", () => {
     expect(
       parseFactoryPairRecord(
         {
-          contract_addr: "terra1missing",
+          contract_addr: pairAddress,
           asset_infos: [{ native_token: { denom: "uluna" } }]
         },
         dex

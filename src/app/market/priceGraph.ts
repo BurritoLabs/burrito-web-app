@@ -2,7 +2,7 @@ import type { MarketPoolSnapshot } from "../data/market"
 import { normalizeAssetKey } from "../utils/assetIdentity"
 import { toUnitAmount } from "../utils/format"
 
-type PriceGraphEntry = {
+export type PriceGraphEntry = {
   price: number
   liquidity: number
 }
@@ -24,7 +24,7 @@ export const normalizeMarketPriceAssetKey = (assetId: string) => {
   return normalizeAssetKey(raw)
 }
 
-export const deriveUsdPricesFromPools = ({
+export const deriveUsdPriceGraphFromPools = ({
   pools,
   seedAssetIds = [],
   getDecimals,
@@ -129,7 +129,13 @@ export const deriveUsdPricesFromPools = ({
     if (!updated) break
   }
 
-  return Object.fromEntries(
-    Array.from(resolved.entries()).map(([key, entry]) => [key, entry.price])
-  ) as Record<string, number>
+  return Object.fromEntries(resolved.entries()) as Record<string, PriceGraphEntry>
 }
+
+export const deriveUsdPricesFromPools = (options: PriceGraphOptions) =>
+  Object.fromEntries(
+    Object.entries(deriveUsdPriceGraphFromPools(options)).map(([key, entry]) => [
+      key,
+      entry.price
+    ])
+  ) as Record<string, number>

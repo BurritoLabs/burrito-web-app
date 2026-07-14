@@ -1,3 +1,5 @@
+import { isSafeNativeDenom, isTerraAddress } from "../utils/assetIdentity"
+
 export type FactoryAssetInfo = {
   native_token?: { denom?: string }
   token?: { contract_addr?: string }
@@ -22,10 +24,10 @@ export type ParsedFactoryPair = {
 
 const normalizeAssetKey = (info: FactoryAssetInfo | undefined) => {
   const nativeDenom = info?.native_token?.denom?.trim()
-  if (nativeDenom) return nativeDenom
+  if (nativeDenom && isSafeNativeDenom(nativeDenom)) return nativeDenom
 
   const contract = info?.token?.contract_addr?.trim().toLowerCase()
-  return contract || undefined
+  return contract && isTerraAddress(contract) ? contract : undefined
 }
 
 const resolvePairType = (value: unknown) => {
@@ -56,7 +58,7 @@ export const parseFactoryPairRecord = (
   const left = normalizeAssetKey(assetInfos[0])
   const right = normalizeAssetKey(assetInfos[1])
 
-  if (!pair?.startsWith("terra1") || !left || !right || left === right) {
+  if (!pair || !isTerraAddress(pair) || !left || !right || left === right) {
     return undefined
   }
 

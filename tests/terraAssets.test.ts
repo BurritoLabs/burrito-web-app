@@ -38,12 +38,12 @@ describe("Terra asset registry selection", () => {
     const mapped = mapCosmosRegistryAssets({
       assets: [
         {
-          base: "ibc/2C962DAB",
+          base: `ibc/${"A".repeat(64)}`,
           display: "usdc",
           symbol: "USDC",
           name: "USDC",
           denom_units: [
-            { denom: "ibc/2C962DAB", exponent: 0 },
+            { denom: `ibc/${"A".repeat(64)}`, exponent: 0 },
             { denom: "usdc", exponent: 6 }
           ],
           traces: [
@@ -66,7 +66,7 @@ describe("Terra asset registry selection", () => {
       ]
     })
 
-    expect(mapped.ibc["2C962DAB"]).toMatchObject({
+    expect(mapped.ibc["A".repeat(64)]).toMatchObject({
       symbol: "USDC",
       name: "USDC",
       base_denom: "uusdc",

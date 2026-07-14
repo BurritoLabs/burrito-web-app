@@ -33,6 +33,13 @@ import {
   buildIbcAssetIconCandidates
 } from "../../app/utils/assetIcons"
 import {
+  formatNativeSymbol,
+  isSafeNativeDenom,
+  isTerraAddress,
+  resolveSafeDisplayName,
+  resolveSafeDisplaySymbol
+} from "../../app/utils/assetIdentity"
+import {
   isTxAlreadyInCacheError,
   parseSequenceMismatchExpected
 } from "../../app/tx/txDiagnostics"
@@ -159,7 +166,7 @@ const formatSwapNativeSymbol = (
     }
     return base.toUpperCase()
   }
-  return denom.split("/").pop()?.toUpperCase() || denom.toUpperCase()
+  return resolveSafeDisplaySymbol(formatNativeSymbol(denom), "NATIVE")
 }
 
 type SwapPanelProps = {
@@ -821,12 +828,12 @@ const SwapPanel = ({
       const dexName = normalizeDexName(entry.dexId)
       if (dexName && !activeDexIds.has(dexName)) return
       ;(entry.assets ?? []).forEach((asset) => {
-        if (asset.startsWith("terra1")) {
-          set.add(asset)
+        if (isTerraAddress(asset)) {
+          set.add(asset.toLowerCase())
         }
       })
     })
-    defaultCw20Contracts.forEach((contract) => set.add(contract))
+    defaultCw20Contracts.filter(isTerraAddress).forEach((contract) => set.add(contract))
     return set
   }, [activeDexIds, defaultCw20Contracts, dexPairs])
 
@@ -836,11 +843,11 @@ const SwapPanel = ({
       const dexName = normalizeDexName(entry.dexId)
       if (dexName && !activeDexIds.has(dexName)) return
       ;(entry.assets ?? []).forEach((asset) => {
-        if (!asset || asset.startsWith("terra1")) return
+        if (!isSafeNativeDenom(asset)) return
         set.add(asset.startsWith("ibc/") ? `ibc/${asset.slice(4).toUpperCase()}` : asset)
       })
     })
-    defaultNativeDenoms.forEach((denom) => set.add(denom))
+    defaultNativeDenoms.filter(isSafeNativeDenom).forEach((denom) => set.add(denom))
     return Array.from(set)
   }, [activeDexIds, defaultNativeDenoms, dexPairs])
 
@@ -891,18 +898,19 @@ const SwapPanel = ({
       if (denom.startsWith("ibc/")) {
         const hash = denom.slice(4).toUpperCase()
         const token = ibcWhitelist[hash]
-        const symbol =
-          token?.symbol ||
+        const symbol = resolveSafeDisplaySymbol(
+          token?.symbol,
           formatSwapNativeSymbol(
             denom,
             chain.nativeDenom,
             chain.displayDenom
           )
+        )
         return {
           id: asNativeId(denom),
           type: "native" as const,
           symbol,
-          name: token?.name || symbol,
+          name: resolveSafeDisplayName(token?.name, symbol),
           denom,
           decimals: token?.decimals ?? 6,
           iconCandidates: buildIbcAssetIconCandidates([token?.icon], "/system/ibc.svg", {
@@ -913,18 +921,19 @@ const SwapPanel = ({
       }
 
       const token = nativeWhitelist[denom.toLowerCase()]
-      const symbol =
-        token?.symbol ||
+      const symbol = resolveSafeDisplaySymbol(
+        token?.symbol,
         formatSwapNativeSymbol(
           denom,
           chain.nativeDenom,
           chain.displayDenom
         )
+      )
       return {
         id: asNativeId(denom),
         type: "native" as const,
         symbol,
-        name: token?.name || symbol,
+        name: resolveSafeDisplayName(token?.name, symbol),
         denom,
         decimals: token?.decimals ?? 6,
         iconCandidates: buildClassicNativeIconCandidates({
@@ -1397,6 +1406,7 @@ const SwapPanel = ({
         if (aBalance !== bBalance) return bBalance > aBalance ? 1 : -1
         return a.symbol.localeCompare(b.symbol)
       })
+      .slice(0, 120)
   }, [assetBalanceMap, assets, fromAsset.id, pickerQuery, pickerTarget])
 
   const closePicker = () => {

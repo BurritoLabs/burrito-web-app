@@ -3,9 +3,17 @@ import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import { getActiveAppChainKey } from "../activeChain"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
-import { formatBaseDenomSymbol } from "../utils/assetIdentity"
+import {
+  formatBaseDenomSymbol,
+  isSafeDisplaySymbol,
+  isSafeNativeDenom,
+  isTerraAddress,
+  resolveSafeDisplayName,
+  resolveSafeDisplaySymbol
+} from "../utils/assetIdentity"
 import {
   ASSET_URL,
+  BURRITO_REGISTRY_API_URL,
   COSMOS_SOURCE_ASSETLIST_URLS,
   COSMOS_TERRA_ASSETLIST_URL
 } from "../config/externalServices"
@@ -363,12 +371,61 @@ const getLocalCw20TokenOverride = (
 const looksLikeHttpUrl = (value?: string) =>
   Boolean(value && /^https?:\/\//i.test(value))
 
+type FinderAssetMetadataResponse = {
+  cw20?: Array<{
+    contract?: string
+    status?: string
+    metadata?: { name?: string; symbol?: string; decimals?: number; icon?: string }
+  }>
+  ibc?: Array<{
+    hash?: string
+    status?: string
+    metadata?: {
+      denom?: string
+      path?: string
+      baseDenom?: string
+      symbol?: string
+      name?: string
+      icon?: string
+      decimals?: number
+    }
+  }>
+}
+
+const fetchFinderAssetMetadata = async ({
+  contracts = [],
+  ibcDenoms = [],
+  chainKey
+}: {
+  contracts?: string[]
+  ibcDenoms?: string[]
+  chainKey: ReturnType<typeof getActiveAppChainKey>
+}) => {
+  if (!BURRITO_REGISTRY_API_URL) return undefined
+  try {
+    const response = await fetch(`${BURRITO_REGISTRY_API_URL}/v1/finder/account-assets`, {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      signal: AbortSignal.timeout(12_000),
+      body: JSON.stringify({
+        network: chainKey === "lunc" ? "classic" : "mainnet",
+        contracts: contracts.slice(0, 500),
+        ibcDenoms: ibcDenoms.slice(0, 100)
+      })
+    })
+    if (!response.ok) throw new Error(`Finder assets returned HTTP ${response.status}`)
+    return (await response.json()) as FinderAssetMetadataResponse
+  } catch {
+    return undefined
+  }
+}
+
 const hasReliableCw20Fallback = (
   contract: string,
   fallback?: Cw20Token
 ) => {
   const symbol = fallback?.symbol?.trim()
-  if (!symbol) return false
+  if (!symbol || !isSafeDisplaySymbol(symbol)) return false
   return symbol.toUpperCase() !== contract.slice(0, 6).toUpperCase()
 }
 
@@ -385,21 +442,22 @@ const mergeCw20TokenMetadata = ({
 }): Cw20Token => {
   const localOverride = getLocalCw20TokenOverride(contract, chainKey)
   const reliableFallback = hasReliableCw20Fallback(contract, fallback)
-  const symbol =
+  const fallbackSymbol = `CW20-${contract.slice(6, 12).toUpperCase()}`
+  const symbolCandidate =
     localOverride?.symbol?.trim() ||
     (reliableFallback ? fallback?.symbol?.trim() : undefined) ||
     onChain?.symbol?.trim() ||
-    fallback?.symbol?.trim() ||
-    contract.slice(0, 6).toUpperCase()
-  const name =
+    fallback?.symbol?.trim()
+  const symbol = resolveSafeDisplaySymbol(symbolCandidate, fallbackSymbol)
+  const nameCandidate =
     localOverride?.name?.trim() ||
     (reliableFallback ? fallback?.name?.trim() : undefined) ||
     (reliableFallback ? fallback?.symbol?.trim() : undefined) ||
     onChain?.name?.trim() ||
     onChain?.symbol?.trim() ||
     fallback?.name?.trim() ||
-    fallback?.symbol?.trim() ||
-    contract
+    fallback?.symbol?.trim()
+  const name = resolveSafeDisplayName(nameCandidate, symbol)
   return {
     token: contract,
     symbol,
@@ -425,29 +483,18 @@ const deriveSymbolFromDenom = (denom?: string) => {
 }
 
 const resolveDisplaySymbol = (candidate: string | undefined, denom: string) => {
-  const symbol = candidate?.trim()
-  if (
-    !symbol ||
-    symbol.length > 24 ||
-    /^(?:ibc|factory)[/:]/i.test(symbol) ||
-    /^0x[0-9a-f]{40}$/i.test(symbol)
-  ) {
-    return deriveSymbolFromDenom(denom)
-  }
-  return symbol
+  const fallback = deriveSymbolFromDenom(denom)
+  const symbol = resolveSafeDisplaySymbol(candidate, fallback)
+  return /^(?:ibc|factory)[/:]/i.test(symbol) || /^0x[0-9a-f]{40}$/i.test(symbol)
+    ? fallback
+    : symbol
 }
 
 const resolveDisplayName = (candidate: string | undefined, symbol: string) => {
-  const name = candidate?.trim()
-  if (
-    !name ||
-    name.length > 64 ||
-    /^(?:ibc|factory)[/:]/i.test(name) ||
-    /^0x[0-9a-f]{40}$/i.test(name)
-  ) {
-    return symbol
-  }
-  return name
+  const name = resolveSafeDisplayName(candidate, symbol)
+  return /^(?:ibc|factory)[/:]/i.test(name) || /^0x[0-9a-f]{40}$/i.test(name)
+    ? symbol
+    : name
 }
 
 const CLASSIC_NATIVE_DEFAULTS: Record<string, NativeToken> = {
@@ -499,22 +546,23 @@ export const mapCosmosRegistryAssets = (
 
   ;(payload.assets ?? []).forEach((asset) => {
     const base = asset.base?.trim()
-    const symbol = asset.symbol?.trim()
-    if (!base || !symbol) return
+    if (!base) return
+    const symbol = resolveDisplaySymbol(asset.symbol, base)
 
-    const name = asset.name?.trim() || symbol
+    const name = resolveDisplayName(asset.name, symbol)
     const decimals = getRegistryAssetDecimals(asset)
     const icon = sanitizeAssetIconUrl(asset.logo_URIs?.svg ?? asset.logo_URIs?.png)
 
     if (base.startsWith("cw20:terra1")) {
       const token = base.slice("cw20:".length).toLowerCase()
+      if (!isTerraAddress(token)) return
       result.cw20[token] = { token, symbol, name, decimals, icon }
       return
     }
 
     if (base.startsWith("ibc/")) {
       const hash = base.slice(4).toUpperCase()
-      if (!hash) return
+      if (!/^[A-F0-9]{64}$/.test(hash)) return
       const trace = asset.traces?.[0]
       result.ibc[hash] = {
         denom: `ibc/${hash}`,
@@ -530,6 +578,7 @@ export const mapCosmosRegistryAssets = (
       return
     }
 
+    if (!isSafeNativeDenom(base)) return
     const denom = base.toLowerCase()
     result.native[denom] = { denom, symbol, name, decimals, icon }
   })
@@ -545,13 +594,13 @@ export const mapCosmosRegistryAssetAliases = (
   payloads.forEach((payload) => {
     ;(payload.assets ?? []).forEach((asset) => {
       const base = asset.base?.trim()
-      const symbol = asset.symbol?.trim()
-      if (!base || !symbol) return
+      if (!base || !isSafeNativeDenom(base)) return
+      const symbol = resolveDisplaySymbol(asset.symbol, base)
 
       const token: NativeToken = {
         denom: base,
         symbol,
-        name: asset.name?.trim() || symbol,
+        name: resolveDisplayName(asset.name, symbol),
         decimals: getRegistryAssetDecimals(asset),
         icon: sanitizeAssetIconUrl(asset.logo_URIs?.svg ?? asset.logo_URIs?.png)
       }
@@ -786,14 +835,15 @@ export const useCw20Whitelist = () => {
       const mapped = Object.entries(tokens).reduce<Record<string, Cw20Token>>((acc, entry) => {
         const [key, token] = entry
         const address = (token.token || key).toLowerCase()
-        const symbol = token.symbol?.trim()
-        if (!address || !symbol) return acc
+        if (!isTerraAddress(address)) return acc
+        const fallbackSymbol = `CW20-${address.slice(6, 12).toUpperCase()}`
+        const symbol = resolveSafeDisplaySymbol(token.symbol, fallbackSymbol)
 
         const parsedDecimals = Number(token.decimals)
         acc[address] = {
           token: address,
           symbol,
-          name: token.name?.trim() || symbol,
+          name: resolveSafeDisplayName(token.name, symbol),
           protocol: token.protocol?.trim() || undefined,
           icon: sanitizeAssetIconUrl(token.icon),
           decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : 6
@@ -817,7 +867,11 @@ export const fetchCw20TokenInfos = async (
   scope = getAssetChainScope()
 ) => {
   const normalized = Array.from(
-    new Set(contracts.map((contract) => contract.trim().toLowerCase()).filter(Boolean))
+    new Set(
+      contracts
+        .map((contract) => contract.trim().toLowerCase())
+        .filter(isTerraAddress)
+    )
   )
   if (!normalized.length) return {}
 
@@ -845,6 +899,27 @@ export const fetchCw20TokenInfos = async (
     }
     missing.push(contract)
   })
+
+  const finderPayload = await fetchFinderAssetMetadata({
+    contracts: missing,
+    chainKey: scope.chainKey
+  })
+  if (finderPayload) {
+    ;(finderPayload.cw20 ?? []).forEach((entry) => {
+      const contract = entry.contract?.trim().toLowerCase()
+      if (!contract || !isTerraAddress(contract) || entry.status !== "ok") return
+      const onChain = entry.metadata
+      if (!onChain) return
+      cacheCw20TokenInfo(contract, onChain, scope.chainId)
+      results[contract] = mergeCw20TokenMetadata({
+        contract,
+        fallback: fallback[contract],
+        onChain,
+        chainKey: scope.chainKey
+      })
+    })
+    return results
+  }
 
   let index = 0
   const concurrency = 8
@@ -922,46 +997,27 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
     const addresses = new Set([...Object.keys(tokens), ...Object.keys(contractMeta)])
 
     return Object.fromEntries(
-      Array.from(addresses).map((address) => {
+      Array.from(addresses).filter(isTerraAddress).map((address) => {
         const token = tokens[address]
         const contract = contractMeta[address]
-        const fallbackSymbol = address.slice(0, 6).toUpperCase()
-
         return [
           address,
-          {
-            token: address,
-            symbol:
-              getLocalCw20TokenOverride(address)?.symbol ??
-              token?.symbol ??
-              contract?.name?.trim() ??
-              fallbackSymbol,
-            name:
-              getLocalCw20TokenOverride(address)?.name?.trim() ||
-              token?.name?.trim() ||
-              contract?.name?.trim() ||
-              token?.protocol?.trim() ||
-              contract?.protocol?.trim() ||
-              token?.symbol ||
-              fallbackSymbol,
-            protocol:
-              getLocalCw20TokenOverride(address)?.protocol?.trim() ||
-              token?.protocol?.trim() ||
-              contract?.protocol?.trim() ||
-              undefined,
-            icon:
-              getLocalCw20TokenOverride(address)?.icon ||
-              token?.icon ||
-              contract?.icon,
-            decimals:
-              getLocalCw20TokenOverride(address)?.decimals ??
-              token?.decimals ??
-              6
-          } satisfies Cw20Token
+          mergeCw20TokenMetadata({
+            contract: address,
+            fallback: {
+              token: address,
+              symbol: token?.symbol ?? contract?.name ?? "",
+              name: token?.name ?? contract?.name,
+              protocol: token?.protocol ?? contract?.protocol,
+              icon: token?.icon ?? contract?.icon,
+              decimals: token?.decimals ?? 6
+            },
+            chainKey: scope.chainKey
+          })
         ]
       })
     )
-  }, [contractsQuery.data, tokenQuery.data])
+  }, [contractsQuery.data, scope.chainKey, tokenQuery.data])
   const normalized = useMemo(
     () =>
       Array.from(
@@ -1048,6 +1104,33 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
       missingHashes.join(",")
     ],
     queryFn: async () => {
+      const finderPayload = await fetchFinderAssetMetadata({
+        ibcDenoms: missingHashes.map((hash) => `ibc/${hash}`),
+        chainKey: scope.chainKey
+      })
+      if (finderPayload) {
+        const entries = (finderPayload.ibc ?? []).flatMap((entry) => {
+          const hash = entry.hash?.trim().toUpperCase()
+          const metadata = entry.metadata
+          if (!hash || !/^[A-F0-9]{64}$/.test(hash) || entry.status !== "ok" || !metadata) {
+            return []
+          }
+          const symbol = resolveDisplaySymbol(metadata.symbol, metadata.baseDenom ?? "")
+          const token: IbcToken = {
+            denom: `ibc/${hash}`,
+            base_denom: metadata.baseDenom ?? `ibc/${hash}`,
+            symbol,
+            name: resolveDisplayName(metadata.name, symbol),
+            icon: sanitizeAssetIconUrl(metadata.icon) ?? "/system/ibc.svg",
+            decimals: Number.isInteger(metadata.decimals) ? metadata.decimals : 6,
+            path: metadata.path
+          }
+          cacheIbcToken(hash, token, scope.chainId)
+          return [[hash, token] as [string, IbcToken]]
+        })
+        return Object.fromEntries(entries)
+      }
+
       const entries = await Promise.all(
         missingHashes.map(async (hash) => {
           const token = await fetchIbcTraceToken(hash, scope)

@@ -10,6 +10,11 @@ afterEach(() => {
 describe("chain-specific market registry", () => {
   it("loads only Phoenix mainnet pairs on LUNA", async () => {
     setActiveAppChainKey("luna")
+    const lunaPair = `terra1${"q".repeat(38)}`
+    const phoenixPair = `terra1${"r".repeat(38)}`
+    const whiteWhalePair = `terra1${"s".repeat(38)}`
+    const classicPair = `terra1${"t".repeat(38)}`
+    const lunaToken = `terra1${"p".repeat(38)}`
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
       if (url.includes("terra1f4cr4sr5eulp3f2us8unu6qv8a5rhjltqsg7ujjx6f2mrlqh923sljwhn3")) {
@@ -17,10 +22,10 @@ describe("chain-specific market registry", () => {
           data: {
             pairs: [
               {
-                contract_addr: "terra1whitewhalepair",
+                contract_addr: whiteWhalePair,
                 asset_infos: [
                   { native_token: { denom: "uluna" } },
-                  { native_token: { denom: "ibc/WHITEWHALE" } }
+                  { native_token: { denom: `ibc/${"A".repeat(64)}` } }
                 ],
                 pair_type: "constant_product"
               }
@@ -35,19 +40,19 @@ describe("chain-specific market registry", () => {
       }
       return new Response(JSON.stringify({
           mainnet: {
-            terra1lunapair: {
+            [lunaPair]: {
               dex: "astroport",
               type: "xyk",
-              assets: ["uluna", "terra1lunatoken"]
+              assets: ["uluna", lunaToken]
             },
-            terra1phoenixpair: {
+            [phoenixPair]: {
               dex: "phoenix",
               type: "xyk",
-              assets: ["uluna", "ibc/LUNAIBC"]
+              assets: ["uluna", `ibc/${"B".repeat(64)}`]
             }
           },
           classic: {
-            terra1classicpair: {
+            [classicPair]: {
               dex: "terraswap",
               type: "xyk",
               assets: ["uluna", "uusd"]
@@ -61,15 +66,15 @@ describe("chain-specific market registry", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(6)
     expect(pairs.map((pair) => pair.pair)).toEqual([
-      "terra1lunapair",
-      "terra1phoenixpair",
-      "terra1whitewhalepair"
+      lunaPair,
+      phoenixPair,
+      whiteWhalePair
     ])
     expect(pairs.map((pair) => pair.dexId)).toEqual([
       "astroport",
       "phoenix",
       "white-whale"
     ])
-    expect(pairs.some((pair) => pair.pair === "terra1classicpair")).toBe(false)
+    expect(pairs.some((pair) => pair.pair === classicPair)).toBe(false)
   })
 })

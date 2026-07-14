@@ -59,7 +59,8 @@ const MarketPairAssetIconInner = ({
     >
       {fallback}
       {!failed && src ? (
-        <img
+      <img
+        loading="lazy"
           src={src}
           alt={symbol}
           width={size}
