@@ -39,5 +39,14 @@ const LUNA_DEX_FILTER_OPTIONS: readonly MarketDexFilterOption[] = [
   { value: "white-whale", label: "White Whale" }
 ]
 
+const STANDARD_LIQUIDITY_DEX_LABELS = {
+  lunc: "Terraswap, Astroport, Terraport, Garuda, and WESO DeFi",
+  luna: "Terraswap, Astroport, and Phoenix"
+} as const satisfies Record<SupportedChainKey, string>
+
 export const getMarketDexFilterOptions = (chainKey: SupportedChainKey) =>
   chainKey === "luna" ? LUNA_DEX_FILTER_OPTIONS : LUNC_DEX_FILTER_OPTIONS
+
+export const getStandardLiquidityDexLabels = (
+  chainKey: SupportedChainKey
+) => STANDARD_LIQUIDITY_DEX_LABELS[chainKey]

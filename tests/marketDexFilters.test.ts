@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { getMarketDexFilterOptions } from "../src/app/market/dexFilters"
+import {
+  getMarketDexFilterOptions,
+  getStandardLiquidityDexLabels
+} from "../src/app/market/dexFilters"
 
 describe("chain-specific market DEX filters", () => {
   it("shows only Phoenix DEXes on LUNA", () => {
@@ -30,5 +33,13 @@ describe("chain-specific market DEX filters", () => {
 
     expect(classicFilters.has("phoenix")).toBe(false)
     expect(classicFilters.has("terraport")).toBe(true)
+  })
+
+  it("uses chain-specific DEX names in liquidity support copy", () => {
+    expect(getStandardLiquidityDexLabels("luna")).toBe(
+      "Terraswap, Astroport, and Phoenix"
+    )
+    expect(getStandardLiquidityDexLabels("lunc")).toContain("Terraport")
+    expect(getStandardLiquidityDexLabels("luna")).not.toContain("Terraport")
   })
 })

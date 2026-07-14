@@ -1,10 +1,14 @@
 import type { ReactNode } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import PageShell from "../../pages/PageShell"
 import { useAppChain } from "../appChainContext"
-import type { AppChainConfig } from "../appChains"
+import { SUPPORTED_APP_CHAINS } from "../appChains"
+import {
+  findAlternativeChainForFeature,
+  type ChainFeature
+} from "./chainFeatureAvailability"
+import { getChainSwitchDestination } from "./chainSwitchNavigation"
 import styles from "./ChainFeatureGuard.module.css"
-
-type ChainFeature = keyof AppChainConfig["features"]
 
 type ChainFeatureGuardProps = {
   children: ReactNode
@@ -17,26 +21,41 @@ const ChainFeatureGuard = ({
   feature,
   title
 }: ChainFeatureGuardProps) => {
-  const { chain, setChainKey } = useAppChain()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { chain, chainKey, setChainKey } = useAppChain()
 
   if (chain.features[feature]) return children
+
+  const alternativeChain = findAlternativeChainForFeature(
+    SUPPORTED_APP_CHAINS,
+    chainKey,
+    feature
+  )
 
   return (
     <PageShell title={title}>
       <div className={`card ${styles.state}`}>
-        <div className={styles.title}>Phoenix integration is not configured</div>
+        <div className={styles.title}>
+          {title} is not available on {chain.name}
+        </div>
         <p className={styles.detail}>
-          This page requires Phoenix DEX or launchpad contract configuration.
-          Wallet, staking, governance, history, and CosmWasm tools remain
-          available on Terra.
+          This deployment does not enable {title.toLowerCase()} on {chain.name}.
+          Other enabled wallet and network tools remain available.
         </p>
-        <button
-          type="button"
-          className={`uiButton uiButtonPrimary ${styles.action}`}
-          onClick={() => setChainKey("lunc")}
-        >
-          Switch to Terra Classic
-        </button>
+        {alternativeChain ? (
+          <button
+            type="button"
+            className={`uiButton uiButtonPrimary ${styles.action}`}
+            onClick={() => {
+              const destination = getChainSwitchDestination(location)
+              setChainKey(alternativeChain.key)
+              if (destination) navigate(destination, { replace: true })
+            }}
+          >
+            Switch to {alternativeChain.name}
+          </button>
+        ) : null}
       </div>
     </PageShell>
   )

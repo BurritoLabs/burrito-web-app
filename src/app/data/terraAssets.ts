@@ -154,6 +154,25 @@ let cw20TokenInfoCache: Record<string, Cw20TokenInfoCacheEntry> | null = null
 let cosmosRegistryAssetsPromise: Promise<CosmosRegistryAssets> | null = null
 let cosmosSourceAssetAliasesPromise: Promise<Record<string, NativeToken>> | null = null
 
+export const buildChainScopedAssetCacheKey = (
+  chainId: string,
+  assetId: string
+) => `${chainId}:${assetId.trim().toLowerCase()}`
+
+type AssetChainScope = {
+  chainId: string
+  chainKey: ReturnType<typeof getActiveAppChainKey>
+  lcd: string
+  name: string
+}
+
+const getAssetChainScope = (): AssetChainScope => ({
+  chainId: CLASSIC_CHAIN.chainId,
+  chainKey: getActiveAppChainKey(),
+  lcd: CLASSIC_CHAIN.lcd,
+  name: CLASSIC_CHAIN.name
+})
+
 export const fetchAsset = async <T,>(path: string): Promise<T> => {
   const res = await fetch(`${ASSET_URL}/${path}`)
   if (!res.ok) throw new Error(`Failed to load ${path}`)
@@ -255,55 +274,64 @@ const writeCw20TokenInfoCache = (
   }
 }
 
-const getCachedIbcToken = (hash: string) => {
+const getCachedIbcToken = (hash: string, chainId: string) => {
   const cache = readIbcCache()
-  const cached = cache[hash]
+  const key = buildChainScopedAssetCacheKey(chainId, hash)
+  const cached = cache[key]
   if (!cached) return undefined
   if (Date.now() - cached.ts > IBC_CACHE_TTL) {
     const next = { ...cache }
-    delete next[hash]
+    delete next[key]
     writeIbcCache(next)
     return undefined
   }
   return cached.token
 }
 
-const cacheIbcToken = (hash: string, token: IbcToken) => {
+const cacheIbcToken = (hash: string, token: IbcToken, chainId: string) => {
   const cache = readIbcCache()
+  const key = buildChainScopedAssetCacheKey(chainId, hash)
   writeIbcCache({
     ...cache,
-    [hash]: { ts: Date.now(), token }
+    [key]: { ts: Date.now(), token }
   })
 }
 
-const getCachedNativeToken = (denom: string) => {
+const getCachedNativeToken = (denom: string, chainId: string) => {
   const cache = readNativeTokenCache()
-  const cached = cache[denom]
+  const key = buildChainScopedAssetCacheKey(chainId, denom)
+  const cached = cache[key]
   if (!cached) return undefined
   if (Date.now() - cached.ts > NATIVE_TOKEN_CACHE_TTL) {
     const next = { ...cache }
-    delete next[denom]
+    delete next[key]
     writeNativeTokenCache(next)
     return undefined
   }
   return cached.token
 }
 
-const cacheNativeToken = (denom: string, token: NativeToken) => {
+const cacheNativeToken = (
+  denom: string,
+  token: NativeToken,
+  chainId: string
+) => {
   const cache = readNativeTokenCache()
+  const key = buildChainScopedAssetCacheKey(chainId, denom)
   writeNativeTokenCache({
     ...cache,
-    [denom]: { ts: Date.now(), token }
+    [key]: { ts: Date.now(), token }
   })
 }
 
-const getCachedCw20TokenInfo = (contract: string) => {
+const getCachedCw20TokenInfo = (contract: string, chainId: string) => {
   const cache = readCw20TokenInfoCache()
-  const cached = cache[contract]
+  const key = buildChainScopedAssetCacheKey(chainId, contract)
+  const cached = cache[key]
   if (!cached) return undefined
   if (Date.now() - cached.ts > CW20_TOKEN_INFO_CACHE_TTL) {
     const next = { ...cache }
-    delete next[contract]
+    delete next[key]
     writeCw20TokenInfoCache(next)
     return undefined
   }
@@ -312,14 +340,24 @@ const getCachedCw20TokenInfo = (contract: string) => {
 
 const cacheCw20TokenInfo = (
   contract: string,
-  token: { name?: string; symbol?: string; decimals?: number; icon?: string }
+  token: { name?: string; symbol?: string; decimals?: number; icon?: string },
+  chainId: string
 ) => {
   const cache = readCw20TokenInfoCache()
+  const key = buildChainScopedAssetCacheKey(chainId, contract)
   writeCw20TokenInfoCache({
     ...cache,
-    [contract]: { ts: Date.now(), token }
+    [key]: { ts: Date.now(), token }
   })
 }
+
+const getLocalCw20TokenOverride = (
+  contract: string,
+  chainKey = getActiveAppChainKey()
+) =>
+  chainKey === "lunc"
+    ? LOCAL_CW20_TOKEN_OVERRIDES[contract]
+    : undefined
 
 const looksLikeHttpUrl = (value?: string) =>
   Boolean(value && /^https?:\/\//i.test(value))
@@ -327,13 +365,15 @@ const looksLikeHttpUrl = (value?: string) =>
 const mergeCw20TokenMetadata = ({
   contract,
   fallback,
-  onChain
+  onChain,
+  chainKey = getActiveAppChainKey()
 }: {
   contract: string
   fallback?: Cw20Token
   onChain?: { name?: string; symbol?: string; decimals?: number; icon?: string }
+  chainKey?: ReturnType<typeof getActiveAppChainKey>
 }): Cw20Token => {
-  const localOverride = LOCAL_CW20_TOKEN_OVERRIDES[contract]
+  const localOverride = getLocalCw20TokenOverride(contract, chainKey)
   const symbol =
     localOverride?.symbol?.trim() ||
     fallback?.symbol?.trim() ||
@@ -519,8 +559,10 @@ export const mapCosmosRegistryAssetAliases = (
   return aliases
 }
 
-const fetchCosmosRegistryAssets = async () => {
-  if (getActiveAppChainKey() !== "luna") return EMPTY_COSMOS_REGISTRY_ASSETS
+const fetchCosmosRegistryAssets = async (
+  chainKey = getActiveAppChainKey()
+) => {
+  if (chainKey !== "luna") return EMPTY_COSMOS_REGISTRY_ASSETS
   if (!cosmosRegistryAssetsPromise) {
     cosmosRegistryAssetsPromise = fetch(COSMOS_TERRA_ASSETLIST_URL)
       .then(async (response) => {
@@ -532,8 +574,10 @@ const fetchCosmosRegistryAssets = async () => {
   return cosmosRegistryAssetsPromise
 }
 
-const fetchCosmosSourceAssetAliases = async () => {
-  if (getActiveAppChainKey() !== "luna") return {}
+const fetchCosmosSourceAssetAliases = async (
+  chainKey = getActiveAppChainKey()
+) => {
+  if (chainKey !== "luna") return {}
   if (!cosmosSourceAssetAliasesPromise) {
     cosmosSourceAssetAliasesPromise = Promise.all(
       COSMOS_SOURCE_ASSETLIST_URLS.map(async (url) => {
@@ -568,31 +612,38 @@ const getBaseDenomLookupCandidates = (baseDenom: string) => {
   return Array.from(candidates)
 }
 
-const fetchSourceRegistryToken = async (baseDenom: string) => {
-  const aliases = await fetchCosmosSourceAssetAliases()
+const fetchSourceRegistryToken = async (
+  baseDenom: string,
+  chainKey = getActiveAppChainKey()
+) => {
+  const aliases = await fetchCosmosSourceAssetAliases(chainKey)
   return getBaseDenomLookupCandidates(baseDenom)
     .map((candidate) => aliases[candidate])
     .find(Boolean)
 }
 
-const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> => {
-  const cached = getCachedIbcToken(hash)
+const fetchIbcTraceToken = async (
+  hash: string,
+  scope = getAssetChainScope()
+): Promise<IbcToken | undefined> => {
+  const { chainId, chainKey, lcd } = scope
+  const cached = getCachedIbcToken(hash, chainId)
   if (cached) return cached
 
   const traceRes = await fetchWithEndpointFallback(
-    `${CLASSIC_CHAIN.lcd}/ibc/apps/transfer/v1/denom_traces/${hash}`
+    `${lcd}/ibc/apps/transfer/v1/denom_traces/${hash}`
   )
   if (!traceRes.ok) return undefined
   const tracePayload = (await traceRes.json()) as IbcTraceResponse
   const baseDenom = tracePayload?.denom_trace?.base_denom
   if (!baseDenom) return undefined
 
-  const sourceToken = await fetchSourceRegistryToken(baseDenom)
+  const sourceToken = await fetchSourceRegistryToken(baseDenom, chainKey)
   let metadata: BankMetadataResponse["metadata"] | undefined
   if (!sourceToken) {
     try {
       const metadataRes = await fetchWithEndpointFallback(
-        `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(
+        `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(
           baseDenom
         )}`
       )
@@ -620,20 +671,22 @@ const fetchIbcTraceToken = async (hash: string): Promise<IbcToken | undefined> =
     decimals: sourceToken?.decimals ?? getDecimalsFromMetadata(metadata) ?? 6,
     path: tracePayload?.denom_trace?.path
   }
-  cacheIbcToken(hash, token)
+  cacheIbcToken(hash, token, chainId)
   return token
 }
 
 const fetchNativeMetadataToken = async (
-  denom: string
+  denom: string,
+  scope = getAssetChainScope()
 ): Promise<NativeToken | undefined> => {
   const normalized = denom.trim().toLowerCase()
   if (!normalized || normalized.startsWith("ibc/") || normalized.startsWith("terra1")) {
     return undefined
   }
 
+  const { chainId, chainKey, lcd } = scope
   const predefined =
-    normalized === "uluna" && getActiveAppChainKey() === "luna"
+    normalized === "uluna" && chainKey === "luna"
       ? {
           denom: "uluna",
           symbol: "LUNA",
@@ -644,17 +697,19 @@ const fetchNativeMetadataToken = async (
       : CLASSIC_NATIVE_DEFAULTS[normalized]
   if (predefined) return predefined
 
-  const cached = getCachedNativeToken(normalized)
+  const cached = getCachedNativeToken(normalized, chainId)
   if (cached) return cached
 
-  const registryToken = (await fetchCosmosRegistryAssets()).native[normalized]
+  const registryToken = (await fetchCosmosRegistryAssets(chainKey)).native[
+    normalized
+  ]
   if (registryToken) {
-    cacheNativeToken(normalized, registryToken)
+    cacheNativeToken(normalized, registryToken, chainId)
     return registryToken
   }
 
   const response = await fetchWithEndpointFallback(
-    `${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
+    `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
   )
   if (!response.ok) return undefined
   const payload = (await response.json()) as BankMetadataResponse
@@ -670,7 +725,7 @@ const fetchNativeMetadataToken = async (
     decimals: getDecimalsFromMetadata(metadata) ?? 6,
     icon: undefined
   }
-  cacheNativeToken(normalized, token)
+  cacheNativeToken(normalized, token, chainId)
   return token
 }
 
@@ -705,13 +760,14 @@ export type Cw20Contract = {
 }
 
 export const useCw20Whitelist = () => {
+  const scope = getAssetChainScope()
   return useQuery({
-    queryKey: ["terra-assets", "cw20", CLASSIC_CHAIN.chainId],
+    queryKey: ["terra-assets", "cw20", scope.chainId],
     queryFn: async () => {
       const data = await fetchAsset<Record<string, Record<string, Cw20Token>>>(
         "cw20/tokens.json"
       )
-      const tokens = pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
+      const tokens = pickChainAssets(data, scope.name, scope.chainId) ?? {}
       const mapped = Object.entries(tokens).reduce<Record<string, Cw20Token>>((acc, entry) => {
         const [key, token] = entry
         const address = (token.token || key).toLowerCase()
@@ -729,7 +785,7 @@ export const useCw20Whitelist = () => {
         }
         return acc
       }, {})
-      const supplemental = (await fetchCosmosRegistryAssets()).cw20
+      const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).cw20
       return Object.fromEntries(
         Object.entries({ ...mapped, ...supplemental }).filter(([, token]) =>
           Boolean(token.symbol && token.token)
@@ -742,7 +798,8 @@ export const useCw20Whitelist = () => {
 
 export const fetchCw20TokenInfos = async (
   contracts: string[],
-  fallback: Record<string, Cw20Token> = {}
+  fallback: Record<string, Cw20Token> = {},
+  scope = getAssetChainScope()
 ) => {
   const normalized = Array.from(
     new Set(contracts.map((contract) => contract.trim().toLowerCase()).filter(Boolean))
@@ -753,12 +810,13 @@ export const fetchCw20TokenInfos = async (
   const missing: string[] = []
 
   normalized.forEach((contract) => {
-    const cached = getCachedCw20TokenInfo(contract)
+    const cached = getCachedCw20TokenInfo(contract, scope.chainId)
     if (cached) {
       results[contract] = mergeCw20TokenMetadata({
         contract,
         fallback: fallback[contract],
-        onChain: cached
+        onChain: cached,
+        chainKey: scope.chainKey
       })
       return
     }
@@ -776,7 +834,7 @@ export const fetchCw20TokenInfos = async (
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
         const response = await fetchWithEndpointFallback(
-          `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+          `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
         )
         if (!response.ok) continue
         const payload = (await response.json()) as Cw20TokenInfoResponse
@@ -788,7 +846,7 @@ export const fetchCw20TokenInfos = async (
         try {
           const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
           const marketingResponse = await fetchWithEndpointFallback(
-            `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
+            `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
           )
           if (marketingResponse.ok) {
             const marketingPayload =
@@ -812,11 +870,12 @@ export const fetchCw20TokenInfos = async (
         ) {
           continue
         }
-        cacheCw20TokenInfo(contract, onChain)
+        cacheCw20TokenInfo(contract, onChain, scope.chainId)
         results[contract] = mergeCw20TokenMetadata({
           contract,
           fallback: fallback[contract],
-          onChain
+          onChain,
+          chainKey: scope.chainKey
         })
       } catch {
         // Ignore per-contract metadata failures.
@@ -829,6 +888,7 @@ export const fetchCw20TokenInfos = async (
 }
 
 export const useResolvedCw20Whitelist = (contracts?: string[]) => {
+  const scope = getAssetChainScope()
   const tokenQuery = useCw20Whitelist()
   const contractsQuery = useCw20Contracts()
   const base = useMemo(() => {
@@ -847,12 +907,12 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
           {
             token: address,
             symbol:
-              LOCAL_CW20_TOKEN_OVERRIDES[address]?.symbol ??
+              getLocalCw20TokenOverride(address)?.symbol ??
               token?.symbol ??
               contract?.name?.trim() ??
               fallbackSymbol,
             name:
-              LOCAL_CW20_TOKEN_OVERRIDES[address]?.name?.trim() ||
+              getLocalCw20TokenOverride(address)?.name?.trim() ||
               token?.name?.trim() ||
               contract?.name?.trim() ||
               token?.protocol?.trim() ||
@@ -860,16 +920,16 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
               token?.symbol ||
               fallbackSymbol,
             protocol:
-              LOCAL_CW20_TOKEN_OVERRIDES[address]?.protocol?.trim() ||
+              getLocalCw20TokenOverride(address)?.protocol?.trim() ||
               token?.protocol?.trim() ||
               contract?.protocol?.trim() ||
               undefined,
             icon:
-              LOCAL_CW20_TOKEN_OVERRIDES[address]?.icon ||
+              getLocalCw20TokenOverride(address)?.icon ||
               token?.icon ||
               contract?.icon,
             decimals:
-              LOCAL_CW20_TOKEN_OVERRIDES[address]?.decimals ??
+              getLocalCw20TokenOverride(address)?.decimals ??
               token?.decimals ??
               6
           } satisfies Cw20Token
@@ -886,8 +946,8 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
   )
 
   const resolvedQuery = useQuery({
-    queryKey: ["terra-assets", "cw20-resolved", CLASSIC_CHAIN.chainId, normalized.join(",")],
-    queryFn: () => fetchCw20TokenInfos(normalized, base),
+    queryKey: ["terra-assets", "cw20-resolved", scope.chainId, normalized.join(",")],
+    queryFn: () => fetchCw20TokenInfos(normalized, base, scope),
     enabled: normalized.length > 0,
     staleTime: 24 * 60 * 60 * 1000
   })
@@ -917,15 +977,16 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
 }
 
 export const useIbcWhitelist = () => {
+  const scope = getAssetChainScope()
   return useQuery({
-    queryKey: ["terra-assets", "ibc", CLASSIC_CHAIN.chainId],
+    queryKey: ["terra-assets", "ibc", scope.chainId],
     queryFn: async () => {
       const data = await fetchAsset<Record<string, Record<string, IbcToken>>>(
         "ibc/tokens.json"
       )
       const tokens =
-        pickChainAssets(data, CLASSIC_CHAIN.name, CLASSIC_CHAIN.chainId) ?? {}
-      const supplemental = (await fetchCosmosRegistryAssets()).ibc
+        pickChainAssets(data, scope.name, scope.chainId) ?? {}
+      const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).ibc
       return { ...tokens, ...supplemental }
     },
     staleTime: 60 * 60 * 1000
@@ -933,6 +994,7 @@ export const useIbcWhitelist = () => {
 }
 
 export const useResolvedIbcWhitelist = (denoms?: string[]) => {
+  const scope = getAssetChainScope()
   const baseQuery = useIbcWhitelist()
   const base = useMemo(() => baseQuery.data ?? {}, [baseQuery.data])
 
@@ -955,13 +1017,13 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
     queryKey: [
       "terra-assets",
       "ibc-resolved",
-      CLASSIC_CHAIN.chainId,
+      scope.chainId,
       missingHashes.join(",")
     ],
     queryFn: async () => {
       const entries = await Promise.all(
         missingHashes.map(async (hash) => {
-          const token = await fetchIbcTraceToken(hash)
+          const token = await fetchIbcTraceToken(hash, scope)
           return token ? [hash, token] : undefined
         })
       )
@@ -989,6 +1051,7 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
 }
 
 export const useResolvedNativeWhitelist = (denoms?: string[]) => {
+  const scope = getAssetChainScope()
   const normalized = useMemo(
     () =>
       Array.from(
@@ -1008,13 +1071,13 @@ export const useResolvedNativeWhitelist = (denoms?: string[]) => {
     queryKey: [
       "terra-assets",
       "native-resolved",
-      CLASSIC_CHAIN.chainId,
+      scope.chainId,
       normalized.join(",")
     ],
     queryFn: async () => {
       const entries = await Promise.all(
         normalized.map(async (denom) => {
-          const token = await fetchNativeMetadataToken(denom)
+          const token = await fetchNativeMetadataToken(denom, scope)
           return token ? [denom, token] : undefined
         })
       )

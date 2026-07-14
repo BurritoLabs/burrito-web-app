@@ -7,13 +7,14 @@ import {
   type SetStateAction
 } from "react"
 import { CLASSIC_DENOMS } from "../chain"
+import { useAppChain } from "../appChainContext"
 
 const HIDE_LOW_BALANCE_KEY = "burritoHideLowBalance"
 const LEGACY_HIDE_LOW_BALANCE_KEYS = [
   "burritoHideLowBalanceCoins",
   "burritoHideLowBalanceTokens"
 ]
-const HIDDEN_TOKENS_KEY = "burritoHiddenTokens"
+const LEGACY_HIDDEN_TOKENS_KEY = "burritoHiddenTokens"
 const VISIBILITY_PREFERENCE_EVENT = "burrito:wallet-visibility-preference"
 
 type WalletVisibilityPreferenceEventDetail = {
@@ -51,10 +52,20 @@ const sanitizeHiddenTokens = (value: unknown) => {
   )
 }
 
-const readStoredHiddenTokens = () => {
+export const getHiddenTokensStorageKey = (chainId: string) =>
+  `burritoHiddenTokens:${chainId}`
+
+const readStoredHiddenTokens = (
+  storageKey: string,
+  legacyStorageKey?: string
+) => {
   if (!canUseWindow()) return []
 
-  const stored = window.localStorage.getItem(HIDDEN_TOKENS_KEY)
+  const stored =
+    window.localStorage.getItem(storageKey) ??
+    (legacyStorageKey
+      ? window.localStorage.getItem(legacyStorageKey)
+      : null)
   if (!stored) return []
 
   try {
@@ -87,6 +98,7 @@ const useSyncedPreference = <T,>({
   const sourceId = useId()
   const [value, setValue] = useState<T>(() => readValue())
   const valueRef = useRef(value)
+  const storageKeyRef = useRef(storageKey)
   const readValueRef = useRef(readValue)
   const serializeValueRef = useRef(serializeValue)
 
@@ -104,6 +116,19 @@ const useSyncedPreference = <T,>({
 
   useEffect(() => {
     if (!canUseWindow()) return
+
+    if (storageKeyRef.current !== storageKey) {
+      storageKeyRef.current = storageKey
+      const nextValue = readValueRef.current()
+      valueRef.current = nextValue
+      setValue(nextValue)
+      window.localStorage.setItem(
+        storageKey,
+        serializeValueRef.current(nextValue)
+      )
+      emitPreferenceChange(storageKey, sourceId)
+      return
+    }
 
     window.localStorage.setItem(storageKey, serializeValueRef.current(value))
     emitPreferenceChange(storageKey, sourceId)
@@ -168,9 +193,17 @@ export const useWalletHideLowBalancePreference = () =>
     serializeValue: (value) => String(value)
   })
 
-export const useWalletHiddenTokensPreference = () =>
-  useSyncedPreference<string[]>({
-    storageKey: HIDDEN_TOKENS_KEY,
-    readValue: readStoredHiddenTokens,
+export const useWalletHiddenTokensPreference = () => {
+  const { chainKey, chain } = useAppChain()
+  const storageKey = getHiddenTokensStorageKey(chain.chainId)
+
+  return useSyncedPreference<string[]>({
+    storageKey,
+    readValue: () =>
+      readStoredHiddenTokens(
+        storageKey,
+        chainKey === "lunc" ? LEGACY_HIDDEN_TOKENS_KEY : undefined
+      ),
     serializeValue: (value) => JSON.stringify(sanitizeHiddenTokens(value))
   })
+}

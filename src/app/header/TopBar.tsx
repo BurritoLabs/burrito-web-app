@@ -1,6 +1,6 @@
 import { lazy, Suspense, useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import styles from "./TopBar.module.css"
 import { SUPPORTED_APP_CHAINS, type AppChainKey } from "../appChains"
@@ -13,6 +13,7 @@ import { fetchValidator } from "../data/classic"
 import { convertBech32Prefix } from "../utils/bech32"
 import BrandLogo from "../../components/brand/BrandLogo"
 import { getTxExplorerUrl } from "../explorer"
+import { getChainSwitchDestination } from "../routes/chainSwitchNavigation"
 
 const ConnectModal = lazy(() => import("../wallet/ConnectModal"))
 const WalletAddressesModal = lazy(() => import("../wallet/WalletAddressesModal"))
@@ -24,6 +25,7 @@ type TopBarProps = {
 
 const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { account, txState, connectorId, disconnect } = useWallet()
   const { chainKey, chain, setChainKey } = useAppChain()
   const [connectOpen, setConnectOpen] = useState(false)
@@ -143,7 +145,13 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   }, [walletMenuOpen])
 
   const selectChain = (next: AppChainKey) => {
+    if (next === chainKey) {
+      setChainOpen(false)
+      return
+    }
+    const destination = getChainSwitchDestination(location)
     setChainKey(next)
+    if (destination) navigate(destination, { replace: true })
     setChainOpen(false)
   }
 

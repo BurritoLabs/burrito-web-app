@@ -27,6 +27,7 @@ import { formatTxError } from "../../app/utils/txError"
 import { truncateHash } from "../../app/utils/format"
 import { getTxExplorerUrl } from "../../app/explorer"
 import { useAppChain } from "../../app/appChainContext"
+import { getStandardLiquidityDexLabels } from "../../app/market/dexFilters"
 import { useWallet } from "../../app/wallet/WalletContext"
 import {
   connectClassicSigningClientForConnector,
@@ -927,7 +928,9 @@ const MarketLiquidityPanel = ({
           resolvedPairAddress
         ]
       }),
-      queryClient.invalidateQueries({ queryKey: ["market", "pools"] })
+      queryClient.invalidateQueries({
+        queryKey: ["market", chain.chainId, "pools"]
+      })
     ])
   }
 
@@ -1125,7 +1128,9 @@ const MarketLiquidityPanel = ({
     ? "This pool uses a custom concentrated liquidity contract, so proportional liquidity controls are disabled."
     : unsupportedWesoPool
     ? "WESO DeFi liquidity controls are available only for AMM pools with a separate LP token. Bonding and wrapped-token pools use trade controls instead."
-    : `Liquidity controls are available for standard AMM pairs on Terraswap, Astroport, Terraport, Garuda, and WESO DeFi. This pair is listed on ${dexLabel}.`
+    : `Liquidity controls are available for standard AMM pairs on ${getStandardLiquidityDexLabels(
+        chainKey
+      )}. This pair is listed on ${dexLabel}.`
 
   if (!liquidityEnabled) {
     return (
