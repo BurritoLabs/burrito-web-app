@@ -22,3 +22,7 @@ export const HEXXAGON_DEX_PAIRS_URL = `${HEXXAGON_REGISTRY_URL}/cw20/dex_pairs/m
 
 export const LOCAL_MARKET_INDEX_URL = "/market/index.json"
 export const LOCAL_MARKET_CANDLES_BASE_URL = "/market/candles"
+
+export const BURRITO_REGISTRY_API_URL = (
+  import.meta.env.VITE_BURRITO_REGISTRY_API_URL ?? ""
+).replace(/\/$/, "")

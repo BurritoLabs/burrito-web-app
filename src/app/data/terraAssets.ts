@@ -10,6 +10,7 @@ import {
   COSMOS_TERRA_ASSETLIST_URL
 } from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import { fetchVerifiedTokenRegistry } from "./tokenRegistry"
 
 export type Cw20Token = {
   protocol?: string
@@ -777,9 +778,10 @@ export const useCw20Whitelist = () => {
   return useQuery({
     queryKey: ["terra-assets", "cw20", scope.chainId],
     queryFn: async () => {
-      const data = await fetchAsset<Record<string, Record<string, Cw20Token>>>(
-        "cw20/tokens.json"
-      )
+      const [data, verified] = await Promise.all([
+        fetchAsset<Record<string, Record<string, Cw20Token>>>("cw20/tokens.json"),
+        fetchVerifiedTokenRegistry(scope.chainKey)
+      ])
       const tokens = pickChainAssets(data, scope.name, scope.chainId) ?? {}
       const mapped = Object.entries(tokens).reduce<Record<string, Cw20Token>>((acc, entry) => {
         const [key, token] = entry
@@ -800,7 +802,7 @@ export const useCw20Whitelist = () => {
       }, {})
       const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).cw20
       return Object.fromEntries(
-        Object.entries({ ...mapped, ...supplemental }).filter(([, token]) =>
+        Object.entries({ ...mapped, ...supplemental, ...verified.cw20 }).filter(([, token]) =>
           Boolean(token.symbol && token.token)
         )
       )
@@ -1005,13 +1007,14 @@ export const useIbcWhitelist = () => {
   return useQuery({
     queryKey: ["terra-assets", "ibc", scope.chainId],
     queryFn: async () => {
-      const data = await fetchAsset<Record<string, Record<string, IbcToken>>>(
-        "ibc/tokens.json"
-      )
+      const [data, verified] = await Promise.all([
+        fetchAsset<Record<string, Record<string, IbcToken>>>("ibc/tokens.json"),
+        fetchVerifiedTokenRegistry(scope.chainKey)
+      ])
       const tokens =
         pickChainAssets(data, scope.name, scope.chainId) ?? {}
       const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).ibc
-      return { ...tokens, ...supplemental }
+      return { ...tokens, ...supplemental, ...verified.ibc }
     },
     staleTime: 60 * 60 * 1000
   })

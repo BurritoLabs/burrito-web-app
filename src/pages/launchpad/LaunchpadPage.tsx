@@ -43,6 +43,7 @@ import {
 } from "../../app/config/launchpadConfig"
 import { useWallet } from "../../app/wallet/WalletContext"
 import { useResolvedCw20Whitelist } from "../../app/data/terraAssets"
+import { submitRegistryDiscovery } from "../../app/data/tokenRegistry"
 import {
   connectClassicSigningClientForConnector,
   getSignerAddressForConnector
@@ -592,6 +593,13 @@ const Launchpad = () => {
       setActiveOwnerId(recordId)
       handleSelectTab("manage")
       finishTx(result.transactionHash)
+      if (contractAddress) {
+        void submitRegistryDiscovery({
+          chainKey,
+          contractAddress,
+          txHash: result.transactionHash
+        }).catch(() => false)
+      }
     } catch (error) {
       const message = formatTxError(error, "Create token failed")
       setCreateError(message)
