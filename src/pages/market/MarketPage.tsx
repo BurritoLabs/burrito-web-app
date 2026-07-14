@@ -91,7 +91,7 @@ type MarketCard = {
 }
 
 const PAGE_SIZE = 40
-const LIVE_POOL_REFRESH_LIMIT = 80
+const LIVE_POOL_REFRESH_LIMIT = 12
 const SORT_METRIC_OPTIONS: Array<{ value: SortMetric; label: string }> = [
   { value: "change", label: "% Change" },
   { value: "volume", label: "Volume" },
@@ -641,28 +641,121 @@ const Market = () => {
     return counts
   }, [cards, dexFilterOptions])
 
+  const getPairChange = useCallback(
+    (card: MarketCard, tf: Timeframe) => {
+      const baseChange = getAssetChange(card.priceBase, tf)
+      const quoteChange = getAssetChange(card.priceQuote, tf)
+      if (baseChange === undefined && quoteChange === undefined) return undefined
+      if (baseChange !== undefined && quoteChange !== undefined) {
+        return ((1 + baseChange / 100) / (1 + quoteChange / 100) - 1) * 100
+      }
+      if (baseChange !== undefined) return baseChange
+      return quoteChange !== undefined ? -quoteChange : undefined
+    },
+    [getAssetChange]
+  )
+
+  const getCardVolumeUsd = useCallback(
+    (card: MarketCard, tf: Timeframe) => {
+      const volumeMap = card.volumes?.[tf]
+      if (!volumeMap) return undefined
+
+      const orientationKey = `${card.priceBase.key}|${card.priceQuote.key}`
+      const volumeQuote = volumeMap[orientationKey]
+      if (volumeQuote === undefined) return undefined
+
+      const quoteUsd = getAssetUsdPrice(card.priceQuote)
+      if (quoteUsd === undefined) return undefined
+      return volumeQuote * quoteUsd
+    },
+    [getAssetUsdPrice]
+  )
+
+  const filteredCards = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    return cards.filter((card) => {
+      if (
+        effectiveDexFilter !== "all" &&
+        getDexFilterBucket(card) !== effectiveDexFilter
+      ) {
+        return false
+      }
+      if (!keyword) return true
+      const haystack = [
+        card.pairLabel,
+        card.dexLabel,
+        card.left.symbol,
+        card.right.symbol,
+        card.left.name,
+        card.right.name,
+        card.pairAddress,
+        card.left.id,
+        card.right.id
+      ]
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(keyword)
+    })
+  }, [cards, effectiveDexFilter, search])
+
+  const supplyCards = useMemo(() => {
+    if (sortMetric === "marketCap") return filteredCards
+
+    const sorted = [...filteredCards]
+    sorted.sort((a, b) => {
+      const resolveMetricValue = (card: MarketCard) => {
+        if (sortMetric === "change") return getPairChange(card, timeframe)
+        if (sortMetric === "volume") return getCardVolumeUsd(card, timeframe)
+        return card.liquidityUsd
+      }
+
+      const valueA = resolveMetricValue(a)
+      const valueB = resolveMetricValue(b)
+      if (valueA === undefined && valueB === undefined) return 0
+      if (valueA === undefined) return 1
+      if (valueB === undefined) return -1
+      return sortDirection === "asc" ? valueA - valueB : valueB - valueA
+    })
+
+    return sorted.slice(0, visibleCount)
+  }, [
+    filteredCards,
+    getCardVolumeUsd,
+    getPairChange,
+    sortDirection,
+    sortMetric,
+    timeframe,
+    visibleCount
+  ])
+
   const cw20SupplyContracts = useMemo(
     () =>
       Array.from(
         new Set(
-          cards
+          supplyCards
             .map((card) => card.priceBase.id)
             .filter((id) => id.startsWith("cw20:"))
             .map((id) => id.slice(5).toLowerCase())
         )
       ),
-    [cards]
+    [supplyCards]
   )
 
-  const { data: cw20Supplies = {} } = useCw20Supplies(cw20SupplyContracts, cw20Whitelist)
+  const { data: cw20Supplies = {} } = useCw20Supplies(
+    cw20SupplyContracts,
+    cw20Whitelist
+  )
 
   const nativeSupplyDenoms = useMemo(
     () =>
       Array.from(
         new Set(
-          cards
+          supplyCards
             .map((card) => card.priceBase)
-            .filter((asset) => asset.id.startsWith("native:") && !asset.isLunc && !asset.isUstc)
+            .filter(
+              (asset) =>
+                asset.id.startsWith("native:") && !asset.isLunc && !asset.isUstc
+            )
             .map((asset) => ({ denom: asset.id.slice(7), decimals: asset.decimals }))
             .map((entry) => `${entry.denom}:${entry.decimals}`)
         )
@@ -670,7 +763,7 @@ const Market = () => {
         const [denom, decimals] = entry.split(":")
         return { denom, decimals: Number(decimals || "6") }
       }),
-    [cards]
+    [supplyCards]
   )
 
   const { data: nativeSupplies = {} } = useQuery({
@@ -722,61 +815,8 @@ const Market = () => {
     [cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
   )
 
-  const getPairChange = useCallback(
-    (card: MarketCard, tf: Timeframe) => {
-      const baseChange = getAssetChange(card.priceBase, tf)
-      const quoteChange = getAssetChange(card.priceQuote, tf)
-      if (baseChange === undefined && quoteChange === undefined) return undefined
-      if (baseChange !== undefined && quoteChange !== undefined) {
-        return ((1 + baseChange / 100) / (1 + quoteChange / 100) - 1) * 100
-      }
-      if (baseChange !== undefined) return baseChange
-      return quoteChange !== undefined ? -quoteChange : undefined
-    },
-    [getAssetChange]
-  )
-
-  const getCardVolumeUsd = useCallback(
-    (card: MarketCard, tf: Timeframe) => {
-      const volumeMap = card.volumes?.[tf]
-      if (!volumeMap) return undefined
-
-      const orientationKey = `${card.priceBase.key}|${card.priceQuote.key}`
-      const volumeQuote = volumeMap[orientationKey]
-      if (volumeQuote === undefined) return undefined
-
-      const quoteUsd = getAssetUsdPrice(card.priceQuote)
-      if (quoteUsd === undefined) return undefined
-      return volumeQuote * quoteUsd
-    },
-    [getAssetUsdPrice]
-  )
-
   const filteredAndSorted = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    const filtered = cards.filter((card) => {
-      if (
-        effectiveDexFilter !== "all" &&
-        getDexFilterBucket(card) !== effectiveDexFilter
-      ) {
-        return false
-      }
-      if (!keyword) return true
-      const haystack = [
-        card.pairLabel,
-        card.dexLabel,
-        card.left.symbol,
-        card.right.symbol,
-        card.left.name,
-        card.right.name,
-        card.pairAddress,
-        card.left.id,
-        card.right.id
-      ]
-        .join(" ")
-        .toLowerCase()
-      return haystack.includes(keyword)
-    })
+    const filtered = [...filteredCards]
 
     filtered.sort((a, b) => {
       const resolveMetricValue = (card: MarketCard) => {
@@ -798,12 +838,10 @@ const Market = () => {
 
     return filtered
   }, [
-    cards,
-    effectiveDexFilter,
+    filteredCards,
     getCardMarketCapUsd,
     getCardVolumeUsd,
     getPairChange,
-    search,
     sortDirection,
     sortMetric,
     timeframe
@@ -853,7 +891,8 @@ const Market = () => {
       return rows.filter((row): row is MarketPoolSnapshot => Boolean(row))
     },
     enabled: liveRefreshCards.length > 0,
-    staleTime: 30 * 1000,
+    initialData: [],
+    staleTime: 60 * 1000,
     refetchInterval: 60 * 1000
   })
 

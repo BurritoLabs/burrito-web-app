@@ -87,22 +87,6 @@ const WalletPanelLoadingShell = () => (
   </aside>
 )
 
-const scheduleIdleTask = (task: () => void) => {
-  if (typeof window === "undefined") return undefined
-  const idleWindow = window as Window & {
-    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
-    cancelIdleCallback?: (handle: number) => void
-  }
-
-  if (idleWindow.requestIdleCallback) {
-    const handle = idleWindow.requestIdleCallback(task, { timeout: 1500 })
-    return () => idleWindow.cancelIdleCallback?.(handle)
-  }
-
-  const timer = window.setTimeout(task, 600)
-  return () => window.clearTimeout(timer)
-}
-
 const DeferredWalletPanel = () => {
   const [requested, setRequested] = useState(() => {
     if (typeof window === "undefined") return false
@@ -119,13 +103,6 @@ const DeferredWalletPanel = () => {
     void loadWalletAssetWarmup()
     setWarmupRequested(true)
   }
-
-  useEffect(() => {
-    const cancel = scheduleIdleTask(() => {
-      void loadWalletPanel()
-    })
-    return cancel
-  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return

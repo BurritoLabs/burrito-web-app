@@ -432,6 +432,37 @@ const toUnits = (amount: string, decimals: number) => {
   return parsed / 10 ** Math.max(0, decimals)
 }
 
+const buildCw20SupplyCacheKey = (contract: string) =>
+  `cw20supply-token:v1:${CLASSIC_CHAIN.chainId}:${contract}`
+
+const loadCw20SupplyCache = (contract: string) => {
+  if (typeof window === "undefined") return undefined
+  try {
+    const raw = window.localStorage.getItem(buildCw20SupplyCacheKey(contract))
+    if (!raw) return undefined
+    const cached = JSON.parse(raw) as { ts?: number; data?: Cw20SupplyInfo }
+    if (!cached.ts || Date.now() - cached.ts > SUPPLY_CACHE_TTL) return undefined
+    if (!cached.data?.totalSupply || !Number.isFinite(cached.data.decimals)) {
+      return undefined
+    }
+    return cached.data
+  } catch {
+    return undefined
+  }
+}
+
+const saveCw20SupplyCache = (contract: string, data: Cw20SupplyInfo) => {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(
+      buildCw20SupplyCacheKey(contract),
+      JSON.stringify({ ts: Date.now(), data })
+    )
+  } catch {
+    // Ignore storage failures in private browsing or low-storage mobile contexts.
+  }
+}
+
 export const fetchCw20Supplies = async (
   contracts: string[],
   whitelist: Record<string, Cw20Token>
@@ -447,28 +478,35 @@ export const fetchCw20Supplies = async (
 
   const cacheKey = `cw20supply:${CLASSIC_CHAIN.chainId}:${unique.join(",")}`
   const cached = loadCache(cacheKey, SUPPLY_CACHE_TTL) as Record<string, string> | undefined
-  if (cached) {
-    const restored: Record<string, Cw20SupplyInfo> = {}
-    Object.entries(cached).forEach(([contract, payload]) => {
-      try {
-        const parsed = JSON.parse(payload) as Cw20SupplyInfo
-        restored[contract] = parsed
-      } catch {
-        // ignore invalid cache entry
-      }
-    })
-    if (Object.keys(restored).length) return restored
-  }
-
   const results: Record<string, Cw20SupplyInfo> = {}
-  const limit = 4
-  let index = 0
+  unique.forEach((contract) => {
+    const individual = loadCw20SupplyCache(contract)
+    if (individual) {
+      results[contract] = individual
+      return
+    }
+    const payload = cached?.[contract]
+    if (!payload) return
+    try {
+      const parsed = JSON.parse(payload) as Cw20SupplyInfo
+      results[contract] = parsed
+      saveCw20SupplyCache(contract, parsed)
+    } catch {
+      // Ignore invalid legacy cache entries.
+    }
+  })
 
-  const workers = Array.from({ length: Math.min(limit, unique.length) }, async () => {
-    while (index < unique.length) {
+  const missing = unique.filter((contract) => !results[contract])
+  if (!missing.length) return results
+
+  let index = 0
+  const limit = 4
+
+  const workers = Array.from({ length: Math.min(limit, missing.length) }, async () => {
+    while (index < missing.length) {
       const current = index
       index += 1
-      const contract = unique[current]
+      const contract = missing[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
         const res = await fetchWithEndpointFallback(
@@ -480,11 +518,13 @@ export const fetchCw20Supplies = async (
         const totalSupply = tokenInfo?.total_supply
         if (!totalSupply) continue
         const decimals = tokenInfo?.decimals ?? whitelist[contract]?.decimals ?? 6
-        results[contract] = {
+        const supply = {
           totalSupply,
           decimals,
           units: toUnits(totalSupply, decimals)
         }
+        results[contract] = supply
+        saveCw20SupplyCache(contract, supply)
       } catch {
         // Ignore per-contract failure.
       }

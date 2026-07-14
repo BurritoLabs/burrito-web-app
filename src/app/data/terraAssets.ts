@@ -362,6 +362,15 @@ const getLocalCw20TokenOverride = (
 const looksLikeHttpUrl = (value?: string) =>
   Boolean(value && /^https?:\/\//i.test(value))
 
+const hasReliableCw20Fallback = (
+  contract: string,
+  fallback?: Cw20Token
+) => {
+  const symbol = fallback?.symbol?.trim()
+  if (!symbol) return false
+  return symbol.toUpperCase() !== contract.slice(0, 6).toUpperCase()
+}
+
 const mergeCw20TokenMetadata = ({
   contract,
   fallback,
@@ -374,17 +383,21 @@ const mergeCw20TokenMetadata = ({
   chainKey?: ReturnType<typeof getActiveAppChainKey>
 }): Cw20Token => {
   const localOverride = getLocalCw20TokenOverride(contract, chainKey)
+  const reliableFallback = hasReliableCw20Fallback(contract, fallback)
   const symbol =
     localOverride?.symbol?.trim() ||
-    fallback?.symbol?.trim() ||
+    (reliableFallback ? fallback?.symbol?.trim() : undefined) ||
     onChain?.symbol?.trim() ||
+    fallback?.symbol?.trim() ||
     contract.slice(0, 6).toUpperCase()
   const name =
     localOverride?.name?.trim() ||
-    fallback?.name?.trim() ||
-    fallback?.symbol?.trim() ||
+    (reliableFallback ? fallback?.name?.trim() : undefined) ||
+    (reliableFallback ? fallback?.symbol?.trim() : undefined) ||
     onChain?.name?.trim() ||
     onChain?.symbol?.trim() ||
+    fallback?.name?.trim() ||
+    fallback?.symbol?.trim() ||
     contract
   return {
     token: contract,
@@ -820,6 +833,14 @@ export const fetchCw20TokenInfos = async (
       })
       return
     }
+    if (hasReliableCw20Fallback(contract, fallback[contract])) {
+      results[contract] = mergeCw20TokenMetadata({
+        contract,
+        fallback: fallback[contract],
+        chainKey: scope.chainKey
+      })
+      return
+    }
     missing.push(contract)
   })
 
@@ -843,18 +864,20 @@ export const fetchCw20TokenInfos = async (
         const name = info?.name?.trim()
         const parsedDecimals = Number(info?.decimals)
         let icon: string | undefined
-        try {
-          const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
-          const marketingResponse = await fetchWithEndpointFallback(
-            `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
-          )
-          if (marketingResponse.ok) {
-            const marketingPayload =
-              (await marketingResponse.json()) as Cw20MarketingInfoResponse
-            icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
+        if (!fallback[contract]?.icon) {
+          try {
+            const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
+            const marketingResponse = await fetchWithEndpointFallback(
+              `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
+            )
+            if (marketingResponse.ok) {
+              const marketingPayload =
+                (await marketingResponse.json()) as Cw20MarketingInfoResponse
+              icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
+            }
+          } catch {
+            icon = undefined
           }
-        } catch {
-          icon = undefined
         }
         const onChain = {
           symbol: symbol || undefined,
@@ -948,7 +971,8 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
   const resolvedQuery = useQuery({
     queryKey: ["terra-assets", "cw20-resolved", scope.chainId, normalized.join(",")],
     queryFn: () => fetchCw20TokenInfos(normalized, base, scope),
-    enabled: normalized.length > 0,
+    enabled:
+      normalized.length > 0 && tokenQuery.isFetched && contractsQuery.isFetched,
     staleTime: 24 * 60 * 60 * 1000
   })
 
@@ -1029,7 +1053,7 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
       )
       return Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][])
     },
-    enabled: missingHashes.length > 0,
+    enabled: missingHashes.length > 0 && baseQuery.isFetched,
     staleTime: 24 * 60 * 60 * 1000
   })
 

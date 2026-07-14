@@ -42,8 +42,8 @@ const GovernanceProposalCard = ({
     queryKey: ["proposalTally", chain.chainId, proposal.id],
     queryFn: () => fetchProposalTally(proposal.id),
     enabled: Boolean(proposal.id) && enableLiveTally,
-    staleTime: 10_000,
-    refetchInterval: enableLiveTally ? 15_000 : false,
+    staleTime: 30_000,
+    refetchInterval: enableLiveTally ? 30_000 : false,
     refetchIntervalInBackground: false
   })
 

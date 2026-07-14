@@ -28,8 +28,8 @@ const Governance = () => {
   const { data: proposals = [] } = useQuery<ProposalItem[]>({
     queryKey: ["proposals", chain.chainId],
     queryFn: fetchProposals,
-    staleTime: 15_000,
-    refetchInterval: 15_000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false
   })
 

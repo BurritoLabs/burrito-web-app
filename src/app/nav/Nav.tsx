@@ -51,7 +51,6 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
             onClick={handleNavigate}
             onFocus={() => void preload()}
             onPointerEnter={() => void preload()}
-            onTouchStart={() => void preload()}
             className={({ isActive }) =>
               `${styles.link} ${isActive ? styles.active : ""}`
             }

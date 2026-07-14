@@ -41,7 +41,7 @@ function App() {
           <TxStatusModal />
           <ScrollTopButton />
           <div
-            key={`${location.pathname}${location.search}${location.hash}`}
+            key={location.pathname}
             className="pageArea"
           >
             {routes}

@@ -355,19 +355,21 @@ const Stake = () => {
 
     validatorDelegations.forEach((item) => addIdentity(item.identity))
 
-    validators
-      .filter(
-        (validator) =>
-          validator.description?.moniker?.trim().toLowerCase() === "burrito node"
-      )
-      .forEach((validator) => addIdentity(validator.description?.identity))
+    if (activeTab === "stake") {
+      validators
+        .filter(
+          (validator) =>
+            validator.description?.moniker?.trim().toLowerCase() === "burrito node"
+        )
+        .forEach((validator) => addIdentity(validator.description?.identity))
 
-    visibleValidators.forEach(({ validator }) =>
-      addIdentity(validator.description?.identity)
-    )
+      visibleValidators.forEach(({ validator }) =>
+        addIdentity(validator.description?.identity)
+      )
+    }
 
     return result
-  }, [validatorDelegations, validators, visibleValidators])
+  }, [activeTab, validatorDelegations, validators, visibleValidators])
 
   useEffect(() => {
     const pending = prioritizedIdentities.filter(
