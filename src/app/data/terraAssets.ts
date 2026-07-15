@@ -290,7 +290,17 @@ const getCachedIbcToken = (hash: string, chainId: string) => {
   const key = buildChainScopedAssetCacheKey(chainId, hash)
   const cached = cache[key]
   if (!cached) return undefined
-  const cacheTtl = cached.token.symbol === "IBC"
+  if (
+    !cached.token ||
+    typeof cached.token.symbol !== "string" ||
+    typeof cached.ts !== "number"
+  ) {
+    const next = { ...cache }
+    delete next[key]
+    writeIbcCache(next)
+    return undefined
+  }
+  const cacheTtl = cached.token.symbol.toUpperCase() === "IBC"
     ? IBC_UNRESOLVED_CACHE_TTL
     : IBC_CACHE_TTL
   if (Date.now() - cached.ts > cacheTtl) {

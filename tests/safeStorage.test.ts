@@ -8,6 +8,7 @@ import { sanitizeHiddenTokens } from "../src/app/wallet/useWalletVisibilityPrefe
 const createQuotaStorage = () => {
   const values = new Map<string, string>([
     ["cw20balance-single:v1:wallet:columbus-5:token", "cached"],
+    ["burritoIbcTraceCacheV4", "cached"],
     ["burritoWalletConnector", "keplr"]
   ])
   return {
@@ -39,6 +40,7 @@ describe("safe browser storage", () => {
     expect(
       readLocalStorageValue("cw20balance-single:v1:wallet:columbus-5:token")
     ).toBeNull()
+    expect(readLocalStorageValue("burritoIbcTraceCacheV4")).toBeNull()
   })
 
   it("deduplicates and bounds legacy hidden-token lists", () => {

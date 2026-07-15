@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
 import DataErrorCard from "./DataErrorCard"
 import { reportRuntimeError } from "./runtimeErrorReporter"
+import { clearVolatileStorageCaches } from "../utils/safeStorage"
 
 type AppErrorBoundaryProps = {
   children: ReactNode
@@ -10,12 +11,31 @@ type AppErrorBoundaryState = {
   error: Error | null
 }
 
-const CHUNK_RELOAD_STORAGE_KEY = "burrito.chunkReloaded"
+const APP_RECOVERY_STORAGE_KEY = "burrito.appRecoveryAt"
+const APP_RECOVERY_COOLDOWN_MS = 60_000
 
-const isChunkLoadError = (error: Error) =>
-  /dynamically imported module|importing a module script failed|loading chunk|chunkloaderror/i.test(
-    error.message
-  )
+const recoverAppOnce = () => {
+  clearVolatileStorageCaches()
+  try {
+    const recoveredAt = Number(
+      window.sessionStorage.getItem(APP_RECOVERY_STORAGE_KEY)
+    )
+    if (
+      Number.isFinite(recoveredAt) &&
+      Date.now() - recoveredAt < APP_RECOVERY_COOLDOWN_MS
+    ) {
+      return false
+    }
+    window.sessionStorage.setItem(APP_RECOVERY_STORAGE_KEY, String(Date.now()))
+  } catch {
+    // Continue with recovery when session storage is restricted.
+  }
+
+  const nextUrl = new URL(window.location.href)
+  nextUrl.searchParams.set("recover", Date.now().toString(36))
+  window.location.replace(nextUrl.toString())
+  return true
+}
 
 class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
@@ -40,20 +60,16 @@ class AppErrorBoundary extends Component<
       console.error(error, errorInfo)
     }
 
-    if (isChunkLoadError(error)) {
-      try {
-        if (window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) !== "1") {
-          window.sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, "1")
-          window.location.reload()
-        }
-      } catch {
-        // A restricted session store must not replace the original app error.
-      }
-    }
+    recoverAppOnce()
   }
 
   handleReload = () => {
-    window.location.reload()
+    try {
+      window.sessionStorage.removeItem(APP_RECOVERY_STORAGE_KEY)
+    } catch {
+      // Continue with a manual recovery when session storage is restricted.
+    }
+    recoverAppOnce()
   }
 
   render() {

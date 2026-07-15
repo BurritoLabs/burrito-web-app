@@ -11,6 +11,7 @@ const VOLATILE_CACHE_KEY_PREFIXES = [
 
 const VOLATILE_CACHE_KEYS = new Set([
   "burritoIbcTraceCacheV3",
+  "burritoIbcTraceCacheV4",
   "burritoNativeTokenCacheV2",
   "burritoCw20TokenInfoCacheV2",
   "burritoPriceCache",
