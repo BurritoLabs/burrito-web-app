@@ -896,10 +896,45 @@ export const useCw20Whitelist = () => {
   })
 }
 
+const fetchFinderCw20TokenInfos = async (
+  contracts: string[],
+  fallback: Record<string, Cw20Token>,
+  scope: AssetChainScope
+) => {
+  const payload = await fetchFinderAssetMetadata({
+    contracts,
+    chainKey: scope.chainKey
+  })
+  if (!payload) return {}
+
+  return (payload.cw20 ?? []).reduce<Record<string, Cw20Token>>((result, entry) => {
+    const contract = entry.contract?.trim().toLowerCase()
+    if (!contract || !isTerraAddress(contract) || entry.status !== "ok") return result
+    const metadata = entry.metadata
+    if (!metadata) return result
+    result[contract] = mergeCw20TokenMetadata({
+      contract,
+      fallback: {
+        ...fallback[contract],
+        token: contract,
+        symbol: metadata.symbol ?? fallback[contract]?.symbol ?? "",
+        name: metadata.name ?? fallback[contract]?.name,
+        icon: metadata.icon ?? fallback[contract]?.icon,
+        decimals: Number.isInteger(metadata.decimals)
+          ? metadata.decimals
+          : fallback[contract]?.decimals
+      },
+      chainKey: scope.chainKey
+    })
+    return result
+  }, {})
+}
+
 export const fetchCw20TokenInfos = async (
   contracts: string[],
   fallback: Record<string, Cw20Token> = {},
-  scope = getAssetChainScope()
+  scope = getAssetChainScope(),
+  options: { skipFinder?: boolean } = {}
 ) => {
   const normalized = Array.from(
     new Set(
@@ -928,24 +963,10 @@ export const fetchCw20TokenInfos = async (
     missing.push(contract)
   })
 
-  const finderPayload = await fetchFinderAssetMetadata({
-    contracts: missing,
-    chainKey: scope.chainKey
-  })
-  if (finderPayload) {
-    ;(finderPayload.cw20 ?? []).forEach((entry) => {
-      const contract = entry.contract?.trim().toLowerCase()
-      if (!contract || !isTerraAddress(contract) || entry.status !== "ok") return
-      const onChain = entry.metadata
-      if (!onChain) return
-      fallbackWithFinder[contract] = {
-        ...fallbackWithFinder[contract],
-        token: contract,
-        symbol: onChain.symbol ?? fallbackWithFinder[contract]?.symbol ?? "",
-        name: onChain.name ?? fallbackWithFinder[contract]?.name,
-        icon: onChain.icon ?? fallbackWithFinder[contract]?.icon
-      }
-    })
+  if (!options.skipFinder) {
+    const finderTokens = await fetchFinderCw20TokenInfos(missing, fallback, scope)
+    Object.assign(fallbackWithFinder, finderTokens)
+    Object.assign(results, finderTokens)
   }
 
   let index = 0
@@ -1053,17 +1074,30 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
     [contracts]
   )
 
+  const finderQuery = useQuery({
+    queryKey: ["terra-assets", "cw20-finder", scope.chainId, normalized.join(",")],
+    queryFn: () => fetchFinderCw20TokenInfos(normalized, base, scope),
+    enabled: normalized.length > 0,
+    staleTime: 5 * 60 * 1000
+  })
+
+  const verificationBase = useMemo(
+    () => ({ ...base, ...(finderQuery.data ?? {}) }),
+    [base, finderQuery.data]
+  )
+
   const resolvedQuery = useQuery({
-    queryKey: ["terra-assets", "cw20-resolved", scope.chainId, normalized.join(",")],
-    queryFn: () => fetchCw20TokenInfos(normalized, base, scope),
-    enabled:
-      normalized.length > 0 && tokenQuery.isFetched && contractsQuery.isFetched,
+    queryKey: ["terra-assets", "cw20-verified", scope.chainId, normalized.join(",")],
+    queryFn: () =>
+      fetchCw20TokenInfos(normalized, verificationBase, scope, { skipFinder: true }),
+    enabled: normalized.length > 0 && finderQuery.isFetched,
     staleTime: 24 * 60 * 60 * 1000
   })
 
   const resolvedData = useMemo(() => {
     const combined = {
       ...base,
+      ...(finderQuery.data ?? {}),
       ...(resolvedQuery.data ?? {})
     }
 
@@ -1074,14 +1108,25 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
         .map((contract) => [contract, combined[contract]])
         .filter((entry): entry is [string, Cw20Token] => Boolean(entry[1]))
     )
-  }, [base, normalized, resolvedQuery.data])
+  }, [base, finderQuery.data, normalized, resolvedQuery.data])
 
   return {
     ...tokenQuery,
     data: resolvedData,
-    isFetching: tokenQuery.isFetching || contractsQuery.isFetching || resolvedQuery.isFetching,
-    isError: tokenQuery.isError || contractsQuery.isError || resolvedQuery.isError,
-    error: (tokenQuery.error ?? contractsQuery.error ?? resolvedQuery.error) as Error | null
+    isFetching:
+      tokenQuery.isFetching ||
+      contractsQuery.isFetching ||
+      finderQuery.isFetching ||
+      resolvedQuery.isFetching,
+    isError:
+      tokenQuery.isError ||
+      contractsQuery.isError ||
+      finderQuery.isError ||
+      resolvedQuery.isError,
+    error: (tokenQuery.error ??
+      contractsQuery.error ??
+      finderQuery.error ??
+      resolvedQuery.error) as Error | null
   }
 }
 

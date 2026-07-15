@@ -8,10 +8,16 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
+pub struct MigrateMsg {
+    pub limit: Option<u32>,
+}
+
+#[cw_serde]
 pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     Withdraw { lock_id: u64 },
     UpdateConfig { owner: String },
+    ReindexLocks { limit: Option<u32> },
 }
 
 #[cw_serde]
@@ -42,6 +48,8 @@ pub enum QueryMsg {
         start_after: Option<u64>,
         limit: Option<u32>,
     },
+    #[returns(MigrationStatusResponse)]
+    MigrationStatus {},
 }
 
 #[cw_serde]
@@ -66,4 +74,10 @@ pub struct LockResponse {
 #[cw_serde]
 pub struct LocksResponse {
     pub locks: Vec<LockResponse>,
+}
+
+#[cw_serde]
+pub struct MigrationStatusResponse {
+    pub complete: bool,
+    pub cursor: Option<u64>,
 }

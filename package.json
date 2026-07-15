@@ -18,7 +18,8 @@
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "verify": "npm run lint && npm test && npm run check:audit && npm run build && npm run check:bundle",
     "preview": "vite preview",
-    "deploy:launchpad": "node scripts/deploy-launchpad-contracts.mjs"
+    "deploy:launchpad": "node scripts/deploy-launchpad-contracts.mjs",
+    "upgrade:launchpad": "node scripts/upgrade-launchpad-contracts.mjs"
   },
   "dependencies": {
     "@cosmjs/amino": "^0.36.2",

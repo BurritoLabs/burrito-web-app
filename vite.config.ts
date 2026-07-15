@@ -23,6 +23,10 @@ const appRelease =
 const hasPackage = (id: string, pkg: string) =>
   id.includes(`/node_modules/${pkg}/`) || id.includes(`\\node_modules\\${pkg}\\`)
 
+const hasPackageScope = (id: string, scope: string) =>
+  id.includes(`/node_modules/${scope}/`) ||
+  id.includes(`\\node_modules\\${scope}\\`)
+
 // https://vite.dev/config/
 export default defineConfig({
   define: {
@@ -55,7 +59,6 @@ export default defineConfig({
             return "protobuf"
           }
           if (
-            hasPackage(id, "@noble") ||
             hasPackage(id, "bn.js") ||
             hasPackage(id, "elliptic") ||
             hasPackage(id, "hash.js") ||
@@ -67,6 +70,7 @@ export default defineConfig({
           ) {
             return "crypto-vendor"
           }
+          if (hasPackageScope(id, "@noble")) return "noble-crypto"
           if (
             hasPackage(id, "react-router") ||
             hasPackage(id, "react-router-dom") ||

@@ -3,11 +3,12 @@ use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
     StdResult, Uint128,
 };
+use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{
     ConfigResponse, ExecuteMsg, InstantiateMsg, LaunchMetadata, LaunchResponse, LaunchStatus,
-    LaunchesResponse, QueryMsg,
+    LaunchesResponse, MigrateMsg, QueryMsg,
 };
 use crate::state::{
     Config, Launch, CONFIG, DEFAULT_QUERY_LIMIT, LAUNCHES, LAUNCH_INDEX, MAX_QUERY_LIMIT, NEXT_ID,
@@ -18,6 +19,8 @@ const SYMBOL_MAX: usize = 20;
 const URL_MAX: usize = 180;
 const DESCRIPTION_MAX: usize = 500;
 const LOCK_ID_MAX: usize = 64;
+const CONTRACT_NAME: &str = "crates.io:burrito-launch-registry";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cw_serde]
 enum LockerQueryMsg {
@@ -87,11 +90,18 @@ pub fn instantiate(
         },
     )?;
     NEXT_ID.save(deps.storage, &1)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
         .add_attribute("owner", owner.to_string())
         .add_attribute("locker_contract", locker_contract.to_string()))
+}
+
+#[entry_point]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(Response::new().add_attribute("action", "migrate"))
 }
 
 #[entry_point]
@@ -890,5 +900,26 @@ mod tests {
             } => {}
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn migration_preserves_existing_config() {
+        let mut deps = mock_dependencies();
+        instantiate(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(CREATOR, &[]),
+            InstantiateMsg {
+                owner: None,
+                locker_contract: LOCKER.to_string(),
+            },
+        )
+        .unwrap();
+
+        migrate(deps.as_mut(), mock_env(), MigrateMsg {}).unwrap();
+        let config: ConfigResponse =
+            from_json(query(deps.as_ref(), mock_env(), QueryMsg::Config {}).unwrap()).unwrap();
+        assert_eq!(config.owner, CREATOR);
+        assert_eq!(config.locker_contract, LOCKER);
     }
 }

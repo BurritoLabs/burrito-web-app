@@ -14,6 +14,7 @@ library = []
 cosmwasm-schema = "1.5.8"
 cosmwasm-std = "1.5.8"
 cw-storage-plus = "1.2.0"
+cw2 = "1.1.2"
 cw20 = "1.1.2"
 # cosmwasm/optimizer:0.16.1 uses Cargo 1.81 and cannot parse base64ct 1.8's edition2024 manifest.
 base64ct = { version = "=1.7.3", default-features = false }

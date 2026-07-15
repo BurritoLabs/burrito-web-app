@@ -6,6 +6,8 @@ pub const MIN_LOCK_SECONDS: u64 = 30 * 24 * 60 * 60;
 pub const MAX_LOCK_SECONDS: u64 = 3650 * 24 * 60 * 60;
 pub const DEFAULT_QUERY_LIMIT: u32 = 20;
 pub const MAX_QUERY_LIMIT: u32 = 100;
+pub const DEFAULT_REINDEX_LIMIT: u32 = 100;
+pub const MAX_REINDEX_LIMIT: u32 = 500;
 
 #[cw_serde]
 pub struct Config {
@@ -29,3 +31,5 @@ pub const NEXT_LOCK_ID: Item<u64> = Item::new("next_lock_id");
 pub const LOCKS: Map<u64, Lock> = Map::new("locks");
 pub const LOCK_IDS_BY_OWNER: Map<(&Addr, u64), bool> = Map::new("locks_by_owner");
 pub const LOCK_IDS_BY_LP_TOKEN: Map<(&Addr, u64), bool> = Map::new("locks_by_lp_token");
+pub const INDEX_MIGRATION_CURSOR: Item<Option<u64>> = Item::new("index_migration_cursor");
+pub const INDEX_MIGRATION_COMPLETE: Item<bool> = Item::new("index_migration_complete");

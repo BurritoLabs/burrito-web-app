@@ -87,6 +87,43 @@ artifacts/launchpad/deploy-result-luna.json
 
 Use the `cloudflare` values from that file as the Cloudflare Pages variables.
 
+## Upgrade Existing Contracts
+
+Do not instantiate replacement contracts for an existing production setup.
+That would leave historical LP locks and launch records at the old addresses.
+The upgrade helper stores new code and migrates both contracts in place:
+
+```bash
+npm run upgrade:launchpad -- chain=lunc --dry-run
+npm run upgrade:launchpad -- chain=luna --dry-run
+```
+
+The helper verifies the RPC chain ID, both current contract admins, the locker
+owner, and the registry-to-locker relationship before broadcasting. The LP
+Locker migration rebuilds historical owner and LP-token indexes in batches and
+will not report success until `migration_status.complete` is true.
+
+The real command requires both a local mnemonic and an explicit confirmation:
+
+```powershell
+$env:DEPLOYER_MNEMONIC="your local deployer mnemonic"
+npm run upgrade:launchpad -- chain=lunc --confirm-upgrade
+Remove-Item Env:\DEPLOYER_MNEMONIC
+```
+
+Run the two chains separately. Results are written to:
+
+```text
+artifacts/launchpad/upgrade-result-lunc.json
+artifacts/launchpad/upgrade-result-luna.json
+```
+
+Optional overrides include `LP_LOCKER_ADDRESS`,
+`LAUNCH_REGISTRY_ADDRESS`, `MIGRATE_GAS`, `REINDEX_GAS`, and
+`REINDEX_LIMIT` (maximum 500). The script defaults to the currently configured
+production contract addresses, but the dry-run output must still be reviewed
+before signing.
+
 ## Instantiate Messages
 
 `lp-locker`:

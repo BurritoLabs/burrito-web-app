@@ -30,6 +30,9 @@ pub enum ContractError {
     #[error("invalid query limit")]
     InvalidQueryLimit {},
 
+    #[error("reindex limit must be between 1 and {max}")]
+    InvalidReindexLimit { max: u32 },
+
     #[error("cannot lock {amount} LP tokens with an empty hook message")]
     MissingHook { amount: Uint128 },
 
