@@ -13,20 +13,25 @@ const BlockStatus = () => {
   const lcd = chain.runtime.chain.lcd
   const { data: latestBlock, isError } = useQuery({
     queryKey: ["latest-block-height", chain.chainId],
-    queryFn: () => fetchLatestBlock(lcd),
+    queryFn: () => fetchLatestBlock(lcd, chain.chainId),
     refetchInterval: BLOCK_REFRESH_MS,
     refetchIntervalInBackground: false,
     staleTime: BLOCK_REFRESH_MS - 1_000,
     retry: false
   })
 
+  // A chain switch can briefly leave the previous query result attached to the
+  // observer. Never expose that height as a link for the newly selected chain.
+  const currentChainBlock =
+    latestBlock?.chainId === chain.chainId ? latestBlock : undefined
+
   const blockAgeMs =
-    latestBlock?.timeMs && Number.isFinite(latestBlock.timeMs)
-      ? Math.max(0, latestBlock.fetchedAt - latestBlock.timeMs)
+    currentChainBlock?.timeMs && Number.isFinite(currentChainBlock.timeMs)
+      ? Math.max(0, currentChainBlock.fetchedAt - currentChainBlock.timeMs)
       : Number.POSITIVE_INFINITY
   const status = isError
     ? "offline"
-    : !latestBlock
+    : !currentChainBlock
       ? "checking"
       : blockAgeMs <= LIVE_BLOCK_MAX_AGE_MS
         ? "live"
@@ -49,12 +54,12 @@ const BlockStatus = () => {
         : status === "offline"
           ? styles.blockDotOffline
           : styles.blockDotChecking
-  const title = latestBlock
-    ? `${statusLabel}: block ${latestBlock.height.toLocaleString()} · ${Math.round(
+  const title = currentChainBlock
+    ? `${statusLabel}: block ${currentChainBlock.height.toLocaleString()} · ${Math.round(
         blockAgeMs / 1_000
-      )}s old · LCD: ${latestBlock.endpoint}`
+      )}s old · LCD: ${currentChainBlock.endpoint}`
     : `${statusLabel}: LCD ${lcd}`
-  const height = latestBlock?.height
+  const height = currentChainBlock?.height
 
   return (
     <div

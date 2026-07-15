@@ -26,7 +26,8 @@ describe("block status chain endpoint", () => {
       vi.stubGlobal("fetch", fetchMock)
 
       const lcd = APP_CHAINS[chainKey].runtime.chain.lcd
-      const result = await fetchLatestBlock(lcd)
+      const chainId = APP_CHAINS[chainKey].chainId
+      const result = await fetchLatestBlock(lcd, chainId)
 
       expect(fetchMock).toHaveBeenCalledWith(
         `${lcd}/cosmos/base/tendermint/v1beta1/blocks/latest`,
@@ -34,6 +35,7 @@ describe("block status chain endpoint", () => {
       )
       expect(result.height).toBe(21_893_510)
       expect(result.endpoint).toBe(lcd)
+      expect(result.chainId).toBe(chainId)
     }
   )
 })

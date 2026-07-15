@@ -1,13 +1,17 @@
 import { fetchWithEndpointFallback } from "../data/endpointFallback"
 
 export type LatestBlock = {
+  chainId: string
   endpoint: string
   fetchedAt: number
   height: number
   timeMs: number
 }
 
-export const fetchLatestBlock = async (lcd: string): Promise<LatestBlock> => {
+export const fetchLatestBlock = async (
+  lcd: string,
+  chainId: string
+): Promise<LatestBlock> => {
   const response = await fetchWithEndpointFallback(
     `${lcd}/cosmos/base/tendermint/v1beta1/blocks/latest`
   )
@@ -28,6 +32,7 @@ export const fetchLatestBlock = async (lcd: string): Promise<LatestBlock> => {
   }
 
   return {
+    chainId,
     endpoint: response.url || lcd,
     fetchedAt: Date.now(),
     height,

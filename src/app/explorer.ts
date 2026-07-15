@@ -1,7 +1,12 @@
 import type { AppChainKey } from "./appChains"
 
+const FINDER_NETWORK_BY_CHAIN: Record<AppChainKey, "classic" | "mainnet"> = {
+  lunc: "classic",
+  luna: "mainnet"
+}
+
 const explorerBase = (chainKey: AppChainKey) =>
-  `https://finder.burrito.money/${chainKey === "lunc" ? "classic" : "mainnet"}`
+  `https://finder.burrito.money/${FINDER_NETWORK_BY_CHAIN[chainKey]}`
 
 export const getTxExplorerUrl = (chainKey: AppChainKey, hash: string) =>
   `${explorerBase(chainKey)}/tx/${hash}`
