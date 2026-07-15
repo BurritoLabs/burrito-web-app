@@ -32,10 +32,17 @@ const normalizeAssetKey = (info: FactoryAssetInfo | undefined) => {
 
 const resolvePairType = (value: unknown) => {
   if (typeof value === "string") {
-    return value.toLowerCase().includes("stable") ? "stable" : "xyk"
+    const normalized = value.toLowerCase()
+    if (normalized.includes("concentrated")) return "concentrated"
+    return normalized.includes("stable") ? "stable" : "xyk"
   }
-  if (value && typeof value === "object" && "stable_swap" in value) {
-    return "stable"
+  if (value && typeof value === "object") {
+    if ("stable_swap" in value) return "stable"
+    if ("custom" in value) {
+      const custom = String(value.custom).toLowerCase()
+      if (custom.includes("concentrated")) return "concentrated"
+      if (custom.includes("stable")) return "stable"
+    }
   }
   return "xyk"
 }

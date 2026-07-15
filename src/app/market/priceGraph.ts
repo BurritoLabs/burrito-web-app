@@ -1,6 +1,7 @@
 import type { MarketPoolSnapshot } from "../data/market"
 import { normalizeAssetKey } from "../utils/assetIdentity"
 import { toUnitAmount } from "../utils/format"
+import { supportsReserveRatioPricing } from "./poolPricing"
 
 export type PriceGraphEntry = {
   price: number
@@ -32,6 +33,7 @@ export const deriveUsdPriceGraphFromPools = ({
 }: PriceGraphOptions) => {
   const poolEdges = pools
     .map((pool) => {
+      if (!supportsReserveRatioPricing(pool.type)) return undefined
       const leftRaw = pool.poolAssets[0]
       const rightRaw = pool.poolAssets[1]
       if (!leftRaw || !rightRaw) return undefined

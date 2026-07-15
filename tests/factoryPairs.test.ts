@@ -49,6 +49,22 @@ describe("parseFactoryPairRecord", () => {
     expect(getFactoryPairCursor({ asset_infos: assetInfos })).toEqual(assetInfos)
   })
 
+  it("preserves Astroport concentrated pool types", () => {
+    const pair = parseFactoryPairRecord(
+      {
+        contract_addr: pairAddress,
+        asset_infos: [
+          { native_token: { denom: "uluna" } },
+          { token: { contract_addr: tokenAddress } }
+        ],
+        pair_type: { custom: "concentrated" }
+      },
+      dex
+    )
+
+    expect(pair?.type).toBe("concentrated")
+  })
+
   it("rejects incomplete factory records", () => {
     expect(
       parseFactoryPairRecord(

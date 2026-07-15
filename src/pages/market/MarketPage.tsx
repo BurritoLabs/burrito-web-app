@@ -42,6 +42,7 @@ import {
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
+import { supportsReserveRatioPricing } from "../../app/market/poolPricing"
 import {
   getMarketDexFilterOptions,
   type MarketDexFilter
@@ -564,7 +565,10 @@ const Market = () => {
       // Price display rule: always use the displayed left/right order.
       const priceBase = left
       const priceQuote = right
-      const priceValue = rightAmount / leftAmount
+      const usesReserveRatioPricing = supportsReserveRatioPricing(pool.type)
+      const priceValue = usesReserveRatioPricing
+        ? rightAmount / leftAmount
+        : undefined
 
       const leftUsd = getAssetUsdPrice(left)
       const rightUsd = getAssetUsdPrice(right)
@@ -599,7 +603,9 @@ const Market = () => {
         ? Math.min(...finiteConfidence)
         : undefined
       const confidenceLimitedLiquidityUsd =
-        calculatedLiquidityUsd !== undefined && priceConfidenceUsd !== undefined
+        usesReserveRatioPricing &&
+        calculatedLiquidityUsd !== undefined &&
+        priceConfidenceUsd !== undefined
           ? Math.min(calculatedLiquidityUsd, priceConfidenceUsd)
           : calculatedLiquidityUsd
       const liquidityUsd = guardChainRelativeValuation(
@@ -608,7 +614,11 @@ const Market = () => {
       )
 
       const priceQuoteUsd = getAssetUsdPrice(priceQuote)
-      const priceUsd = priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined
+      const priceUsd =
+        leftUsd ??
+        (priceValue !== undefined && priceQuoteUsd !== undefined
+          ? priceValue * priceQuoteUsd
+          : undefined)
       const marketCapUsd =
         priceBase.isLunc
           ? (nativePrice?.usd_market_cap ??
@@ -638,7 +648,10 @@ const Market = () => {
         priceBase,
         priceQuote,
         priceValue,
-        priceLabel: `1 ${priceBase.symbol} ≈ ${formatNumber(priceValue, priceValue < 1 ? 6 : 4)} ${priceQuote.symbol}`,
+        priceLabel:
+          priceValue !== undefined
+            ? `1 ${priceBase.symbol} ≈ ${formatNumber(priceValue, priceValue < 1 ? 6 : 4)} ${priceQuote.symbol}`
+            : undefined,
         priceUsd,
         marketCapUsd,
         liquidityUsd,

@@ -22,7 +22,8 @@ import {
   fetchPairTrades,
   fetchMarketDexPairs,
   fetchMarketPoolLive,
-  fetchMarketPools
+  fetchMarketPools,
+  fetchMarketSpotPrice
 } from "../../app/data/market"
 import {
   useResolvedNativeWhitelist,
@@ -65,6 +66,7 @@ import {
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
+import { supportsReserveRatioPricing } from "../../app/market/poolPricing"
 import { useAppChain } from "../../app/appChainContext"
 import { getAddressExplorerUrl } from "../../app/explorer"
 
@@ -553,10 +555,11 @@ const MarketPairDetails = () => {
     const priceQuote = right
     const priceValue = rightAmount / leftAmount
     const priceQuoteUsd = getAssetUsdPrice(priceQuote)
-    const priceUsd = priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined
-
     const leftUsd = getAssetUsdPrice(left)
     const rightUsd = getAssetUsdPrice(right)
+    const priceUsd =
+      leftUsd ??
+      (priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined)
     const bondingLiquidityUsd =
       displayPool.bonding?.liquidityAssetId && displayPool.bonding?.liquidityAmount
         ? (() => {
@@ -588,7 +591,9 @@ const MarketPairDetails = () => {
       )
       .filter((value): value is number => value !== undefined && Number.isFinite(value))
     const confidenceLimitedLiquidityUsd =
-      calculatedLiquidityUsd !== undefined && finiteConfidence.length
+      supportsReserveRatioPricing(displayPool.type) &&
+      calculatedLiquidityUsd !== undefined &&
+      finiteConfidence.length
         ? Math.min(calculatedLiquidityUsd, ...finiteConfidence)
         : calculatedLiquidityUsd
     const chainMarketCapUsd =
@@ -660,6 +665,41 @@ const MarketPairDetails = () => {
       } as Record<Timeframe, number | undefined>
     }
   })()
+
+  const usesSimulatedSpotPrice = Boolean(
+    detail && !supportsReserveRatioPricing(detail.pool.type)
+  )
+  const { data: simulatedSpotPrice } = useQuery({
+    queryKey: [
+      "market",
+      chain.chainId,
+      "spot-price",
+      detail?.pool.pair,
+      detail?.left.id,
+      detail?.left.decimals,
+      detail?.right.decimals
+    ],
+    queryFn: () =>
+      fetchMarketSpotPrice({
+        pairAddress: detail!.pool.pair,
+        offerAssetId: detail!.left.id,
+        offerDecimals: detail!.left.decimals,
+        askDecimals: detail!.right.decimals
+      }),
+    enabled: usesSimulatedSpotPrice,
+    staleTime: 30_000,
+    refetchInterval: 60_000
+  })
+  const detailPriceValue = usesSimulatedSpotPrice
+    ? simulatedSpotPrice
+    : detail?.priceValue
+  const detailQuoteUsd =
+    usesSimulatedSpotPrice &&
+    detail?.priceUsd !== undefined &&
+    detailPriceValue !== undefined &&
+    detailPriceValue > 0
+      ? detail.priceUsd / detailPriceValue
+      : detail?.priceQuoteUsd
 
   const liquidityTokenAsset = detail
     ? [detail.left, detail.right].find((asset) => asset.id.startsWith("cw20:"))
@@ -790,7 +830,7 @@ const MarketPairDetails = () => {
         rightAssetKey: detail!.right.key,
         leftDecimals: detail!.left.decimals,
         rightDecimals: detail!.right.decimals,
-        expectedPrice: detail!.priceValue,
+        expectedPrice: detailPriceValue,
         bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
         lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
         maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
@@ -798,7 +838,7 @@ const MarketPairDetails = () => {
         minCandles: MIN_CANDLES_FOR_CHART[timeframe],
         includeLocalFallback: true
       }),
-    enabled: Boolean(detail?.pool.pair),
+    enabled: Boolean(detail?.pool.pair && detailPriceValue),
     staleTime: 60_000,
     refetchInterval: 120_000
   })
@@ -844,7 +884,7 @@ const MarketPairDetails = () => {
     return candles.find((candle) => candle.bucketStart === activeCandleTime) ?? candles[candles.length - 1]
   }, [activeCandleTime, candles])
   const baseSymbol = detail?.left.symbol ?? ""
-  const chartQuoteUsd = detail?.priceQuoteUsd
+  const chartQuoteUsd = detailQuoteUsd
   const quoteSymbol = detail?.right.symbol ?? ""
 
   const chartStats = useMemo(() => {
@@ -1269,7 +1309,9 @@ const MarketPairDetails = () => {
             </div>
             <div className={styles.priceHint}>
               1 {detail.priceBase.symbol} ≈{" "}
-              {formatNumberNoRoundByNonZeroFractionDigits(detail.priceValue, 4)}{" "}
+              {detailPriceValue !== undefined
+                ? formatNumberNoRoundByNonZeroFractionDigits(detailPriceValue, 4)
+                : "--"}{" "}
               {detail.priceQuote.symbol}
             </div>
           </div>
@@ -1478,7 +1520,7 @@ const MarketPairDetails = () => {
             }))
           }
           priceQuoteSymbol={detail.priceQuote.symbol}
-          priceQuoteUsd={detail.priceQuoteUsd}
+          priceQuoteUsd={detailQuoteUsd}
           trades={trades}
         />
       </div>

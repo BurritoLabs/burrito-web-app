@@ -34,4 +34,32 @@ describe("market price confidence graph", () => {
     expect(graph.terra1pppppppppppppppppppppppppppppppppppppp.liquidity).toBe(200)
     expect(graph.terra1ssssssssssssssssssssssssssssssssssssss.liquidity).toBeLessThanOrEqual(200)
   })
+
+  it("does not derive prices from concentrated pool reserve ratios", () => {
+    const graph = deriveUsdPriceGraphFromPools({
+      pools: [
+        {
+          pair: `terra1${"c".repeat(38)}`,
+          dexId: "astroport",
+          dexLabel: "Astroport",
+          type: "concentrated",
+          poolAssets: [
+            { id: "native:uluna", amount: "100000000" },
+            {
+              id: "native:ibc/2C962DAB9F57FE0921435426AE75196009FAA1981BF86991203C8411F8980FDB",
+              amount: "999999999999"
+            }
+          ]
+        }
+      ],
+      seedAssetIds: ["native:uluna"],
+      getDecimals: () => 6,
+      getSeedUsdPrice: (_id, key) => (key === "uluna" ? 0.05 : undefined)
+    })
+
+    expect(graph.uluna?.price).toBe(0.05)
+    expect(
+      graph["ibc/2c962dab9f57fe0921435426ae75196009faa1981bf86991203c8411f8980fdb"]
+    ).toBeUndefined()
+  })
 })

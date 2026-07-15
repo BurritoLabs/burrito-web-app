@@ -26,6 +26,7 @@ import {
   isTerraAddress,
   normalizeSafeMarketAssetId
 } from "../utils/assetIdentity"
+import { toUnitAmount } from "../utils/format"
 
 type AssetDexPair = {
   dex?: string
@@ -53,6 +54,10 @@ type PoolResponse = {
   assets?: PoolAsset[]
   reserve1?: string
   reserve2?: string
+}
+
+type SimulationResponse = {
+  return_amount?: string
 }
 
 type WesoCurveInfoResponse = {
@@ -1486,6 +1491,40 @@ export const fetchMarketPool = async (pair: MarketDexPair) => {
 
 export const fetchMarketPoolLive = async (pair: MarketDexPair) =>
   fetchPoolForPair(pair, new Map())
+
+export const fetchMarketSpotPrice = async ({
+  pairAddress,
+  offerAssetId,
+  offerDecimals,
+  askDecimals
+}: {
+  pairAddress: string
+  offerAssetId: string
+  offerDecimals: number
+  askDecimals: number
+}) => {
+  const offerInfo = offerAssetId.startsWith("native:")
+    ? { native_token: { denom: offerAssetId.slice("native:".length) } }
+    : offerAssetId.startsWith("cw20:")
+      ? { token: { contract_addr: offerAssetId.slice("cw20:".length) } }
+      : undefined
+  if (!offerInfo) throw new Error("Unsupported market asset")
+
+  const safeOfferDecimals = Math.max(0, Math.min(30, Math.trunc(offerDecimals)))
+  const response = await queryContractSmart<SimulationResponse>(pairAddress, {
+    simulation: {
+      offer_asset: {
+        info: offerInfo,
+        amount: (10n ** BigInt(safeOfferDecimals)).toString()
+      }
+    }
+  })
+  const price = toUnitAmount(response.return_amount ?? "0", askDecimals)
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Market spot price unavailable")
+  }
+  return price
+}
 
 export const fetchMarketPools = async (pairs: MarketDexPair[]) => {
   const local = await fetchLocalMarketIndex()
