@@ -235,12 +235,12 @@ export const buildIbcAssetIconCandidates = (
   unique([
     ...icons.map((icon) => sanitizeAssetIconUrl(icon)),
     ...buildIbcStaticGuessCandidates(options ?? {}),
-    buildGeneratedTokenIcon(options?.symbol),
-    fallback
+    fallback,
+    buildGeneratedTokenIcon(options?.symbol)
   ])
 
 export const buildCw20IconCandidates = (
   icon?: string,
   symbol?: string,
   fallback = "/system/cw20.svg"
-) => unique([sanitizeAssetIconUrl(icon), buildGeneratedTokenIcon(symbol), fallback])
+) => unique([sanitizeAssetIconUrl(icon), fallback, buildGeneratedTokenIcon(symbol)])
