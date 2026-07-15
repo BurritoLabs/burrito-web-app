@@ -5,6 +5,10 @@ import {
   type WalletPanelNavigationDetail
 } from "./panelNavigation"
 import { isLikelyMobileBrowser } from "./walletPlatform"
+import {
+  readLocalStorageValue,
+  writeLocalStorageValue
+} from "../utils/safeStorage"
 
 const loadWalletPanel = () => import("./WalletPanel")
 const loadWalletAssetWarmup = () => import("./WalletAssetWarmup")
@@ -91,7 +95,7 @@ const DeferredWalletPanel = () => {
   const [requested, setRequested] = useState(() => {
     if (typeof window === "undefined") return false
     return (
-      window.localStorage.getItem("burritoWalletOpen") === "true" &&
+      readLocalStorageValue("burritoWalletOpen") === "true" &&
       !isLikelyMobileBrowser()
     )
   })
@@ -113,7 +117,7 @@ const DeferredWalletPanel = () => {
       void loadWalletAssetWarmup()
       setWarmupRequested(true)
       pendingDetailRef.current = detail ?? { view: "wallet" }
-      window.localStorage.setItem("burritoWalletOpen", "true")
+      writeLocalStorageValue("burritoWalletOpen", "true")
       setRequested(true)
     }
 
@@ -151,7 +155,7 @@ const DeferredWalletPanel = () => {
     prepareWalletPanel()
     pendingDetailRef.current = { view: "wallet" }
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("burritoWalletOpen", "true")
+      writeLocalStorageValue("burritoWalletOpen", "true")
     }
     setRequested(true)
   }

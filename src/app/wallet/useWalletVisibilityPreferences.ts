@@ -8,6 +8,10 @@ import {
 } from "react"
 import { CLASSIC_DENOMS } from "../chain"
 import { useAppChain } from "../appChainContext"
+import {
+  readLocalStorageValue,
+  writeLocalStorageValue
+} from "../utils/safeStorage"
 
 const HIDE_LOW_BALANCE_KEY = "burritoHideLowBalance"
 const LEGACY_HIDE_LOW_BALANCE_KEYS = [
@@ -16,6 +20,7 @@ const LEGACY_HIDE_LOW_BALANCE_KEYS = [
 ]
 const LEGACY_HIDDEN_TOKENS_KEY = "burritoHiddenTokens"
 const VISIBILITY_PREFERENCE_EVENT = "burrito:wallet-visibility-preference"
+const MAX_HIDDEN_TOKENS = 1_000
 
 type WalletVisibilityPreferenceEventDetail = {
   key: string
@@ -32,24 +37,37 @@ const canUseWindow = () => typeof window !== "undefined"
 const readStoredBoolean = (key: string, fallback: boolean, fallbackKeys: string[] = []) => {
   if (!canUseWindow()) return fallback
 
-  const stored = window.localStorage.getItem(key)
+  const stored = readLocalStorageValue(key)
   if (stored !== null) return stored === "true"
 
   for (const fallbackKey of fallbackKeys) {
-    const legacyValue = window.localStorage.getItem(fallbackKey)
+    const legacyValue = readLocalStorageValue(fallbackKey)
     if (legacyValue !== null) return legacyValue === "true"
   }
 
   return fallback
 }
 
-const sanitizeHiddenTokens = (value: unknown) => {
+export const sanitizeHiddenTokens = (value: unknown) => {
   if (!Array.isArray(value)) return []
-
-  return value.filter(
-    (item): item is string =>
-      typeof item === "string" && item.length > 0 && !ALWAYS_VISIBLE_DENOMS.has(item)
-  )
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    if (typeof item !== "string") continue
+    const normalized = item.trim()
+    if (
+      !normalized ||
+      normalized.length > 256 ||
+      ALWAYS_VISIBLE_DENOMS.has(normalized.toLowerCase()) ||
+      seen.has(normalized)
+    ) {
+      continue
+    }
+    seen.add(normalized)
+    result.push(normalized)
+    if (result.length >= MAX_HIDDEN_TOKENS) break
+  }
+  return result
 }
 
 export const getHiddenTokensStorageKey = (chainId: string) =>
@@ -62,9 +80,9 @@ const readStoredHiddenTokens = (
   if (!canUseWindow()) return []
 
   const stored =
-    window.localStorage.getItem(storageKey) ??
+    readLocalStorageValue(storageKey) ??
     (legacyStorageKey
-      ? window.localStorage.getItem(legacyStorageKey)
+      ? readLocalStorageValue(legacyStorageKey)
       : null)
   if (!stored) return []
 
@@ -122,16 +140,19 @@ const useSyncedPreference = <T,>({
       const nextValue = readValueRef.current()
       valueRef.current = nextValue
       setValue(nextValue)
-      window.localStorage.setItem(
+      const stored = writeLocalStorageValue(
         storageKey,
         serializeValueRef.current(nextValue)
       )
-      emitPreferenceChange(storageKey, sourceId)
+      if (stored) emitPreferenceChange(storageKey, sourceId)
       return
     }
 
-    window.localStorage.setItem(storageKey, serializeValueRef.current(value))
-    emitPreferenceChange(storageKey, sourceId)
+    const stored = writeLocalStorageValue(
+      storageKey,
+      serializeValueRef.current(value)
+    )
+    if (stored) emitPreferenceChange(storageKey, sourceId)
   }, [sourceId, storageKey, value])
 
   useEffect(() => {

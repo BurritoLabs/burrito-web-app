@@ -19,6 +19,7 @@ import {
 } from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 import { fetchVerifiedTokenRegistry } from "./tokenRegistry"
+import { writeLocalStorageValue } from "../utils/safeStorage"
 
 export type Cw20Token = {
   protocol?: string
@@ -213,7 +214,7 @@ const writeIbcCache = (next: Record<string, IbcCacheEntry>) => {
   ibcCache = next
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(IBC_CACHE_KEY, JSON.stringify(next))
+    writeLocalStorageValue(IBC_CACHE_KEY, JSON.stringify(next))
   } catch {
     // Ignore cache write failures.
   }
@@ -244,7 +245,7 @@ const writeNativeTokenCache = (next: Record<string, NativeTokenCacheEntry>) => {
   nativeTokenCache = next
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(NATIVE_TOKEN_CACHE_KEY, JSON.stringify(next))
+    writeLocalStorageValue(NATIVE_TOKEN_CACHE_KEY, JSON.stringify(next))
   } catch {
     // Ignore cache write failures.
   }
@@ -277,7 +278,7 @@ const writeCw20TokenInfoCache = (
   cw20TokenInfoCache = next
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(CW20_TOKEN_INFO_CACHE_KEY, JSON.stringify(next))
+    writeLocalStorageValue(CW20_TOKEN_INFO_CACHE_KEY, JSON.stringify(next))
   } catch {
     // Ignore cache write failures.
   }

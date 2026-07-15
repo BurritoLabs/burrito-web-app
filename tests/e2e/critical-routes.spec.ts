@@ -63,3 +63,43 @@ test("network switcher changes the active chain and preserves the current route"
     )
     .toBe("luna")
 })
+
+test("wallet recovers from a full local asset cache", async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on("pageerror", (error) => pageErrors.push(error.message))
+  await page.addInitScript(() => {
+    const cacheKey = "cw20balance-single:v1:wallet:columbus-5:token"
+    const originalSetItem = Storage.prototype.setItem
+    originalSetItem.call(window.localStorage, cacheKey, "cached")
+    originalSetItem.call(window.localStorage, "burritoWalletConnector", "keplr")
+
+    Storage.prototype.setItem = function setItem(key: string, value: string) {
+      if (
+        key === "burritoHiddenTokens:columbus-5" &&
+        window.localStorage.getItem(cacheKey)
+      ) {
+        throw new DOMException("Quota exceeded", "QuotaExceededError")
+      }
+      originalSetItem.call(this, key, value)
+    }
+  })
+
+  await page.goto("/wallet")
+
+  await expect(page.getByRole("heading", { name: "Wallet", exact: true })).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem(
+          "cw20balance-single:v1:wallet:columbus-5:token"
+        )
+      )
+    )
+    .toBeNull()
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.localStorage.getItem("burritoWalletConnector"))
+    )
+    .toBe("keplr")
+  expect(pageErrors).toEqual([])
+})

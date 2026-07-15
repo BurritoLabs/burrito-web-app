@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { CLASSIC_CHAIN } from "../chain"
 import type { Cw20Token } from "./terraAssets"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import { writeLocalStorageValue } from "../utils/safeStorage"
 
 export type Cw20Balance = Cw20Token & {
   address: string
@@ -44,7 +45,7 @@ const loadCache = (key: string, ttl = CACHE_TTL) => loadCachePayload(key, ttl)?.
 const saveCache = (key: string, data: Record<string, string>) => {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+    writeLocalStorageValue(key, JSON.stringify({ ts: Date.now(), data }))
   } catch {
     // Ignore storage failures in private browsing or low-storage mobile contexts.
   }
@@ -99,7 +100,7 @@ const saveSingleBalanceCache = (
     return
   }
   try {
-    window.localStorage.setItem(
+    writeLocalStorageValue(
       buildSingleBalanceCacheKey(address, contract),
       JSON.stringify({ ts: Date.now(), balance })
     )
@@ -153,7 +154,7 @@ const saveActiveBalanceContracts = (
   })
   const contracts = Array.from(active)
   try {
-    window.localStorage.setItem(
+    writeLocalStorageValue(
       buildActiveBalanceCacheKey(normalizedAddress),
       JSON.stringify({ ts: Date.now(), contracts })
     )
@@ -454,7 +455,7 @@ const loadCw20SupplyCache = (contract: string) => {
 const saveCw20SupplyCache = (contract: string, data: Cw20SupplyInfo) => {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(
+    writeLocalStorageValue(
       buildCw20SupplyCacheKey(contract),
       JSON.stringify({ ts: Date.now(), data })
     )
@@ -538,7 +539,7 @@ export const fetchCw20Supplies = async (
       Object.entries(results).map(([contract, info]) => [contract, JSON.stringify(info)])
     )
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(
+      writeLocalStorageValue(
         cacheKey,
         JSON.stringify({ ts: Date.now(), data: serializable })
       )

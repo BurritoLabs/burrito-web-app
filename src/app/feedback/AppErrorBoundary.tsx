@@ -40,12 +40,15 @@ class AppErrorBoundary extends Component<
       console.error(error, errorInfo)
     }
 
-    if (
-      isChunkLoadError(error) &&
-      window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) !== "1"
-    ) {
-      window.sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, "1")
-      window.location.reload()
+    if (isChunkLoadError(error)) {
+      try {
+        if (window.sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) !== "1") {
+          window.sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, "1")
+          window.location.reload()
+        }
+      } catch {
+        // A restricted session store must not replace the original app error.
+      }
     }
   }
 

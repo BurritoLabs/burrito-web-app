@@ -15,10 +15,14 @@ import {
 } from "./appChains"
 import { AppChainContext } from "./appChainContext"
 import { setActiveAppChainKey } from "./activeChain"
+import {
+  readLocalStorageValue,
+  writeLocalStorageValue
+} from "./utils/safeStorage"
 
 const readStoredChain = () => {
   if (typeof window === "undefined") return DEFAULT_APP_CHAIN
-  const stored = window.localStorage.getItem(APP_CHAIN_STORAGE_KEY)
+  const stored = readLocalStorageValue(APP_CHAIN_STORAGE_KEY)
   const selected = stored && isAppChainKey(stored) ? stored : DEFAULT_APP_CHAIN
   setActiveAppChainKey(selected)
   return selected
@@ -33,7 +37,7 @@ export const AppChainProvider = ({ children }: { children: ReactNode }) => {
     void queryClient.cancelQueries()
     queryClient.clear()
     setChainKeyState(next)
-    window.localStorage.setItem(APP_CHAIN_STORAGE_KEY, next)
+    writeLocalStorageValue(APP_CHAIN_STORAGE_KEY, next)
   }, [queryClient])
 
   useEffect(() => {

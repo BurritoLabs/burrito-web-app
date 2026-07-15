@@ -40,6 +40,11 @@ import {
 } from "../utils/format"
 import { formatTxError } from "../utils/txError"
 import {
+  readLocalStorageValue,
+  removeLocalStorageValue,
+  writeLocalStorageValue
+} from "../utils/safeStorage"
+import {
   DEFAULT_SEND_ASSET,
   FALLBACK_SEND_GAS_CW20,
   FALLBACK_SEND_GAS_NATIVE,
@@ -83,7 +88,7 @@ const WalletPanel = () => {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === "undefined") return false
-    return window.localStorage.getItem("burritoWalletOpen") === "true"
+    return readLocalStorageValue("burritoWalletOpen") === "true"
   })
   const [view, setView] = useState<WalletPanelView>("wallet")
   const [manageOpen, setManageOpen] = useState(false)
@@ -208,7 +213,7 @@ const WalletPanel = () => {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("burritoWalletOpen", String(isOpen))
+      writeLocalStorageValue("burritoWalletOpen", String(isOpen))
       const offset =
         window.innerWidth >= 992 && isOpen ? "var(--wallet-width)" : "0px"
       document.documentElement.style.setProperty("--wallet-offset", offset)
@@ -234,7 +239,7 @@ const WalletPanel = () => {
       return
     }
 
-    const stored = window.localStorage.getItem(
+    const stored = readLocalStorageValue(
       getRecentRecipientsStorageKey(account.address, chain.chainId)
     )
     if (!stored) {
@@ -261,7 +266,7 @@ const WalletPanel = () => {
 
   useEffect(() => {
     if (typeof window === "undefined" || !account?.address) return
-    window.localStorage.setItem(
+    writeLocalStorageValue(
       getRecentRecipientsStorageKey(account.address, chain.chainId),
       JSON.stringify(recentRecipients.slice(0, RECENT_RECIPIENT_LIMIT))
     )
@@ -909,7 +914,7 @@ const WalletPanel = () => {
       }
 
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem(
+        removeLocalStorageValue(
           `cw20balance:${account.address}:${chain.chainId}`
         )
       }
