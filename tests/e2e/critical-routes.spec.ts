@@ -116,6 +116,9 @@ test("wallet CW20 deep links prioritize the requested swap asset", async ({
     if (!requestedContracts.length && bodyContracts.includes(contract)) {
       requestedContracts = bodyContracts
     }
+    if (bodyContracts.includes(contract)) {
+      await new Promise((resolve) => setTimeout(resolve, 1_500))
+    }
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({

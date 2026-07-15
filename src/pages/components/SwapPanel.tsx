@@ -1049,16 +1049,37 @@ const SwapPanel = ({
 
   useEffect(() => {
     if (!assets.length) return
-    if (!assets.some((asset) => asset.id === fromAssetId)) {
+    const isWaitingForDefaultFrom = Boolean(
+      defaultFromAssetId && fromAssetId === resolvedDefaultFromAssetId
+    )
+    const isWaitingForDefaultTo = Boolean(
+      defaultToAssetId && toAssetId === resolvedDefaultToAssetId
+    )
+    if (
+      !assets.some((asset) => asset.id === fromAssetId) &&
+      !isWaitingForDefaultFrom
+    ) {
       setFromAssetId(assets[0].id)
     }
-    if (!assets.some((asset) => asset.id === toAssetId) || toAssetId === fromAssetId) {
+    if (
+      (!assets.some((asset) => asset.id === toAssetId) &&
+        !isWaitingForDefaultTo) ||
+      toAssetId === fromAssetId
+    ) {
       const nextTo = assets.find((asset) => asset.id !== fromAssetId)
       if (nextTo) {
         setToAssetId(nextTo.id)
       }
     }
-  }, [assets, fromAssetId, toAssetId])
+  }, [
+    assets,
+    defaultFromAssetId,
+    defaultToAssetId,
+    fromAssetId,
+    resolvedDefaultFromAssetId,
+    resolvedDefaultToAssetId,
+    toAssetId
+  ])
 
   useEffect(() => {
     appliedDefaultPairRef.current = null
