@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
 import DataErrorCard from "./DataErrorCard"
+import { reportRuntimeError } from "./runtimeErrorReporter"
 
 type AppErrorBoundaryProps = {
   children: ReactNode
@@ -29,6 +30,12 @@ class AppErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    reportRuntimeError({
+      kind: "react",
+      error,
+      componentStack: errorInfo.componentStack ?? undefined
+    })
+
     if (import.meta.env.DEV) {
       console.error(error, errorInfo)
     }

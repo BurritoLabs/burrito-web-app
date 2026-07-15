@@ -6,7 +6,10 @@ import "./index.css"
 import App from "./App"
 import { AppChainProvider } from "./app/AppChainProvider"
 import AppErrorBoundary from "./app/feedback/AppErrorBoundary"
+import { installRuntimeErrorReporting } from "./app/feedback/runtimeErrorReporter"
 import WalletBoot from "./app/wallet/WalletBoot"
+
+installRuntimeErrorReporting()
 
 const shouldRetryQuery = (failureCount: number, error: unknown) => {
   if (failureCount >= 1) return false

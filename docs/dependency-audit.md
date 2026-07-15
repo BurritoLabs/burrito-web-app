@@ -7,7 +7,7 @@ weekly `Dependency Audit` workflow.
 
 - Reviewed: 2026-07-13
 - Review again by: 2026-10-13
-- Known findings: 13 low, 0 moderate, 0 high, 0 critical
+- Known findings: 12 low, 0 moderate, 0 high, 0 critical
 - Scope: production dependencies only (`npm audit --omit=dev`)
 
 The low-risk findings are transitive dependencies in the CosmosKit, Keplr, and

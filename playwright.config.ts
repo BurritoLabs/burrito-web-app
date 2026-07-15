@@ -12,6 +12,14 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "chromium-desktop",
+      testMatch: /critical-routes\.spec\.ts/,
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1440, height: 900 }
+      }
+    },
+    {
       name: "chromium-mobile",
       use: {
         browserName: "chromium",
