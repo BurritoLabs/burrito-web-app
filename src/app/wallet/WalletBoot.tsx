@@ -114,7 +114,7 @@ const WalletFallbackProvider = ({
 }: {
   children: ReactNode
   autoConnectId?: WalletConnectorId
-  onRuntimeRequested?: () => void
+  onRuntimeRequested?: (id: WalletConnectorId) => void
 }) => {
   const [status, setStatus] = useState<WalletStatus>("disconnected")
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
@@ -135,7 +135,7 @@ const WalletFallbackProvider = ({
       rememberWalletConnectorId(id)
 
       if (id === "keplr-mobile") {
-        onRuntimeRequested?.()
+        onRuntimeRequested?.(id)
         return
       }
 
@@ -348,6 +348,7 @@ const WalletFallbackProvider = ({
 
 const WalletBoot = ({ children }: { children: ReactNode }) => {
   const [storedAutoConnectId] = useState(() => getInitialStoredConnector())
+  const [connectOnMountId, setConnectOnMountId] = useState<WalletConnectorId>()
   const [loadWalletRuntime, setLoadWalletRuntime] = useState(() =>
     shouldLoadWalletRuntime()
   )
@@ -359,6 +360,7 @@ const WalletBoot = ({ children }: { children: ReactNode }) => {
         componentStack: info.componentStack ?? undefined
       })
       forgetStoredWalletSession()
+      setConnectOnMountId(undefined)
       setLoadWalletRuntime(false)
     },
     []
@@ -374,7 +376,9 @@ const WalletBoot = ({ children }: { children: ReactNode }) => {
             </WalletFallbackProvider>
           }
         >
-          <WalletRuntimeProvider>{children}</WalletRuntimeProvider>
+          <WalletRuntimeProvider connectOnMountId={connectOnMountId}>
+            {children}
+          </WalletRuntimeProvider>
         </Suspense>
       </WalletRuntimeErrorBoundary>
     )
@@ -383,7 +387,10 @@ const WalletBoot = ({ children }: { children: ReactNode }) => {
   return (
     <WalletFallbackProvider
       autoConnectId={storedAutoConnectId}
-      onRuntimeRequested={() => setLoadWalletRuntime(true)}
+      onRuntimeRequested={(id) => {
+        setConnectOnMountId(id)
+        setLoadWalletRuntime(true)
+      }}
     >
       {children}
     </WalletFallbackProvider>

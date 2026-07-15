@@ -89,3 +89,33 @@ test("mobile market keeps the fixed header above content and covers the bottom",
   expect(backgrounds.html).not.toBe("rgba(0, 0, 0, 0)")
   expect(backgrounds.body).not.toBe("rgba(0, 0, 0, 0)")
 })
+
+test("mobile Connect starts the Keplr Mobile handoff", async ({ page }) => {
+  const walletRuntimeErrors: string[] = []
+  page.on("console", (message) => {
+    if (message.text().includes("walletModal")) {
+      walletRuntimeErrors.push(message.text())
+    }
+  })
+  await page.goto("/")
+
+  await page.getByRole("button", { name: "Connect", exact: true }).click()
+  const mobileConnector = page.getByRole("button", { name: /Keplr Mobile/ })
+  await expect(mobileConnector).toBeEnabled()
+
+  await mobileConnector.click()
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        connector: localStorage.getItem("burritoWalletConnector"),
+        cosmosWallet: localStorage.getItem(
+          "cosmos-kit@2:core//current-wallet"
+        )
+      }))
+    )
+    .toEqual({
+      connector: "keplr-mobile",
+      cosmosWallet: "keplr-mobile"
+    })
+  expect(walletRuntimeErrors).toEqual([])
+})

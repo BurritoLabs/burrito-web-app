@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  fetchCw20TokenInfos,
   isResolvedIbcMetadata,
   mapCosmosRegistryAssetAliases,
   mapCosmosRegistryAssets,
@@ -115,5 +116,33 @@ describe("Terra asset registry selection", () => {
   it("rejects generic Finder IBC placeholders as resolved metadata", () => {
     expect(isResolvedIbcMetadata({ symbol: "IBC", name: "IBC" })).toBe(false)
     expect(isResolvedIbcMetadata({ symbol: "WBTC", name: "Wrapped Bitcoin" })).toBe(true)
+  })
+
+  it("uses the verified JURIS logo for its Terra Classic contract", async () => {
+    const contract =
+      "terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2"
+    const tokens = await fetchCw20TokenInfos(
+      [contract],
+      {
+        [contract]: {
+          token: contract,
+          symbol: "JURIS",
+          name: "Juris Protocol",
+          icon: "/system/cw20.svg"
+        }
+      },
+      {
+        chainId: "columbus-5",
+        chainKey: "lunc",
+        lcd: "https://terra-classic-lcd.publicnode.com",
+        name: "Terra Classic"
+      }
+    )
+
+    expect(tokens[contract]).toMatchObject({
+      symbol: "JURIS",
+      name: "Juris Protocol",
+      icon: "/tokens/juris.svg"
+    })
   })
 })

@@ -54,6 +54,12 @@ const LOCAL_CW20_TOKEN_OVERRIDES: Record<string, Partial<Cw20Token>> = {
     name: "DO",
     protocol: "DO",
     icon: "/system/do-cookie.jpg"
+  },
+  terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2: {
+    symbol: "JURIS",
+    name: "Juris Protocol",
+    protocol: "Juris Protocol",
+    icon: "/tokens/juris.svg"
   }
 }
 

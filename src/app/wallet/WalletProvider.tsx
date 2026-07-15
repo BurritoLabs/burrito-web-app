@@ -208,7 +208,13 @@ const getActiveWalletConnectSession = (
   )
 }
 
-export const WalletProvider = ({ children }: { children: ReactNode }) => {
+export const WalletProvider = ({
+  children,
+  connectOnMountId
+}: {
+  children: ReactNode
+  connectOnMountId?: WalletConnectorId
+}) => {
   const { chainKey, chain } = useAppChain()
   const cosmosChain = useChain(COSMOS_KIT_CHAIN_NAME_BY_KEY[chainKey])
   const [status, setStatus] = useState<WalletStatus>("disconnected")
@@ -222,6 +228,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const accountAddressRef = useRef<string | undefined>(undefined)
   const connectorIdRef = useRef<WalletConnectorId | undefined>(undefined)
   const walletStatusRef = useRef<WalletStatus>("disconnected")
+  const explicitConnectAttemptedRef = useRef(false)
   const lastAutoConnectRetryAtRef = useRef(0)
   const previousChainKeyRef = useRef(chainKey)
   const manualDisconnectRef = useRef(isWalletManualDisconnectStored())
@@ -1160,6 +1167,22 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   )
 
   useEffect(() => {
+    if (!connectOnMountId || explicitConnectAttemptedRef.current) return
+    if (
+      !connectors.some(
+        (connector) =>
+          connector.id === connectOnMountId && connector.available
+      )
+    ) {
+      return
+    }
+
+    explicitConnectAttemptedRef.current = true
+    void connect(connectOnMountId)
+  }, [connect, connectOnMountId, connectors])
+
+  useEffect(() => {
+    if (connectOnMountId) return
     if (
       effectiveAutoConnectId &&
       isCosmosConnectorId(effectiveAutoConnectId) &&
@@ -1200,6 +1223,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   }, [
     autoConnectAttempted,
     connect,
+    connectOnMountId,
     effectiveAutoConnectId,
     autoConnectAvailable,
     hydrateMobileWalletSession,
