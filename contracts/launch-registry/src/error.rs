@@ -38,4 +38,7 @@ pub enum ContractError {
 
     #[error("locker contract is not the configured Burrito locker")]
     InvalidLockerContract {},
+
+    #[error("pair verification failed: {reason}")]
+    InvalidPair { reason: &'static str },
 }

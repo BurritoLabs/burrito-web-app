@@ -27,6 +27,7 @@ export type Cw20Token = {
   token: string
   icon?: string
   decimals?: number
+  decimalsVerified?: boolean
   name?: string
 }
 
@@ -37,6 +38,7 @@ export type IbcToken = {
   name: string
   icon?: string
   decimals?: number
+  decimalsVerified?: boolean
   path?: string
 }
 
@@ -111,6 +113,7 @@ type IbcCacheEntry = {
 
 type Cw20TokenInfoCacheEntry = {
   ts: number
+  verified?: boolean
   token: {
     name?: string
     symbol?: string
@@ -360,6 +363,7 @@ const getCachedCw20TokenInfo = (contract: string, chainId: string) => {
   const key = buildChainScopedAssetCacheKey(chainId, contract)
   const cached = cache[key]
   if (!cached) return undefined
+  if (cached.verified !== true) return undefined
   if (Date.now() - cached.ts > CW20_TOKEN_INFO_CACHE_TTL) {
     const next = { ...cache }
     delete next[key]
@@ -374,11 +378,12 @@ const cacheCw20TokenInfo = (
   token: { name?: string; symbol?: string; decimals?: number; icon?: string },
   chainId: string
 ) => {
+  if (!Number.isInteger(token.decimals)) return
   const cache = readCw20TokenInfoCache()
   const key = buildChainScopedAssetCacheKey(chainId, contract)
   writeCw20TokenInfoCache({
     ...cache,
-    [key]: { ts: Date.now(), token }
+    [key]: { ts: Date.now(), verified: true, token }
   })
 }
 
@@ -496,8 +501,10 @@ const mergeCw20TokenMetadata = ({
     protocol: localOverride?.protocol?.trim() || fallback?.protocol?.trim(),
     icon: sanitizeAssetIconUrl(localOverride?.icon ?? fallback?.icon ?? onChain?.icon),
     decimals:
-      localOverride?.decimals ??
-      (Number.isFinite(onChain?.decimals) ? onChain?.decimals : (fallback?.decimals ?? 6))
+      (Number.isFinite(onChain?.decimals)
+        ? onChain?.decimals
+        : (localOverride?.decimals ?? fallback?.decimals ?? 6)),
+    decimalsVerified: Number.isInteger(onChain?.decimals)
   }
 }
 
@@ -722,7 +729,7 @@ const fetchIbcTraceToken = async (
 ): Promise<IbcToken | undefined> => {
   const { chainId, chainKey, lcd } = scope
   const cached = getCachedIbcToken(hash, chainId)
-  if (cached) return cached
+  if (cached?.decimalsVerified) return cached
 
   const traceRes = await fetchWithEndpointFallback(
     `${lcd}/ibc/apps/transfer/v1/denom_traces/${hash}`
@@ -734,20 +741,16 @@ const fetchIbcTraceToken = async (
 
   const sourceToken = await fetchSourceRegistryToken(baseDenom, chainKey)
   let metadata: BankMetadataResponse["metadata"] | undefined
-  if (!sourceToken) {
-    try {
-      const metadataRes = await fetchWithEndpointFallback(
-        `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(
-          baseDenom
-        )}`
-      )
-      if (metadataRes.ok) {
-        const payload = (await metadataRes.json()) as BankMetadataResponse
-        metadata = payload?.metadata
-      }
-    } catch {
-      metadata = undefined
+  try {
+    const metadataRes = await fetchWithEndpointFallback(
+      `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(baseDenom)}`
+    )
+    if (metadataRes.ok) {
+      const payload = (await metadataRes.json()) as BankMetadataResponse
+      metadata = payload?.metadata
     }
+  } catch {
+    metadata = undefined
   }
 
   const symbol = resolveDisplaySymbol(sourceToken?.symbol ?? metadata?.symbol, baseDenom)
@@ -762,7 +765,8 @@ const fetchIbcTraceToken = async (
       (looksLikeHttpUrl(metadata?.uri)
         ? sanitizeAssetIconUrl(metadata?.uri) ?? "/system/ibc.svg"
         : "/system/ibc.svg"),
-    decimals: sourceToken?.decimals ?? getDecimalsFromMetadata(metadata) ?? 6,
+    decimals: getDecimalsFromMetadata(metadata) ?? sourceToken?.decimals ?? 6,
+    decimalsVerified: getDecimalsFromMetadata(metadata) !== undefined,
     path: tracePayload?.denom_trace?.path
   }
   cacheIbcToken(hash, token, chainId)
@@ -908,6 +912,7 @@ export const fetchCw20TokenInfos = async (
 
   const results: Record<string, Cw20Token> = {}
   const missing: string[] = []
+  const fallbackWithFinder: Record<string, Cw20Token> = { ...fallback }
 
   normalized.forEach((contract) => {
     const cached = getCachedCw20TokenInfo(contract, scope.chainId)
@@ -916,14 +921,6 @@ export const fetchCw20TokenInfos = async (
         contract,
         fallback: fallback[contract],
         onChain: cached,
-        chainKey: scope.chainKey
-      })
-      return
-    }
-    if (hasReliableCw20Fallback(contract, fallback[contract])) {
-      results[contract] = mergeCw20TokenMetadata({
-        contract,
-        fallback: fallback[contract],
         chainKey: scope.chainKey
       })
       return
@@ -941,15 +938,14 @@ export const fetchCw20TokenInfos = async (
       if (!contract || !isTerraAddress(contract) || entry.status !== "ok") return
       const onChain = entry.metadata
       if (!onChain) return
-      cacheCw20TokenInfo(contract, onChain, scope.chainId)
-      results[contract] = mergeCw20TokenMetadata({
-        contract,
-        fallback: fallback[contract],
-        onChain,
-        chainKey: scope.chainKey
-      })
+      fallbackWithFinder[contract] = {
+        ...fallbackWithFinder[contract],
+        token: contract,
+        symbol: onChain.symbol ?? fallbackWithFinder[contract]?.symbol ?? "",
+        name: onChain.name ?? fallbackWithFinder[contract]?.name,
+        icon: onChain.icon ?? fallbackWithFinder[contract]?.icon
+      }
     })
-    return results
   }
 
   let index = 0
@@ -972,7 +968,7 @@ export const fetchCw20TokenInfos = async (
         const name = info?.name?.trim()
         const parsedDecimals = Number(info?.decimals)
         let icon: string | undefined
-        if (!fallback[contract]?.icon) {
+        if (!fallbackWithFinder[contract]?.icon) {
           try {
             const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
             const marketingResponse = await fetchWithEndpointFallback(
@@ -1004,7 +1000,7 @@ export const fetchCw20TokenInfos = async (
         cacheCw20TokenInfo(contract, onChain, scope.chainId)
         results[contract] = mergeCw20TokenMetadata({
           contract,
-          fallback: fallback[contract],
+          fallback: fallbackWithFinder[contract],
           onChain,
           chainKey: scope.chainKey
         })
@@ -1123,7 +1119,7 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
   }, [denoms])
 
   const missingHashes = useMemo(
-    () => hashes.filter((hash) => !base[hash]),
+    () => hashes.filter((hash) => !base[hash] || !base[hash].decimalsVerified),
     [base, hashes]
   )
 
@@ -1161,11 +1157,10 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
             decimals: Number.isInteger(metadata.decimals) ? metadata.decimals : 6,
             path: metadata.path
           }
-          cacheIbcToken(hash, token, scope.chainId)
           return [[hash, token] as [string, IbcToken]]
         })
       const finderTokens = Object.fromEntries(finderEntries)
-      const unresolvedHashes = missingHashes.filter((hash) => !finderTokens[hash])
+      const unresolvedHashes = missingHashes
 
       const entries = await Promise.all(
         unresolvedHashes.map(async (hash) => {
@@ -1174,8 +1169,8 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
         })
       )
       return {
-        ...Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][]),
-        ...finderTokens
+        ...finderTokens,
+        ...Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][])
       }
     },
     enabled: missingHashes.length > 0 && baseQuery.isFetched,

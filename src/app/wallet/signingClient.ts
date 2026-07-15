@@ -15,6 +15,10 @@ import {
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import {
+  getActiveAppChainGeneration,
+  getActiveAppChainRuntime
+} from "../activeChain"
+import {
   CHAIN_RUNTIME_CONFIG,
   CLASSIC_READ_ENDPOINTS_CONFIG,
   type ChainRuntimeConfig
@@ -177,14 +181,26 @@ const getClassicClientOptions = ({
   aminoTypes: getClassicAminoTypes()
 })
 
-const connectClassicEndpoint = (
+const connectClassicEndpoint = async (
   signer: OfflineSigner,
   endpoint: string,
   options?: ClassicClientOptions
-) =>
-  SigningStargateClient.connectWithSigner(endpoint, signer, {
+): Promise<SigningStargateClient> => {
+  const runtime = options?.runtime ?? CHAIN_RUNTIME_CONFIG.lunc
+  const client = await SigningStargateClient.connectWithSigner(endpoint, signer, {
     ...getClassicClientOptions(options)
   })
+
+  const actualChainId = await client.getChainId()
+  if (actualChainId !== runtime.chain.chainId) {
+    client.disconnect()
+    throw new Error(
+      `RPC chain mismatch. Expected ${runtime.chain.chainId}, received ${actualChainId}.`
+    )
+  }
+
+  return client
+}
 
 const connectClassicEndpointWithFallback = async (
   signer: OfflineSigner,
@@ -217,8 +233,21 @@ const connectClassicClientWithFallback = async (
   signer: OfflineSigner,
   options?: ClassicClientOptions
 ): Promise<ClassicSigningClient> => {
-  const initial = await connectClassicEndpointWithFallback(signer, options)
   const runtime = options?.runtime ?? CHAIN_RUNTIME_CONFIG.lunc
+  const chainGeneration = getActiveAppChainGeneration()
+  const assertSigningContext = () => {
+    const active = getActiveAppChainRuntime()
+    if (
+      active.chain.chainId !== runtime.chain.chainId ||
+      getActiveAppChainGeneration() !== chainGeneration
+    ) {
+      throw new Error(
+        "The selected chain changed before signing. Review the transaction and try again."
+      )
+    }
+  }
+
+  const initial = await connectClassicEndpointWithFallback(signer, options)
   const endpoints = getSigningRpcEndpoints(runtime)
   let endpointIndex = initial.endpointIndex
   let client = initial.client
@@ -276,45 +305,31 @@ const connectClassicClientWithFallback = async (
   }
 
   return {
-    simulate: (signerAddress, messages, memo) =>
-      withEndpointFallback((activeClient) =>
+    simulate: (signerAddress, messages, memo) => {
+      assertSigningContext()
+      return withEndpointFallback((activeClient) =>
         activeClient.simulate(signerAddress, messages, memo)
-      ),
+      )
+    },
     signAndBroadcast: (signerAddress, messages, fee, memo = "") =>
       runSerializedTransaction(
         `${runtime.chain.chainId}:${signerAddress}`,
         async () => {
+          assertSigningContext()
           if (fee === "auto") {
-            for (let attempt = 0; attempt < 3; attempt += 1) {
-              try {
-                return await withEndpointFallback(async (activeClient) =>
-                  ensureBroadcastSuccess(
-                    await activeClient.signAndBroadcast(
-                      signerAddress,
-                      messages,
-                      fee,
-                      memo
-                    )
-                  )
-                )
-              } catch (error) {
-                const message = error instanceof Error ? error.message : String(error)
-                const expectedSequence = parseSequenceMismatchExpected(message)
-                if (expectedSequence !== undefined && attempt < 2) {
-                  await waitBeforeSequenceRetry()
-                  continue
-                }
-                throw error
-              }
-            }
-
-            throw new Error("Classic transaction broadcast failed")
+            // CosmJS owns simulation, signing, and broadcast in this call. Do
+            // not move it to another endpoint after a timeout: the wallet may
+            // already have approved and the chain may already have accepted it.
+            return ensureBroadcastSuccess(
+              await client.signAndBroadcast(signerAddress, messages, fee, memo)
+            )
           }
 
           let sequenceHint: number | undefined
 
           for (let attempt = 0; attempt < 3; attempt += 1) {
             try {
+              assertSigningContext()
               let signingClient = client
               const { accountNumber, sequence } = await withEndpointFallback(
                 async (activeClient) => {
@@ -333,6 +348,7 @@ const connectClassicClientWithFallback = async (
                   chainId: runtime.chain.chainId
                 }
               )
+              assertSigningContext()
               const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
               try {
                 const result = await withEndpointFallback(async (activeClient) =>
@@ -362,9 +378,12 @@ const connectClassicClientWithFallback = async (
       ),
     getSequence: (address) =>
       withEndpointFallback((activeClient) => activeClient.getSequence(address)),
-    sign: (signerAddress, messages, fee, memo, signerData) =>
-      client.sign(signerAddress, messages, fee, memo, signerData),
+    sign: (signerAddress, messages, fee, memo, signerData) => {
+      assertSigningContext()
+      return client.sign(signerAddress, messages, fee, memo, signerData)
+    },
     broadcastTx: async (tx, timeoutMs, pollIntervalMs) => {
+      assertSigningContext()
       try {
         return await withEndpointFallback((activeClient) =>
           activeClient.broadcastTx(tx, timeoutMs, pollIntervalMs)
@@ -377,6 +396,7 @@ const connectClassicClientWithFallback = async (
       }
     },
     broadcastTxSync: async (tx) => {
+      assertSigningContext()
       try {
         return await withEndpointFallback((activeClient) =>
           activeClient.broadcastTxSync(tx)
@@ -389,35 +409,33 @@ const connectClassicClientWithFallback = async (
       }
     },
     delegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
-      fee === "auto"
-        ? client.delegateTokens(delegatorAddress, validatorAddress, amount, fee, memo)
-        : withEndpointFallback((activeClient) =>
-            activeClient.delegateTokens(
-              delegatorAddress,
-              validatorAddress,
-              amount,
-              fee,
-              memo
-            )
-          ),
-    undelegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
-      fee === "auto"
-        ? client.undelegateTokens(
+      runSerializedTransaction(
+        `${runtime.chain.chainId}:${delegatorAddress}`,
+        async () => {
+          assertSigningContext()
+          return client.delegateTokens(
             delegatorAddress,
             validatorAddress,
             amount,
             fee,
             memo
           )
-        : withEndpointFallback((activeClient) =>
-            activeClient.undelegateTokens(
-              delegatorAddress,
-              validatorAddress,
-              amount,
-              fee,
-              memo
-            )
+        }
+      ),
+    undelegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
+      runSerializedTransaction(
+        `${runtime.chain.chainId}:${delegatorAddress}`,
+        async () => {
+          assertSigningContext()
+          return client.undelegateTokens(
+            delegatorAddress,
+            validatorAddress,
+            amount,
+            fee,
+            memo
           )
+        }
+      )
   }
 }
 

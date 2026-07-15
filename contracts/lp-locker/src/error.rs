@@ -32,4 +32,7 @@ pub enum ContractError {
 
     #[error("cannot lock {amount} LP tokens with an empty hook message")]
     MissingHook { amount: Uint128 },
+
+    #[error("LP token and pair verification failed: {reason}")]
+    InvalidLpToken { reason: &'static str },
 }

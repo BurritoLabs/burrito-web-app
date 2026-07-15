@@ -383,7 +383,34 @@ const MarketLiquidityPanel = ({
       : normalizedPairAddress
   const unsupportedPairType =
     supportsStandardLiquidity && Boolean(pairInfo?.pair_type?.custom)
-  const baseLiquidityAvailable = supported && !unsupportedPairType
+  const expectedPairAssetIds = useMemo(
+    () =>
+      new Set(
+        [tokenAsset?.id, luncAsset?.id].filter((id): id is string => Boolean(id))
+      ),
+    [luncAsset?.id, tokenAsset?.id]
+  )
+  const standardPairAssetIds = useMemo(
+    () =>
+      new Set(
+        pairInfo?.asset_infos
+          ?.map((info) => resolveAssetIdFromInfo(info))
+          .filter(Boolean)
+      ),
+    [pairInfo]
+  )
+  const standardPairVerified = Boolean(
+    supportsStandardLiquidity &&
+      pairInfo?.contract_addr &&
+      pairInfo.contract_addr.toLowerCase() === normalizedPairAddress &&
+      pairInfo.liquidity_token &&
+      standardPairAssetIds.size === expectedPairAssetIds.size &&
+      Array.from(expectedPairAssetIds).every((id) => standardPairAssetIds.has(id))
+  )
+  const baseLiquidityAvailable =
+    supported &&
+    !unsupportedPairType &&
+    (!supportsStandardLiquidity || standardPairVerified)
   const pairAssetDecimals = useMemo(() => {
     const map = new Map<string, number>()
     pairInfo?.asset_infos?.forEach((info, index) => {
@@ -442,9 +469,26 @@ const MarketLiquidityPanel = ({
     (!lpTokenAddress ||
       lpTokenAddress === resolvedPairAddress ||
       lpTokenMatchesPoolAsset)
+  const garudaPairAssetIds = useMemo(
+    () =>
+      new Set(
+        [
+          resolveAssetIdFromGarudaInfo(garudaPoolInfo?.asset1),
+          resolveAssetIdFromGarudaInfo(garudaPoolInfo?.asset2)
+        ].filter(Boolean)
+      ),
+    [garudaPoolInfo]
+  )
+  const garudaPairVerified = Boolean(
+    supportsGarudaLiquidity &&
+      garudaPoolInfo?.liquidity_token &&
+      garudaPairAssetIds.size === expectedPairAssetIds.size &&
+      Array.from(expectedPairAssetIds).every((id) => garudaPairAssetIds.has(id))
+  )
   const liquidityInfoLoading = supportsWesoLiquidity && pairInfoLoading
   const liquidityEnabled =
     baseLiquidityAvailable &&
+    (!supportsGarudaLiquidity || garudaPairVerified) &&
     !liquidityInfoLoading &&
     !unsupportedWesoPool
 

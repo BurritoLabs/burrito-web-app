@@ -27,3 +27,5 @@ pub struct Lock {
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const NEXT_LOCK_ID: Item<u64> = Item::new("next_lock_id");
 pub const LOCKS: Map<u64, Lock> = Map::new("locks");
+pub const LOCK_IDS_BY_OWNER: Map<(&Addr, u64), bool> = Map::new("locks_by_owner");
+pub const LOCK_IDS_BY_LP_TOKEN: Map<(&Addr, u64), bool> = Map::new("locks_by_lp_token");

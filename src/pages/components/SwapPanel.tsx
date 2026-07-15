@@ -7,6 +7,7 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import {
   cacheNativeBalances,
   fetchBalances,
+  fetchContractInfo,
   fetchPrices,
   getCachedNativeBalances
 } from "../../app/data/classic"
@@ -17,7 +18,7 @@ import {
   useCw20Balances
 } from "../../app/data/cw20"
 import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
-import { fetchMarketDexPairs } from "../../app/data/market"
+import { fetchMarketDexPairs, type MarketDexPair } from "../../app/data/market"
 import {
   useResolvedCw20Whitelist,
   useResolvedIbcWhitelist,
@@ -81,6 +82,7 @@ type SwapAsset = {
   symbol: string
   name: string
   decimals: number
+  decimalsVerified?: boolean
   denom?: string
   contract?: string
   iconCandidates: string[]
@@ -107,6 +109,7 @@ type DexConfig = {
   label: string
   factory: string
   mode?: DexQueryMode
+  pairCodeIds?: readonly number[]
 }
 
 type SwapMessage = Parameters<ClassicStargateClient["simulate"]>[1][number]
@@ -267,11 +270,12 @@ const toGarudaAsset = (asset: SwapAsset) => {
 const resolveFactoryPair = async (
   dex: DexConfig,
   offerAsset: SwapAsset,
-  askAsset: SwapAsset
+  askAsset: SwapAsset,
+  forceRefresh = false
 ) => {
   const cacheKey = `${dex.id}:${dex.factory}:${offerAsset.id}:${askAsset.id}`
   const cached = FACTORY_PAIR_CACHE.get(cacheKey)
-  if (cached) return cached
+  if (cached && !forceRefresh) return cached
 
   const query =
     dex.mode === "garuda"
@@ -300,6 +304,47 @@ const resolveFactoryPair = async (
   }
   FACTORY_PAIR_CACHE.set(cacheKey, pair)
   return pair
+}
+
+const verifySwapRouteBeforeSigning = async ({
+  hops,
+  marketPairs
+}: {
+  hops: readonly SwapRouteHopQuote[]
+  marketPairs: readonly MarketDexPair[]
+}) => {
+  const verifiedPairKeys = new Set(
+    marketPairs.map(
+      (entry) => `${normalizeDexName(entry.dexId)}:${entry.pair.toLowerCase()}`
+    )
+  )
+
+  for (const hop of hops) {
+    if (hop.dex.factory) {
+      const factoryPair = await resolveFactoryPair(
+        hop.dex,
+        hop.offerAsset,
+        hop.askAsset,
+        true
+      )
+      if (factoryPair.toLowerCase() !== hop.pair.toLowerCase()) {
+        throw new Error("Swap route changed. Refresh the quote and try again.")
+      }
+      continue
+    }
+
+    const pairKey = `${normalizeDexName(hop.dex.id)}:${hop.pair.toLowerCase()}`
+    if (!verifiedPairKeys.has(pairKey)) {
+      throw new Error("Swap pool is not a verified market entry. Refresh the quote and try again.")
+    }
+    if (hop.dex.pairCodeIds?.length) {
+      const contract = await fetchContractInfo(hop.pair)
+      const codeId = Number(contract?.code_id)
+      if (!Number.isInteger(codeId) || !hop.dex.pairCodeIds.includes(codeId)) {
+        throw new Error("Swap pool contract is not an approved DEX pair. Refresh the quote and try again.")
+      }
+    }
+  }
 }
 
 const simulateSwapQuote = async (
@@ -986,7 +1031,7 @@ const SwapPanel = ({
         ...asset,
         symbol: override.symbol ?? asset.symbol,
         name: override.name ?? asset.name,
-        decimals: override.decimals ?? asset.decimals,
+        decimals: asset.type === "cw20" ? asset.decimals : (override.decimals ?? asset.decimals),
         iconCandidates:
           override.iconCandidates && override.iconCandidates.length > 0
             ? override.iconCandidates
@@ -1013,6 +1058,7 @@ const SwapPanel = ({
           symbol: token.symbol || token.name || contract.slice(0, 6).toUpperCase(),
           name: token.name || token.symbol || contract,
           decimals: Number.isFinite(decimals) ? decimals : 6,
+          decimalsVerified: token.decimalsVerified,
           contract,
           iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
         } satisfies SwapAsset)
@@ -1490,6 +1536,7 @@ const SwapPanel = ({
             factory: matched?.factory ?? "",
             id: dexId.toLowerCase(),
             label: dexLabel || matched?.label || dexId,
+            pairCodeIds: matched?.pairCodeIds,
             mode:
               matched?.mode ??
               (dexId.toLowerCase().startsWith("garuda")
@@ -1762,6 +1809,13 @@ const SwapPanel = ({
       setSubmitError(`Insufficient ${fromAsset.symbol} balance.`)
       return
     }
+    if (
+      (fromAsset.type === "cw20" && !fromAsset.decimalsVerified) ||
+      (toAsset.type === "cw20" && !toAsset.decimalsVerified)
+    ) {
+      setSubmitError("Token decimals could not be verified on-chain. Refresh the page and try again.")
+      return
+    }
 
     setSubmitError(undefined)
     setSubmitLoading(true)
@@ -1773,6 +1827,11 @@ const SwapPanel = ({
       )
       const signerAddress = accountAddress
       const client = await connectSigningClientForConnector(connectorId)
+
+      await verifySwapRouteBeforeSigning({
+        hops: selectedQuote.hops,
+        marketPairs: dexPairs
+      })
 
       const feeMsg = await buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
       const swapMessages = await Promise.all(

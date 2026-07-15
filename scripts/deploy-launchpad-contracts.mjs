@@ -144,6 +144,22 @@ const eventValue = (result, keys) => {
   return undefined;
 };
 
+const instantiateEventAddress = (result) => {
+  const event = result.events.find((candidate) => {
+    const attributes = candidate.attributes ?? [];
+    return (
+      candidate.type === "instantiate" ||
+      attributes.some(
+        (attribute) => attribute.key === "action" && attribute.value === "instantiate"
+      )
+    );
+  });
+  if (!event) return undefined;
+  return event.attributes.find((attribute) =>
+    ["_contract_address", "contract_address"].includes(attribute.key)
+  )?.value;
+};
+
 const storeCode = async (client, sender, wasmPath, label) => {
   const wasmByteCode = readFileSync(wasmPath);
   const result = await client.signAndBroadcast(
@@ -206,7 +222,7 @@ const instantiate = async (client, sender, codeId, label, msg, owner) => {
   );
   const contractAddress = response
     ? MsgInstantiateContractResponse.decode(response.value).address
-    : eventValue(result, ["_contract_address", "contract_address"]);
+    : instantiateEventAddress(result);
   if (!contractAddress) {
     throw new Error(`Could not read ${label} contract address from tx.`);
   }
@@ -258,6 +274,14 @@ const main = async () => {
     gasPrice,
     registry
   });
+
+  const actualChainId = await client.getChainId();
+  if (actualChainId !== chainConfig.chainId) {
+    client.disconnect();
+    throw new Error(
+      `Deployment RPC chain mismatch. Expected ${chainConfig.chainId}, received ${actualChainId}.`
+    );
+  }
 
   console.log(`Deployer: ${address}`);
   console.log(`Owner:    ${owner}`);

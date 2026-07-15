@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest"
-import { setActiveAppChainKey } from "../src/app/activeChain"
+import {
+  getActiveAppChainGeneration,
+  setActiveAppChainKey
+} from "../src/app/activeChain"
 import { APP_CHAINS } from "../src/app/appChains"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../src/app/chain"
 import {
@@ -35,6 +38,12 @@ describe("app chain runtime", () => {
       market: true,
       launchpad: true
     })
+  })
+
+  it("increments the signing context when the active chain changes", () => {
+    const before = getActiveAppChainGeneration()
+    setActiveAppChainKey("luna")
+    expect(getActiveAppChainGeneration()).toBeGreaterThan(before)
   })
 })
 

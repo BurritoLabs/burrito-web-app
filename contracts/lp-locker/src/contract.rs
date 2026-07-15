@@ -2,16 +2,27 @@ use cosmwasm_std::{
     entry_point, from_json, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, WasmMsg,
 };
-use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, TokenInfoResponse};
+use cosmwasm_schema::cw_serde;
 
 use crate::error::ContractError;
 use crate::msg::{
     ConfigResponse, Cw20HookMsg, ExecuteMsg, InstantiateMsg, LockResponse, LocksResponse, QueryMsg,
 };
 use crate::state::{
-    Config, Lock, CONFIG, DEFAULT_QUERY_LIMIT, LOCKS, MAX_LOCK_SECONDS, MAX_QUERY_LIMIT,
-    MIN_LOCK_SECONDS, NEXT_LOCK_ID,
+    Config, Lock, CONFIG, DEFAULT_QUERY_LIMIT, LOCK_IDS_BY_LP_TOKEN, LOCK_IDS_BY_OWNER, LOCKS,
+    MAX_LOCK_SECONDS, MAX_QUERY_LIMIT, MIN_LOCK_SECONDS, NEXT_LOCK_ID,
 };
+
+#[cw_serde]
+enum PairQueryMsg {
+    Pair {},
+}
+
+#[cw_serde]
+struct PairInfoResponse {
+    liquidity_token: String,
+}
 
 #[entry_point]
 pub fn instantiate(
@@ -127,6 +138,19 @@ fn execute_lock(
         None => deps.api.addr_validate(&receive_msg.sender)?,
     };
     let pair_contract = deps.api.addr_validate(&pair_contract)?;
+    let pair: PairInfoResponse = deps.querier.query_wasm_smart(
+        pair_contract.to_string(),
+        &PairQueryMsg::Pair {},
+    )?;
+    if pair.liquidity_token != lp_token.as_str() {
+        return Err(ContractError::InvalidLpToken {
+            reason: "pair liquidity token mismatch",
+        });
+    }
+    let _: TokenInfoResponse = deps.querier.query_wasm_smart(
+        lp_token.to_string(),
+        &Cw20QueryMsg::TokenInfo {},
+    )?;
     let lock_id = NEXT_LOCK_ID.load(deps.storage)?;
 
     let lock = Lock {
@@ -140,6 +164,8 @@ fn execute_lock(
         withdrawn: false,
     };
     LOCKS.save(deps.storage, lock_id, &lock)?;
+    LOCK_IDS_BY_OWNER.save(deps.storage, (&lock_owner, lock_id), &true)?;
+    LOCK_IDS_BY_LP_TOKEN.save(deps.storage, (&lp_token, lock_id), &true)?;
     NEXT_LOCK_ID.save(deps.storage, &(lock_id + 1))?;
 
     Ok(Response::new()
@@ -242,7 +268,18 @@ fn query_locks_by_owner(
     limit: Option<u32>,
 ) -> StdResult<LocksResponse> {
     let owner = deps.api.addr_validate(&owner)?;
-    query_locks(deps, start_after, limit, |lock| lock.owner == owner)
+    let limit = limit.unwrap_or(DEFAULT_QUERY_LIMIT).min(MAX_QUERY_LIMIT) as usize;
+    let start = start_after.map(cw_storage_plus::Bound::exclusive);
+    let locks = LOCK_IDS_BY_OWNER
+        .prefix(&owner)
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            let (lock_id, _) = item?;
+            LOCKS.load(deps.storage, lock_id).map(lock_response)
+        })
+        .collect::<StdResult<Vec<_>>>()?;
+    Ok(LocksResponse { locks })
 }
 
 fn query_locks_by_lp_token(
@@ -252,30 +289,17 @@ fn query_locks_by_lp_token(
     limit: Option<u32>,
 ) -> StdResult<LocksResponse> {
     let lp_token = deps.api.addr_validate(&lp_token)?;
-    query_locks(deps, start_after, limit, |lock| lock.lp_token == lp_token)
-}
-
-fn query_locks<F>(
-    deps: Deps,
-    start_after: Option<u64>,
-    limit: Option<u32>,
-    filter: F,
-) -> StdResult<LocksResponse>
-where
-    F: Fn(&Lock) -> bool,
-{
     let limit = limit.unwrap_or(DEFAULT_QUERY_LIMIT).min(MAX_QUERY_LIMIT) as usize;
     let start = start_after.map(cw_storage_plus::Bound::exclusive);
-    let locks = LOCKS
+    let locks = LOCK_IDS_BY_LP_TOKEN
+        .prefix(&lp_token)
         .range(deps.storage, start, None, Order::Ascending)
-        .filter_map(|item| match item {
-            Ok((_id, lock)) if filter(&lock) => Some(Ok(lock_response(lock))),
-            Ok(_) => None,
-            Err(error) => Some(Err(error)),
-        })
         .take(limit)
+        .map(|item| {
+            let (lock_id, _) = item?;
+            LOCKS.load(deps.storage, lock_id).map(lock_response)
+        })
         .collect::<StdResult<Vec<_>>>()?;
-
     Ok(LocksResponse { locks })
 }
 
@@ -295,7 +319,10 @@ fn lock_response(lock: Lock) -> LockResponse {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{attr, from_json, to_json_binary, Uint128};
+    use cosmwasm_std::{
+        attr, from_json, to_json_binary, ContractResult, QuerierResult, SystemResult, Uint128,
+        WasmQuery,
+    };
 
     use super::*;
     use crate::msg::LocksResponse;
@@ -304,6 +331,37 @@ mod tests {
     const OWNER: &str = "terra1owner00000000000000000000000000000000000";
     const LP_TOKEN: &str = "terra1lp0000000000000000000000000000000000000";
     const PAIR: &str = "terra1pair000000000000000000000000000000000000";
+
+    fn configure_pair_queries(deps: &mut cosmwasm_std::OwnedDeps<
+        cosmwasm_std::MemoryStorage,
+        cosmwasm_std::testing::MockApi,
+        cosmwasm_std::testing::MockQuerier,
+    >) {
+        deps.querier.update_wasm(|query| match query {
+            WasmQuery::Smart { contract_addr, msg } if contract_addr == PAIR => {
+                let _: PairQueryMsg = from_json(msg).unwrap();
+                SystemResult::Ok(ContractResult::Ok(
+                    to_json_binary(&PairInfoResponse {
+                        liquidity_token: LP_TOKEN.to_string(),
+                    })
+                    .unwrap(),
+                ))
+            }
+            WasmQuery::Smart { contract_addr, msg } if contract_addr == LP_TOKEN => {
+                let _: Cw20QueryMsg = from_json(msg).unwrap();
+                SystemResult::Ok(ContractResult::Ok(
+                    to_json_binary(&TokenInfoResponse {
+                        name: "LP".to_string(),
+                        symbol: "LP".to_string(),
+                        decimals: 6,
+                        total_supply: Uint128::new(1_000_000),
+                    })
+                    .unwrap(),
+                ))
+            }
+            _ => SystemResult::Ok(ContractResult::Err("unsupported query".to_string())),
+        });
+    }
 
     #[test]
     fn locks_lp_from_cw20_receive() {
@@ -316,6 +374,7 @@ mod tests {
             InstantiateMsg { owner: None },
         )
         .unwrap();
+        configure_pair_queries(&mut deps);
 
         let unlock_time = env.block.time.seconds() + MIN_LOCK_SECONDS + 1;
         let receive_msg = Cw20ReceiveMsg {
@@ -335,6 +394,7 @@ mod tests {
             ExecuteMsg::Receive(receive_msg),
         )
         .unwrap();
+        configure_pair_queries(&mut deps);
 
         assert_eq!(
             response.attributes,

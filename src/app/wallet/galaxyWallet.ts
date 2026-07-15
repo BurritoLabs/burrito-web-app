@@ -58,12 +58,10 @@ const decodePubkey = (value?: string) => {
   }
 }
 
-const resolveGalaxyAddress = (
+export const resolveGalaxyAddress = (
   response: GalaxyConnectResponse,
   chainId: string
-) =>
-  response.addresses[chainId] ??
-  Object.values(response.addresses)[0]
+) => response.addresses[chainId]
 
 const getConnectedResponse = async (
   chainId: string = CLASSIC_CHAIN.chainId

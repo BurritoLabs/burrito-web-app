@@ -4,6 +4,7 @@ import type { OfflineSigner } from "@cosmjs/proto-signing"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { useAppChain } from "../appChainContext"
+import { getActiveAppChainKey } from "../activeChain"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import {
   COSMOS_CONNECTOR_CONFIGS,
@@ -616,53 +617,102 @@ export const WalletProvider = ({
           messages: Parameters<ClassicStargateClient["signAndBroadcast"]>[1],
           fee: Parameters<ClassicStargateClient["signAndBroadcast"]>[2],
           memo?: string
-        ) => ReturnType<ClassicStargateClient["signAndBroadcast"]>
-      ): ClassicStargateClient => ({
+          ) => ReturnType<ClassicStargateClient["signAndBroadcast"]>
+      ): ClassicStargateClient => {
+        const assertTransactionContext = () => {
+          if (getActiveAppChainKey() !== chainKey) {
+            throw new Error(
+              "The selected chain changed before signing. Review the transaction and try again."
+            )
+          }
+          if (wallet.address && wallet.address !== signerAddress) {
+            throw new Error(
+              "Wallet account changed before signing. Review the transaction and try again."
+            )
+          }
+        }
+
+        return {
         ...client,
         simulate: (
           _signerAddress: string,
           messages: Parameters<ClassicStargateClient["simulate"]>[1],
           memo: string
-        ) => client.simulate(signerAddress, messages, memo),
+        ) => {
+          assertTransactionContext()
+          return client.simulate(signerAddress, messages, memo)
+        },
         sign: (
           _signerAddress: string,
           messages: Parameters<ClassicStargateClient["sign"]>[1],
           fee: Parameters<ClassicStargateClient["sign"]>[2],
           memo: string,
           signerData: Parameters<ClassicStargateClient["sign"]>[4]
-        ) => client.sign(signerAddress, messages, fee, memo, signerData),
+        ) => {
+          assertTransactionContext()
+          return client.sign(signerAddress, messages, fee, memo, signerData)
+        },
         signAndBroadcast: (
           _signerAddress: string,
           messages: Parameters<ClassicStargateClient["signAndBroadcast"]>[1],
           fee: Parameters<ClassicStargateClient["signAndBroadcast"]>[2],
           memo = ""
-        ) =>
-          signAndBroadcastImpl
+        ) => {
+          assertTransactionContext()
+          return signAndBroadcastImpl
             ? signAndBroadcastImpl(messages, fee, memo)
-            : client.signAndBroadcast(signerAddress, messages, fee, memo),
+            : client.signAndBroadcast(signerAddress, messages, fee, memo)
+        },
         getSequence: (address: string) => client.getSequence(address),
         broadcastTx: (
           tx: Parameters<ClassicStargateClient["broadcastTx"]>[0],
           timeoutMs?: Parameters<ClassicStargateClient["broadcastTx"]>[1],
           pollIntervalMs?: Parameters<ClassicStargateClient["broadcastTx"]>[2]
-        ) => client.broadcastTx(tx, timeoutMs, pollIntervalMs),
-        broadcastTxSync: (tx: Parameters<ClassicStargateClient["broadcastTxSync"]>[0]) =>
-          client.broadcastTxSync(tx),
+        ) => {
+          assertTransactionContext()
+          return client.broadcastTx(tx, timeoutMs, pollIntervalMs)
+        },
+        broadcastTxSync: (tx: Parameters<ClassicStargateClient["broadcastTxSync"]>[0]) => {
+          assertTransactionContext()
+          return client.broadcastTxSync(tx)
+        },
         delegateTokens: (
           _delegatorAddress: string,
           validatorAddress: Parameters<ClassicStargateClient["delegateTokens"]>[1],
           amount: Parameters<ClassicStargateClient["delegateTokens"]>[2],
           fee: Parameters<ClassicStargateClient["delegateTokens"]>[3],
           memo?: Parameters<ClassicStargateClient["delegateTokens"]>[4]
-        ) => client.delegateTokens(signerAddress, validatorAddress, amount, fee, memo),
+        ) => {
+          assertTransactionContext()
+          return client.delegateTokens(signerAddress, validatorAddress, amount, fee, memo)
+        },
         undelegateTokens: (
           _delegatorAddress: string,
           validatorAddress: Parameters<ClassicStargateClient["undelegateTokens"]>[1],
           amount: Parameters<ClassicStargateClient["undelegateTokens"]>[2],
           fee: Parameters<ClassicStargateClient["undelegateTokens"]>[3],
           memo?: Parameters<ClassicStargateClient["undelegateTokens"]>[4]
-        ) => client.undelegateTokens(signerAddress, validatorAddress, amount, fee, memo)
-      })
+        ) => {
+          assertTransactionContext()
+          return client.undelegateTokens(signerAddress, validatorAddress, amount, fee, memo)
+        }
+        }
+      }
+
+      const assertClientChain = async (client: ClassicStargateClient) => {
+        const chainReader = client as ClassicStargateClient & {
+          getChainId?: () => Promise<string>
+        }
+        if (typeof chainReader.getChainId !== "function") {
+          throw new Error("Wallet RPC chain identity is unavailable.")
+        }
+        const actualChainId = await chainReader.getChainId()
+        if (actualChainId !== chain.chainId) {
+          throw new Error(
+            `Wallet RPC chain mismatch. Expected ${chain.chainId}, received ${actualChainId}.`
+          )
+        }
+      }
 
       const activeWallet = currentCosmosWallet
       const shouldUseChainClient =
@@ -681,6 +731,7 @@ export const WalletProvider = ({
             await getCosmosOfflineSigner(id)
           )
           const client = await cosmosChain.getSigningStargateClient()
+          await assertClientChain(client)
           return wrapStargateClient(client, signerAddress, (messages, fee, memo = "") =>
             cosmosChain.signAndBroadcast([...messages], fee as never, memo, "stargate")
           )
@@ -698,28 +749,26 @@ export const WalletProvider = ({
             wallet.address ||
             (await getOfflineSignerAddress(await getCosmosOfflineSigner(id)))
           const client = await wallet.getSigningStargateClient()
+          await assertClientChain(client)
           return wrapStargateClient(
-            client,
-            signerAddress,
-            (messages, fee, memo = "") =>
-              runWithCosmosWalletSessionRetry(id, wallet, async () => {
-                if (isMobileWallet) {
-                  wallet.offlineSigner = undefined
-                }
-                return wallet.signAndBroadcast(
+              client,
+              signerAddress,
+              (messages, fee, memo = "") =>
+                wallet.signAndBroadcast(
                   [...messages],
                   fee as never,
                   memo,
                   "stargate"
                 )
-              })
-          )
+            )
         })
       } catch {
         return undefined
       }
     },
     [
+      chainKey,
+      chain.chainId,
       cosmosChain,
       currentCosmosWallet,
       getCosmosOfflineSigner,

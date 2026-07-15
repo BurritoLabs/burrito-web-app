@@ -30,6 +30,23 @@ enum Cw20QueryMsg {
 }
 
 #[cw_serde]
+enum PairQueryMsg {
+    Pair {},
+}
+
+#[cw_serde]
+enum PairAssetInfo {
+    NativeToken { denom: String },
+    Token { contract_addr: String },
+}
+
+#[cw_serde]
+struct PairInfoResponse {
+    asset_infos: Vec<PairAssetInfo>,
+    liquidity_token: String,
+}
+
+#[cw_serde]
 struct LockerLockResponse {
     id: u64,
     owner: String,
@@ -176,6 +193,7 @@ fn execute_register_launch(
         parsed_lp_lock_id,
         lp_unlock_time,
     )?;
+    verify_pair(deps.as_ref(), &token_contract, &pair_contract, &lp_token)?;
     verify_token_metadata(deps.as_ref(), &token_contract, &metadata)?;
 
     let launch = Launch {
@@ -258,6 +276,35 @@ fn verify_lp_lock(
     if lock.amount.is_zero() {
         return Err(ContractError::InvalidLpLock {
             reason: "empty lp amount",
+        });
+    }
+
+    Ok(())
+}
+
+fn verify_pair(
+    deps: Deps,
+    token_contract: &Addr,
+    pair_contract: &Addr,
+    lp_token: &Addr,
+) -> Result<(), ContractError> {
+    let pair: PairInfoResponse = deps
+        .querier
+        .query_wasm_smart(pair_contract.to_string(), &PairQueryMsg::Pair {})?;
+
+    if pair.liquidity_token != lp_token.as_str() {
+        return Err(ContractError::InvalidPair {
+            reason: "liquidity token mismatch",
+        });
+    }
+
+    let contains_token = pair.asset_infos.iter().any(|asset| match asset {
+        PairAssetInfo::Token { contract_addr } => contract_addr == token_contract.as_str(),
+        PairAssetInfo::NativeToken { .. } => false,
+    });
+    if !contains_token {
+        return Err(ContractError::InvalidPair {
+            reason: "pair does not contain launch token",
         });
     }
 
@@ -543,6 +590,23 @@ mod tests {
                         .unwrap(),
                     )),
                 }
+            }
+            WasmQuery::Smart { contract_addr, msg } if contract_addr == PAIR => {
+                let _: PairQueryMsg = from_json(msg).unwrap();
+                SystemResult::Ok(ContractResult::Ok(
+                    to_json_binary(&PairInfoResponse {
+                        asset_infos: vec![
+                            PairAssetInfo::Token {
+                                contract_addr: TOKEN.to_string(),
+                            },
+                            PairAssetInfo::NativeToken {
+                                denom: "uluna".to_string(),
+                            },
+                        ],
+                        liquidity_token: LP.to_string(),
+                    })
+                    .unwrap(),
+                ))
             }
             _ => SystemResult::Ok(ContractResult::Err("unsupported wasm query".to_string())),
         }
