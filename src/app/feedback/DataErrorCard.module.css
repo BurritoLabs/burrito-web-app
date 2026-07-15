@@ -33,15 +33,31 @@
   line-height: 1.5;
 }
 
-.button {
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.button,
+.secondaryButton {
   width: fit-content;
   min-height: 42px;
   padding: 0 20px;
-  border: 0;
   border-radius: 999px;
-  background: #53dd31;
-  color: #06120d;
   font: inherit;
   font-weight: 900;
   cursor: pointer;
+}
+
+.button {
+  border: 0;
+  background: #53dd31;
+  color: #06120d;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(209, 255, 211, 0.24);
+  background: transparent;
+  color: #f4fff3;
 }

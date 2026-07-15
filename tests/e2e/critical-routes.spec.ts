@@ -104,6 +104,52 @@ test("wallet recovers from a full local asset cache", async ({ page }) => {
   expect(pageErrors).toEqual([])
 })
 
+test("stored mobile wallet session cannot crash the app shell", async ({
+  page
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("burritoWalletConnector", "keplr-mobile")
+    window.localStorage.setItem(
+      "cosmos-kit@2:core//current-wallet",
+      "keplr-mobile"
+    )
+  })
+
+  await page.goto("/")
+
+  await expect(
+    page.getByRole("heading", { name: "Dashboard", exact: true })
+  ).toBeVisible()
+})
+
+test("mobile wallet runtime failure degrades to a disconnected app", async ({
+  page
+}) => {
+  await page.route(
+    "**/src/app/wallet/WalletRuntimeProvider.tsx*",
+    (route) => route.abort()
+  )
+  await page.addInitScript(() => {
+    window.localStorage.setItem("burritoWalletConnector", "keplr-mobile")
+  })
+
+  await page.goto("/")
+
+  await expect(
+    page.getByRole("heading", { name: "Dashboard", exact: true })
+  ).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Connect", exact: true })
+  ).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("burritoWalletConnector")
+      )
+    )
+    .toBeNull()
+})
+
 test("wallet CW20 deep links prioritize the requested swap asset", async ({
   page
 }) => {

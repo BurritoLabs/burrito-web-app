@@ -1,6 +1,9 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
 import DataErrorCard from "./DataErrorCard"
-import { reportRuntimeError } from "./runtimeErrorReporter"
+import {
+  reportRuntimeError,
+  sanitizeClientErrorText
+} from "./runtimeErrorReporter"
 import { clearVolatileStorageCaches } from "../utils/safeStorage"
 
 type AppErrorBoundaryProps = {
@@ -9,6 +12,7 @@ type AppErrorBoundaryProps = {
 
 type AppErrorBoundaryState = {
   error: Error | null
+  diagnosticsCopied: boolean
 }
 
 const APP_RECOVERY_STORAGE_KEY = "burrito.appRecoveryAt"
@@ -42,11 +46,12 @@ class AppErrorBoundary extends Component<
   AppErrorBoundaryState
 > {
   state: AppErrorBoundaryState = {
-    error: null
+    error: null,
+    diagnosticsCopied: false
   }
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
-    return { error }
+    return { error, diagnosticsCopied: false }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -72,6 +77,30 @@ class AppErrorBoundary extends Component<
     recoverAppOnce()
   }
 
+  handleCopyDiagnostics = async () => {
+    const error = this.state.error
+    const diagnostics = JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        path: window.location.pathname,
+        message: sanitizeClientErrorText(
+          error?.message || error?.name || "Unknown runtime error",
+          1_000
+        ),
+        userAgent: window.navigator.userAgent.slice(0, 500)
+      },
+      null,
+      2
+    )
+
+    try {
+      await window.navigator.clipboard.writeText(diagnostics)
+      this.setState({ diagnosticsCopied: true })
+    } catch {
+      this.setState({ diagnosticsCopied: false })
+    }
+  }
+
   render() {
     if (this.state.error) {
       return (
@@ -82,6 +111,12 @@ class AppErrorBoundary extends Component<
               : "Reload the app and try again."
           }
           onAction={this.handleReload}
+          secondaryActionLabel={
+            this.state.diagnosticsCopied
+              ? "Diagnostics copied"
+              : "Copy diagnostics"
+          }
+          onSecondaryAction={() => void this.handleCopyDiagnostics()}
         />
       )
     }

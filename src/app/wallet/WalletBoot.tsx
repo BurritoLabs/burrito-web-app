@@ -1,4 +1,5 @@
 import {
+  Component,
   Suspense,
   lazy,
   useCallback,
@@ -6,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ErrorInfo,
   type ReactNode
 } from "react"
 import {
@@ -26,6 +28,7 @@ import {
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
+import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
 
 const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
 
@@ -80,6 +83,28 @@ const shouldLoadWalletRuntime = () => {
   }
 
   return getStoredWalletConnectorId() === "keplr-mobile"
+}
+
+class WalletRuntimeErrorBoundary extends Component<
+  {
+    children: ReactNode
+    onError: (error: Error, info: ErrorInfo) => void
+  },
+  { failed: boolean }
+> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    this.props.onError(error, info)
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
 }
 
 const WalletFallbackProvider = ({
@@ -326,18 +351,32 @@ const WalletBoot = ({ children }: { children: ReactNode }) => {
   const [loadWalletRuntime, setLoadWalletRuntime] = useState(() =>
     shouldLoadWalletRuntime()
   )
+  const handleWalletRuntimeError = useCallback(
+    (error: Error, info: ErrorInfo) => {
+      reportRuntimeError({
+        kind: "react",
+        error,
+        componentStack: info.componentStack ?? undefined
+      })
+      forgetStoredWalletSession()
+      setLoadWalletRuntime(false)
+    },
+    []
+  )
 
   if (loadWalletRuntime) {
     return (
-      <Suspense
-        fallback={
-          <WalletFallbackProvider autoConnectId={storedAutoConnectId}>
-            {children}
-          </WalletFallbackProvider>
-        }
-      >
-        <WalletRuntimeProvider>{children}</WalletRuntimeProvider>
-      </Suspense>
+      <WalletRuntimeErrorBoundary onError={handleWalletRuntimeError}>
+        <Suspense
+          fallback={
+            <WalletFallbackProvider autoConnectId={storedAutoConnectId}>
+              {children}
+            </WalletFallbackProvider>
+          }
+        >
+          <WalletRuntimeProvider>{children}</WalletRuntimeProvider>
+        </Suspense>
+      </WalletRuntimeErrorBoundary>
     )
   }
 
