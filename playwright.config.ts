@@ -33,6 +33,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4173 --strictPort",
     url: "http://127.0.0.1:4173/market",
+    env: {
+      VITE_BURRITO_REGISTRY_API_URL: "/__registry-test"
+    },
     reuseExistingServer: false,
     timeout: 120_000
   }

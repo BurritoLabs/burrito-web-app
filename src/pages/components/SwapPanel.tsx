@@ -823,7 +823,8 @@ const SwapPanel = ({
   }, [nativeAssets, resolvedDefaultFromAssetId, resolvedDefaultToAssetId])
 
   const tradableCw20Set = useMemo(() => {
-    const set = new Set<string>()
+    // URL-selected assets must stay ahead of the bounded metadata request.
+    const set = new Set<string>(defaultCw20Contracts.filter(isTerraAddress))
     dexPairs.forEach((entry) => {
       const dexName = normalizeDexName(entry.dexId)
       if (dexName && !activeDexIds.has(dexName)) return
@@ -833,7 +834,6 @@ const SwapPanel = ({
         }
       })
     })
-    defaultCw20Contracts.filter(isTerraAddress).forEach((contract) => set.add(contract))
     return set
   }, [activeDexIds, defaultCw20Contracts, dexPairs])
 

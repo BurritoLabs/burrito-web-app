@@ -103,3 +103,46 @@ test("wallet recovers from a full local asset cache", async ({ page }) => {
     .toBe("keplr")
   expect(pageErrors).toEqual([])
 })
+
+test("wallet CW20 deep links prioritize the requested swap asset", async ({
+  page
+}) => {
+  const contract =
+    "terra1dut9t6cglr2ns2gherm7dtwk3u05xtz0gqan8a7j0ehtkqkdefws7g20e4"
+  let requestedContracts: string[] = []
+  await page.route("**/__registry-test/v1/finder/account-assets", async (route) => {
+    const body = route.request().postDataJSON() as { contracts?: string[] }
+    const bodyContracts = body.contracts ?? []
+    if (!requestedContracts.length && bodyContracts.includes(contract)) {
+      requestedContracts = bodyContracts
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        cw20: bodyContracts.includes(contract)
+          ? [
+              {
+                contract,
+                status: "ok",
+                metadata: {
+                  name: "Burrito Test",
+                  symbol: "BTEST",
+                  decimals: 6
+                }
+              }
+            ]
+          : [],
+        ibc: []
+      })
+    })
+  })
+
+  await page.goto(
+    `/swap?from=${encodeURIComponent(`cw20:${contract}`)}&to=native%3Auluna`
+  )
+
+  await expect(
+    page.getByRole("button", { name: /^BTEST BTEST/ })
+  ).toBeVisible({ timeout: 20_000 })
+  expect(requestedContracts[0]).toBe(contract)
+})
