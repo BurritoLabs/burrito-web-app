@@ -152,8 +152,9 @@ const EMPTY_COSMOS_REGISTRY_ASSETS: CosmosRegistryAssets = {
   native: {}
 }
 
-const IBC_CACHE_KEY = "burritoIbcTraceCacheV3"
+const IBC_CACHE_KEY = "burritoIbcTraceCacheV4"
 const IBC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+const IBC_UNRESOLVED_CACHE_TTL = 5 * 60 * 1000
 const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV2"
 const NATIVE_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV2"
@@ -289,7 +290,10 @@ const getCachedIbcToken = (hash: string, chainId: string) => {
   const key = buildChainScopedAssetCacheKey(chainId, hash)
   const cached = cache[key]
   if (!cached) return undefined
-  if (Date.now() - cached.ts > IBC_CACHE_TTL) {
+  const cacheTtl = cached.token.symbol === "IBC"
+    ? IBC_UNRESOLVED_CACHE_TTL
+    : IBC_CACHE_TTL
+  if (Date.now() - cached.ts > cacheTtl) {
     const next = { ...cache }
     delete next[key]
     writeIbcCache(next)
@@ -391,6 +395,15 @@ type FinderAssetMetadataResponse = {
       decimals?: number
     }
   }>
+}
+
+export const isResolvedIbcMetadata = (metadata?: {
+  symbol?: string
+  name?: string
+}) => {
+  const symbol = metadata?.symbol?.trim().toUpperCase()
+  const name = metadata?.name?.trim().toUpperCase()
+  return Boolean(symbol && symbol !== "IBC" && name !== "IBC")
 }
 
 const fetchFinderAssetMetadata = async ({
@@ -1109,11 +1122,16 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
         ibcDenoms: missingHashes.map((hash) => `ibc/${hash}`),
         chainKey: scope.chainKey
       })
-      if (finderPayload) {
-        const entries = (finderPayload.ibc ?? []).flatMap((entry) => {
+      const finderEntries = (finderPayload?.ibc ?? []).flatMap((entry) => {
           const hash = entry.hash?.trim().toUpperCase()
           const metadata = entry.metadata
-          if (!hash || !/^[A-F0-9]{64}$/.test(hash) || entry.status !== "ok" || !metadata) {
+          if (
+            !hash ||
+            !/^[A-F0-9]{64}$/.test(hash) ||
+            entry.status !== "ok" ||
+            !metadata ||
+            !isResolvedIbcMetadata(metadata)
+          ) {
             return []
           }
           const symbol = resolveDisplaySymbol(metadata.symbol, metadata.baseDenom ?? "")
@@ -1129,16 +1147,19 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
           cacheIbcToken(hash, token, scope.chainId)
           return [[hash, token] as [string, IbcToken]]
         })
-        return Object.fromEntries(entries)
-      }
+      const finderTokens = Object.fromEntries(finderEntries)
+      const unresolvedHashes = missingHashes.filter((hash) => !finderTokens[hash])
 
       const entries = await Promise.all(
-        missingHashes.map(async (hash) => {
+        unresolvedHashes.map(async (hash) => {
           const token = await fetchIbcTraceToken(hash, scope)
           return token ? [hash, token] : undefined
         })
       )
-      return Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][])
+      return {
+        ...Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][]),
+        ...finderTokens
+      }
     },
     enabled: missingHashes.length > 0 && baseQuery.isFetched,
     staleTime: 24 * 60 * 60 * 1000

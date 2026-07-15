@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  isResolvedIbcMetadata,
   mapCosmosRegistryAssetAliases,
   mapCosmosRegistryAssets,
   pickChainAssets
@@ -109,5 +110,10 @@ describe("Terra asset registry selection", () => {
       name: "Wrapped Bitcoin",
       decimals: 8
     })
+  })
+
+  it("rejects generic Finder IBC placeholders as resolved metadata", () => {
+    expect(isResolvedIbcMetadata({ symbol: "IBC", name: "IBC" })).toBe(false)
+    expect(isResolvedIbcMetadata({ symbol: "WBTC", name: "Wrapped Bitcoin" })).toBe(true)
   })
 })
