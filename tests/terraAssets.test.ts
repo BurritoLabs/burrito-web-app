@@ -142,7 +142,7 @@ describe("Terra asset registry selection", () => {
     expect(tokens[contract]).toMatchObject({
       symbol: "JURIS",
       name: "Juris Protocol",
-      icon: "/tokens/juris.svg"
+      icon: "/tokens/juris.webp"
     })
   })
 })

@@ -59,7 +59,8 @@ const LOCAL_CW20_TOKEN_OVERRIDES: Record<string, Partial<Cw20Token>> = {
     symbol: "JURIS",
     name: "Juris Protocol",
     protocol: "Juris Protocol",
-    icon: "/tokens/juris.svg"
+    // Optimized from JurisProtocol/assets/blob/main/jurislogo.png.
+    icon: "/tokens/juris.webp"
   }
 }
 
