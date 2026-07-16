@@ -443,8 +443,7 @@ fn lock_response(lock: Lock) -> LockResponse {
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{
-        attr, from_json, to_json_binary, ContractResult, QuerierResult, SystemResult, Uint128,
-        WasmQuery,
+        attr, from_json, to_json_binary, ContractResult, SystemResult, Uint128, WasmQuery,
     };
 
     use super::*;
@@ -519,7 +518,6 @@ mod tests {
             ExecuteMsg::Receive(receive_msg),
         )
         .unwrap();
-        configure_pair_queries(&mut deps);
 
         assert_eq!(
             response.attributes,
@@ -560,6 +558,7 @@ mod tests {
             InstantiateMsg { owner: None },
         )
         .unwrap();
+        configure_pair_queries(&mut deps);
 
         let unlock_time = env.block.time.seconds() + MIN_LOCK_SECONDS + 1;
         let receive_msg = Cw20ReceiveMsg {
