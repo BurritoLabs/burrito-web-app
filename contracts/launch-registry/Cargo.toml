@@ -17,6 +17,8 @@ cw-storage-plus = "1.2.0"
 cw2 = "1.1.2"
 # cosmwasm/optimizer:0.16.1 uses Cargo 1.81 and cannot parse base64ct 1.8's edition2024 manifest.
 base64ct = { version = "=1.7.3", default-features = false }
+# Keep transitive crypto manifests readable by the optimizer's Cargo 1.81 toolchain.
+zeroize = "=1.8.1"
 schemars = "0.8.22"
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 thiserror = "1.0.69"
