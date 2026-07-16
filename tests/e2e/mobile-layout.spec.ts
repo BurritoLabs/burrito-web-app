@@ -97,6 +97,22 @@ test("mobile Connect starts the Keplr Mobile handoff", async ({ page }) => {
       walletRuntimeErrors.push(message.text())
     }
   })
+  await page.addInitScript(() => {
+    const walletWindow = window as Window & {
+      __burritoWalletWrites?: Array<{ key: string; value: string }>
+    }
+    const originalSetItem = Storage.prototype.setItem
+    walletWindow.__burritoWalletWrites = []
+    Storage.prototype.setItem = function setItem(key: string, value: string) {
+      if (
+        key === "burritoWalletConnector" ||
+        key === "cosmos-kit@2:core//current-wallet"
+      ) {
+        walletWindow.__burritoWalletWrites?.push({ key, value })
+      }
+      originalSetItem.call(this, key, value)
+    }
+  })
   await page.goto("/")
 
   await page.getByRole("button", { name: "Connect", exact: true }).click()
@@ -106,16 +122,21 @@ test("mobile Connect starts the Keplr Mobile handoff", async ({ page }) => {
   await mobileConnector.click()
   await expect
     .poll(() =>
-      page.evaluate(() => ({
-        connector: localStorage.getItem("burritoWalletConnector"),
-        cosmosWallet: localStorage.getItem(
-          "cosmos-kit@2:core//current-wallet"
-        )
-      }))
+      page.evaluate(() => {
+        const walletWindow = window as Window & {
+          __burritoWalletWrites?: Array<{ key: string; value: string }>
+        }
+        return walletWindow.__burritoWalletWrites ?? []
+      })
     )
-    .toEqual({
-      connector: "keplr-mobile",
-      cosmosWallet: "keplr-mobile"
-    })
+    .toEqual(
+      expect.arrayContaining([
+        { key: "burritoWalletConnector", value: "keplr-mobile" },
+        {
+          key: "cosmos-kit@2:core//current-wallet",
+          value: "keplr-mobile"
+        }
+      ])
+    )
   expect(walletRuntimeErrors).toEqual([])
 })
