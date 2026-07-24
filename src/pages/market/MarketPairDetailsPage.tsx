@@ -126,8 +126,11 @@ const toPairFallbackAsset = (assetId: string) => {
   return assetId
 }
 
-const buildNativeIconCandidates = (denom: string, symbol: string) =>
-  buildClassicNativeIconCandidates({ denom, symbol })
+const buildNativeIconCandidates = (
+  denom: string,
+  symbol: string,
+  primaryIcon?: string
+) => buildClassicNativeIconCandidates({ denom, symbol, primaryIcon })
 
 const buildIbcIconCandidates = ({
   ibcIcon,
@@ -486,7 +489,7 @@ const MarketPairDetails = () => {
         symbol,
         name: nativeToken?.name ?? symbol,
         decimals: nativeToken?.decimals ?? 6,
-        iconCandidates: buildNativeIconCandidates(denom, symbol),
+        iconCandidates: buildNativeIconCandidates(denom, symbol, nativeToken?.icon),
         isLunc: denom === "uluna",
         isUstc: denom === "uusd"
       }

@@ -1223,10 +1223,7 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
   })
 
   const resolvedData = useMemo(
-    () => ({
-      ...base,
-      ...(resolvedQuery.data ?? {})
-    }),
+    () => mergeResolvedIbcAssets(base, resolvedQuery.data ?? {}),
     [base, resolvedQuery.data]
   )
 
@@ -1237,6 +1234,31 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
     isError: baseQuery.isError || resolvedQuery.isError,
     error: (baseQuery.error ?? resolvedQuery.error) as Error | null
   }
+}
+
+export const mergeResolvedIbcAssets = (
+  base: Record<string, IbcToken>,
+  resolved: Record<string, IbcToken>
+) => {
+  const merged = { ...base }
+
+  Object.entries(resolved).forEach(([hash, token]) => {
+    const registryToken = base[hash]
+    const registryIcon = registryToken?.icon
+    const resolvedIcon = token.icon
+    const icon =
+      registryIcon && registryIcon !== "/system/ibc.svg"
+        ? registryIcon
+        : resolvedIcon ?? registryIcon
+
+    merged[hash] = {
+      ...registryToken,
+      ...token,
+      icon
+    }
+  })
+
+  return merged
 }
 
 export const useResolvedNativeWhitelist = (denoms?: string[]) => {

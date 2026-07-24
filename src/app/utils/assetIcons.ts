@@ -173,11 +173,19 @@ export const buildClassicNativeIconCandidates = ({
   if (!SAFE_ICON_LOOKUP_RE.test(iconDenom)) {
     return unique([
       sanitizeAssetIconUrl(primaryIcon),
-      buildGeneratedTokenIcon(symbol),
-      fallback
+      fallback,
+      buildGeneratedTokenIcon(symbol)
     ])
   }
   const upper = iconDenom.toUpperCase()
+
+  if (getActiveAppChainKey() === "luna") {
+    return unique([
+      sanitizeAssetIconUrl(primaryIcon),
+      fallback,
+      buildGeneratedTokenIcon(symbol)
+    ])
+  }
 
   return unique([
     sanitizeAssetIconUrl(primaryIcon),
@@ -234,7 +242,9 @@ export const buildIbcAssetIconCandidates = (
 ) =>
   unique([
     ...icons.map((icon) => sanitizeAssetIconUrl(icon)),
-    ...buildIbcStaticGuessCandidates(options ?? {}),
+    ...(getActiveAppChainKey() === "lunc"
+      ? buildIbcStaticGuessCandidates(options ?? {})
+      : []),
     fallback,
     buildGeneratedTokenIcon(options?.symbol)
   ])

@@ -4,6 +4,7 @@ import {
   isResolvedIbcMetadata,
   mapCosmosRegistryAssetAliases,
   mapCosmosRegistryAssets,
+  mergeResolvedIbcAssets,
   pickChainAssets
 } from "../src/app/data/terraAssets"
 
@@ -116,6 +117,41 @@ describe("Terra asset registry selection", () => {
   it("rejects generic Finder IBC placeholders as resolved metadata", () => {
     expect(isResolvedIbcMetadata({ symbol: "IBC", name: "IBC" })).toBe(false)
     expect(isResolvedIbcMetadata({ symbol: "WBTC", name: "Wrapped Bitcoin" })).toBe(true)
+  })
+
+  it("preserves the exact chain registry logo during IBC resolution", () => {
+    const hash = "A".repeat(64)
+    const registryLogo =
+      "https://raw.githubusercontent.com/cosmos/chain-registry/master/injective/images/inj.svg"
+
+    const merged = mergeResolvedIbcAssets(
+      {
+        [hash]: {
+          denom: `ibc/${hash}`,
+          base_denom: "inj",
+          symbol: "INJ",
+          name: "Injective",
+          icon: registryLogo
+        }
+      },
+      {
+        [hash]: {
+          denom: `ibc/${hash}`,
+          base_denom: "inj",
+          symbol: "INJ",
+          name: "Injective",
+          icon: "/system/ibc.svg",
+          decimals: 18,
+          decimalsVerified: true
+        }
+      }
+    )
+
+    expect(merged[hash]).toMatchObject({
+      icon: registryLogo,
+      decimals: 18,
+      decimalsVerified: true
+    })
   })
 
   it("uses the verified JURIS logo for its Terra Classic contract", async () => {
