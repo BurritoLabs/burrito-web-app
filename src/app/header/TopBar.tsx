@@ -99,8 +99,15 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         setChainOpen(false)
       }
     }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setChainOpen(false)
+    }
     window.addEventListener("mousedown", handleClick)
-    return () => window.removeEventListener("mousedown", handleClick)
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("mousedown", handleClick)
+      window.removeEventListener("keydown", handleKeyDown)
+    }
   }, [chainOpen])
 
   useEffect(() => {
