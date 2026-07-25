@@ -7,6 +7,7 @@ import {
   HistoryIcon,
   LaunchpadIcon,
   MarketIcon,
+  NftIcon,
   StakeIcon,
   SwapIcon,
   WalletIcon
@@ -18,6 +19,7 @@ import type { AppChainConfig } from "./appChains"
 const ICON_SIZE = { width: 18, height: 18 }
 
 const loadWallet = () => import("../pages/Wallet")
+const loadNft = () => import("../pages/NFT")
 const loadMarket = () => import("../pages/Market")
 const loadMarketPairDetails = () => import("../pages/MarketPairDetails")
 const loadLaunchpad = () => import("../pages/Launchpad")
@@ -28,6 +30,7 @@ const loadGovernance = () => import("../pages/Governance")
 const loadContract = () => import("../pages/Contract")
 
 const Wallet = lazy(loadWallet)
+const NFT = lazy(loadNft)
 const Market = lazy(loadMarket)
 const MarketPairDetails = lazy(loadMarketPairDetails)
 const Launchpad = lazy(loadLaunchpad)
@@ -66,6 +69,12 @@ export const navMenu = [
     title: "Wallet",
     icon: <WalletIcon {...ICON_SIZE} />,
     preload: loadWallet
+  },
+  {
+    path: "/nft",
+    title: "NFT",
+    icon: <NftIcon {...ICON_SIZE} />,
+    preload: loadNft
   },
   {
     path: "/swap",
@@ -126,6 +135,7 @@ const appRoutes = [
   { path: "/rewards", element: renderPage(WithdrawRewards) },
   { path: "/commission", element: renderPage(WithdrawCommission) },
   { path: "/wallet", element: renderPage(Wallet) },
+  { path: "/nft", element: renderPage(NFT) },
   { path: "/swap", element: renderFeaturePage(Swap, "swap", "Swap") },
   { path: "/market", element: renderFeaturePage(Market, "market", "Market") },
   {

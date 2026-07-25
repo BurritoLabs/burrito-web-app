@@ -1,0 +1,242 @@
+.refreshButton,
+.retryButton,
+.loadMoreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.55);
+  background: rgba(var(--active-chain-rgb), 0.12);
+  color: var(--chain-accent);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  cursor: pointer;
+}
+
+.refreshButton {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+}
+
+.refreshButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: var(--border-width) solid var(--card-border);
+  border-bottom: var(--border-width) solid var(--card-border);
+}
+
+.summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+}
+
+.summary > div + div {
+  border-left: var(--border-width) solid var(--card-border);
+}
+
+.summary span {
+  color: rgba(234, 245, 235, 0.58);
+  font-size: var(--font-size-small);
+}
+
+.summary strong {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: var(--bold);
+}
+
+.nftGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--grid-gap);
+}
+
+.nftCard,
+.loadingCard {
+  min-width: 0;
+  overflow: hidden;
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+}
+
+.media,
+.loadingMedia {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.media img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.cardBody {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px 14px;
+}
+
+.collectionName,
+.tokenId {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(234, 245, 235, 0.58);
+  font-size: var(--font-size-xs);
+}
+
+.tokenName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: var(--bold);
+}
+
+.stateBand {
+  min-height: 164px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 0;
+  border-top: var(--border-width) solid var(--card-border);
+  border-bottom: var(--border-width) solid var(--card-border);
+}
+
+.stateBand img {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+}
+
+.stateBand div {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.stateBand strong {
+  color: #ffffff;
+  font-size: var(--font-size-title);
+}
+
+.stateBand span {
+  color: rgba(234, 245, 235, 0.6);
+  font-size: var(--font-size-small);
+  line-height: 1.45;
+}
+
+.retryButton {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+}
+
+.loadMoreButton {
+  justify-self: center;
+  min-width: 128px;
+  min-height: 38px;
+  padding: 8px 18px;
+  border-radius: var(--radius-md);
+}
+
+.limitNotice {
+  text-align: center;
+  color: rgba(234, 245, 235, 0.55);
+  font-size: var(--font-size-small);
+}
+
+.loadingCard {
+  padding-bottom: 14px;
+}
+
+.loadingMedia,
+.loadingLine {
+  position: relative;
+  overflow: hidden;
+}
+
+.loadingMedia::after,
+.loadingLine::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.07),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: nftLoading 1.4s ease-in-out infinite;
+}
+
+.loadingLine {
+  height: 12px;
+  margin: 13px 14px 0;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.loadingLineShort {
+  width: 48%;
+}
+
+@keyframes nftLoading {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 600px) {
+  .refreshButton span {
+    display: none;
+  }
+
+  .refreshButton {
+    width: 34px;
+    padding: 0;
+  }
+
+  .summary > div {
+    padding: 12px 10px;
+  }
+
+  .summary strong {
+    font-size: 16px;
+  }
+
+  .nftGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .cardBody {
+    padding: 11px 12px 12px;
+  }
+
+  .stateBand {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .retryButton {
+    width: 100%;
+    margin-left: 0;
+  }
+}

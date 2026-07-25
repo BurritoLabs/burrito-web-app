@@ -46,6 +46,10 @@ export const getRouteMetadata = (pathname: string): RouteMetadataValue => {
       title: "Wallet | Burrito",
       description: "Manage LUNA, LUNC, CW20, and IBC assets across Terra and Terra Classic."
     },
+    "/nft": {
+      title: "NFT | Burrito",
+      description: "View wallet NFTs from registered CW721 collections on Terra and Terra Classic."
+    },
     "/swap": {
       title: "Swap | Burrito",
       description: "Compare and execute supported on-chain swap routes on Terra and Terra Classic."
