@@ -36,8 +36,9 @@ if (report.error || !report.metadata?.vulnerabilities || !report.vulnerabilities
 }
 
 const severities = report.metadata.vulnerabilities
-const elevated = ["moderate", "high", "critical"].filter(
-  (severity) => Number(severities[severity] ?? 0) > 0
+const elevatedSeverities = new Set(["moderate", "high", "critical"])
+const elevatedPackages = Object.entries(report.vulnerabilities ?? {}).filter(
+  ([, vulnerability]) => elevatedSeverities.has(vulnerability?.severity)
 )
 const lowPackages = Object.entries(report.vulnerabilities ?? {})
   .filter(([, vulnerability]) => vulnerability?.severity === "low")
@@ -47,9 +48,55 @@ const allowed = new Set(baseline.allowedLowPackages)
 const unexpected = lowPackages.filter((name) => !allowed.has(name))
 const lowCount = Number(severities.low ?? lowPackages.length)
 
+const collectAdvisoryUrls = (packageName, visited = new Set()) => {
+  if (visited.has(packageName)) return []
+  visited.add(packageName)
+
+  const vulnerability = report.vulnerabilities[packageName]
+  if (!vulnerability) return []
+
+  return [
+    ...new Set(
+      (vulnerability.via ?? []).flatMap((entry) => {
+        if (typeof entry === "string") {
+          return collectAdvisoryUrls(entry, visited)
+        }
+        return typeof entry?.url === "string" ? [entry.url] : []
+      })
+    )
+  ]
+}
+
+const allowedElevatedAdvisories = baseline.allowedElevatedAdvisories ?? []
+const reviewedElevatedPackages = elevatedPackages.filter(([name, vulnerability]) => {
+  const advisoryUrls = collectAdvisoryUrls(name)
+  return allowedElevatedAdvisories.some(
+    (entry) =>
+      entry.severity === vulnerability.severity &&
+      entry.packages.includes(name) &&
+      advisoryUrls.length > 0 &&
+      advisoryUrls.every((url) => entry.urls.includes(url))
+  )
+})
+const reviewedElevatedNames = new Set(
+  reviewedElevatedPackages.map(([name]) => name)
+)
+const unexpectedElevatedPackages = elevatedPackages.filter(
+  ([name]) => !reviewedElevatedNames.has(name)
+)
+
 const failures = []
-if (elevated.length > 0) {
-  failures.push(`elevated severities: ${elevated.join(", ")}`)
+if (unexpectedElevatedPackages.length > 0) {
+  failures.push(
+    `unreviewed elevated packages: ${unexpectedElevatedPackages
+      .map(
+        ([name, vulnerability]) =>
+          `${name} (${vulnerability.severity}: ${
+            collectAdvisoryUrls(name).join(", ") || "unknown advisory"
+          })`
+      )
+      .join("; ")}`
+  )
 }
 if (lowCount > baseline.maxLow) {
   failures.push(`low count ${lowCount} exceeds baseline ${baseline.maxLow}`)
@@ -69,5 +116,5 @@ if (new Date() > new Date(`${baseline.reviewBy}T23:59:59Z`)) {
 }
 
 console.log(
-  `DEPENDENCY_AUDIT_OK low=${lowCount} moderate=${severities.moderate ?? 0} high=${severities.high ?? 0} critical=${severities.critical ?? 0} review_by=${baseline.reviewBy}`
+  `DEPENDENCY_AUDIT_OK low=${lowCount} moderate=${severities.moderate ?? 0} high=${severities.high ?? 0} critical=${severities.critical ?? 0} reviewed_elevated=${reviewedElevatedPackages.length} review_by=${baseline.reviewBy}`
 )

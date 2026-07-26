@@ -5,9 +5,9 @@ weekly `Dependency Audit` workflow.
 
 ## Current Baseline
 
-- Reviewed: 2026-07-13
-- Review again by: 2026-10-13
-- Known findings: 12 low, 0 moderate, 0 high, 0 critical
+- Reviewed: 2026-07-25
+- Review again by: 2026-10-25
+- Known findings: 12 low, 0 moderate, 2 high, 0 critical
 - Scope: production dependencies only (`npm audit --omit=dev`)
 
 The low-risk findings are transitive dependencies in the CosmosKit, Keplr, and
@@ -15,10 +15,18 @@ secp256k1 wallet stack. npm currently offers either no direct fix or changes
 that would replace current wallet packages with incompatible versions. Do not
 run `npm audit fix --force` without a wallet regression plan.
 
-The accepted package names and maximum count live in
+The two reviewed high findings are the same React Router advisory
+(`GHSA-qwww-vcr4-c8h2`) propagated through `react-router` and
+`react-router-dom`. It only affects the unstable React Server Components APIs.
+This application is a client-side Vite SPA and does not use React Server
+Components. The published npm remediation downgrades `react-router-dom` to
+7.11.0, which reintroduces eight older high findings, so that downgrade is not
+accepted.
+
+The accepted package names, exact advisory URLs, and maximum count live in
 `scripts/dependency-audit-baseline.json`. `npm run check:audit` fails when:
 
-- a moderate, high, or critical finding appears;
+- an elevated finding is not matched by an exact reviewed advisory and package;
 - the low-risk count exceeds the reviewed baseline; or
 - a low-risk finding appears in a package that was not reviewed.
 
