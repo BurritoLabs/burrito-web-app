@@ -71,12 +71,6 @@ export const navMenu = [
     preload: loadWallet
   },
   {
-    path: "/nft",
-    title: "NFT",
-    icon: <NftIcon {...ICON_SIZE} />,
-    preload: loadNft
-  },
-  {
     path: "/swap",
     title: "Swap",
     icon: <SwapIcon {...ICON_SIZE} />,
@@ -111,6 +105,12 @@ export const navMenu = [
     title: "Governance",
     icon: <GovIcon {...ICON_SIZE} />,
     preload: loadGovernance
+  },
+  {
+    path: "/nft",
+    title: "NFT",
+    icon: <NftIcon {...ICON_SIZE} />,
+    preload: loadNft
   },
   {
     path: "/contract",

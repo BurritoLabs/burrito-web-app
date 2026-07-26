@@ -9,6 +9,11 @@ const TOKENS_PAGE_SIZE = 50
 const MAX_TOKENS_PER_COLLECTION = 250
 const MAX_OWNED_NFTS = 400
 const DEFAULT_NFT_IMAGE = "/system/nft.svg"
+const IPFS_IMAGE_GATEWAYS = [
+  "https://dweb.link/ipfs/",
+  "https://ipfs.io/ipfs/",
+  "https://gateway.pinata.cloud/ipfs/"
+] as const
 
 type UnknownRecord = Record<string, unknown>
 
@@ -100,6 +105,19 @@ export const normalizeNftUri = (value?: string) => {
     return trimmed
   }
   return undefined
+}
+
+export const buildNftImageCandidates = (value?: string) => {
+  const normalized = normalizeNftUri(value)
+  if (!normalized || normalized.startsWith("data:application/")) return []
+
+  const ipfsPath =
+    normalized.match(/^https?:\/\/[^/]+\/ipfs\/(.+)$/i)?.[1] ??
+    value?.trim().match(/^ipfs:\/\/(.+)$/i)?.[1]
+
+  if (!ipfsPath) return [normalized]
+
+  return IPFS_IMAGE_GATEWAYS.map((gateway) => `${gateway}${ipfsPath}`)
 }
 
 const normalizeNftImage = (value?: string) => {

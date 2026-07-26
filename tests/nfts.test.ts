@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildNftImageCandidates,
   extractNftTokenEntries,
   mapNftRegistry,
   normalizeNftUri,
@@ -40,6 +41,18 @@ describe("NFT data normalization", () => {
       "https://arweave.net/example-id"
     )
     expect(normalizeNftUri("javascript:alert(1)")).toBeUndefined()
+  })
+
+  it("builds resilient IPFS image gateway candidates", () => {
+    expect(buildNftImageCandidates("ipfs://QmImage/1.png")).toEqual([
+      "https://dweb.link/ipfs/QmImage/1.png",
+      "https://ipfs.io/ipfs/QmImage/1.png",
+      "https://gateway.pinata.cloud/ipfs/QmImage/1.png"
+    ])
+    expect(buildNftImageCandidates("https://images.example/nft.png")).toEqual([
+      "https://images.example/nft.png"
+    ])
+    expect(buildNftImageCandidates("javascript:alert(1)")).toEqual([])
   })
 
   it("reads common CW721 metadata fields", () => {

@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import PageShell from "../PageShell"
 import styles from "../NFT.module.css"
 import { useAppChain } from "../../app/appChainContext"
 import {
   DEFAULT_NFT_IMAGE,
+  buildNftImageCandidates,
   fetchNftMetadata,
   fetchOwnedNfts,
   type OwnedNft
@@ -12,6 +13,7 @@ import {
 import { useWallet } from "../../app/wallet/WalletContext"
 
 const PAGE_SIZE = 24
+const NFT_IMAGE_TIMEOUT_MS = 4_000
 
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -28,31 +30,65 @@ const RefreshIcon = () => (
 
 const NftImage = ({
   alt,
-  collectionIcon,
   image
 }: {
   alt: string
-  collectionIcon?: string
   image?: string
 }) => {
-  const candidates = useMemo(
-    () => Array.from(new Set([image, collectionIcon, DEFAULT_NFT_IMAGE].filter(Boolean))),
-    [collectionIcon, image]
-  )
-  const [candidateIndex, setCandidateIndex] = useState(0)
+  const candidates = useMemo(() => buildNftImageCandidates(image), [image])
+  const [resolvedSrc, setResolvedSrc] = useState(DEFAULT_NFT_IMAGE)
+
+  useEffect(() => {
+    let cancelled = false
+    let activeImage: HTMLImageElement | undefined
+    let timeoutId: number | undefined
+
+    const tryCandidate = (index: number) => {
+      if (cancelled || index >= candidates.length) return
+
+      const candidate = candidates[index]
+      const preload = new Image()
+      activeImage = preload
+
+      const cleanup = () => {
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+        preload.onload = null
+        preload.onerror = null
+      }
+      const tryNext = () => {
+        cleanup()
+        tryCandidate(index + 1)
+      }
+
+      preload.referrerPolicy = "no-referrer"
+      preload.onload = () => {
+        cleanup()
+        if (!cancelled) setResolvedSrc(candidate)
+      }
+      preload.onerror = tryNext
+      timeoutId = window.setTimeout(tryNext, NFT_IMAGE_TIMEOUT_MS)
+      preload.src = candidate
+    }
+
+    tryCandidate(0)
+
+    return () => {
+      cancelled = true
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId)
+      if (activeImage) {
+        activeImage.onload = null
+        activeImage.onerror = null
+      }
+    }
+  }, [candidates])
 
   return (
     <img
-      src={candidates[candidateIndex] ?? DEFAULT_NFT_IMAGE}
+      src={resolvedSrc}
       alt={alt}
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
-      onError={() =>
-        setCandidateIndex((current) =>
-          Math.min(current + 1, Math.max(candidates.length - 1, 0))
-        )
-      }
     />
   )
 }
@@ -72,9 +108,8 @@ const NftCard = ({ item }: { item: OwnedNft }) => {
     <article className={styles.nftCard}>
       <div className={styles.media}>
         <NftImage
-          key={`${image ?? ""}:${item.collectionIcon ?? ""}`}
+          key={image ?? DEFAULT_NFT_IMAGE}
           alt={name}
-          collectionIcon={item.collectionIcon}
           image={image}
         />
       </div>
