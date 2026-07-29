@@ -68,7 +68,7 @@ import {
 } from "../../app/config/swapConfig"
 import {
   applyLunaNetworkRewardFee,
-  buildRevenueDistribution,
+  buildSwapRevenueDistribution,
   isSupportedRevenueAsset,
   splitRevenueFee
 } from "../../app/revenue/feeDistribution"
@@ -1200,15 +1200,12 @@ const SwapPanel = ({
     () => toMicroAmount(amountIn, fromAsset.decimals),
     [amountIn, fromAsset.decimals]
   )
-  const revenueAssetSupported =
+  const autoDistributionSupported =
     fromAsset.type === "native" &&
     isSupportedRevenueAsset(chainKey, fromAsset.denom)
   const platformFeeMicro = useMemo(
-    () =>
-      revenueAssetSupported
-        ? (amountInMicro * PLATFORM_FEE_BPS) / 10_000n
-        : 0n,
-    [amountInMicro, revenueAssetSupported]
+    () => (amountInMicro * PLATFORM_FEE_BPS) / 10_000n,
+    [amountInMicro]
   )
   const swapAmountMicro = useMemo(
     () => amountInMicro - platformFeeMicro,
@@ -1715,7 +1712,7 @@ const SwapPanel = ({
         chain.runtime.gasPriceStep.average
       )
     const networkRewardFee =
-      chainKey === "luna"
+      chainKey === "luna" && autoDistributionSupported
         ? splitRevenueFee(platformFeeMicro).networkRewards
         : 0n
     const displayedFeeMicro =
@@ -1733,6 +1730,7 @@ const SwapPanel = ({
   }, [
     chain.displayDenom,
     chain.runtime.gasPriceStep.average,
+    autoDistributionSupported,
     chainKey,
     feeQuote,
     platformFeeMicro,
@@ -1817,10 +1815,10 @@ const SwapPanel = ({
         marketPairs: dexPairs
       })
 
-      const revenueDistribution = buildRevenueDistribution({
+      const revenueDistribution = buildSwapRevenueDistribution({
         amount: platformFeeMicro,
+        asset: fromAsset,
         chainKey,
-        denom: fromAsset.denom ?? "",
         sender: signerAddress
       })
       const swapMessages = await Promise.all(
@@ -1857,7 +1855,10 @@ const SwapPanel = ({
       })
       finishTx(hash)
       setLastTxHash(hash)
-      if (revenueDistribution.split.collector > 0n) {
+      if (
+        revenueDistribution.receiptSupported &&
+        revenueDistribution.split.collector > 0n
+      ) {
         void queueWebFeeReceipt(chainKey, hash)
       }
     } catch (error) {
@@ -2127,18 +2128,16 @@ const SwapPanel = ({
                         <label>Estimated fee</label>
                         <strong>{feeLoading ? "Estimating..." : feeDisplay}</strong>
                       </div>
-                      {revenueAssetSupported ? (
-                        <div>
-                          <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
-                          <strong>
-                            {`${formatTokenAmount(
-                              platformFeeMicro.toString(),
-                              fromAsset.decimals,
-                              6
-                            )} ${fromAsset.symbol}`}
-                          </strong>
-                        </div>
-                      ) : null}
+                      <div>
+                        <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
+                        <strong>
+                          {`${formatTokenAmount(
+                            platformFeeMicro.toString(),
+                            fromAsset.decimals,
+                            6
+                          )} ${fromAsset.symbol}`}
+                        </strong>
+                      </div>
                       <div>
                         <label>Route path</label>
                         <strong>

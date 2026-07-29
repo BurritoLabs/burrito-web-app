@@ -102,6 +102,7 @@ import {
   type TokenInfoLookupState
 } from "../../app/launchpad/pageModel"
 import { applyLunaNetworkRewardFee } from "../../app/revenue/feeDistribution"
+import { WEB_FEE_MEMO } from "../../app/revenue/webFeeConfig"
 import { queueWebFeeReceipt } from "../../app/revenue/webFeeReceipt"
 
 const Launchpad = () => {
@@ -536,7 +537,7 @@ const Launchpad = () => {
         },
         `Burrito ${tokenSymbol}`
       )
-      const memo = isCw20Only ? "Burrito CW20 only" : "Burrito launch token"
+      const memo = WEB_FEE_MEMO
       const messages = [
         ...creationFeeDistribution.messages,
         createTokenMessage

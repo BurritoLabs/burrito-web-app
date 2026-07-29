@@ -1,3 +1,5 @@
+import { WEB_FEE_MEMO } from "../revenue/webFeeConfig"
+
 const DEFAULT_PLATFORM_FEE_BPS = 20n
 const MAX_PLATFORM_FEE_BPS = 100n
 
@@ -16,7 +18,7 @@ export const FALLBACK_GAS_NATIVE_SWAP = 220_000
 export const FALLBACK_GAS_CW20_SWAP = 300_000
 export const FALLBACK_GAS_NATIVE_FEE = 80_000
 export const FALLBACK_GAS_CW20_FEE = 120_000
-export const SWAP_MEMO = "Swapped via Burrito Swap"
+export const SWAP_MEMO = WEB_FEE_MEMO
 export const PLATFORM_FEE_BPS = parseFeeBps(
   import.meta.env.VITE_SWAP_PLATFORM_FEE_BPS
 )

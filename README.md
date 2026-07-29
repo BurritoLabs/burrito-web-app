@@ -138,10 +138,12 @@ Terra launchpad production addresses are bundled defaults. Chain-specific
 environment variables override the bundled values. Terra Classic LP locking
 and registry publishing remain disabled when its addresses are not configured.
 
-Swap platform fees are charged only when the offered asset is LUNC, USTC, or
-LUNA. Supported fees and launchpad creation fees are split 5% to burn, 5% to
-the community pool, 5% to the Classic oracle pool or Terra network rewards, and
-85% to the dedicated collector. Confirmed collector receipts are settled to the
+Swap platform fees charge 0.2% of every supported swap input, including native,
+IBC, and CW20 assets. LUNC, USTC, LUNA, and launchpad creation fees are split 5%
+to burn, 5% to the community pool, 5% to the Classic oracle pool or Terra
+network rewards, and 85% to the dedicated collector. Other swap assets are sent
+in full to the collector because CW20 assets cannot be represented as Cosmos
+community-pool coins. Confirmed supported collector receipts are settled to the
 configured treasury by the Burrito AI allocator.
 
 ## Performance Behavior

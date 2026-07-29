@@ -1,6 +1,7 @@
 import type { EncodeObject } from "@cosmjs/proto-signing"
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
 import { MsgFundCommunityPool } from "cosmjs-types/cosmos/distribution/v1beta1/tx"
+import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import type { AppChainKey } from "../appChains"
 
 const DEFAULT_COLLECTOR_ADDRESS =
@@ -39,6 +40,12 @@ export type RevenueSplit = {
   collector: bigint
 }
 
+type SwapFeeAsset = {
+  type: "native" | "cw20"
+  denom?: string
+  contract?: string
+}
+
 export const splitRevenueFee = (amount: bigint): RevenueSplit => {
   if (amount <= 0n) {
     return {
@@ -70,6 +77,57 @@ const bankSend = (
     amount: [{ denom, amount: amount.toString() }]
   })
 })
+
+const cw20Transfer = (
+  sender: string,
+  contract: string,
+  recipient: string,
+  amount: bigint
+): EncodeObject => ({
+  typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+  value: MsgExecuteContract.fromPartial({
+    sender,
+    contract,
+    msg: new TextEncoder().encode(
+      JSON.stringify({
+        transfer: {
+          recipient,
+          amount: amount.toString()
+        }
+      })
+    ),
+    funds: []
+  })
+})
+
+export const buildCollectorFeeTransfer = ({
+  amount,
+  asset,
+  sender
+}: {
+  amount: bigint
+  asset: SwapFeeAsset
+  sender: string
+}) => {
+  if (amount <= 0n) return undefined
+  if (asset.type === "native" && asset.denom) {
+    return bankSend(
+      sender,
+      WEB_FEE_COLLECTOR_ADDRESS,
+      asset.denom,
+      amount
+    )
+  }
+  if (asset.type === "cw20" && asset.contract) {
+    return cw20Transfer(
+      sender,
+      asset.contract,
+      WEB_FEE_COLLECTOR_ADDRESS,
+      amount
+    )
+  }
+  throw new Error("Unsupported platform fee asset.")
+}
 
 export const buildRevenueDistribution = ({
   amount,
@@ -124,6 +182,51 @@ export const buildRevenueDistribution = ({
     messages,
     networkRewardFee: chainKey === "luna" ? split.networkRewards : 0n,
     split
+  }
+}
+
+export const buildSwapRevenueDistribution = ({
+  amount,
+  asset,
+  chainKey,
+  sender
+}: {
+  amount: bigint
+  asset: SwapFeeAsset
+  chainKey: AppChainKey
+  sender: string
+}) => {
+  if (
+    asset.type === "native" &&
+    asset.denom &&
+    isSupportedRevenueAsset(chainKey, asset.denom)
+  ) {
+    return {
+      ...buildRevenueDistribution({
+        amount,
+        chainKey,
+        denom: asset.denom,
+        sender
+      }),
+      receiptSupported: true
+    }
+  }
+
+  const collectorMessage = buildCollectorFeeTransfer({
+    amount,
+    asset,
+    sender
+  })
+  return {
+    messages: collectorMessage ? [collectorMessage] : [],
+    networkRewardFee: 0n,
+    receiptSupported: false,
+    split: {
+      burn: 0n,
+      communityPool: 0n,
+      networkRewards: 0n,
+      collector: amount > 0n ? amount : 0n
+    }
   }
 }
 
