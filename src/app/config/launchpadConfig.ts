@@ -11,7 +11,6 @@ const parsePositiveAmount = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
-const FEE_RECIPIENT = "terra16x9dcx9pm9j8ykl0td4hptwule706ysjeskflu"
 const LUNA_LP_LOCKER_ADDRESS =
   "terra1zs54uanqzwh2y4a6z9xlzawjyjp3tddd99ad0h58ghr5yh2fdfjq95gmcv"
 const LUNA_LAUNCH_REGISTRY_ADDRESS =
@@ -34,7 +33,6 @@ const launchpadConfigs = {
     nativeSymbol: "LUNC",
     creationFee: classicCreationFee,
     creationFeeMicro: BigInt(Math.round(classicCreationFee * 1_000_000)),
-    feeRecipient: FEE_RECIPIENT,
     cw20CodeId: 3n,
     cw20CodeIdLabel: "Terra Classic CW20 code ID 3",
     terraswapFactoryAddress:
@@ -55,7 +53,6 @@ const launchpadConfigs = {
     nativeSymbol: "LUNA",
     creationFee: lunaCreationFee,
     creationFeeMicro: BigInt(Math.round(lunaCreationFee * 1_000_000)),
-    feeRecipient: FEE_RECIPIENT,
     cw20CodeId: 4n,
     cw20CodeIdLabel: "Terra CW20 code ID 4",
     terraswapFactoryAddress:

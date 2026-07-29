@@ -6,6 +6,7 @@ import {
   type FormEvent
 } from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import { calculateFee, GasPrice } from "@cosmjs/stargate"
 import PageShell from "../PageShell"
 import styles from "../Launchpad.module.css"
 import {
@@ -61,7 +62,7 @@ import LaunchpadTabs from "./LaunchpadTabs"
 import {
   CW20_SYMBOL_PATTERN,
   TERRA_TOKEN_DECIMALS,
-  buildLaunchpadCreationFeeMessage,
+  buildLaunchpadCreationFeeDistribution,
   buildOwnerRecordFromRegistryLaunch,
   createSteps,
   formatCompact,
@@ -100,6 +101,8 @@ import {
   type TokenBalanceLookupState,
   type TokenInfoLookupState
 } from "../../app/launchpad/pageModel"
+import { applyLunaNetworkRewardFee } from "../../app/revenue/feeDistribution"
+import { queueWebFeeReceipt } from "../../app/revenue/webFeeReceipt"
 
 const Launchpad = () => {
   const { chainKey, chain } = useAppChain()
@@ -518,7 +521,8 @@ const Launchpad = () => {
       startTx(`Create ${tokenSymbol}`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
-      const creationFeeMessage = buildLaunchpadCreationFeeMessage(signerAddress)
+      const creationFeeDistribution =
+        buildLaunchpadCreationFeeDistribution(signerAddress)
       const createTokenMessage = buildCw20InstantiateMessage(
         {
           creatorAddress: signerAddress,
@@ -532,17 +536,44 @@ const Launchpad = () => {
         },
         `Burrito ${tokenSymbol}`
       )
+      const memo = isCw20Only ? "Burrito CW20 only" : "Burrito launch token"
+      const messages = [
+        ...creationFeeDistribution.messages,
+        createTokenMessage
+      ]
+      let fee: "auto" | ReturnType<typeof applyLunaNetworkRewardFee> = "auto"
+      if (creationFeeDistribution.networkRewardFee > 0n) {
+        const simulatedGas = await client.simulate(
+          signerAddress,
+          messages,
+          memo
+        )
+        const standardFee = calculateFee(
+          Math.ceil(simulatedGas * 1.5),
+          GasPrice.fromString(
+            `${chain.runtime.gasPriceStep.average}${chain.nativeDenom}`
+          )
+        )
+        fee = applyLunaNetworkRewardFee(
+          standardFee,
+          chain.nativeDenom,
+          creationFeeDistribution.networkRewardFee
+        )
+      }
       const result = await client.signAndBroadcast(
         signerAddress,
-        [creationFeeMessage, createTokenMessage],
-        "auto",
-        isCw20Only ? "Burrito CW20 only" : "Burrito launch token"
+        messages,
+        fee,
+        memo
       )
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Create token failed")
       }
       const contractAddress = extractContractAddressFromEvents(result.events)
       const recordId = contractAddress || result.transactionHash
+      if (creationFeeDistribution.split.collector > 0n) {
+        void queueWebFeeReceipt(chainKey, result.transactionHash)
+      }
       const isLaunchWithPool = !isCw20Only
       const createdRecord: OwnerLaunchRecord = {
         id: recordId,

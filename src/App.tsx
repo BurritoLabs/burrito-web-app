@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useLocation } from "react-router-dom"
 import { useAppRoutes } from "./app/routes"
 import Layout, {
@@ -15,6 +15,7 @@ import LoadingBar from "./app/feedback/LoadingBar"
 import TxStatusModal from "./app/feedback/TxStatusModal"
 import ScrollTopButton from "./app/layout/ScrollTopButton"
 import RouteMetadata from "./app/metadata/RouteMetadata"
+import { retryPendingWebFeeReceipts } from "./app/revenue/webFeeReceipt"
 
 function App() {
   const routes = useAppRoutes()
@@ -22,6 +23,10 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const toggleMenu = useCallback(() => setMenuOpen((open) => !open), [])
+
+  useEffect(() => {
+    void retryPendingWebFeeReceipts()
+  }, [])
 
   return (
     <Layout menuOpen={menuOpen}>

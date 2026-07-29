@@ -1,8 +1,8 @@
-import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx"
 import {
   getLaunchpadConfig,
   getLaunchpadStorageKeys
 } from "../config/launchpadConfig"
+import { buildRevenueDistribution } from "../revenue/feeDistribution"
 import { sanitizeAssetIconUrl } from "../utils/assetIcons"
 import {
   formatBaseUnitsToTokenAmount,
@@ -334,21 +334,14 @@ export const formatPrice = (value: number) => {
 export const formatDateTime = (value: string | number | Date) =>
   new Date(value).toLocaleString()
 
-export const buildLaunchpadCreationFeeMessage = (sender: string) => {
+export const buildLaunchpadCreationFeeDistribution = (sender: string) => {
   const config = getLaunchpadConfig()
-  return {
-    typeUrl: "/cosmos.bank.v1beta1.MsgSend",
-    value: MsgSend.fromPartial({
-      fromAddress: sender,
-      toAddress: config.feeRecipient,
-      amount: [
-        {
-          denom: config.nativeDenom,
-          amount: config.creationFeeMicro.toString()
-        }
-      ]
-    })
-  }
+  return buildRevenueDistribution({
+    amount: config.creationFeeMicro,
+    chainKey: config.chainKey,
+    denom: config.nativeDenom,
+    sender
+  })
 }
 
 export const normalizeOptionalHttpUrl = (value: string, field: string) => {

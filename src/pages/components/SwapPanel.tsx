@@ -63,10 +63,16 @@ import {
   FALLBACK_GAS_NATIVE_FEE,
   FALLBACK_GAS_NATIVE_SWAP,
   PLATFORM_FEE_BPS,
-  PLATFORM_FEE_RECIPIENT,
   SLIPPAGE_OPTIONS,
   SWAP_MEMO
 } from "../../app/config/swapConfig"
+import {
+  applyLunaNetworkRewardFee,
+  buildRevenueDistribution,
+  isSupportedRevenueAsset,
+  splitRevenueFee
+} from "../../app/revenue/feeDistribution"
+import { queueWebFeeReceipt } from "../../app/revenue/webFeeReceipt"
 import type { ClassicStargateClient } from "../../app/wallet/walletAdapters"
 import { getClassicTxHash } from "../../app/wallet/signingClient"
 import SwapAssetPickerModal from "./swap/SwapAssetPickerModal"
@@ -526,51 +532,6 @@ const buildSwapMessage = async (
   throw new Error("unsupported swap asset")
 }
 
-const buildPlatformFeeMessage = async (
-  sender: string,
-  offerAsset: SwapAsset,
-  feeAmountMicro: bigint
-) => {
-  if (feeAmountMicro <= 0n) return undefined
-
-  if (offerAsset.type === "native" && offerAsset.denom) {
-    const { MsgSend } = await import("cosmjs-types/cosmos/bank/v1beta1/tx")
-    return {
-      typeUrl: "/cosmos.bank.v1beta1.MsgSend",
-      value: MsgSend.fromPartial({
-        fromAddress: sender,
-        toAddress: PLATFORM_FEE_RECIPIENT,
-        amount: [
-          {
-            denom: offerAsset.denom,
-            amount: feeAmountMicro.toString()
-          }
-        ]
-      })
-    }
-  }
-
-  if (offerAsset.type === "cw20" && offerAsset.contract) {
-    const { MsgExecuteContract } = await import("cosmjs-types/cosmwasm/wasm/v1/tx")
-    return {
-      typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
-      value: MsgExecuteContract.fromPartial({
-        sender,
-        contract: offerAsset.contract,
-        msg: encodeJsonBytes({
-          transfer: {
-            recipient: PLATFORM_FEE_RECIPIENT,
-            amount: feeAmountMicro.toString()
-          }
-        }),
-        funds: []
-      })
-    }
-  }
-
-  throw new Error("unsupported fee asset")
-}
-
 const estimateFallbackGas = (
   offerAssets: readonly SwapAsset[],
   includePlatformFee: boolean
@@ -648,6 +609,7 @@ const signAndBroadcastSwapFast = async ({
   feeDenom,
   gasPrice,
   messages,
+  networkRewardFee,
   signerAddress
 }: {
   client: ClassicStargateClient
@@ -656,13 +618,14 @@ const signAndBroadcastSwapFast = async ({
   feeDenom: string
   gasPrice: number
   messages: readonly SwapMessage[]
+  networkRewardFee: bigint
   signerAddress: string
 }) => {
   let sequenceHint: number | undefined
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const fee = await estimateSwapFee({
+      const standardFee = await estimateSwapFee({
         client,
         fallbackGas,
         feeDenom,
@@ -670,6 +633,11 @@ const signAndBroadcastSwapFast = async ({
         messages,
         signerAddress
       })
+      const fee = applyLunaNetworkRewardFee(
+        standardFee,
+        feeDenom,
+        networkRewardFee
+      )
       const signerState = await client.getSequence(signerAddress)
       const signed = await client.sign(
         signerAddress,
@@ -1232,9 +1200,15 @@ const SwapPanel = ({
     () => toMicroAmount(amountIn, fromAsset.decimals),
     [amountIn, fromAsset.decimals]
   )
+  const revenueAssetSupported =
+    fromAsset.type === "native" &&
+    isSupportedRevenueAsset(chainKey, fromAsset.denom)
   const platformFeeMicro = useMemo(
-    () => (amountInMicro * PLATFORM_FEE_BPS) / 10_000n,
-    [amountInMicro]
+    () =>
+      revenueAssetSupported
+        ? (amountInMicro * PLATFORM_FEE_BPS) / 10_000n
+        : 0n,
+    [amountInMicro, revenueAssetSupported]
   )
   const swapAmountMicro = useMemo(
     () => amountInMicro - platformFeeMicro,
@@ -1735,12 +1709,21 @@ const SwapPanel = ({
       return undefined
     }
 
-    const fallbackFee = `${formatTokenAmount(
-      estimateFallbackFeeMicro(
+    const estimatedFeeMicro = estimateFallbackFeeMicro(
         feeQuote.hops.map((hop) => hop.offerAsset),
         platformFeeMicro > 0n,
         chain.runtime.gasPriceStep.average
-      ).toString(),
+      )
+    const networkRewardFee =
+      chainKey === "luna"
+        ? splitRevenueFee(platformFeeMicro).networkRewards
+        : 0n
+    const displayedFeeMicro =
+      networkRewardFee > estimatedFeeMicro
+        ? networkRewardFee
+        : estimatedFeeMicro
+    const fallbackFee = `${formatTokenAmount(
+      displayedFeeMicro.toString(),
       6,
       6
     )} ${chain.displayDenom}`
@@ -1750,6 +1733,7 @@ const SwapPanel = ({
   }, [
     chain.displayDenom,
     chain.runtime.gasPriceStep.average,
+    chainKey,
     feeQuote,
     platformFeeMicro,
     swapAmountMicro
@@ -1833,7 +1817,12 @@ const SwapPanel = ({
         marketPairs: dexPairs
       })
 
-      const feeMsg = await buildPlatformFeeMessage(signerAddress, fromAsset, platformFeeMicro)
+      const revenueDistribution = buildRevenueDistribution({
+        amount: platformFeeMicro,
+        chainKey,
+        denom: fromAsset.denom ?? "",
+        sender: signerAddress
+      })
       const swapMessages = await Promise.all(
         selectedQuote.hops.map((hop, index) =>
           buildSwapMessage(
@@ -1849,7 +1838,10 @@ const SwapPanel = ({
           )
         )
       )
-      const messages = feeMsg ? [feeMsg, ...swapMessages] : swapMessages
+      const messages = [
+        ...revenueDistribution.messages,
+        ...swapMessages
+      ]
       const hash = await signAndBroadcastSwapFast({
         client,
         chainId: chain.chainId,
@@ -1860,10 +1852,14 @@ const SwapPanel = ({
         feeDenom: chain.nativeDenom,
         gasPrice: chain.runtime.gasPriceStep.average,
         messages,
+        networkRewardFee: revenueDistribution.networkRewardFee,
         signerAddress
       })
       finishTx(hash)
       setLastTxHash(hash)
+      if (revenueDistribution.split.collector > 0n) {
+        void queueWebFeeReceipt(chainKey, hash)
+      }
     } catch (error) {
       const message = formatTxError(error, "Swap failed")
       failTx(message)
@@ -2131,16 +2127,18 @@ const SwapPanel = ({
                         <label>Estimated fee</label>
                         <strong>{feeLoading ? "Estimating..." : feeDisplay}</strong>
                       </div>
-                      <div>
-                        <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
-                        <strong>
-                          {`${formatTokenAmount(
-                            platformFeeMicro.toString(),
-                            fromAsset.decimals,
-                            6
-                          )} ${fromAsset.symbol}`}
-                        </strong>
-                      </div>
+                      {revenueAssetSupported ? (
+                        <div>
+                          <label>Platform fee ({(Number(PLATFORM_FEE_BPS) / 100).toFixed(2)}%)</label>
+                          <strong>
+                            {`${formatTokenAmount(
+                              platformFeeMicro.toString(),
+                              fromAsset.decimals,
+                              6
+                            )} ${fromAsset.symbol}`}
+                          </strong>
+                        </div>
+                      ) : null}
                       <div>
                         <label>Route path</label>
                         <strong>

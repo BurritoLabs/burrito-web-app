@@ -121,7 +121,8 @@ All variables are optional unless the related production feature is enabled.
 
 ```bash
 VITE_SWAP_PLATFORM_FEE_BPS=
-VITE_SWAP_PLATFORM_FEE_RECIPIENT=
+VITE_WEB_FEE_COLLECTOR_ADDRESS=
+VITE_WEB_FEE_CONFIRM_URL=
 VITE_WALLETCONNECT_PROJECT_ID=
 VITE_LUNC_LAUNCHPAD_LP_LOCKER_ADDRESS=
 VITE_LUNC_LAUNCHPAD_REGISTRY_ADDRESS=
@@ -136,6 +137,12 @@ project id owned by Burrito.
 Terra launchpad production addresses are bundled defaults. Chain-specific
 environment variables override the bundled values. Terra Classic LP locking
 and registry publishing remain disabled when its addresses are not configured.
+
+Swap platform fees are charged only when the offered asset is LUNC, USTC, or
+LUNA. Supported fees and launchpad creation fees are split 5% to burn, 5% to
+the community pool, 5% to the Classic oracle pool or Terra network rewards, and
+85% to the dedicated collector. Confirmed collector receipts are settled to the
+configured treasury by the Burrito AI allocator.
 
 ## Performance Behavior
 
