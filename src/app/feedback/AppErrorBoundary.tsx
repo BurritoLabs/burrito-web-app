@@ -17,6 +17,12 @@ type AppErrorBoundaryState = {
 
 const APP_RECOVERY_STORAGE_KEY = "burrito.appRecoveryAt"
 const APP_RECOVERY_COOLDOWN_MS = 60_000
+const STALE_ASSET_RECOVERY_DELAY_MS = 1_500
+
+const isStaleAssetLoadError = (error: Error) =>
+  /failed to fetch dynamically imported module|chunkloaderror|loading chunk/i.test(
+    `${error.name} ${error.message}`
+  )
 
 const recoverAppOnce = () => {
   clearVolatileStorageCaches()
@@ -45,6 +51,8 @@ class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
   AppErrorBoundaryState
 > {
+  private recoveryTimer: number | undefined
+
   state: AppErrorBoundaryState = {
     error: null,
     diagnosticsCopied: false
@@ -65,10 +73,25 @@ class AppErrorBoundary extends Component<
       console.error(error, errorInfo)
     }
 
-    recoverAppOnce()
+    const delay = isStaleAssetLoadError(error)
+      ? STALE_ASSET_RECOVERY_DELAY_MS
+      : 0
+    this.recoveryTimer = window.setTimeout(() => {
+      recoverAppOnce()
+    }, delay)
+  }
+
+  componentWillUnmount() {
+    if (this.recoveryTimer !== undefined) {
+      window.clearTimeout(this.recoveryTimer)
+    }
   }
 
   handleReload = () => {
+    if (this.recoveryTimer !== undefined) {
+      window.clearTimeout(this.recoveryTimer)
+      this.recoveryTimer = undefined
+    }
     try {
       window.sessionStorage.removeItem(APP_RECOVERY_STORAGE_KEY)
     } catch {
