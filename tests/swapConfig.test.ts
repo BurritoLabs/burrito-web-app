@@ -7,7 +7,7 @@ import {
 
 describe("swap transaction settings", () => {
   it("uses an ASCII memo that wallets cannot double-escape", () => {
-    expect(SWAP_MEMO).toBe("Burrito Burn and Support")
+    expect(SWAP_MEMO).toBe("Swapped via Burrito Swap")
     expect(SWAP_MEMO).not.toContain("\\u")
   })
 
