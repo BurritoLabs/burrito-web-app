@@ -64,6 +64,8 @@ import {
   FALLBACK_GAS_NATIVE_SWAP,
   PLATFORM_FEE_BPS,
   SLIPPAGE_OPTIONS,
+  SWAP_FALLBACK_GAS_ADJUSTMENT,
+  SWAP_GAS_ADJUSTMENT,
   SWAP_MEMO
 } from "../../app/config/swapConfig"
 import {
@@ -594,9 +596,12 @@ const estimateSwapFee = async ({
   let gasLimit = fallbackGas
   try {
     const simulatedGas = await client.simulate(signerAddress, messages, SWAP_MEMO)
-    gasLimit = Math.max(fallbackGas, Math.ceil(simulatedGas * 1.45))
+    gasLimit = Math.max(
+      fallbackGas,
+      Math.ceil(simulatedGas * SWAP_GAS_ADJUSTMENT)
+    )
   } catch {
-    gasLimit = Math.ceil(fallbackGas * 1.15)
+    gasLimit = Math.ceil(fallbackGas * SWAP_FALLBACK_GAS_ADJUSTMENT)
   }
 
   return buildSwapFee(gasLimit, gasPrice, feeDenom)
