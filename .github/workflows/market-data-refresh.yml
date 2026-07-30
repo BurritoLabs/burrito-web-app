@@ -3,7 +3,7 @@ name: Market Data Refresh
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 7 * * *"
+    - cron: "17 */6 * * *"
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
 
       - name: Rebuild market index
         env:
-          MARKET_INDEX_MIN_PAIRS: 1000
+          MARKET_INDEX_MIN_PAIRS: 3500
         run: npm run build:market-index
 
       - name: Rebuild hot-pair candles

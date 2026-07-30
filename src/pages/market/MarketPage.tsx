@@ -878,10 +878,8 @@ const Market = () => {
     [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
   )
 
-  const filteredAndSorted = useMemo(() => {
-    const filtered = [...filteredCards]
-
-    filtered.sort((a, b) => {
+  const compareMarketCards = useCallback(
+    (a: MarketCard, b: MarketCard) => {
       const resolveMetricValue = (card: MarketCard) => {
         if (sortMetric === "change") return getPairChange(card, timeframe)
         if (sortMetric === "volume") return getCardVolumeUsd(card, timeframe)
@@ -897,18 +895,21 @@ const Market = () => {
       if (valueB === undefined) return -1
 
       return sortDirection === "asc" ? valueA - valueB : valueB - valueA
-    })
+    },
+    [
+      getCardMarketCapUsd,
+      getCardVolumeUsd,
+      getPairChange,
+      sortDirection,
+      sortMetric,
+      timeframe
+    ]
+  )
 
-    return filtered
-  }, [
-    filteredCards,
-    getCardMarketCapUsd,
-    getCardVolumeUsd,
-    getPairChange,
-    sortDirection,
-    sortMetric,
-    timeframe
-  ])
+  const filteredAndSorted = useMemo(
+    () => [...filteredCards].sort(compareMarketCards),
+    [compareMarketCards, filteredCards]
+  )
 
   const visible = filteredAndSorted.slice(0, visibleCount)
   const hasMore = filteredAndSorted.length > visible.length
@@ -1027,10 +1028,21 @@ const Market = () => {
     [hydrateVisibleCw20Asset]
   )
 
-  const displayVisible = useMemo(
-    () => visible.map((card) => hydrateVisibleCard(liveCardById.get(card.id) ?? card)),
-    [hydrateVisibleCard, liveCardById, visible]
-  )
+  const displayVisible = useMemo(() => {
+    const hydrated = visible.map((card) =>
+      hydrateVisibleCard(liveCardById.get(card.id) ?? card)
+    )
+    const refreshedHead = hydrated
+      .slice(0, LIVE_POOL_REFRESH_LIMIT)
+      .sort(compareMarketCards)
+
+    return [...refreshedHead, ...hydrated.slice(LIVE_POOL_REFRESH_LIMIT)]
+  }, [
+    compareMarketCards,
+    hydrateVisibleCard,
+    liveCardById,
+    visible
+  ])
   const isLoading = isPairsLoading || isPoolsLoading
   const selectedSortMetric =
     SORT_METRIC_OPTIONS.find((option) => option.value === sortMetric) ?? SORT_METRIC_OPTIONS[0]

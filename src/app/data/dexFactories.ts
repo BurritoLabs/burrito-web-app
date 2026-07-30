@@ -145,7 +145,8 @@ export const CLASSIC_SWAP_DEXES: readonly ClassicSwapDex[] = [
     label: "Garuda DeFi V2",
     factory: "terra1ypwj6sw25g0qcykv7mzmcvsndvx56r3yrgkaw3fds7yzwl7fwwcsnxkeh7",
     mode: "garuda",
-    pairCodeIds: [10907]
+    // 10902 contains the first V2 generation; 10907 is the current factory code.
+    pairCodeIds: [10902, 10907]
   },
   {
     id: "white-whale",

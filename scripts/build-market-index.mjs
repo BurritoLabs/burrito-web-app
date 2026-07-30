@@ -61,7 +61,7 @@ const DEXES = [
     factory:
       "terra1ypwj6sw25g0qcykv7mzmcvsndvx56r3yrgkaw3fds7yzwl7fwwcsnxkeh7",
     mode: "garuda",
-    pairCodeIds: [10907],
+    pairCodeIds: [10902, 10907],
   },
   {
     id: "white-whale",
@@ -651,28 +651,30 @@ const parseOutArg = () => {
   return DEFAULT_OUT;
 };
 
-const readExistingVolumeMap = async (outFile) => {
+const readExistingMarketIndex = async (outFile) => {
   try {
     const payload = JSON.parse(await fs.readFile(outFile, "utf8"));
     const pairs = Array.isArray(payload?.pairs) ? payload.pairs : [];
     const volumesByPair = new Map();
+    const pairsByAddress = new Map();
 
     pairs.forEach((entry) => {
       const pair = typeof entry?.pair === "string" ? entry.pair.toLowerCase() : "";
+      if (pair) pairsByAddress.set(pair, entry);
       const volumes = entry?.volumes;
       if (!pair || !volumes || typeof volumes !== "object") return;
       volumesByPair.set(pair, volumes);
     });
 
-    return volumesByPair;
+    return { pairsByAddress, volumesByPair };
   } catch {
-    return new Map();
+    return { pairsByAddress: new Map(), volumesByPair: new Map() };
   }
 };
 
 const run = async () => {
   const outFile = parseOutArg();
-  const existingVolumes = await readExistingVolumeMap(outFile);
+  const existing = await readExistingMarketIndex(outFile);
   const records = [];
 
   for (const dex of DEXES) {
@@ -696,11 +698,17 @@ const run = async () => {
     records.push(...snapshots);
   }
 
-  const byPair = new Map();
+  const freshByPair = new Map();
   for (const entry of records) {
     if (!entry?.pair) continue;
-    if (!byPair.has(entry.pair)) byPair.set(entry.pair, entry);
+    if (!freshByPair.has(entry.pair)) freshByPair.set(entry.pair, entry);
   }
+
+  // Public LCDs can return partial factory pages or drop smart queries. Keep
+  // previously verified pools when a refresh cannot rediscover them, while
+  // replacing every pool that was resolved in the current run.
+  const byPair = new Map(existing.pairsByAddress);
+  freshByPair.forEach((entry, pair) => byPair.set(pair, entry));
 
   const pairs = Array.from(byPair.values())
     .sort((a, b) =>
@@ -709,7 +717,7 @@ const run = async () => {
         : a.dexLabel.localeCompare(b.dexLabel)
     )
     .map((entry) => {
-      const volumes = existingVolumes.get(entry.pair);
+      const volumes = existing.volumesByPair.get(entry.pair);
       return volumes ? { ...entry, volumes } : entry;
     });
 
@@ -730,6 +738,8 @@ const run = async () => {
     lcd: LCD,
     chainId: CHAIN_ID,
     pairCount: pairs.length,
+    freshPairCount: freshByPair.size,
+    carriedPairCount: pairs.length - freshByPair.size,
     dexes: dexCounts,
     pairs,
   };
@@ -737,7 +747,11 @@ const run = async () => {
   await fs.mkdir(path.dirname(outFile), { recursive: true });
   await fs.writeFile(outFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 
-  console.log(`Wrote ${pairs.length} pools -> ${outFile}`);
+  console.log(
+    `Wrote ${pairs.length} pools (${freshByPair.size} fresh, ${
+      pairs.length - freshByPair.size
+    } carried) -> ${outFile}`
+  );
   console.table(dexCounts);
 };
 
