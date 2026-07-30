@@ -426,6 +426,11 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 190px;
   }
+
+  .poolCardLink:hover,
+  .poolCardLink:focus-visible {
+    content-visibility: visible;
+  }
 }
 
 .poolCard {
