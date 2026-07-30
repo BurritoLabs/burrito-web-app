@@ -37,6 +37,7 @@ import {
   formatNativeSymbol,
   isSafeNativeDenom,
   isTerraAddress,
+  resolveNativeAssetIdentity,
   resolveSafeDisplayName,
   resolveSafeDisplaySymbol
 } from "../../app/utils/assetIdentity"
@@ -939,24 +940,28 @@ const SwapPanel = ({
       }
 
       const token = nativeWhitelist[denom.toLowerCase()]
-      const symbol = resolveSafeDisplaySymbol(
-        token?.symbol,
-        formatSwapNativeSymbol(
-          denom,
-          chain.nativeDenom,
-          chain.displayDenom
-        )
-      )
+      const identity = resolveNativeAssetIdentity({
+        denom,
+        candidateSymbol:
+          token?.symbol ??
+          formatSwapNativeSymbol(
+            denom,
+            chain.nativeDenom,
+            chain.displayDenom
+          ),
+        candidateName: token?.name,
+        chainKey
+      })
       return {
         id: asNativeId(denom),
         type: "native" as const,
-        symbol,
-        name: resolveSafeDisplayName(token?.name, symbol),
+        symbol: identity.symbol,
+        name: identity.name,
         denom,
         decimals: token?.decimals ?? 6,
         iconCandidates: buildClassicNativeIconCandidates({
           denom,
-          symbol,
+          symbol: identity.symbol,
           primaryIcon: token?.icon
         })
       }
@@ -964,6 +969,7 @@ const SwapPanel = ({
   }, [
     chain.displayDenom,
     chain.nativeDenom,
+    chainKey,
     ibcWhitelist,
     nativeWhitelist,
     tradableNativeDenoms

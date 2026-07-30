@@ -27,7 +27,10 @@ import {
   useResolvedIbcWhitelist
 } from "../data/terraAssets"
 import { toUnitAmount } from "../utils/format"
-import { formatNativeSymbol } from "../utils/assetIdentity"
+import {
+  formatNativeSymbol,
+  resolveNativeAssetIdentity
+} from "../utils/assetIdentity"
 import {
   buildClassicNativeIconCandidates,
   buildCw20IconCandidates,
@@ -812,8 +815,12 @@ export const useWalletAssets = (accountAddress?: string) => {
 
         const displaySymbol = formatWalletDenom(coin.denom, isClassic)
         const nativeToken = nativeWhitelist[coin.denom.toLowerCase()]
-        const symbol = nativeToken?.symbol ?? displaySymbol
-        const name = nativeToken?.name ?? symbol
+        const identity = resolveNativeAssetIdentity({
+          denom: coin.denom,
+          candidateSymbol: nativeToken?.symbol ?? displaySymbol,
+          candidateName: nativeToken?.name,
+          chainKey
+        })
         const decimals = nativeToken?.decimals ?? 6
         const unitAmount = toUnitAmount(coin.amount, decimals)
         const value =
@@ -825,8 +832,8 @@ export const useWalletAssets = (accountAddress?: string) => {
         return {
           kind: "native",
           denom: coin.denom,
-          symbol,
-          name,
+          symbol: identity.symbol,
+          name: identity.name,
           decimals,
           amount: coin.amount,
           price,
@@ -838,7 +845,7 @@ export const useWalletAssets = (accountAddress?: string) => {
           iconCandidates: buildWalletIconCandidates({
             icon: nativeToken?.icon,
             denom: coin.denom,
-            symbol,
+            symbol: identity.symbol,
             isClassic,
             fallback: "/system/cw20.svg"
           })
@@ -955,6 +962,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     balances,
     chain.displayDenom,
     chain.name,
+    chainKey,
     cw20Balances,
     fxRates?.MNT,
     fxRates?.TWD,

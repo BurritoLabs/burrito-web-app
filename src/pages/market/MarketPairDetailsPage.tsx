@@ -45,8 +45,8 @@ import {
   buildIbcAssetIconCandidates
 } from "../../app/utils/assetIcons"
 import {
-  formatNativeSymbol,
-  normalizeAssetKey
+  normalizeAssetKey,
+  resolveNativeAssetIdentity
 } from "../../app/utils/assetIdentity"
 import { splitDexLabel } from "../../app/utils/dexDisplay"
 import { formatUsdCompact } from "../../app/utils/numberDisplay"
@@ -482,14 +482,23 @@ const MarketPairDetails = () => {
         }
       }
       const nativeToken = nativeWhitelist[denom.toLowerCase()]
-      const symbol = nativeToken?.symbol ?? formatNativeSymbol(denom)
+      const identity = resolveNativeAssetIdentity({
+        denom,
+        candidateSymbol: nativeToken?.symbol,
+        candidateName: nativeToken?.name,
+        chainKey
+      })
       return {
         id: assetId,
         key: normalizeAssetKey(denom),
-        symbol,
-        name: nativeToken?.name ?? symbol,
+        symbol: identity.symbol,
+        name: identity.name,
         decimals: nativeToken?.decimals ?? 6,
-        iconCandidates: buildNativeIconCandidates(denom, symbol, nativeToken?.icon),
+        iconCandidates: buildNativeIconCandidates(
+          denom,
+          identity.symbol,
+          nativeToken?.icon
+        ),
         isLunc: denom === "uluna",
         isUstc: denom === "uusd"
       }

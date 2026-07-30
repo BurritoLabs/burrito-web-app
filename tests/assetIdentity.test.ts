@@ -6,6 +6,7 @@ import {
   isSafeDisplaySymbol,
   isSafeNativeDenom,
   normalizeSafeMarketAssetId,
+  resolveNativeAssetIdentity,
   resolveSafeDisplaySymbol
 } from "../src/app/utils/assetIdentity"
 
@@ -35,6 +36,44 @@ describe("asset identity fallbacks", () => {
     setActiveAppChainKey("lunc")
     expect(formatNativeSymbol("ukrw")).toBe("KRTC")
     expect(formatNativeSymbol("ucre")).toBe("CRE")
+  })
+
+  it("does not allow registry metadata to relabel canonical Classic assets", () => {
+    expect(
+      resolveNativeAssetIdentity({
+        denom: "uusd",
+        candidateSymbol: "USDC",
+        candidateName: "USD Coin",
+        chainKey: "lunc"
+      })
+    ).toEqual({
+      symbol: "USTC",
+      name: "TerraClassicUSD"
+    })
+    expect(
+      resolveNativeAssetIdentity({
+        denom: "uluna",
+        candidateSymbol: "LUNA",
+        candidateName: "Terra",
+        chainKey: "lunc"
+      })
+    ).toEqual({
+      symbol: "LUNC",
+      name: "Terra Classic"
+    })
+  })
+
+  it("keeps IBC asset identity separate from the native uusd identity", () => {
+    const nobleUsdc =
+      `ibc/${"0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5"}`
+
+    expect(normalizeSafeMarketAssetId("native:uusd")).toBe("native:uusd")
+    expect(normalizeSafeMarketAssetId(`native:${nobleUsdc}`)).toBe(
+      `native:${nobleUsdc}`
+    )
+    expect(normalizeSafeMarketAssetId(`native:${nobleUsdc}`)).not.toBe(
+      normalizeSafeMarketAssetId("native:uusd")
+    )
   })
 
   it("rejects hostile market identifiers and display symbols", () => {

@@ -104,14 +104,17 @@ export const formatBaseDenomSymbol = (denom: string) => {
     : display.toUpperCase()
 }
 
-export const formatNativeSymbol = (denom: string) => {
+export const formatNativeSymbol = (
+  denom: string,
+  chainKey = getActiveAppChainKey()
+) => {
   if (!denom) return ""
-  if (denom === "uluna") return getActiveAppChainKey() === "lunc" ? "LUNC" : "LUNA"
+  if (denom === "uluna") return chainKey === "lunc" ? "LUNC" : "LUNA"
   if (denom === "uusd") return "USTC"
   if (/^u[a-z0-9]{2,20}$/i.test(denom)) {
     const f = denom.slice(1)
     if (
-      getActiveAppChainKey() === "lunc" &&
+      chainKey === "lunc" &&
       CLASSIC_STABLE_MICRO_DENOMS.has(denom.toLowerCase())
     ) {
       return `${f.slice(0, 2).toUpperCase()}TC`
@@ -119,4 +122,34 @@ export const formatNativeSymbol = (denom: string) => {
     return f.toUpperCase()
   }
   return formatBaseDenomSymbol(denom)
+}
+
+export const resolveNativeAssetIdentity = ({
+  denom,
+  candidateSymbol,
+  candidateName,
+  chainKey = getActiveAppChainKey()
+}: {
+  denom: string
+  candidateSymbol?: string
+  candidateName?: string
+  chainKey?: ReturnType<typeof getActiveAppChainKey>
+}) => {
+  const normalized = denom.trim().toLowerCase()
+  const canonical =
+    normalized === "uluna"
+      ? {
+          symbol: chainKey === "lunc" ? "LUNC" : "LUNA",
+          name: chainKey === "lunc" ? "Terra Classic" : "Terra"
+        }
+      : normalized === "uusd"
+        ? { symbol: "USTC", name: "TerraClassicUSD" }
+        : undefined
+  const fallback = formatNativeSymbol(normalized, chainKey) || "NATIVE"
+  const symbol = canonical?.symbol ??
+    resolveSafeDisplaySymbol(candidateSymbol, fallback)
+  const name = canonical?.name ??
+    resolveSafeDisplayName(candidateName, symbol)
+
+  return { symbol, name }
 }
