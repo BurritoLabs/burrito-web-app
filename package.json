@@ -11,6 +11,7 @@
     "build:market-candles": "node scripts/build-market-candles.mjs",
     "build:market-all": "npm run build:market-index && npm run build:market-candles",
     "build:brand-assets": "node scripts/build-brand-assets.mjs",
+    "build:social-preview": "node scripts/build-social-preview.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
