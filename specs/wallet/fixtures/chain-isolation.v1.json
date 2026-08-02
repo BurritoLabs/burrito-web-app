@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "description": "Public, non-signing fixtures proving that chainId is part of every wallet identity and transaction key.",
+  "testAddress": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+  "cases": [
+    {
+      "name": "classic-local-account",
+      "accountRef": {
+        "source": "burrito",
+        "chainId": "columbus-5",
+        "address": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
+      },
+      "cacheKey": "columbus-5:terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+      "transactionQueueKey": "columbus-5:terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
+    },
+    {
+      "name": "phoenix-local-account",
+      "accountRef": {
+        "source": "burrito",
+        "chainId": "phoenix-1",
+        "address": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
+      },
+      "cacheKey": "phoenix-1:terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+      "transactionQueueKey": "phoenix-1:terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
+    },
+    {
+      "name": "classic-keplr-account",
+      "accountRef": {
+        "source": "keplr",
+        "chainId": "columbus-5",
+        "address": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
+      },
+      "cacheKey": "columbus-5:terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+      "transactionQueueKey": "columbus-5:terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
+    }
+  ]
+}

@@ -115,6 +115,18 @@ npm run build:release
 Wallets remain the signing boundary. Burrito never stores private keys and does
 not custody user assets.
 
+## Wallet Ecosystem Work
+
+Burrito is preparing separate Mobile and browser-extension wallets while this
+Web app remains an external-wallet dApp. The implementation boundaries,
+Station source lineage, and Mobile migration gates are documented in:
+
+- [`docs/architecture/wallet-ecosystem-boundaries.md`](docs/architecture/wallet-ecosystem-boundaries.md)
+- [`docs/architecture/station-source-lineage.md`](docs/architecture/station-source-lineage.md)
+- [`docs/architecture/station-mobile-migration.md`](docs/architecture/station-mobile-migration.md)
+- [`docs/architecture/ios-mac-handoff.md`](docs/architecture/ios-mac-handoff.md)
+- [`OPEN_SOURCE_ATTRIBUTIONS.md`](OPEN_SOURCE_ATTRIBUTIONS.md)
+
 ## Configuration
 
 All variables are optional unless the related production feature is enabled.

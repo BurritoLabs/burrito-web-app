@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "generatedFrom": "src/app/config/chainConfig.ts",
+  "sourceSha256": "5c56683cfe5725c6429471a1d8fa381220e7196931649206d5a48d321d9a1be2",
+  "keyAlgorithm": "secp256k1",
+  "chains": [
+    {
+      "key": "lunc",
+      "chainId": "columbus-5",
+      "displayName": "Terra Classic",
+      "bech32Prefix": "terra",
+      "coinType": 330,
+      "cosmosKitChainName": "terra",
+      "nativeAsset": {
+        "symbol": "LUNC",
+        "minimalDenom": "uluna",
+        "decimals": 6,
+        "coinGeckoId": "terra-luna"
+      },
+      "feeAssets": [
+        {
+          "symbol": "LUNC",
+          "minimalDenom": "uluna",
+          "decimals": 6,
+          "coinGeckoId": "terra-luna"
+        },
+        {
+          "symbol": "USTC",
+          "minimalDenom": "uusd",
+          "decimals": 6,
+          "coinGeckoId": "terrausd"
+        }
+      ],
+      "gasPriceStep": {
+        "low": 28.325,
+        "average": 28.325,
+        "high": 50
+      },
+      "endpoints": {
+        "rpc": [
+          "https://terra-classic-rpc.publicnode.com:443",
+          "https://rpc.terra-classic.hexxagon.io",
+          "https://api-lunc-rpc.binodes.com"
+        ],
+        "lcd": [
+          "https://terra-classic-lcd.publicnode.com",
+          "https://lcd.terra-classic.hexxagon.io",
+          "https://api-lunc-lcd.binodes.com"
+        ],
+        "fcd": [
+          "https://terra-classic-public-api.publicnode.com",
+          "https://terra-classic-fcd.publicnode.com"
+        ]
+      }
+    },
+    {
+      "key": "luna",
+      "chainId": "phoenix-1",
+      "displayName": "Terra",
+      "bech32Prefix": "terra",
+      "coinType": 330,
+      "cosmosKitChainName": "terra2",
+      "nativeAsset": {
+        "symbol": "LUNA",
+        "minimalDenom": "uluna",
+        "decimals": 6,
+        "coinGeckoId": "terra-luna-2"
+      },
+      "feeAssets": [
+        {
+          "symbol": "LUNA",
+          "minimalDenom": "uluna",
+          "decimals": 6,
+          "coinGeckoId": "terra-luna-2"
+        }
+      ],
+      "gasPriceStep": {
+        "low": 0.015,
+        "average": 0.015,
+        "high": 0.04
+      },
+      "endpoints": {
+        "rpc": [
+          "https://terra-rpc.publicnode.com:443",
+          "https://terra-rpc.polkachu.com",
+          "https://rpc.lavenderfive.com:443/terra2",
+          "https://terra-rpc.stakely.io:443"
+        ],
+        "lcd": [
+          "https://terra-lcd.publicnode.com",
+          "https://phoenix-lcd.terra.dev",
+          "https://terra-rest.publicnode.com",
+          "https://terra-api.chainroot.io"
+        ],
+        "fcd": [
+          "https://phoenix-fcd.terra.dev"
+        ]
+      }
+    }
+  ]
+}

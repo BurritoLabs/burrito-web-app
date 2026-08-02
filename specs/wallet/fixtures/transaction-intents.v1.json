@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "description": "Public review fixtures only. They contain no mnemonic, private key, signature, or authorization.",
+  "valid": [
+    {
+      "name": "classic-native-send",
+      "intent": {
+        "version": 1,
+        "chainId": "columbus-5",
+        "account": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+        "messages": [
+          {
+            "typeUrl": "/cosmos.bank.v1beta1.MsgSend",
+            "value": {
+              "fromAddress": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+              "toAddress": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+              "amount": [{ "denom": "uluna", "amount": "1000000" }]
+            }
+          }
+        ],
+        "fee": {
+          "amount": [{ "denom": "uluna", "amount": "5665" }],
+          "gas": "200000"
+        },
+        "memo": "Burrito wallet fixture",
+        "origin": "burrito://wallet/send"
+      }
+    },
+    {
+      "name": "phoenix-native-send",
+      "intent": {
+        "version": 1,
+        "chainId": "phoenix-1",
+        "account": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+        "messages": [
+          {
+            "typeUrl": "/cosmos.bank.v1beta1.MsgSend",
+            "value": {
+              "fromAddress": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+              "toAddress": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+              "amount": [{ "denom": "uluna", "amount": "1000000" }]
+            }
+          }
+        ],
+        "fee": {
+          "amount": [{ "denom": "uluna", "amount": "3000" }],
+          "gas": "200000"
+        },
+        "memo": "Burrito wallet fixture",
+        "origin": "burrito://wallet/send"
+      }
+    }
+  ],
+  "mustReject": [
+    {
+      "name": "missing-chain-id",
+      "reason": "The same Terra address and uluna denom can exist on both supported chains.",
+      "intent": {
+        "version": 1,
+        "account": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+        "messages": [],
+        "memo": "",
+        "origin": "burrito://wallet/send"
+      }
+    },
+    {
+      "name": "unsupported-chain",
+      "reason": "A client must fail closed when the chain is not in the approved registry.",
+      "intent": {
+        "version": 1,
+        "chainId": "not-a-burrito-chain",
+        "account": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+        "messages": [{ "typeUrl": "/cosmos.bank.v1beta1.MsgSend", "value": {} }],
+        "memo": "",
+        "origin": "burrito://wallet/send"
+      }
+    },
+    {
+      "name": "non-integer-amount",
+      "reason": "Minimal-denom amounts must use integer strings, never floating point.",
+      "intent": {
+        "version": 1,
+        "chainId": "columbus-5",
+        "account": "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a",
+        "messages": [{ "typeUrl": "/cosmos.bank.v1beta1.MsgSend", "value": {} }],
+        "fee": {
+          "amount": [{ "denom": "uluna", "amount": "0.5" }],
+          "gas": "200000"
+        },
+        "memo": "",
+        "origin": "burrito://wallet/send"
+      }
+    }
+  ]
+}
