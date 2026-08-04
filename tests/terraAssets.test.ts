@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   fetchCw20TokenInfos,
+  includeTrustedCw20Tokens,
   isResolvedIbcMetadata,
   mapCosmosRegistryAssetAliases,
   mapCosmosRegistryAssets,
@@ -179,6 +180,42 @@ describe("Terra asset registry selection", () => {
       symbol: "JURIS",
       name: "Juris Protocol",
       icon: "/tokens/juris.webp"
+    })
+  })
+
+  it("includes trusted Terra Classic CW20s in wallet discovery", () => {
+    const contract =
+      "terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt"
+
+    expect(includeTrustedCw20Tokens({}, "lunc")[contract]).toMatchObject({
+      token: contract,
+      symbol: "DO",
+      name: "DO",
+      icon: "/system/do-cookie.jpg"
+    })
+  })
+
+  it("does not inject Terra Classic CW20s on Luna", () => {
+    expect(includeTrustedCw20Tokens({}, "luna")).toEqual({})
+  })
+
+  it("preserves registry decimals for trusted CW20s", () => {
+    const contract =
+      "terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt"
+    const tokens = includeTrustedCw20Tokens(
+      {
+        [contract]: {
+          token: contract,
+          symbol: "COOKIE",
+          decimals: 8
+        }
+      },
+      "lunc"
+    )
+
+    expect(tokens[contract]).toMatchObject({
+      symbol: "DO",
+      decimals: 8
     })
   })
 })

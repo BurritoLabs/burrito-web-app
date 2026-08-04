@@ -508,6 +508,25 @@ const mergeCw20TokenMetadata = ({
   }
 }
 
+export const includeTrustedCw20Tokens = (
+  tokens: Record<string, Cw20Token>,
+  chainKey: ReturnType<typeof getActiveAppChainKey>
+) => {
+  if (chainKey !== "lunc") return tokens
+
+  return Object.keys(LOCAL_CW20_TOKEN_OVERRIDES).reduce<Record<string, Cw20Token>>(
+    (result, contract) => {
+      result[contract] = mergeCw20TokenMetadata({
+        contract,
+        fallback: result[contract],
+        chainKey
+      })
+      return result
+    },
+    { ...tokens }
+  )
+}
+
 const extractCw20MarketingLogo = (logo?: Cw20MarketingLogo) => {
   if (!logo || typeof logo !== "object" || !("url" in logo)) return undefined
   return sanitizeAssetIconUrl(logo.url)
@@ -886,8 +905,12 @@ export const useCw20Whitelist = () => {
         return acc
       }, {})
       const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).cw20
+      const merged = includeTrustedCw20Tokens(
+        { ...mapped, ...supplemental, ...verified.cw20 },
+        scope.chainKey
+      )
       return Object.fromEntries(
-        Object.entries({ ...mapped, ...supplemental, ...verified.cw20 }).filter(([, token]) =>
+        Object.entries(merged).filter(([, token]) =>
           Boolean(token.symbol && token.token)
         )
       )
