@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
+import { BurritoThemeSwitcher } from "@burritolabs/ui"
 import styles from "./TopBar.module.css"
 import { SUPPORTED_APP_CHAINS, type AppChainKey } from "../appChains"
 import { useAppChain } from "../appChainContext"
@@ -280,6 +281,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         </div>
       </div>
       <div className={styles.actions}>
+        <BurritoThemeSwitcher />
         {showValidator ? (
           <button
             className={`uiButton uiButtonOutline ${styles.validatorButton}`}

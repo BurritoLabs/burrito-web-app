@@ -1,36 +1,36 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Nunito+Sans:wght@400;600;700&display=swap");
 
 :root {
-  --bg: #101b17;
-  --bg-muted: rgba(255, 255, 255, 0.1);
-  --fg: #f0faf1;
-  --surface: rgba(255, 255, 255, 0.055);
-  --surface-strong: rgba(255, 255, 255, 0.1);
-  --border: rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.24);
-  --green: #68d83f;
+  --bg: var(--bui-color-canvas);
+  --bg-muted: var(--bui-color-surface-hover);
+  --fg: var(--bui-color-text);
+  --surface: var(--bui-color-surface);
+  --surface-strong: var(--bui-color-surface-raised);
+  --border: var(--bui-color-border);
+  --border-strong: var(--bui-color-border-strong);
+  --green: var(--bui-color-brand);
   --active-chain-rgb: 56, 189, 248;
   --chain-accent: #38bdf8;
   --chain-accent-strong: #0284c7;
   --chain-accent-soft: #bae6fd;
-  --menu-bg: rgba(15, 27, 22, 0.78);
-  --glass-sidebar: rgba(15, 27, 22, 0.76);
-  --glass-header: rgba(15, 27, 22, 0.74);
-  --glass-main: rgba(15, 27, 22, 0.68);
-  --glass-brand: rgba(15, 27, 22, 0.68);
+  --menu-bg: var(--bui-color-glass);
+  --glass-sidebar: var(--bui-color-glass);
+  --glass-header: var(--bui-color-glass);
+  --glass-main: var(--bui-color-glass);
+  --glass-brand: var(--bui-color-glass);
   --glass-blur: 18px;
   --glass-saturate: 175%;
-  --menu-border: rgba(255, 255, 255, 0.14);
-  --menu-text: rgba(240, 250, 241, 0.92);
-  --card-bg: rgba(16, 29, 24, 0.68);
-  --card-bg-muted: rgba(18, 32, 26, 0.78);
-  --text: #f0faf1;
-  --text-muted: rgba(240, 250, 241, 0.68);
-  --button-default-bg: rgba(255, 255, 255, 0.1);
-  --button-default-text: rgba(240, 250, 241, 0.92);
+  --menu-border: var(--bui-color-border-strong);
+  --menu-text: var(--bui-color-text);
+  --card-bg: var(--bui-color-surface);
+  --card-bg-muted: var(--bui-color-surface-raised);
+  --text: var(--bui-color-text);
+  --text-muted: var(--bui-color-text-secondary);
+  --button-default-bg: var(--bui-color-surface-hover);
+  --button-default-text: var(--bui-color-text);
   --wallet-shadow: 1px 0px 10px 2px rgba(0, 0, 0, 0.31);
   --border-width: 1px;
-  --card-border: rgba(255, 255, 255, 0.14);
+  --card-border: var(--bui-color-border);
   --button-height: 48px;
   --button-height-small: 32px;
   --button-radius: 15px;
@@ -69,9 +69,9 @@
   --bold: 700;
 
   --app-background:
-    radial-gradient(1600px 900px at 12% -20%, rgba(255, 255, 255, 0.065), transparent 70%),
+    radial-gradient(1600px 900px at 12% -20%, color-mix(in srgb, var(--bui-color-text) 5%, transparent), transparent 70%),
     radial-gradient(1400px 800px at 88% -10%, rgba(var(--active-chain-rgb), 0.07), transparent 72%),
-    linear-gradient(180deg, #14231d 0%, #101b17 55%, #0d1815 100%);
+    linear-gradient(180deg, var(--bui-color-surface-raised) 0%, var(--bui-color-canvas-subtle) 55%, var(--bui-color-canvas) 100%);
   --font-montserrat: "Montserrat", "Nunito Sans", system-ui, sans-serif;
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
 }

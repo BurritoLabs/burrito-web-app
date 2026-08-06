@@ -8,8 +8,8 @@
     <meta name="terra-wallet" />
     <meta name="galaxy-wallet" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#101b17" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#070D0B" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="application-name" content="Burrito" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -50,20 +50,49 @@
     <meta name="twitter:image" content="https://app.burrito.money/social-preview-v3.png" />
     <meta name="twitter:image:alt" content="Burrito Terra and Terra Classic web app" />
     <title>Burrito | Terra &amp; Terra Classic</title>
+    <script>
+      (() => {
+        const key = "burrito:theme"
+        let saved = null
+        try { saved = localStorage.getItem(key) } catch (_) {}
+        if (saved !== "light" && saved !== "dark" && saved !== "system") {
+          try { saved = sessionStorage.getItem(key) } catch (_) {}
+        }
+        const preference = saved === "light" || saved === "dark" || saved === "system" ? saved : "system"
+        const theme = preference === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : preference
+        const root = document.documentElement
+        root.dataset.themePreference = preference
+        root.dataset.theme = theme
+        root.style.colorScheme = theme
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#070D0B" : "#F5F8F5")
+      })()
+    </script>
     <style>
       :root {
-        --boot-bg: #101b17;
-        --boot-card: rgba(16, 29, 24, 0.72);
-        --boot-border: rgba(255, 255, 255, 0.12);
-        --boot-green: #68d83f;
+        --boot-bg: #070d0b;
+        --boot-card: #0b1411;
+        --boot-border: rgba(225, 247, 233, 0.105);
+        --boot-green: #52c41a;
+        --boot-text: #eaf5eb;
+        --boot-top: rgba(11, 20, 17, 0.88);
+        --boot-shimmer: rgba(234, 245, 235, 0.14);
+      }
+
+      :root[data-theme="light"] {
+        --boot-bg: #f5f8f5;
+        --boot-card: #ffffff;
+        --boot-border: rgba(43, 78, 57, 0.12);
+        --boot-text: #142019;
+        --boot-top: rgba(255, 255, 255, 0.9);
+        --boot-shimmer: rgba(20, 32, 25, 0.12);
       }
 
       .boot-shell {
         min-height: 100vh;
         background:
           radial-gradient(900px 520px at 70% 12%, rgba(104, 216, 63, 0.1), transparent 64%),
-          linear-gradient(180deg, #14231d 0%, var(--boot-bg) 58%, #0d1815 100%);
-        color: #f0faf1;
+          linear-gradient(180deg, var(--boot-card) 0%, var(--boot-bg) 100%);
+        color: var(--boot-text);
         font-family: Montserrat, system-ui, sans-serif;
       }
 
@@ -74,13 +103,13 @@
         justify-content: space-between;
         padding: 0 24px;
         border-bottom: 1px solid var(--boot-border);
-        background: rgba(15, 27, 22, 0.76);
+        background: var(--boot-top);
       }
 
       .boot-brand,
       .boot-pill {
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
+        background: var(--boot-border);
       }
 
       .boot-brand {
@@ -106,7 +135,7 @@
         width: 220px;
         height: 42px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.1);
+        background: var(--boot-border);
       }
 
       .boot-grid {
@@ -131,7 +160,7 @@
         position: relative;
         overflow: hidden;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
+        background: var(--boot-border);
       }
 
       .boot-line {
@@ -153,7 +182,7 @@
         position: absolute;
         inset: 0;
         transform: translateX(-100%);
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+        background: linear-gradient(90deg, transparent, var(--boot-shimmer), transparent);
         animation: boot-shimmer 1.5s ease-in-out infinite;
       }
 

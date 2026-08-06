@@ -21,6 +21,11 @@
   z-index: 1;
 }
 
+.layout > .header {
+  z-index: 200;
+  overflow: visible;
+}
+
 .globalGlow {
   position: fixed;
   inset: 0;
