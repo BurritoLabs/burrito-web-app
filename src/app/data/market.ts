@@ -27,6 +27,7 @@ import {
   normalizeSafeMarketAssetId
 } from "../utils/assetIdentity"
 import { toUnitAmount } from "../utils/format"
+import { fetchSharedPairCandles } from "./sharedMarketApi"
 
 type AssetDexPair = {
   dex?: string
@@ -1678,6 +1679,25 @@ export const fetchPairCandles = async ({
   }
 
   const timeframe = resolveTimeframeFromBucketMs(bucketMs)
+  const candidates: PairCandle[][] = []
+
+  // Burrito API is the shared, cached K-line source. Keep the existing direct
+  // chain and static paths as resilience fallbacks while pair coverage grows.
+  if (getActiveAppChainKey() === "lunc") {
+    const sharedCandles = await fetchSharedPairCandles({
+      pairAddress,
+      leftAssetKey,
+      rightAssetKey,
+      bucketMs,
+      maxCandles
+    })
+    if (candlesMatchExpectedPrice(sharedCandles, expectedPrice)) {
+      if (sharedCandles.length >= minCandles) {
+        return fillCandleGaps({ candles: sharedCandles, bucketMs, lookbackBuckets, maxCandles })
+      }
+      if (sharedCandles.length) candidates.push(sharedCandles)
+    }
+  }
 
   // Prioritize on-chain tx-derived candles when they already have enough bars.
   const txCandles = await fetchFromTx(lookbackBuckets)
@@ -1691,7 +1711,6 @@ export const fetchPairCandles = async ({
     })
   }
 
-  const candidates: PairCandle[][] = []
   if (txCandlesValid && txCandles.length > 0) candidates.push(txCandles)
 
   if (expandedLookbackMultiplier > 1) {

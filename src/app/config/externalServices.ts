@@ -26,3 +26,9 @@ export const LOCAL_MARKET_CANDLES_BASE_URL = "/market/candles"
 export const BURRITO_REGISTRY_API_URL = (
   import.meta.env.VITE_BURRITO_REGISTRY_API_URL ?? ""
 ).replace(/\/$/, "")
+
+export const BURRITO_MARKET_API_URL = (
+  import.meta.env.VITE_BURRITO_MARKET_API_URL ||
+  BURRITO_REGISTRY_API_URL ||
+  "https://api.burrito.money"
+).replace(/\/$/, "")
