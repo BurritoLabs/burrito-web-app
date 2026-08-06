@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
-import { CLASSIC_CHAIN } from "../chain"
 import type { Cw20Token } from "./terraAssets"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 import { writeLocalStorageValue } from "../utils/safeStorage"
+import { isTerraAddress } from "../utils/assetIdentity"
+import { getActiveAppChainRuntime } from "../activeChain"
 
 export type Cw20Balance = Cw20Token & {
   address: string
@@ -14,6 +15,7 @@ type Cw20BalanceOptions = {
 }
 
 const CACHE_TTL = 30 * 60 * 1000
+const ACTIVE_BALANCE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000
 const SUPPLY_CACHE_TTL = 15 * 60 * 1000
 const BALANCE_CACHE_VERSION = "v2"
 const SINGLE_BALANCE_CACHE_VERSION = "v1"
@@ -21,6 +23,16 @@ const ACTIVE_BALANCE_CACHE_VERSION = "v1"
 const BALANCE_FETCH_ATTEMPTS = 2
 const BALANCE_FETCH_RETRY_DELAY_MS = 200
 const BALANCE_FETCH_CONCURRENCY = 8
+
+type Cw20ChainScope = {
+  chainId: string
+  lcd: string
+}
+
+const getCw20ChainScope = (): Cw20ChainScope => {
+  const { chain } = getActiveAppChainRuntime()
+  return { chainId: chain.chainId, lcd: chain.lcd }
+}
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -62,19 +74,24 @@ const normalizeAddress = (address: string | undefined) =>
 const normalizeContract = (contract: string | undefined) =>
   contract?.trim().toLowerCase() ?? ""
 
-const buildSingleBalanceCacheKey = (address: string, contract: string) =>
+const buildSingleBalanceCacheKey = (
+  address: string,
+  contract: string,
+  chainId: string
+) =>
   `cw20balance-single:${SINGLE_BALANCE_CACHE_VERSION}:${address
     .trim()
-    .toLowerCase()}:${CLASSIC_CHAIN.chainId}:${contract.trim().toLowerCase()}`
+    .toLowerCase()}:${chainId}:${contract.trim().toLowerCase()}`
 
 const loadSingleBalanceCache = (
   address: string | undefined,
-  contract: string
+  contract: string,
+  chainId: string
 ): SingleBalanceCache | undefined => {
   if (!address || typeof window === "undefined") return undefined
   try {
     const cached = window.localStorage.getItem(
-      buildSingleBalanceCacheKey(address, contract)
+      buildSingleBalanceCacheKey(address, contract, chainId)
     )
     if (!cached) return undefined
     const parsed = JSON.parse(cached) as SingleBalanceCache
@@ -94,14 +111,15 @@ const loadSingleBalanceCache = (
 const saveSingleBalanceCache = (
   address: string | undefined,
   contract: string,
-  balance: string | undefined
+  balance: string | undefined,
+  chainId: string
 ) => {
   if (!address || !contract || balance === undefined || typeof window === "undefined") {
     return
   }
   try {
     writeLocalStorageValue(
-      buildSingleBalanceCacheKey(address, contract),
+      buildSingleBalanceCacheKey(address, contract, chainId),
       JSON.stringify({ ts: Date.now(), balance })
     )
   } catch {
@@ -109,24 +127,27 @@ const saveSingleBalanceCache = (
   }
 }
 
-const buildActiveBalanceCacheKey = (address: string) =>
+const buildActiveBalanceCacheKey = (address: string, chainId: string) =>
   `cw20balance-active:${ACTIVE_BALANCE_CACHE_VERSION}:${address
     .trim()
-    .toLowerCase()}:${CLASSIC_CHAIN.chainId}`
+    .toLowerCase()}:${chainId}`
 
-const loadActiveBalanceContracts = (address: string | undefined) => {
+const loadActiveBalanceContracts = (
+  address: string | undefined,
+  chainId: string
+) => {
   const normalizedAddress = normalizeAddress(address)
   if (!normalizedAddress || typeof window === "undefined") return []
   try {
     const cached = window.localStorage.getItem(
-      buildActiveBalanceCacheKey(normalizedAddress)
+      buildActiveBalanceCacheKey(normalizedAddress, chainId)
     )
     if (!cached) return []
     const parsed = JSON.parse(cached) as { ts: number; contracts: string[] }
     if (
       typeof parsed.ts !== "number" ||
       !Array.isArray(parsed.contracts) ||
-      Date.now() - parsed.ts > CACHE_TTL
+      Date.now() - parsed.ts > ACTIVE_BALANCE_CACHE_TTL
     ) {
       return []
     }
@@ -138,11 +159,12 @@ const loadActiveBalanceContracts = (address: string | undefined) => {
 
 const saveActiveBalanceContracts = (
   address: string | undefined,
-  balances: Record<string, string>
+  balances: Record<string, string>,
+  chainId: string
 ) => {
   const normalizedAddress = normalizeAddress(address)
   if (!normalizedAddress || typeof window === "undefined") return
-  const active = new Set(loadActiveBalanceContracts(normalizedAddress))
+  const active = new Set(loadActiveBalanceContracts(normalizedAddress, chainId))
   Object.entries(balances).forEach(([contractRaw, balance]) => {
     const contract = normalizeContract(contractRaw)
     if (!contract) return
@@ -155,7 +177,7 @@ const saveActiveBalanceContracts = (
   const contracts = Array.from(active)
   try {
     writeLocalStorageValue(
-      buildActiveBalanceCacheKey(normalizedAddress),
+      buildActiveBalanceCacheKey(normalizedAddress, chainId),
       JSON.stringify({ ts: Date.now(), contracts })
     )
   } catch {
@@ -165,13 +187,14 @@ const saveActiveBalanceContracts = (
 
 export const getCachedCw20ContractBalances = (
   address: string | undefined,
-  contracts: string[]
+  contracts: string[],
+  scope = getCw20ChainScope()
 ) => {
   const entries = contracts
     .map((contract) => contract.trim().toLowerCase())
     .filter(Boolean)
     .map((contract) => {
-      const cached = loadSingleBalanceCache(address, contract)
+      const cached = loadSingleBalanceCache(address, contract, scope.chainId)
       return cached ? ([contract, cached] as const) : undefined
     })
     .filter(
@@ -204,11 +227,31 @@ const buildWhitelistSignature = (whitelist: Record<string, Cw20Token>) => {
   return `${keys.length}:${hash.toString(16)}`
 }
 
+export const includeActiveCw20Contracts = (
+  whitelist: Record<string, Cw20Token>,
+  contracts: string[]
+) => {
+  const result = { ...whitelist }
+  contracts.forEach((contractRaw) => {
+    const contract = normalizeContract(contractRaw)
+    if (!contract || !isTerraAddress(contract) || result[contract]) return
+    const symbol = `CW20-${contract.slice(6, 12).toUpperCase()}`
+    result[contract] = {
+      token: contract,
+      symbol,
+      name: symbol,
+      decimals: 6
+    }
+  })
+  return result
+}
+
 const buildBalanceCacheKey = (
   address: string,
-  whitelist: Record<string, Cw20Token>
+  whitelist: Record<string, Cw20Token>,
+  chainId: string
 ) =>
-  `cw20balance:${BALANCE_CACHE_VERSION}:${address}:${CLASSIC_CHAIN.chainId}:${buildWhitelistSignature(
+  `cw20balance:${BALANCE_CACHE_VERSION}:${address}:${chainId}:${buildWhitelistSignature(
     whitelist
   )}`
 
@@ -224,14 +267,15 @@ const mapCw20BalanceResults = (
 
 const fetchCw20BalanceResult = async (
   address: string,
-  contract: string
+  contract: string,
+  lcd: string
 ): Promise<{ balance: string; invalid?: boolean } | undefined> => {
   const query = btoa(JSON.stringify({ balance: { address } }))
 
   for (let attempt = 0; attempt < BALANCE_FETCH_ATTEMPTS; attempt += 1) {
     try {
       const res = await fetchWithEndpointFallback(
-        `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        `${lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
       )
 
       if (!res.ok) {
@@ -264,18 +308,28 @@ const fetchCw20BalanceResult = async (
 export const fetchCw20Balances = async (
   address: string,
   whitelist: Record<string, Cw20Token>,
-  options: Cw20BalanceOptions = {}
+  options: Cw20BalanceOptions = {},
+  scope = getCw20ChainScope()
 ) => {
   const normalizedAddress = normalizeAddress(address)
   if (!normalizedAddress) return []
+
+  const effectiveWhitelist = includeActiveCw20Contracts(
+    whitelist,
+    loadActiveBalanceContracts(normalizedAddress, scope.chainId)
+  )
 
   const forceContracts = new Set(
     (options.forceContracts ?? [])
       .map(normalizeContract)
       .filter(Boolean)
   )
-  const cacheKey = buildBalanceCacheKey(normalizedAddress, whitelist)
-  const invalidKey = "cw20invalid:classic"
+  const cacheKey = buildBalanceCacheKey(
+    normalizedAddress,
+    effectiveWhitelist,
+    scope.chainId
+  )
+  const invalidKey = `cw20invalid:${scope.chainId}`
   const cached = loadCache(cacheKey)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
   const invalidContracts: Record<string, boolean> = {}
@@ -287,14 +341,18 @@ export const fetchCw20Balances = async (
   }
 
   const results: Record<string, string> = cached ? { ...cached } : {}
-  loadActiveBalanceContracts(normalizedAddress).forEach((contract) => {
-    if (!(contract in whitelist) || contract in results) return
-    const cachedSingle = loadSingleBalanceCache(normalizedAddress, contract)
+  loadActiveBalanceContracts(normalizedAddress, scope.chainId).forEach((contract) => {
+    if (!(contract in effectiveWhitelist) || contract in results) return
+    const cachedSingle = loadSingleBalanceCache(
+      normalizedAddress,
+      contract,
+      scope.chainId
+    )
     if (cachedSingle) {
       results[contract] = cachedSingle.balance
     }
   })
-  const entries = Object.entries(whitelist).filter(([contract]) => {
+  const entries = Object.entries(effectiveWhitelist).filter(([contract]) => {
     const normalized = contract.toLowerCase()
     if (forceContracts.has(normalized)) return true
     if (invalidContracts[normalized]) return false
@@ -309,7 +367,11 @@ export const fetchCw20Balances = async (
       index += 1
       const [contractRaw] = entries[current]
       const contract = contractRaw.toLowerCase()
-      const result = await fetchCw20BalanceResult(normalizedAddress, contract)
+      const result = await fetchCw20BalanceResult(
+        normalizedAddress,
+        contract,
+        scope.lcd
+      )
       if (!result) continue
       if (result.invalid && !forceContracts.has(contract)) {
         invalidContracts[contract] = true
@@ -323,36 +385,52 @@ export const fetchCw20Balances = async (
   saveCache(cacheKey, results)
   saveCache(invalidKey, Object.fromEntries(Object.keys(invalidContracts).map((k) => [k, "1"])))
   Object.entries(results).forEach(([contract, balance]) => {
-    saveSingleBalanceCache(normalizedAddress, contract, balance)
+    saveSingleBalanceCache(normalizedAddress, contract, balance, scope.chainId)
   })
-  saveActiveBalanceContracts(normalizedAddress, results)
+  saveActiveBalanceContracts(normalizedAddress, results, scope.chainId)
 
-  return mapCw20BalanceResults(results, whitelist)
+  return mapCw20BalanceResults(results, effectiveWhitelist)
 }
 
 export const getCachedCw20Balances = (
   address: string | undefined,
-  whitelist: Record<string, Cw20Token>
+  whitelist: Record<string, Cw20Token>,
+  scope = getCw20ChainScope()
 ) => {
-  if (!address || !Object.keys(whitelist).length) return undefined
+  if (!address) return undefined
   const normalizedAddress = normalizeAddress(address)
   if (!normalizedAddress) return undefined
-  const payload = loadCachePayload(buildBalanceCacheKey(normalizedAddress, whitelist))
+  const effectiveWhitelist = includeActiveCw20Contracts(
+    whitelist,
+    loadActiveBalanceContracts(normalizedAddress, scope.chainId)
+  )
+  if (!Object.keys(effectiveWhitelist).length) return undefined
+  const payload = loadCachePayload(
+    buildBalanceCacheKey(normalizedAddress, effectiveWhitelist, scope.chainId)
+  )
   const data: Record<string, string> = payload ? { ...payload.data } : {}
 
-  loadActiveBalanceContracts(normalizedAddress).forEach((contract) => {
-    if (!(contract in whitelist) || contract in data) return
-    const cachedSingle = loadSingleBalanceCache(normalizedAddress, contract)
+  loadActiveBalanceContracts(normalizedAddress, scope.chainId).forEach((contract) => {
+    if (!(contract in effectiveWhitelist) || contract in data) return
+    const cachedSingle = loadSingleBalanceCache(
+      normalizedAddress,
+      contract,
+      scope.chainId
+    )
     if (cachedSingle) {
       data[contract] = cachedSingle.balance
     }
   })
 
   if (!payload && !Object.keys(data).length) {
-    Object.keys(whitelist).forEach((contractRaw) => {
+    Object.keys(effectiveWhitelist).forEach((contractRaw) => {
       const contract = normalizeContract(contractRaw)
       if (!contract || contract in data) return
-      const cachedSingle = loadSingleBalanceCache(normalizedAddress, contract)
+      const cachedSingle = loadSingleBalanceCache(
+        normalizedAddress,
+        contract,
+        scope.chainId
+      )
       if (cachedSingle) {
         data[contract] = cachedSingle.balance
       }
@@ -361,24 +439,39 @@ export const getCachedCw20Balances = (
 
   if (!Object.keys(data).length) return undefined
   return {
-    data: mapCw20BalanceResults(data, whitelist),
+    data: mapCw20BalanceResults(data, effectiveWhitelist),
     updatedAt: payload?.ts ?? Date.now() - 1
   }
 }
 
-export const fetchCw20Balance = async (address: string, contract: string) => {
+export const fetchCw20Balance = async (
+  address: string,
+  contract: string,
+  scope = getCw20ChainScope()
+) => {
   const normalizedAddress = address.trim()
   const normalizedContract = contract.trim().toLowerCase()
   if (!normalizedAddress || !normalizedContract) return "0"
 
-  const result = await fetchCw20BalanceResult(normalizedAddress, normalizedContract)
+  const result = await fetchCw20BalanceResult(
+    normalizedAddress,
+    normalizedContract,
+    scope.lcd
+  )
   if (!result) {
     throw new Error(`Failed to fetch CW20 balance for ${normalizedContract}`)
   }
-  saveSingleBalanceCache(normalizedAddress, normalizedContract, result.balance)
-  saveActiveBalanceContracts(normalizedAddress, {
-    [normalizedContract]: result.balance
-  })
+  saveSingleBalanceCache(
+    normalizedAddress,
+    normalizedContract,
+    result.balance,
+    scope.chainId
+  )
+  saveActiveBalanceContracts(
+    normalizedAddress,
+    { [normalizedContract]: result.balance },
+    scope.chainId
+  )
   return result.balance
 }
 
@@ -387,23 +480,24 @@ export const useCw20Balances = (
   whitelist?: Record<string, Cw20Token>,
   options: Cw20BalanceOptions = {}
 ) => {
+  const scope = getCw20ChainScope()
   const whitelistSignature = buildWhitelistSignature(whitelist ?? {})
   const forceSignature = (options.forceContracts ?? [])
     .map((contract) => contract.trim().toLowerCase())
     .filter(Boolean)
     .sort()
     .join(",")
-  const cachedBalances = getCachedCw20Balances(address, whitelist ?? {})
+  const cachedBalances = getCachedCw20Balances(address, whitelist ?? {}, scope)
 
   return useQuery({
     queryKey: [
       "cw20-balances",
-      CLASSIC_CHAIN.chainId,
+      scope.chainId,
       address,
       whitelistSignature,
       forceSignature
     ],
-    queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}, options),
+    queryFn: () => fetchCw20Balances(address ?? "", whitelist ?? {}, options, scope),
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
     initialData: cachedBalances?.data,
     initialDataUpdatedAt: cachedBalances?.updatedAt,
@@ -433,13 +527,15 @@ const toUnits = (amount: string, decimals: number) => {
   return parsed / 10 ** Math.max(0, decimals)
 }
 
-const buildCw20SupplyCacheKey = (contract: string) =>
-  `cw20supply-token:v1:${CLASSIC_CHAIN.chainId}:${contract}`
+const buildCw20SupplyCacheKey = (contract: string, chainId: string) =>
+  `cw20supply-token:v1:${chainId}:${contract}`
 
-const loadCw20SupplyCache = (contract: string) => {
+const loadCw20SupplyCache = (contract: string, chainId: string) => {
   if (typeof window === "undefined") return undefined
   try {
-    const raw = window.localStorage.getItem(buildCw20SupplyCacheKey(contract))
+    const raw = window.localStorage.getItem(
+      buildCw20SupplyCacheKey(contract, chainId)
+    )
     if (!raw) return undefined
     const cached = JSON.parse(raw) as { ts?: number; data?: Cw20SupplyInfo }
     if (!cached.ts || Date.now() - cached.ts > SUPPLY_CACHE_TTL) return undefined
@@ -452,11 +548,15 @@ const loadCw20SupplyCache = (contract: string) => {
   }
 }
 
-const saveCw20SupplyCache = (contract: string, data: Cw20SupplyInfo) => {
+const saveCw20SupplyCache = (
+  contract: string,
+  data: Cw20SupplyInfo,
+  chainId: string
+) => {
   if (typeof window === "undefined") return
   try {
     writeLocalStorageValue(
-      buildCw20SupplyCacheKey(contract),
+      buildCw20SupplyCacheKey(contract, chainId),
       JSON.stringify({ ts: Date.now(), data })
     )
   } catch {
@@ -466,7 +566,8 @@ const saveCw20SupplyCache = (contract: string, data: Cw20SupplyInfo) => {
 
 export const fetchCw20Supplies = async (
   contracts: string[],
-  whitelist: Record<string, Cw20Token>
+  whitelist: Record<string, Cw20Token>,
+  scope = getCw20ChainScope()
 ) => {
   const unique = Array.from(
     new Set(
@@ -477,11 +578,11 @@ export const fetchCw20Supplies = async (
   )
   if (!unique.length) return {}
 
-  const cacheKey = `cw20supply:${CLASSIC_CHAIN.chainId}:${unique.join(",")}`
+  const cacheKey = `cw20supply:${scope.chainId}:${unique.join(",")}`
   const cached = loadCache(cacheKey, SUPPLY_CACHE_TTL) as Record<string, string> | undefined
   const results: Record<string, Cw20SupplyInfo> = {}
   unique.forEach((contract) => {
-    const individual = loadCw20SupplyCache(contract)
+    const individual = loadCw20SupplyCache(contract, scope.chainId)
     if (individual) {
       results[contract] = individual
       return
@@ -491,7 +592,7 @@ export const fetchCw20Supplies = async (
     try {
       const parsed = JSON.parse(payload) as Cw20SupplyInfo
       results[contract] = parsed
-      saveCw20SupplyCache(contract, parsed)
+      saveCw20SupplyCache(contract, parsed, scope.chainId)
     } catch {
       // Ignore invalid legacy cache entries.
     }
@@ -511,7 +612,7 @@ export const fetchCw20Supplies = async (
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
         const res = await fetchWithEndpointFallback(
-          `${CLASSIC_CHAIN.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+          `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
         )
         if (!res.ok) continue
         const data = (await res.json()) as Cw20TokenInfoResponse
@@ -525,7 +626,7 @@ export const fetchCw20Supplies = async (
           units: toUnits(totalSupply, decimals)
         }
         results[contract] = supply
-        saveCw20SupplyCache(contract, supply)
+        saveCw20SupplyCache(contract, supply, scope.chainId)
       } catch {
         // Ignore per-contract failure.
       }
@@ -552,13 +653,14 @@ export const useCw20Supplies = (
   contracts: string[],
   whitelist?: Record<string, Cw20Token>
 ) => {
+  const scope = getCw20ChainScope()
   const normalized = Array.from(
     new Set(contracts.map((contract) => contract.trim().toLowerCase()).filter(Boolean))
   ).sort()
 
   return useQuery({
-    queryKey: ["cw20-supplies", CLASSIC_CHAIN.chainId, normalized.join(",")],
-    queryFn: () => fetchCw20Supplies(normalized, whitelist ?? {}),
+    queryKey: ["cw20-supplies", scope.chainId, normalized.join(",")],
+    queryFn: () => fetchCw20Supplies(normalized, whitelist ?? {}, scope),
     enabled: normalized.length > 0,
     staleTime: SUPPLY_CACHE_TTL
   })
