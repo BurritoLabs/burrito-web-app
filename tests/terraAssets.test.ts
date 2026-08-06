@@ -27,6 +27,21 @@ describe("Terra asset registry selection", () => {
     ).toBe("Wormhole CW20")
   })
 
+  it("recovers CW20 bridge provenance from a verified on-chain name", () => {
+    expect(
+      getAssetProvenanceLabel({
+        id: "cw20:terra1contract",
+        name: "USD Coin (Wormhole)"
+      })
+    ).toBe("Wormhole CW20")
+    expect(
+      getAssetProvenanceLabel({
+        denom: `ibc/${"A".repeat(64)}`,
+        name: "USD Coin (Wormhole)"
+      })
+    ).toBe("Wormhole via IBC")
+  })
+
   it("selects the Phoenix mainnet registry", () => {
     expect(pickChainAssets(registry, "Terra", "phoenix-1")).toEqual({
       token: "luna"
