@@ -5,6 +5,10 @@ import {
   sanitizeClientErrorText
 } from "./runtimeErrorReporter"
 import { clearVolatileStorageCaches } from "../utils/safeStorage"
+import {
+  getStaleAssetRecoveryDelay,
+  STALE_ASSET_RECOVERY_DELAYS_MS
+} from "./appRecovery"
 
 type AppErrorBoundaryProps = {
   children: ReactNode
@@ -17,12 +21,60 @@ type AppErrorBoundaryState = {
 
 const APP_RECOVERY_STORAGE_KEY = "burrito.appRecoveryAt"
 const APP_RECOVERY_COOLDOWN_MS = 60_000
-const STALE_ASSET_RECOVERY_DELAY_MS = 1_500
+const STALE_ASSET_RECOVERY_STORAGE_KEY = "burrito.staleAssetRecovery"
+const STALE_ASSET_RECOVERY_WINDOW_MS = 2 * 60_000
 
 const isStaleAssetLoadError = (error: Error) =>
   /failed to fetch dynamically imported module|chunkloaderror|loading chunk/i.test(
     `${error.name} ${error.message}`
   )
+
+type StaleAssetRecoveryState = {
+  attempts: number
+  startedAt: number
+}
+
+const readStaleAssetRecoveryState = (): StaleAssetRecoveryState => {
+  try {
+    const parsed = JSON.parse(
+      window.sessionStorage.getItem(STALE_ASSET_RECOVERY_STORAGE_KEY) ?? "null"
+    ) as Partial<StaleAssetRecoveryState> | null
+    if (
+      parsed &&
+      Number.isInteger(parsed.attempts) &&
+      typeof parsed.startedAt === "number" &&
+      Date.now() - parsed.startedAt < STALE_ASSET_RECOVERY_WINDOW_MS
+    ) {
+      return {
+        attempts: Math.max(0, parsed.attempts ?? 0),
+        startedAt: parsed.startedAt
+      }
+    }
+  } catch {
+    // Start a fresh recovery sequence when session storage is restricted.
+  }
+  return { attempts: 0, startedAt: Date.now() }
+}
+
+const recoverStaleAsset = () => {
+  clearVolatileStorageCaches()
+  const state = readStaleAssetRecoveryState()
+  if (state.attempts >= STALE_ASSET_RECOVERY_DELAYS_MS.length) return false
+
+  try {
+    window.sessionStorage.setItem(
+      STALE_ASSET_RECOVERY_STORAGE_KEY,
+      JSON.stringify({ ...state, attempts: state.attempts + 1 })
+    )
+  } catch {
+    // Continue with a bounded reload when session storage is restricted.
+  }
+
+  const nextUrl = new URL(window.location.href)
+  nextUrl.searchParams.set("recover", Date.now().toString(36))
+  window.location.replace(nextUrl.toString())
+  return true
+}
 
 const recoverAppOnce = () => {
   clearVolatileStorageCaches()
@@ -73,11 +125,13 @@ class AppErrorBoundary extends Component<
       console.error(error, errorInfo)
     }
 
-    const delay = isStaleAssetLoadError(error)
-      ? STALE_ASSET_RECOVERY_DELAY_MS
+    const staleAssetError = isStaleAssetLoadError(error)
+    const delay = staleAssetError
+      ? getStaleAssetRecoveryDelay(readStaleAssetRecoveryState().attempts)
       : 0
     this.recoveryTimer = window.setTimeout(() => {
-      recoverAppOnce()
+      if (staleAssetError) recoverStaleAsset()
+      else recoverAppOnce()
     }, delay)
   }
 
@@ -94,6 +148,7 @@ class AppErrorBoundary extends Component<
     }
     try {
       window.sessionStorage.removeItem(APP_RECOVERY_STORAGE_KEY)
+      window.sessionStorage.removeItem(STALE_ASSET_RECOVERY_STORAGE_KEY)
     } catch {
       // Continue with a manual recovery when session storage is restricted.
     }
