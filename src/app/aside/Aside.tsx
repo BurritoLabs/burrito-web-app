@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom"
 import styles from "./Aside.module.css"
 import BlockStatus from "./BlockStatus"
 import { useAppChain } from "../appChainContext"
@@ -72,6 +73,10 @@ const Aside = () => {
               {link.label}
             </a>
           ))}
+          <Link className={styles.link} to="/privacy">
+            <DocsIcon />
+            Privacy
+          </Link>
         </div>
 
         <div className={styles.community}>

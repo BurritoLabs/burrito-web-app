@@ -16,6 +16,7 @@ const routes = [
   ["/proposal/1", "Proposal details"],
   ["/rewards", "Withdraw rewards"],
   ["/commission", "Withdraw commission"],
+  ["/privacy", "Privacy Policy"],
   ["/audit-not-found", "404"]
 ] as const
 

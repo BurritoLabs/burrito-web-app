@@ -28,6 +28,7 @@ const loadHistory = () => import("../pages/History")
 const loadStake = () => import("../pages/Stake")
 const loadGovernance = () => import("../pages/Governance")
 const loadContract = () => import("../pages/Contract")
+const loadPrivacy = () => import("../pages/Privacy")
 
 const Wallet = lazy(loadWallet)
 const NFT = lazy(loadNft)
@@ -43,6 +44,7 @@ const Governance = lazy(loadGovernance)
 const ProposalDetails = lazy(() => import("../pages/ProposalDetails"))
 const ProposalNew = lazy(() => import("../pages/ProposalNew"))
 const Contract = lazy(loadContract)
+const Privacy = lazy(loadPrivacy)
 const NotFound = lazy(() => import("../pages/NotFound"))
 
 const renderPage = (Component: ComponentType) => (
@@ -146,6 +148,7 @@ const appRoutes = [
   { path: "/stake", element: renderPage(Stake) },
   { path: "/gov", element: renderPage(Governance) },
   { path: "/contract", element: renderPage(Contract) },
+  { path: "/privacy", element: renderPage(Privacy) },
   { path: "*", element: renderPage(NotFound) }
 ]
 

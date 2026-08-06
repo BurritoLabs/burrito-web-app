@@ -1,0 +1,57 @@
+.policy {
+  display: grid;
+  gap: 24px;
+  padding: 28px;
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--border-radius-card);
+  background: var(--card-bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.policy section {
+  display: grid;
+  gap: 10px;
+}
+
+.policy h2,
+.policy p,
+.policy ul {
+  margin: 0;
+}
+
+.policy h2 {
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.policy ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 22px;
+}
+
+.policy a {
+  color: var(--chain-accent);
+  overflow-wrap: anywhere;
+}
+
+.intro {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--card-border);
+}
+
+.updated {
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 600px) {
+  .policy {
+    gap: 22px;
+    padding: 20px 16px;
+  }
+}

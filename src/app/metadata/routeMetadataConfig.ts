@@ -85,6 +85,11 @@ export const getRouteMetadata = (pathname: string): RouteMetadataValue => {
     "/contract": {
       title: "Contract Tools | Burrito",
       description: "Use advanced CosmWasm query, upload, instantiate, execute, and migration tools."
+    },
+    "/privacy": {
+      title: "Privacy Policy | Burrito",
+      description:
+        "Learn how the non-custodial Burrito wallet processes local wallet data, public blockchain information, and network metadata."
     }
   }
   const route = routes[path]

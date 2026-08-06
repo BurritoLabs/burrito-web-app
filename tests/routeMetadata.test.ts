@@ -11,6 +11,10 @@ describe("route metadata", () => {
       title: "Launchpad | Burrito",
       canonicalPath: "/launchpad"
     })
+    expect(getRouteMetadata("/privacy")).toMatchObject({
+      title: "Privacy Policy | Burrito",
+      canonicalPath: "/privacy"
+    })
   })
 
   it("keeps detail routes canonical without query state", () => {

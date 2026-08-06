@@ -10,7 +10,8 @@ const routes = [
   ["/history", "History"],
   ["/stake", "Stake"],
   ["/gov", "Governance"],
-  ["/contract", "Contract"]
+  ["/contract", "Contract"],
+  ["/privacy", "Privacy Policy"]
 ] as const
 
 const selectStoredChain = async (page: Page, chainKey: "lunc" | "luna") => {
