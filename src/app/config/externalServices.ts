@@ -4,6 +4,8 @@ export const KEYBASE_PROXY_URL = import.meta.env.DEV
 
 export const COINPAPRIKA_LUNC_URL =
   "https://api.coinpaprika.com/v1/tickers/luna-terra"
+export const COINPAPRIKA_LUNA_URL =
+  "https://api.coinpaprika.com/v1/tickers/luna-terra-v2"
 export const COINPAPRIKA_USTC_URL =
   "https://api.coinpaprika.com/v1/tickers/ust-terrausd"
 

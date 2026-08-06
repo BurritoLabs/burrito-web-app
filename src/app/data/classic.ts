@@ -1,6 +1,7 @@
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import {
   BURRITO_REGISTRY_API_URL,
+  COINPAPRIKA_LUNA_URL,
   COINPAPRIKA_LUNC_URL,
   COINPAPRIKA_USTC_URL
 } from "../config/externalServices"
@@ -1650,6 +1651,18 @@ const buildCoinPaprikaPriceEntry = (
   }
 }
 
+const buildSimplePriceEntry = (
+  simple: { usd: number; usd_24h_change?: number } | undefined,
+  fallback?: PriceMap["lunc"]
+) =>
+  simple
+    ? {
+        usd: simple.usd,
+        usd_24h_change: simple.usd_24h_change,
+        usd_market_cap: fallback?.usd_market_cap
+      }
+    : fallback
+
 export const fetchPrices = async (): Promise<PriceMap> => {
   const base =
     import.meta.env.DEV ? "/coingecko" : "https://api.coingecko.com/api/v3"
@@ -1679,7 +1692,9 @@ export const fetchPrices = async (): Promise<PriceMap> => {
   }
 
   try {
-    const [luncTicker, ustcTicker, simple] = await Promise.all([
+    const [lunaTickerResult, luncTickerResult, ustcTickerResult, simpleResult] =
+      await Promise.allSettled([
+      fetchJson<CoinPaprikaTicker>(COINPAPRIKA_LUNA_URL),
       fetchJson<CoinPaprikaTicker>(COINPAPRIKA_LUNC_URL),
       fetchJson<CoinPaprikaTicker>(COINPAPRIKA_USTC_URL),
       fetchJson<Record<string, { usd: number; usd_24h_change?: number }>>(
@@ -1687,18 +1702,30 @@ export const fetchPrices = async (): Promise<PriceMap> => {
       )
     ])
 
-    const lunaSimple = simple["terra-luna-2"]
+    const lunaTicker =
+      lunaTickerResult.status === "fulfilled" ? lunaTickerResult.value : undefined
+    const luncTicker =
+      luncTickerResult.status === "fulfilled" ? luncTickerResult.value : undefined
+    const ustcTicker =
+      ustcTickerResult.status === "fulfilled" ? ustcTickerResult.value : undefined
+    const simple = simpleResult.status === "fulfilled" ? simpleResult.value : {}
 
     const result: PriceMap = {
-      luna: lunaSimple
-        ? {
-            usd: lunaSimple.usd,
-            usd_24h_change: lunaSimple.usd_24h_change,
-            usd_market_cap: cached?.data?.luna?.usd_market_cap
-          }
-        : cached?.data?.luna,
-      lunc: buildCoinPaprikaPriceEntry(luncTicker, cached?.data?.lunc),
-      ustc: buildCoinPaprikaPriceEntry(ustcTicker, cached?.data?.ustc)
+      luna: buildCoinPaprikaPriceEntry(
+        lunaTicker,
+        buildSimplePriceEntry(simple["terra-luna-2"], cached?.data?.luna)
+      ),
+      lunc: buildCoinPaprikaPriceEntry(
+        luncTicker,
+        buildSimplePriceEntry(simple["terra-luna"], cached?.data?.lunc)
+      ),
+      ustc: buildCoinPaprikaPriceEntry(
+        ustcTicker,
+        buildSimplePriceEntry(
+          simple["terraclassicusd"] ?? simple["terrausd"],
+          cached?.data?.ustc
+        )
+      )
     }
 
     if (result.luna || result.lunc || result.ustc) {
