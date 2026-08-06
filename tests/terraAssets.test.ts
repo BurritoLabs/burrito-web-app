@@ -9,6 +9,7 @@ import {
   pickChainAssets
 } from "../src/app/data/terraAssets"
 import { mapVerifiedRegistryAssets } from "../src/app/data/tokenRegistry"
+import { getAssetProvenanceLabel } from "../src/app/utils/assetProvenance"
 
 describe("Terra asset registry selection", () => {
   const registry = {
@@ -16,6 +17,15 @@ describe("Terra asset registry selection", () => {
     classic: { token: "lunc" },
     testnet: { token: "test" }
   }
+
+  it("labels verified CW20 bridge provenance without changing the symbol", () => {
+    expect(
+      getAssetProvenanceLabel({
+        provenanceLabel: "Wormhole",
+        transport: "cw20"
+      })
+    ).toBe("Wormhole CW20")
+  })
 
   it("selects the Phoenix mainnet registry", () => {
     expect(pickChainAssets(registry, "Terra", "phoenix-1")).toEqual({

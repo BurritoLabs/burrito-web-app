@@ -14,6 +14,9 @@ export const getAssetProvenanceLabel = (
   if (origin && transport === "ibc") {
     return compact ? `${origin} IBC` : `${origin} via IBC`
   }
+  if (origin && transport === "cw20") {
+    return `${origin} CW20`
+  }
   if (origin) return origin
   if (transport === "ibc") return "IBC"
   return undefined
