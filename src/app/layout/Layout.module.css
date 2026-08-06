@@ -230,6 +230,7 @@
 
   .headerInner {
     padding: 0 var(--main-padding);
+    background: rgba(15, 27, 22, 0.96);
   }
 
   .menuOpen {
