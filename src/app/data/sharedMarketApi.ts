@@ -14,6 +14,7 @@ type SharedCandleResponse = {
   quote?: string
   status?: "ok" | "limited" | "unavailable"
   candles?: SharedCandle[]
+  limitations?: string[]
 }
 
 export type SharedPairCandle = {
@@ -23,6 +24,31 @@ export type SharedPairCandle = {
   low: number
   close: number
   volumeQuote: number
+}
+
+const activationRequested = new Set<string>()
+
+export const requestSharedPairActivation = async (pairAddress: string) => {
+  const normalized = pairAddress.trim().toLowerCase()
+  if (!BURRITO_MARKET_API_URL || !normalized || activationRequested.has(normalized)) {
+    return false
+  }
+  activationRequested.add(normalized)
+  try {
+    const response = await fetch(`${BURRITO_MARKET_API_URL}/v1/market/activate`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ chain: "columbus-5", pair: normalized }),
+      signal: AbortSignal.timeout(8_000)
+    })
+    return response.status === 202
+  } catch {
+    activationRequested.delete(normalized)
+    return false
+  }
 }
 
 const normalizeAssetId = (value: string) => {
@@ -134,7 +160,12 @@ export const fetchSharedPairCandles = async ({
     })
     if (!response.ok) return []
     const payload = (await response.json()) as SharedCandleResponse
-    if (payload.status === "unavailable") return []
+    if (payload.status === "unavailable") {
+      if (payload.limitations?.includes("candles_not_indexed")) {
+        void requestSharedPairActivation(pairAddress)
+      }
+      return []
+    }
     return normalizeSharedCandles({ payload, leftAssetKey, rightAssetKey })
   } catch {
     return []
