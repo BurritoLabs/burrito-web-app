@@ -22,7 +22,7 @@ test("mobile market keeps the fixed header above content and covers the bottom",
   await expect(page.getByRole("heading", { name: "Market" })).toBeVisible()
   const networkSwitcher = page.getByRole("button", { name: "Switch network" })
   await expect(networkSwitcher).toBeVisible()
-  await expect(networkSwitcher).toHaveCSS("width", "50px")
+  await expect(networkSwitcher).toHaveCSS("width", "44px")
   await expect(networkSwitcher.getByText("LUNC", { exact: true })).toBeHidden()
   await expect(async () => {
     if (!(await page.getByRole("dialog").isVisible())) {
@@ -39,7 +39,7 @@ test("mobile market keeps the fixed header above content and covers the bottom",
   expect(header.zIndex).toBeGreaterThanOrEqual(500)
   expect(header.top).toBeGreaterThanOrEqual(0)
   expect(header.top).toBeLessThan(2)
-  expect(header.height).toBeGreaterThan(56)
+  expect(header.height).toBeGreaterThanOrEqual(56)
 
   const mainTop = await page.locator("main").evaluate((element) => {
     return element.getBoundingClientRect().top

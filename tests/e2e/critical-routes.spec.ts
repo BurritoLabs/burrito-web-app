@@ -156,6 +156,12 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
               }
             }
           }
+          if (method === "wallet.getStatus") {
+            return {
+              exists: true,
+              deviceProtectionAvailable: true
+            }
+          }
           if (method === "wallet.open") {
             return {
               source: "burrito",
@@ -163,6 +169,14 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
                 {
                   source: "burrito",
                   chainId: "columbus-5",
+                  address: "terra1amdttz2937a3dytmxmkany53pp6ma6dy4vsllv",
+                  algorithm: "secp256k1",
+                  publicKey:
+                    "Aqy0vCZ9t3dGFL9gEcWZKbAGwlVDhqMJC6/ws/xBjsBE"
+                },
+                {
+                  source: "burrito",
+                  chainId: "phoenix-1",
                   address: "terra1amdttz2937a3dytmxmkany53pp6ma6dy4vsllv",
                   algorithm: "secp256k1",
                   publicKey:
@@ -195,7 +209,7 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
             .__burritoBridgeCalls
       )
     )
-    .toEqual(["bridge.getCapabilities", "wallet.open"])
+    .toEqual(["bridge.getCapabilities", "wallet.getStatus", "wallet.open"])
 })
 
 test("wallet recovers from a full local asset cache", async ({ page }) => {
