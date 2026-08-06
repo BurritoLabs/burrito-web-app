@@ -27,13 +27,13 @@ import {
   rememberWalletManualDisconnect
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
+import { getBurritoNativeConnector } from "./burritoNativeWallet"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
 
 const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
 
 type WalletWindow = Window & {
-  BurritoNative?: { version?: number }
   keplr?: unknown
   galaxyStation?: unknown
 }
@@ -52,10 +52,7 @@ const getFallbackConnectors = (): WalletConnector[] => {
     !(walletWindow?.galaxyStation instanceof HTMLElement)
 
   return [
-    {
-      ...CONNECTOR_META["burrito-native"],
-      available: walletWindow?.BurritoNative?.version === 1
-    },
+    getBurritoNativeConnector(),
     {
       ...CONNECTOR_META.keplr,
       available: desktopKeplr
@@ -127,9 +124,23 @@ const WalletFallbackProvider = ({
   const [error, setError] = useState<string>()
   const [txState, setTxState] = useState<TxState>({ status: "idle" })
   const [walletPreparingForTx, setWalletPreparingForTx] = useState(false)
+  const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const currentTxLabelRef = useRef<string | undefined>(undefined)
   const currentTxStartedAtRef = useRef<number | undefined>(undefined)
-  const connectors = useMemo(() => getFallbackConnectors(), [])
+  const connectors = useMemo(() => {
+    void connectorRefreshNonce
+    return getFallbackConnectors()
+  }, [connectorRefreshNonce])
+
+  useEffect(() => {
+    const refreshNativeConnector = () => {
+      setConnectorRefreshNonce((current) => current + 1)
+    }
+    window.addEventListener("burrito:native-ready", refreshNativeConnector)
+    return () => {
+      window.removeEventListener("burrito:native-ready", refreshNativeConnector)
+    }
+  }, [])
 
   const reconnectConnector = useCallback(
     async (id: WalletConnectorId) => {

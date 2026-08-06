@@ -1,38 +1,103 @@
+import { encodeSecp256k1Pubkey, pubkeyToAddress } from "@cosmjs/amino"
 import { sha256 } from "@cosmjs/crypto"
 import { toBase64, toHex } from "@cosmjs/encoding"
-import { SignDoc, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
+import {
+  AuthInfo,
+  TxBody,
+  TxRaw,
+  type SignDoc
+} from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   connectBurritoNativeWallet,
   disconnectBurritoNativeWallet,
+  getBurritoNativeConnector,
   getBurritoNativeOfflineSigner,
   isBurritoNativeWalletAvailable
 } from "../src/app/wallet/burritoNativeWallet"
+import { getWalletConnectors } from "../src/app/wallet/walletAdapters"
 
-const account = "terra1amdttz2937a3dytmxmkany53pp6ma6dy4vsllv"
-const publicKey = "Aqy0vCZ9t3dGFL9gEcWZKbAGwlVDhqMJC6/ws/xBjsBE"
+const publicKey = Uint8Array.from([2, ...Array.from({ length: 32 }, (_, i) => i + 1)])
+const address = pubkeyToAddress(encodeSecp256k1Pubkey(publicKey), "terra")
+const signatureBytes = Uint8Array.from({ length: 64 }, (_, index) => index + 1)
+
+const nativeAccounts = ["columbus-5", "phoenix-1"].map((chainId) => ({
+  source: "burrito",
+  chainId,
+  address,
+  algorithm: "secp256k1",
+  publicKey: toBase64(publicKey)
+}))
 
 const capabilities = {
   platform: "ios",
   protocolVersion: 1,
   capabilities: {
+    biometricApproval: true,
+    deepLinks: true,
     localWallet: true,
+    qrScanner: false,
+    supportedDirectSignTypeUrls: ["/cosmos.bank.v1beta1.MsgSend"],
     transactionSigning: true,
-    supportedDirectSignTypeUrls: ["/cosmos.bank.v1beta1.MsgSend"]
+    walletConnect: false
   }
 }
 
-const walletOpenResult = {
-  source: "burrito",
-  accounts: [
-    {
-      source: "burrito",
-      chainId: "columbus-5",
-      address: account,
-      algorithm: "secp256k1",
-      publicKey
-    }
-  ]
+const createSignDoc = (chainId = "columbus-5"): SignDoc => ({
+  bodyBytes: TxBody.encode(TxBody.fromPartial({ memo: "Burrito native test" })).finish(),
+  authInfoBytes: AuthInfo.encode(
+    AuthInfo.fromPartial({ signerInfos: [{ sequence: 7n }] })
+  ).finish(),
+  chainId,
+  accountNumber: 42n
+})
+
+const installBridge = ({
+  mutateBody = false,
+  mutateHash = false,
+  sequence = "7",
+  accounts = nativeAccounts,
+  deviceProtectionAvailable = true
+} = {}) => {
+  const bridge = {
+    version: 1,
+    request: vi.fn(async (method: string, params: Record<string, unknown> = {}) => {
+      if (method === "bridge.getCapabilities") return capabilities
+      if (method === "wallet.getStatus") {
+        return { exists: true, deviceProtectionAvailable }
+      }
+      if (method === "wallet.open") {
+        return { source: "burrito", accounts }
+      }
+      if (method === "wallet.signDirect") {
+        const bodyBytes = mutateBody
+          ? Uint8Array.of(10, 1, 120)
+          : Uint8Array.from(Buffer.from(String(params.bodyBytes), "base64"))
+        const authInfoBytes = Uint8Array.from(
+          Buffer.from(String(params.authInfoBytes), "base64")
+        )
+        const txRawBytes = TxRaw.encode(
+          TxRaw.fromPartial({
+            bodyBytes,
+            authInfoBytes,
+            signatures: [signatureBytes]
+          })
+        ).finish()
+        return {
+          txRawBytes: toBase64(txRawBytes),
+          txHash: mutateHash
+            ? "A".repeat(64)
+            : toHex(sha256(txRawBytes)).toUpperCase(),
+          chainId: params.chainId,
+          account: params.account,
+          sequence
+        }
+      }
+      throw new Error(`Unexpected native method: ${method}`)
+    })
+  }
+  vi.stubGlobal("window", { BurritoNative: bridge })
+  return bridge
 }
 
 afterEach(async () => {
@@ -40,127 +105,102 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-describe("Burrito native direct signer", () => {
-  it("validates the public identity and returns a native-approved signature", async () => {
-    const signDoc = SignDoc.fromPartial({
-      chainId: "columbus-5",
-      accountNumber: 42n,
-      bodyBytes: Uint8Array.from([10, 20, 30]),
-      authInfoBytes: Uint8Array.from([40, 50])
-    })
-    const rawSignature = Uint8Array.from({ length: 64 }, (_, index) => index)
-    const txBytes = TxRaw.encode({
-      bodyBytes: signDoc.bodyBytes,
-      authInfoBytes: signDoc.authInfoBytes,
-      signatures: [rawSignature]
-    }).finish()
-    const request = vi.fn(async (method: string, params?: Record<string, unknown>) => {
-      if (method === "bridge.getCapabilities") return capabilities
-      if (method === "wallet.open") return walletOpenResult
-      if (method === "wallet.signDirect") {
-        expect(params).toEqual({
-          version: 1,
-          chainId: "columbus-5",
-          account,
-          accountNumber: "42",
-          bodyBytes: toBase64(signDoc.bodyBytes),
-          authInfoBytes: toBase64(signDoc.authInfoBytes)
-        })
-        return {
-          chainId: "columbus-5",
-          account,
-          sequence: "7",
-          txRawBytes: toBase64(txBytes),
-          txHash: toHex(sha256(txBytes)).toUpperCase()
-        }
-      }
-      throw new Error(`Unexpected method: ${method}`)
-    })
-    vi.stubGlobal("window", {
-      BurritoNative: { version: 1, request }
+describe("Burrito native wallet bridge", () => {
+  it("is available only when the versioned native bridge is injected", () => {
+    vi.stubGlobal("window", {})
+    expect(isBurritoNativeWalletAvailable()).toBe(false)
+    expect(getBurritoNativeConnector()).toMatchObject({
+      id: "burrito-native",
+      label: "Burrito Wallet",
+      available: false
     })
 
+    installBridge()
     expect(isBurritoNativeWalletAvailable()).toBe(true)
+    expect(getWalletConnectors()[0]).toMatchObject({
+      id: "burrito-native",
+      available: true
+    })
+  })
+
+  it("connects both chain accounts and validates direct signatures", async () => {
+    const bridge = installBridge()
     await expect(connectBurritoNativeWallet("columbus-5")).resolves.toEqual({
-      address: account,
+      address,
       name: "Burrito Wallet"
     })
-    const signer = getBurritoNativeOfflineSigner("columbus-5")
-    await expect(signer.getAccounts()).resolves.toEqual([
-      {
-        address: account,
-        algo: "secp256k1",
-        pubkey: expect.any(Uint8Array)
-      }
+
+    const classicSigner = getBurritoNativeOfflineSigner("columbus-5")
+    await expect(classicSigner.getAccounts()).resolves.toEqual([
+      { address, algo: "secp256k1", pubkey: publicKey }
     ])
-    const response = await signer.signDirect(account, signDoc)
-    expect(response.signed).toBe(signDoc)
-    expect(response.signature.pub_key).toEqual({
-      type: "tendermint/PubKeySecp256k1",
-      value: publicKey
+    const classicSignDoc = createSignDoc()
+    const response = await classicSigner.signDirect(address, classicSignDoc)
+    expect(response.signed).toBe(classicSignDoc)
+    expect(response.signature.signature).toBe(toBase64(signatureBytes))
+
+    const phoenixSigner = getBurritoNativeOfflineSigner("phoenix-1")
+    const phoenixSignDoc = createSignDoc("phoenix-1")
+    await phoenixSigner.signDirect(address, phoenixSignDoc)
+    expect(bridge.request).toHaveBeenLastCalledWith("wallet.signDirect", {
+      version: 1,
+      chainId: "phoenix-1",
+      account: address,
+      accountNumber: "42",
+      bodyBytes: toBase64(phoenixSignDoc.bodyBytes),
+      authInfoBytes: toBase64(phoenixSignDoc.authInfoBytes)
     })
-    expect(response.signature.signature).toBe(toBase64(rawSignature))
+    expect(bridge.request.mock.calls.map(([method]) => method)).toEqual([
+      "bridge.getCapabilities",
+      "wallet.getStatus",
+      "wallet.open",
+      "wallet.signDirect",
+      "wallet.signDirect"
+    ])
   })
 
-  it("rejects native responses that sign different transaction bytes", async () => {
-    const request = vi.fn(async (method: string) => {
-      if (method === "bridge.getCapabilities") return capabilities
-      if (method === "wallet.open") return walletOpenResult
-      if (method === "wallet.signDirect") {
-        const txBytes = TxRaw.encode({
-          bodyBytes: Uint8Array.from([99]),
-          authInfoBytes: Uint8Array.from([2]),
-          signatures: [new Uint8Array(64)]
-        }).finish()
-        return {
-          chainId: "columbus-5",
-          account,
-          sequence: "0",
-          txRawBytes: toBase64(txBytes),
-          txHash: toHex(sha256(txBytes)).toUpperCase()
-        }
-      }
-      throw new Error(`Unexpected method: ${method}`)
-    })
-    vi.stubGlobal("window", {
-      BurritoNative: { version: 1, request }
-    })
-
+  it("rejects a native response that changes transaction bytes", async () => {
+    installBridge({ mutateBody: true })
     await connectBurritoNativeWallet("columbus-5")
     const signer = getBurritoNativeOfflineSigner("columbus-5")
-    await expect(
-      signer.signDirect(
-        account,
-        SignDoc.fromPartial({
-          chainId: "columbus-5",
-          bodyBytes: Uint8Array.from([1]),
-          authInfoBytes: Uint8Array.from([2])
-        })
-      )
-    ).rejects.toThrow("signature does not match the request")
+
+    await expect(signer.signDirect(address, createSignDoc())).rejects.toThrow(
+      "signature does not match the request"
+    )
   })
 
-  it("rejects a public key that does not derive the returned address", async () => {
-    vi.stubGlobal("window", {
-      BurritoNative: {
-        version: 1,
-        request: async (method: string) =>
-          method === "bridge.getCapabilities"
-            ? capabilities
-            : {
-                ...walletOpenResult,
-                accounts: [
-                  {
-                    ...walletOpenResult.accounts[0],
-                    address: "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq486l9a"
-                  }
-                ]
-              }
-      }
-    })
+  it("rejects a native response whose transaction hash does not match", async () => {
+    installBridge({ mutateHash: true })
+    await connectBurritoNativeWallet("columbus-5")
+    const signer = getBurritoNativeOfflineSigner("columbus-5")
 
-    await expect(connectBurritoNativeWallet("columbus-5")).rejects.toThrow(
-      "public key does not match"
+    await expect(signer.signDirect(address, createSignDoc())).rejects.toThrow(
+      "signature does not match the request"
     )
+  })
+
+  it("rejects a sequence that does not match the signed auth info", async () => {
+    installBridge({ sequence: "8" })
+    await connectBurritoNativeWallet("columbus-5")
+    const signer = getBurritoNativeOfflineSigner("columbus-5")
+
+    await expect(signer.signDirect(address, createSignDoc())).rejects.toThrow(
+      "signature does not match the request"
+    )
+  })
+
+  it("rejects duplicate native chain accounts", async () => {
+    installBridge({ accounts: [nativeAccounts[0], nativeAccounts[0]] })
+    await expect(connectBurritoNativeWallet("columbus-5")).rejects.toThrow(
+      "duplicate chain accounts"
+    )
+  })
+
+  it("requires secure device-owner protection before opening the wallet", async () => {
+    const bridge = installBridge({ deviceProtectionAvailable: false })
+    await expect(connectBurritoNativeWallet("columbus-5")).rejects.toThrow(
+      "device-owner authentication"
+    )
+    expect(bridge.request).not.toHaveBeenCalledWith("wallet.open", {})
   })
 })

@@ -10,11 +10,11 @@ import type {
   DirectSignResponse,
   OfflineDirectSigner
 } from "@cosmjs/proto-signing"
-import { SignDoc, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
+import { AuthInfo, SignDoc, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import type { WalletAccount, WalletConnector } from "./WalletContext"
 
 const NATIVE_PROTOCOL_VERSION = 1
-const SUPPORTED_CHAIN_IDS = new Set(["columbus-5", "phoenix-1"])
+const SUPPORTED_CHAIN_IDS = ["columbus-5", "phoenix-1"] as const
 const HASH = /^[A-F0-9]{64}$/
 const UNSIGNED_INTEGER = /^(0|[1-9][0-9]*)$/
 
@@ -24,8 +24,10 @@ type NativeBridge = {
 }
 
 type NativeWalletAccount = AccountData & {
-  chainId: string
+  chainId: SupportedChainId
 }
+
+type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number]
 
 declare global {
   interface Window {
@@ -33,10 +35,15 @@ declare global {
   }
 }
 
-let activeAccount: NativeWalletAccount | undefined
+let connectedAccounts: NativeWalletAccount[] | undefined
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
+
+const hasOnlyKeys = (
+  value: Record<string, unknown>,
+  allowed: readonly string[]
+) => Object.keys(value).every((key) => allowed.includes(key))
 
 const equalBytes = (left: Uint8Array, right: Uint8Array) => {
   if (left.length !== right.length) return false
@@ -75,7 +82,12 @@ export const getBurritoNativeConnector = (): WalletConnector => ({
 })
 
 const validateCapabilities = (value: unknown) => {
-  if (!isRecord(value) || value.protocolVersion !== NATIVE_PROTOCOL_VERSION) {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["platform", "protocolVersion", "capabilities"]) ||
+    (value.platform !== "ios" && value.platform !== "android") ||
+    value.protocolVersion !== NATIVE_PROTOCOL_VERSION
+  ) {
     throw new Error("Burrito native protocol is incompatible")
   }
   const capabilities = value.capabilities
@@ -83,18 +95,43 @@ const validateCapabilities = (value: unknown) => {
     !isRecord(capabilities) ||
     capabilities.localWallet !== true ||
     capabilities.transactionSigning !== true ||
-    !Array.isArray(capabilities.supportedDirectSignTypeUrls)
+    !Array.isArray(capabilities.supportedDirectSignTypeUrls) ||
+    capabilities.supportedDirectSignTypeUrls.length === 0 ||
+    capabilities.supportedDirectSignTypeUrls.some(
+      (typeUrl) => typeof typeUrl !== "string"
+    )
   ) {
     throw new Error("Burrito native signing is unavailable")
   }
 }
 
+const validateWalletStatus = (value: unknown) => {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["exists", "deviceProtectionAvailable"]) ||
+    typeof value.exists !== "boolean" ||
+    typeof value.deviceProtectionAvailable !== "boolean"
+  ) {
+    throw new Error("Burrito native wallet protection status is invalid")
+  }
+  if (!value.deviceProtectionAvailable) {
+    throw new Error("Secure device-owner authentication is required")
+  }
+}
+
 const parseNativeAccount = (
   value: unknown,
-  chainId: string
+  chainId: SupportedChainId
 ): NativeWalletAccount => {
   if (
     !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      "source",
+      "chainId",
+      "address",
+      "algorithm",
+      "publicKey"
+    ]) ||
     value.source !== "burrito" ||
     value.chainId !== chainId ||
     value.algorithm !== "secp256k1" ||
@@ -127,41 +164,58 @@ const parseNativeAccount = (
   }
 }
 
+const parseNativeAccounts = (value: unknown): NativeWalletAccount[] => {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["source", "accounts"]) ||
+    value.source !== "burrito" ||
+    !Array.isArray(value.accounts) ||
+    value.accounts.length !== SUPPORTED_CHAIN_IDS.length
+  ) {
+    throw new Error("Burrito native wallet returned invalid accounts")
+  }
+
+  const accountValues = value.accounts
+  const accounts = SUPPORTED_CHAIN_IDS.map((chainId) => {
+    const matches = accountValues.filter(
+      (candidate) => isRecord(candidate) && candidate.chainId === chainId
+    )
+    if (matches.length !== 1) {
+      throw new Error("Burrito native wallet returned duplicate chain accounts")
+    }
+    return parseNativeAccount(matches[0], chainId)
+  })
+
+  return accounts
+}
+
 export const connectBurritoNativeWallet = async (
   chainId: string
 ): Promise<WalletAccount> => {
-  if (!SUPPORTED_CHAIN_IDS.has(chainId)) {
+  if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
     throw new Error("Burrito native wallet does not support this chain")
   }
   const bridge = getBridge()
   validateCapabilities(await bridge.request("bridge.getCapabilities", {}))
-  const result = await bridge.request("wallet.open", {})
-  if (
-    !isRecord(result) ||
-    result.source !== "burrito" ||
-    !Array.isArray(result.accounts)
-  ) {
-    throw new Error("Burrito native wallet returned an invalid account")
-  }
-  const accountValue = result.accounts.find(
-    (candidate) => isRecord(candidate) && candidate.chainId === chainId
-  )
-  const account = parseNativeAccount(accountValue, chainId)
-  activeAccount?.pubkey.fill(0)
-  activeAccount = account
+  validateWalletStatus(await bridge.request("wallet.getStatus", {}))
+  const accounts = parseNativeAccounts(await bridge.request("wallet.open", {}))
+  connectedAccounts?.forEach((account) => account.pubkey.fill(0))
+  connectedAccounts = accounts
+  const account = requireActiveAccount(chainId)
   return { address: account.address, name: "Burrito Wallet" }
 }
 
 export const disconnectBurritoNativeWallet = async () => {
-  activeAccount?.pubkey.fill(0)
-  activeAccount = undefined
+  connectedAccounts?.forEach((account) => account.pubkey.fill(0))
+  connectedAccounts = undefined
 }
 
 const requireActiveAccount = (chainId: string) => {
-  if (!activeAccount || activeAccount.chainId !== chainId) {
+  const account = connectedAccounts?.find((candidate) => candidate.chainId === chainId)
+  if (!account) {
     throw new Error("Reconnect Burrito Wallet before signing")
   }
-  return activeAccount
+  return account
 }
 
 const validateSignedTransaction = (
@@ -171,6 +225,13 @@ const validateSignedTransaction = (
 ) => {
   if (
     !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      "txRawBytes",
+      "txHash",
+      "chainId",
+      "account",
+      "sequence"
+    ]) ||
     value.chainId !== signDoc.chainId ||
     value.account !== account.address ||
     typeof value.sequence !== "string" ||
@@ -184,9 +245,11 @@ const validateSignedTransaction = (
 
   let txBytes: Uint8Array
   let txRaw: TxRaw
+  let authInfo: AuthInfo
   try {
     txBytes = fromBase64(value.txRawBytes)
     txRaw = TxRaw.decode(txBytes)
+    authInfo = AuthInfo.decode(signDoc.authInfoBytes)
   } catch {
     throw new Error("Burrito native signed transaction is invalid")
   }
@@ -197,7 +260,9 @@ const validateSignedTransaction = (
     !equalBytes(txRaw.authInfoBytes, signDoc.authInfoBytes) ||
     txRaw.signatures.length !== 1 ||
     txRaw.signatures[0].length !== 64 ||
-    toHex(sha256(txBytes)).toUpperCase() !== value.txHash
+    toHex(sha256(txBytes)).toUpperCase() !== value.txHash ||
+    authInfo.signerInfos.length !== 1 ||
+    authInfo.signerInfos[0].sequence.toString() !== value.sequence
   ) {
     throw new Error("Burrito native signature does not match the request")
   }
@@ -207,6 +272,9 @@ const validateSignedTransaction = (
 export const getBurritoNativeOfflineSigner = (
   chainId: string
 ): OfflineDirectSigner => {
+  if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
+    throw new Error("Burrito native wallet does not support this chain")
+  }
   const account = requireActiveAccount(chainId)
   const accountData: AccountData = {
     address: account.address,

@@ -845,12 +845,15 @@ export const WalletProvider = ({
 
     const handleKeplrChange = () => requestDesktopWalletReconnect("keplr")
     const handleGalaxyChange = () => requestDesktopWalletReconnect("galaxy")
+    const handleBurritoNativeReady = () => refreshConnectors()
 
+    window.addEventListener("burrito:native-ready", handleBurritoNativeReady)
     window.addEventListener("keplr_keystorechange", handleKeplrChange)
     window.addEventListener("galaxy_station_wallet_change", handleGalaxyChange)
     window.addEventListener("galaxy_station_network_change", handleGalaxyChange)
 
     return () => {
+      window.removeEventListener("burrito:native-ready", handleBurritoNativeReady)
       window.removeEventListener("keplr_keystorechange", handleKeplrChange)
       window.removeEventListener(
         "galaxy_station_wallet_change",
