@@ -1036,8 +1036,7 @@ const fetchLocalMarketIndex = async () => {
   }
   if (localMarketIndexInFlight) return localMarketIndexInFlight
 
-  const cacheBuster = Math.floor(Date.now() / LOCAL_INDEX_CACHE_TTL)
-  localMarketIndexInFlight = fetch(`${LOCAL_MARKET_INDEX_URL}?v=${cacheBuster}`, { cache: "no-store" })
+  localMarketIndexInFlight = fetch(LOCAL_MARKET_INDEX_URL)
     .then(async (response) => {
       if (!response.ok) return null
       const payload = (await response.json()) as MarketIndexPayload

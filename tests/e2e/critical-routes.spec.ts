@@ -10,7 +10,13 @@ const routes = [
   ["/history", "History"],
   ["/stake", "Stake"],
   ["/gov", "Governance"],
-  ["/contract", "Contract"]
+  ["/nft", "NFT"],
+  ["/contract", "Contract"],
+  ["/proposal/new", "New proposal"],
+  ["/proposal/1", "Proposal details"],
+  ["/rewards", "Withdraw rewards"],
+  ["/commission", "Withdraw commission"],
+  ["/audit-not-found", "404"]
 ] as const
 
 const selectStoredChain = async (page: Page, chainKey: "lunc" | "luna") => {
@@ -62,6 +68,64 @@ test("network switcher changes the active chain and preserves the current route"
       page.evaluate((key) => window.localStorage.getItem(key), APP_CHAIN_STORAGE_KEY)
     )
     .toBe("luna")
+})
+
+test("closed wallet handle does not cover page actions", async ({ page }) => {
+  await selectStoredChain(page, "lunc")
+  await page.setViewportSize({ width: 320, height: 812 })
+  const cases = [
+    ["/", "7d"],
+    ["/stake", "Withdraw all rewards"],
+    ["/gov", "New proposal"],
+    ["/contract", "Instantiate"]
+  ] as const
+
+  for (const [path, actionName] of cases) {
+    await page.goto(path)
+    const walletHandle = page.locator('button[aria-label="Open wallet"]')
+    const action = page
+      .getByRole("button", { name: actionName, exact: true })
+      .or(page.getByRole("link", { name: actionName, exact: true }))
+    await expect(walletHandle).toBeVisible()
+    await expect(action).toBeVisible()
+
+    const [walletBox, actionBox] = await Promise.all([
+      walletHandle.boundingBox(),
+      action.boundingBox()
+    ])
+    expect(walletBox).not.toBeNull()
+    expect(actionBox).not.toBeNull()
+
+    const overlaps =
+      walletBox!.x < actionBox!.x + actionBox!.width &&
+      walletBox!.x + walletBox!.width > actionBox!.x &&
+      walletBox!.y < actionBox!.y + actionBox!.height &&
+      walletBox!.y + walletBox!.height > actionBox!.y
+    expect(overlaps, `${path} wallet handle overlaps ${actionName}`).toBe(false)
+  }
+})
+
+test("mobile navigation and wallet panel remain operable", async ({ page }) => {
+  await selectStoredChain(page, "lunc")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto("/")
+
+  await page.getByRole("button", { name: "Open menu" }).click()
+  await expect(page.getByRole("link", { name: "NFT", exact: true })).toBeVisible()
+  await page.getByRole("link", { name: "NFT", exact: true }).click()
+  await expect(page).toHaveURL(/\/nft$/)
+
+  await page.locator('button[aria-label="Open wallet"]').click()
+  const walletToggle = page.locator('button[aria-label="Toggle wallet"]')
+  await expect(walletToggle).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("burritoWalletOpen")))
+    .toBe("true")
+
+  await walletToggle.click()
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("burritoWalletOpen")))
+    .toBe("false")
 })
 
 test("wallet recovers from a full local asset cache", async ({ page }) => {

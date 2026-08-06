@@ -183,10 +183,11 @@
     left: 100%;
     right: auto;
     transform: translate(-100%, 0);
-    width: fit-content;
-    min-width: 0;
-    min-height: 0;
-    padding: 10px 8px;
+    width: 24px;
+    min-width: 24px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
     background-color: var(--card-bg);
     border-radius: 10px 0 0 10px;
     border: var(--border-width) solid var(--card-border);
@@ -208,7 +209,7 @@
   }
 
   .closed .close span {
-    display: block;
+    display: none;
   }
 
   .closed .walletIcon {
