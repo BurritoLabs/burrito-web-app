@@ -86,7 +86,7 @@
   justify-content: space-between;
   gap: 16px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   padding: var(--card-padding);
   padding-top: 0;
   border-bottom: var(--border-width) solid var(--card-border);
@@ -149,7 +149,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 10pt;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-weight: var(--bold);
 }
 
@@ -227,7 +227,7 @@
 .messagePrimary {
   display: inline-flex;
   font-size: var(--font-size);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
   gap: 6px;
   flex-wrap: wrap;
@@ -236,7 +236,7 @@
 .messageSecondary {
   display: inline-flex;
   font-size: var(--font-size);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   gap: 6px;
   flex-wrap: wrap;
 }
@@ -262,7 +262,7 @@
 }
 
 .arrow {
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .addressLink {
@@ -313,7 +313,7 @@
 }
 
 .footer {
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   border-top: var(--border-width) solid var(--card-border);
   font-size: var(--font-size-small);
   margin: 0 calc(-1 * var(--card-padding));
@@ -334,11 +334,11 @@
 
 .detailLabel {
   font-weight: var(--bold);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
 }
 
 .detailValue {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
   line-height: 1.4;
 }

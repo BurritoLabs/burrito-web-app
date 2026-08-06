@@ -21,7 +21,7 @@
 }
 
 .policy h2 {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 18px;
   line-height: 1.35;
 }

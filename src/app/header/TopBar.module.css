@@ -47,12 +47,13 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 32px;
+  min-width: var(--bui-chain-trigger-min-width);
+  height: var(--bui-chain-trigger-height);
   padding: 0 9px 0 5px;
   border: 1px solid rgba(234, 245, 235, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.026);
-  color: rgba(234, 245, 235, 0.76);
+  border-radius: var(--bui-radius-control);
+  background: var(--bui-color-surface);
+  color: var(--bui-color-text-secondary);
   cursor: pointer;
   font: inherit;
   transition:
@@ -65,7 +66,7 @@
 .chainTriggerOpen {
   border-color: rgba(var(--chain-rgb), 0.38);
   background: rgba(var(--chain-rgb), 0.08);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .chainTrigger:focus,
@@ -91,7 +92,7 @@
 .chainChevron {
   width: 14px;
   height: 14px;
-  color: rgba(234, 245, 235, 0.48);
+  color: var(--bui-color-text-secondary);
   transition: transform 180ms ease;
 }
 
@@ -102,13 +103,13 @@
 .chainMenu {
   z-index: 9999;
   display: grid;
-  width: min(13rem, calc(100vw - 2rem));
+  width: min(var(--bui-chain-menu-width), calc(100vw - 2rem));
   gap: 3px;
   padding: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(8, 17, 15, 0.96);
-  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--bui-color-border-strong);
+  border-radius: var(--bui-chain-menu-radius);
+  background: var(--bui-color-surface);
+  box-shadow: var(--bui-shadow-panel);
 }
 
 .chainOption {
@@ -116,11 +117,12 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  min-height: var(--bui-chain-option-min-height);
   padding: 7px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: rgba(234, 245, 235, 0.68);
+  color: var(--bui-color-text-secondary);
   text-align: left;
   cursor: pointer;
   transition:
@@ -129,12 +131,12 @@
 }
 
 .chainOption:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.045);
+  color: var(--bui-color-text);
+  background: var(--bui-color-surface-hover);
 }
 
 .chainOptionActive {
-  color: #ffffff;
+  color: var(--bui-color-text);
   background: rgba(var(--chain-rgb), 0.1);
 }
 
@@ -142,8 +144,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: var(--bui-chain-logo-size);
+  height: var(--bui-chain-logo-size);
   flex: 0 0 auto;
   padding: 1.5px;
   border-radius: 999px;
@@ -160,7 +162,7 @@
   overflow: hidden;
   padding: 1.5px;
   border-radius: 999px;
-  background: #0c1411;
+  background: var(--bui-color-surface-sunken);
 }
 
 .chainLogo img {
@@ -186,7 +188,7 @@
 }
 
 .chainName span:last-child {
-  color: rgba(234, 245, 235, 0.44);
+  color: var(--bui-color-text-secondary);
   font-size: 10px;
   font-weight: 500;
 }
@@ -360,7 +362,7 @@
 }
 
 .connectButton {
-  border-color: rgba(234, 245, 235, 0.38);
+  border-color: var(--bui-color-text-secondary);
   background: transparent;
   box-shadow: none;
   height: var(--button-height-small);
@@ -372,7 +374,7 @@
 }
 
 .connectButton:hover {
-  border-color: rgba(234, 245, 235, 0.56);
+  border-color: var(--bui-color-text-secondary);
 }
 
 .connectButton:focus-visible {
@@ -465,7 +467,7 @@
 }
 
 .walletMenuItemText > span:last-child {
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: 500;
 }
@@ -477,7 +479,7 @@
 .walletMenuIcon {
   width: 16px;
   height: 16px;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -503,7 +505,7 @@
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-  color: rgba(234, 245, 235, 0.85);
+  color: var(--bui-color-text-secondary);
   cursor: zoom-in;
 }
 
@@ -551,7 +553,7 @@
 
 .latestHash {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 @media (max-width: 991.98px) {
@@ -629,8 +631,9 @@
 
 @media (max-width: 680px) {
   .chainTrigger {
-    width: 50px;
-    min-width: 50px;
+    width: var(--bui-chain-trigger-mobile-width);
+    min-width: var(--bui-chain-trigger-mobile-width);
+    height: var(--bui-chain-trigger-mobile-height);
     padding: 0 6px 0 5px;
     gap: 2px;
   }

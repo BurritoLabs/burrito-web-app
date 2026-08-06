@@ -11,7 +11,7 @@
 .sectionHeader {
   font-size: var(--font-size-small);
   font-weight: var(--bold);
-  color: rgba(234, 245, 235, 0.65);
+  color: var(--bui-color-text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -25,7 +25,7 @@
 
 .sectionSubtext {
   margin: 5px 0 0;
-  color: rgba(234, 245, 235, 0.52);
+  color: var(--bui-color-text-muted);
   font-size: var(--font-size-small);
 }
 
@@ -86,21 +86,21 @@
 
 .metricLabel {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   letter-spacing: 0.02em;
 }
 
 .metricValue {
   font-size: 22px;
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
   min-width: 0;
 }
 
 .metricValue span {
   font-size: var(--font-size-small);
   font-weight: var(--normal);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-muted);
   margin-left: 6px;
 }
 
@@ -109,7 +109,7 @@
   align-items: center;
   gap: 6px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-muted);
 }
 
 .up {
@@ -121,7 +121,7 @@
 }
 
 .neutral {
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-muted);
 }
 
 .metricSkeleton {
@@ -182,7 +182,7 @@
 .rangeButton {
   border: none;
   background: transparent;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   padding: 6px 12px;
@@ -192,12 +192,12 @@
 }
 
 .rangeButton:hover {
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .rangeButtonActive {
   background: rgba(82, 196, 26, 0.2);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 @keyframes dashboardShimmer {

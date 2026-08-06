@@ -30,7 +30,7 @@
 .chainTitle {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .chainPills {
@@ -173,7 +173,7 @@
 
 .legendPercent {
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .emptyDonut {
@@ -181,7 +181,7 @@
   height: 300px;
   display: grid;
   place-items: center;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   text-align: center;
 }
@@ -191,13 +191,13 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .chartMeta strong {
   display: block;
   font-size: var(--font-size-title);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
 }
 
@@ -258,7 +258,7 @@
 .stakeTab {
   padding: 0 16px;
   background: transparent;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size);
   font-weight: var(--bold);
   border: 0;
@@ -276,7 +276,7 @@
 
 .stakeTabActive {
   background: rgba(var(--active-chain-rgb), 0.12);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .stakeTabBody {
@@ -299,7 +299,7 @@
 .myStakeTitle {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .myStakeBody {
@@ -365,7 +365,7 @@
 .validatorNameStrong {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--bui-color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -376,7 +376,7 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  color: #ffffff;
+  color: var(--bui-color-text);
   text-decoration: none;
 }
 
@@ -392,7 +392,7 @@
 
 .validatorCommission {
   font-size: 12px;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .myStakeAmounts {
@@ -411,7 +411,7 @@
 
 .amountLabel {
   font-size: 11px;
-  color: rgba(234, 245, 235, 0.5);
+  color: var(--bui-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -419,7 +419,7 @@
 .amountValue {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
 }
 
 .manageButton {
@@ -493,7 +493,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   user-select: none;
 }
 
@@ -521,7 +521,7 @@
   padding: 0 16px;
   font-size: 12px;
   font-weight: 600;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   background: rgba(255, 255, 255, 0.04);
   border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
   align-items: center;
@@ -554,11 +554,11 @@
 }
 
 .sortHeader:hover {
-  color: rgba(234, 245, 235, 0.95);
+  color: var(--bui-color-text-secondary);
 }
 
 .sortHeader[data-active="true"] {
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .sorter {
@@ -623,7 +623,7 @@
 }
 
 .validatorLoadMoreCount {
-  color: rgba(234, 245, 235, 0.62);
+  color: var(--bui-color-text-secondary);
   font-weight: 500;
 }
 
@@ -682,7 +682,7 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  color: #ffffff;
+  color: var(--bui-color-text);
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
@@ -708,7 +708,7 @@
 .validatorCell {
   text-align: right;
   font-size: 13px;
-  color: rgba(234, 245, 235, 0.75);
+  color: var(--bui-color-text-secondary);
 }
 
 .validatorActionCell {
@@ -736,7 +736,7 @@
 .emptyState {
   padding: 24px 0;
   text-align: center;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
 }
 

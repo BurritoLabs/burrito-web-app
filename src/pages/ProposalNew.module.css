@@ -24,7 +24,7 @@
 .noticeInfo {
   background: rgba(var(--active-chain-rgb), 0.12);
   border: 1px solid rgba(var(--active-chain-rgb), 0.35);
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
 }
 
 .noticeWarning {
@@ -46,7 +46,7 @@
 .sectionTitle {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .sectionGrid {
@@ -83,7 +83,7 @@
 .maxButton {
   background: transparent;
   border: none;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--normal);
   padding: 0;
@@ -108,7 +108,7 @@
   margin-left: 6px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-size: 10px;
   line-height: 1;
   position: relative;
@@ -121,7 +121,7 @@
   bottom: calc(100% + 8px);
   transform: translateX(-50%);
   background: #0f1916;
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   padding: 8px 10px;
@@ -149,7 +149,7 @@ select.input {
   border-radius: var(--radius-lg);
   border: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
-  color: rgba(234, 245, 235, 0.85);
+  color: var(--bui-color-text-secondary);
   padding: 0 12px;
   font-size: var(--font-size);
   outline: none;
@@ -178,7 +178,7 @@ select.input:focus {
 }
 
 .textarea::placeholder {
-  color: rgba(234, 245, 235, 0.4);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size);
   font-weight: var(--normal);
   line-height: 1.5;
@@ -192,7 +192,7 @@ select.input:focus {
 
 .helper {
   font-size: var(--font-size-xxs);
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
 }
 
 .changeRow {
@@ -208,7 +208,7 @@ select.input:focus {
   border-radius: var(--radius-lg);
   border: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 18px;
   line-height: 1;
   display: inline-flex;
@@ -221,7 +221,7 @@ select.input:focus {
   border-radius: var(--radius-lg);
   border: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
-  color: #ffffff;
+  color: var(--bui-color-text);
   padding: 6px 16px;
   font-size: var(--font-size-small);
   height: var(--button-height-small);
@@ -287,7 +287,7 @@ select.input:focus {
   border-radius: 8px;
   border: var(--border-width) solid var(--card-border);
   background: rgba(255, 255, 255, 0.03);
-  color: #ffffff;
+  color: var(--bui-color-text);
   padding: 0 10px;
   font-size: var(--font-size-small);
   font-family: var(--font-ui);
@@ -319,7 +319,7 @@ select.input:focus {
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 7px 8px;
-  color: rgba(234, 245, 235, 0.82);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-family: var(--font-ui);
 }
@@ -332,11 +332,11 @@ select.input:focus {
 .feeSelectOptionActive {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .feeTopAmount {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: var(--font-size-small);
   font-weight: 600;
 }
@@ -356,7 +356,7 @@ select.input:focus {
 .feeCard dd {
   margin: 0;
   text-align: right;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .feeNegative {
@@ -404,7 +404,7 @@ select.input:focus {
   top: 50%;
   transform: translateY(-50%);
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.65);
+  color: var(--bui-color-text-secondary);
 }
 
 .numberInput::-webkit-outer-spin-button,
@@ -450,7 +450,7 @@ select.input option {
   border-radius: var(--radius-lg);
   border: var(--border-width) solid var(--card-border);
   background: var(--card-bg);
-  color: rgba(234, 245, 235, 0.85);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size);
   font-weight: var(--normal);
   font-family: var(--font-ui);
@@ -499,20 +499,20 @@ select.input option {
   font-size: var(--font-size);
   font-weight: var(--normal);
   font-family: var(--font-ui);
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .selectOption:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .selectOptionActive {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.24);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 @media (max-width: 720px) {

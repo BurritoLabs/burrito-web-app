@@ -33,7 +33,7 @@
 }
 
 .searchInput::placeholder {
-  color: rgba(234, 245, 235, 0.45);
+  color: var(--bui-color-text-secondary);
 }
 
 .searchInput {
@@ -200,14 +200,14 @@
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   cursor: pointer;
   transition: background-color 0.16s ease, color 0.16s ease;
 }
 
 .sortOption:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .sortOptionActive {
@@ -226,7 +226,7 @@
 .meta {
   min-width: 0;
   font-size: 12px;
-  color: rgba(234, 245, 235, 0.62);
+  color: var(--bui-color-text-secondary);
 }
 
 .timeframe {
@@ -243,7 +243,7 @@
 .timeButton {
   border: 0;
   background: transparent;
-  color: rgba(234, 245, 235, 0.65);
+  color: var(--bui-color-text-secondary);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: var(--bold);
@@ -277,7 +277,7 @@
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background: rgba(10, 17, 13, 0.58);
-  color: rgba(234, 245, 235, 0.68);
+  color: var(--bui-color-text-secondary);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: var(--semibold);
@@ -304,7 +304,7 @@
   justify-content: center;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
   font-size: 10px;
   font-weight: var(--bold);
   padding: 0 5px;
@@ -362,7 +362,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -378,11 +378,11 @@
 
 .dexMoreOption:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .dexMoreOption strong {
-  color: rgba(234, 245, 235, 0.62);
+  color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: var(--bold);
 }
@@ -401,7 +401,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-size: 14px;
 }
 
@@ -534,22 +534,22 @@
 }
 
 .pairBase {
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .pairDivider {
-  color: rgba(234, 245, 235, 0.54);
+  color: var(--bui-color-text-secondary);
 }
 
 .pairQuote {
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
 }
 
 .rank {
   flex: 0 0 auto;
   font-size: 10px;
   font-weight: var(--bold);
-  color: rgba(234, 245, 235, 0.64);
+  color: var(--bui-color-text-secondary);
   line-height: 1;
   align-self: flex-start;
 }
@@ -571,7 +571,7 @@
 
 .dexTag {
   background: rgba(255, 255, 255, 0.05);
-  color: rgba(234, 245, 235, 0.74);
+  color: var(--bui-color-text-secondary);
 }
 
 .dexVersionTag {
@@ -614,12 +614,12 @@
   justify-content: flex-start;
   gap: 6px;
   font-size: 11.5px;
-  color: rgba(234, 245, 235, 0.62);
+  color: var(--bui-color-text-secondary);
   white-space: nowrap;
 }
 
 .metricLine strong {
-  color: rgba(234, 245, 235, 0.92);
+  color: var(--bui-color-text-secondary);
   font-size: 11.5px;
   font-weight: var(--bold);
 }
@@ -635,7 +635,7 @@
   line-height: 1;
   font-weight: var(--bold);
   letter-spacing: -0.015em;
-  color: #ffffff;
+  color: var(--bui-color-text);
   white-space: nowrap;
 }
 
@@ -646,7 +646,7 @@
   position: relative;
   bottom: 0;
   margin: 0 1px;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
 }
 
 .change {
@@ -664,7 +664,7 @@
 }
 
 .changeFlat {
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
 }
 
 .loadMoreWrap {

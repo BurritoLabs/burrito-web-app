@@ -15,7 +15,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: rgba(234, 245, 235, 0.66);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   letter-spacing: 0.12em;
   text-transform: uppercase;

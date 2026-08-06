@@ -26,7 +26,7 @@
 .sectionTitle {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .filterToggle {
@@ -34,7 +34,7 @@
   align-items: center;
   gap: 8px;
   font-size: var(--font-size-xs);
-  color: rgba(234, 245, 235, 0.65);
+  color: var(--bui-color-text-secondary);
   cursor: pointer;
 }
 
@@ -116,7 +116,7 @@
   justify-content: center;
   font-size: var(--font-size-small);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
   background: transparent;
   border: 0;
   overflow: hidden;
@@ -133,14 +133,14 @@
   gap: 2px;
   font-size: 16px;
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
   grid-column: 2;
   line-height: 1.1;
   align-self: flex-end;
 }
 
 .assetName small {
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
   font-size: 10px;
   font-weight: var(--normal);
   line-height: 1;
@@ -148,7 +148,7 @@
 
 .assetValue {
   font-size: 16px;
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
   grid-column: 3;
   justify-self: end;
@@ -156,7 +156,7 @@
 
 .assetAmount {
   font-size: 16px;
-  color: rgba(234, 245, 235, 0.75);
+  color: var(--bui-color-text-secondary);
   font-weight: var(--normal);
   margin: 0;
   grid-column: 2;
@@ -166,7 +166,7 @@
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-size: 12px;
   font-weight: 400;
   white-space: nowrap;
@@ -199,7 +199,7 @@
 }
 
 .assetActions button:hover {
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .assetBadge {
@@ -211,7 +211,7 @@
   gap: 10px;
   justify-items: start;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   padding: 6px 2px;
 }
 
@@ -313,12 +313,12 @@
 .sideTitle {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .sideText {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .sideLink {

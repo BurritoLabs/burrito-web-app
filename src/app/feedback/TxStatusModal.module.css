@@ -78,7 +78,7 @@
 }
 
 .pending {
-  color: rgba(234, 245, 235, 0.88);
+  color: var(--bui-color-text-secondary);
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -108,14 +108,14 @@
   font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .detail {
   margin: 10px 0 0;
   font-size: 13px;
   line-height: 1.45;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   word-break: break-word;
 }
 
@@ -144,7 +144,7 @@
   border: 1px solid rgba(234, 245, 235, 0.2);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
-  color: rgba(234, 245, 235, 0.78);
+  color: var(--bui-color-text-secondary);
   font: inherit;
   font-size: 12px;
   font-weight: 700;

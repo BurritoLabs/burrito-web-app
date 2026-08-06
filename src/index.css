@@ -181,11 +181,11 @@ strong {
 }
 
 input::placeholder {
-  color: rgba(234, 245, 235, 0.4);
+  color: var(--bui-color-text-secondary);
 }
 
 textarea::placeholder {
-  color: rgba(234, 245, 235, 0.4);
+  color: var(--bui-color-text-secondary);
   font-weight: var(--normal);
 }
 
@@ -216,7 +216,7 @@ textarea::placeholder {
   font-size: var(--font-size-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .sidebarTag {
@@ -233,15 +233,15 @@ textarea::placeholder {
 
 .pageArea {
   grid-area: main;
-  background: linear-gradient(
-    180deg,
-    rgba(16, 29, 24, 0.78) 0%,
-    rgba(16, 29, 24, 0.7) 100%
-  );
+  background: transparent;
   min-height: 100%;
   animation: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+:root[data-theme="light"] body::after {
+  opacity: 0.08;
 }
 
 .card {
@@ -276,12 +276,12 @@ textarea::placeholder {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
   letter-spacing: -0.01em;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .cardText {
   margin: 8px 0 0;
-  color: rgba(240, 250, 241, 0.8);
+  color: var(--bui-color-text-secondary);
   line-height: 1.45;
   font-size: var(--font-size);
 }
@@ -290,7 +290,7 @@ textarea::placeholder {
   margin-top: 8px;
   font-size: var(--font-size-small);
   letter-spacing: 0.01em;
-  color: rgba(240, 250, 241, 0.62);
+  color: var(--bui-color-text-secondary);
   line-height: 1.4;
 }
 
@@ -314,18 +314,18 @@ textarea::placeholder {
   padding: 18px 20px;
   display: grid;
   gap: 8px;
-  color: rgba(240, 250, 241, 0.74);
+  color: var(--bui-color-text-secondary);
 }
 
 .statCard div {
   font-size: var(--font-size-small);
-  color: rgba(240, 250, 241, 0.68);
+  color: var(--bui-color-text-secondary);
   letter-spacing: 0.02em;
 }
 
 .statCard strong {
   font-size: var(--font-size-title);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
 }
 
@@ -345,7 +345,7 @@ textarea::placeholder {
   background: rgba(255, 255, 255, 0.08);
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   font-size: var(--font-size-xxs);
-  color: rgba(240, 250, 241, 0.8);
+  color: var(--bui-color-text-secondary);
 }
 
 .list {
@@ -377,20 +377,20 @@ textarea::placeholder {
 
 .listRow strong {
   font-size: var(--font-size);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
 }
 
 .listRow span {
   display: block;
   font-size: var(--font-size-xxs);
-  color: rgba(240, 250, 241, 0.62);
+  color: var(--bui-color-text-secondary);
   line-height: 1.4;
 }
 
 .listMeta {
   font-size: var(--font-size-small);
-  color: rgba(240, 250, 241, 0.62);
+  color: var(--bui-color-text-secondary);
 }
 
 .uiButton {
@@ -406,7 +406,7 @@ textarea::placeholder {
   line-height: 1;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  color: var(--bui-color-text);
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
@@ -431,7 +431,7 @@ textarea::placeholder {
 }
 
 .uiButtonPrimary:hover {
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .filterPill {
@@ -442,7 +442,7 @@ textarea::placeholder {
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(240, 250, 241, 0.84);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
 }

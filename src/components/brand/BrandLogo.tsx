@@ -1,3 +1,5 @@
+import "./BrandLogo.css"
+
 type BrandLogoProps = {
   textSize?: number
   iconSize?: number
@@ -12,6 +14,7 @@ export default function BrandLogo({
   return (
     <span
       aria-label="Burrito"
+      className="burrito-responsive-brand"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -21,6 +24,7 @@ export default function BrandLogo({
       }}
     >
       <img
+        className="burrito-responsive-brand__icon"
         src="/brand/icon-192.png"
         alt="Burrito"
         style={{
@@ -30,11 +34,12 @@ export default function BrandLogo({
         }}
       />
       <span
+        className="burrito-responsive-brand__wordmark"
         style={{
           fontSize: textSize,
           fontWeight: 650,
           letterSpacing: "-0.05em",
-          color: "#FFFFFF",
+          color: "var(--bui-color-text)",
           lineHeight: "1em",
           display: "block",
           fontFamily: "var(--font-montserrat), var(--font-ui)"
@@ -45,3 +50,4 @@ export default function BrandLogo({
     </span>
   )
 }
+import "./BrandLogo.css"

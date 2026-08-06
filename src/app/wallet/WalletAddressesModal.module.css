@@ -70,7 +70,7 @@
 .chainLabel {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -152,7 +152,7 @@
 .qrStatus {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
 }
 
 .qrOverlay {
@@ -213,7 +213,7 @@
 
 .qrAddress {
   font-size: 12px;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   text-align: center;
   word-break: break-all;
 }
@@ -221,6 +221,6 @@
 .qrTitle {
   font-size: 18px;
   font-weight: 700;
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
   text-align: center;
 }

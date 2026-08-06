@@ -1,0 +1,21 @@
+.burrito-responsive-brand {
+  --burrito-brand-icon-size: 24px;
+  --burrito-brand-text-size: 20px;
+  --burrito-brand-gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .burrito-responsive-brand {
+    gap: 5px !important;
+    padding-left: 0 !important;
+  }
+
+  .burrito-responsive-brand__icon {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .burrito-responsive-brand__wordmark {
+    font-size: 16px !important;
+  }
+}

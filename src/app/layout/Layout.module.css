@@ -140,7 +140,7 @@
   min-width: 0;
   overflow: hidden;
   position: relative;
-  background: linear-gradient(180deg, #101a17 0%, #101b17 100%);
+  background: var(--app-background);
   border-left: var(--border-width) solid var(--card-border);
 }
 
@@ -162,12 +162,7 @@
   right: 0;
   bottom: 0;
   width: var(--wallet-offset);
-  background:
-    linear-gradient(
-      180deg,
-      rgba(16, 29, 24, 0.78) 0%,
-      rgba(16, 29, 24, 0.86) 100%
-    );
+  background: var(--bui-color-surface-raised);
   border-left: var(--border-width) solid var(--card-border);
   pointer-events: none;
   transition:
@@ -235,7 +230,7 @@
 
   .headerInner {
     padding: 0 var(--main-padding);
-    background: rgba(15, 27, 22, 0.985);
+    background: var(--bui-color-surface-raised);
   }
 
   .menuOpen {

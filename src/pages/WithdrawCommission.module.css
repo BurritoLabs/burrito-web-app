@@ -23,7 +23,7 @@
   border-radius: 8px;
   padding: 14px 16px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.75);
+  color: var(--bui-color-text-secondary);
 }
 
 .header {
@@ -35,12 +35,12 @@
   font-size: 18px;
   font-weight: var(--bold);
   line-height: 1.2;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .valoper {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
   overflow-wrap: anywhere;
 }
 
@@ -48,7 +48,7 @@
   margin-top: 2px;
   font-size: 12px;
   font-weight: var(--bold);
-  color: rgba(234, 245, 235, 0.78);
+  color: var(--bui-color-text-secondary);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -69,7 +69,7 @@
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 13px;
-  color: rgba(234, 245, 235, 0.84);
+  color: var(--bui-color-text-secondary);
 }
 
 .commissionLeft {
@@ -87,7 +87,7 @@
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(234, 245, 235, 0.88);
+  color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -110,7 +110,7 @@
 }
 
 .commissionRow strong {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 14px;
   font-weight: var(--bold);
 }
@@ -139,7 +139,7 @@
 .feeLabel {
   font-size: 12px;
   font-weight: var(--bold);
-  color: rgba(234, 245, 235, 0.78);
+  color: var(--bui-color-text-secondary);
 }
 
 .feeSelectWrap {
@@ -153,7 +153,7 @@
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(0, 0, 0, 0.2);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -204,18 +204,18 @@
 
 .feeOption:hover {
   background: rgba(var(--active-chain-rgb), 0.16);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .feeOptionActive {
   background: rgba(var(--active-chain-rgb), 0.24);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .feeValue {
   font-size: 12px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .feeError {

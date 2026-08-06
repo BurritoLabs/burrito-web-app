@@ -21,7 +21,7 @@
   justify-content: space-between;
   gap: 16px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
 }
 
 .metaLeft {
@@ -54,7 +54,7 @@
 .detailTitle {
   font-size: 20px;
   font-weight: var(--normal);
-  color: #ffffff;
+  color: var(--bui-color-text);
   margin: 0;
 }
 
@@ -71,7 +71,7 @@
   border-radius: 8px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: var(--font-size-xxs);
   font-weight: 600;
   cursor: pointer;
@@ -96,12 +96,12 @@
 
 .detailsLabel {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-weight: 500;
 }
 
 .detailsValue {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: 400;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -111,7 +111,7 @@
 .description {
   display: grid;
   gap: 10px;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   line-height: 1.6;
 }
@@ -119,7 +119,7 @@
 .descHeading {
   margin: 0;
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: var(--font-size-title);
 }
 
@@ -146,17 +146,17 @@
   display: grid;
   gap: 4px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .summaryLabel {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-weight: 500;
 }
 
 .summaryValue {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: 400;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -222,7 +222,7 @@
   padding: 16px var(--card-padding);
   font-size: var(--font-size-title);
   font-weight: 500;
-  color: #ffffff;
+  color: var(--bui-color-text);
   border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
 }
 
@@ -263,14 +263,14 @@
 
 .depositMetricLabel {
   font-size: var(--font-size-xxs);
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .depositMetricValue {
   font-size: var(--font-size-small);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: 600;
 }
 
@@ -292,12 +292,12 @@
 .depositProgressLabel,
 .depositFieldLabel {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
 }
 
 .depositProgressValue {
   font-size: var(--font-size-small);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: 600;
 }
 
@@ -317,7 +317,7 @@
 
 .depositProgressMeta {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.62);
+  color: var(--bui-color-text-secondary);
 }
 
 .depositModalSummary {
@@ -331,11 +331,11 @@
 
 .depositModalRow {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
 }
 
 .depositModalRow strong {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: 600;
 }
 
@@ -371,32 +371,32 @@
   border: 0;
   outline: none;
   background: transparent;
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 28px;
   font-weight: 600;
   line-height: 1.1;
 }
 
 .depositAmountInput::placeholder {
-  color: rgba(234, 245, 235, 0.28);
+  color: var(--bui-color-text-secondary);
 }
 
 .depositAmountDenom {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-weight: 600;
 }
 
 .depositFieldHint,
 .depositModalHint {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.62);
+  color: var(--bui-color-text-secondary);
 }
 
 
 .emptyState {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .list {
@@ -409,7 +409,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: var(--font-size-xxs);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   padding: 2px 2px 6px;
 }
 
@@ -436,11 +436,11 @@
 }
 
 .listName {
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
 }
 
 .listValue {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
   position: relative;
   z-index: 1;
@@ -536,12 +536,12 @@
 .validatorName {
   font-size: var(--font-size-small);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .validatorAddress {
   font-size: var(--font-size-xxs);
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
   word-break: break-all;
 }
 
@@ -567,25 +567,25 @@
 
 .voteTotalTitle {
   font-size: var(--font-size);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-weight: 500;
 }
 
 .voteTotalValue {
   font-size: inherit;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .voteTotalPercent {
   font-size: inherit;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   margin-left: 4px;
 }
 
 .voteTotalMeta {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   margin-top: 4px;
   font-weight: 400;
 }
@@ -633,7 +633,7 @@
 
 .voteItemTitle {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   margin-bottom: 2px;
   font-weight: 500;
 }
@@ -645,7 +645,7 @@
 
 .voteItemAmount {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-weight: 400;
 }
 
@@ -661,7 +661,7 @@
 
 .progressLabel {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .progressTrack {
@@ -699,7 +699,7 @@
   top: -4px;
   display: inline-block;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
 }
 
 .progressFlagLine {
@@ -714,13 +714,13 @@
 
 .voteEnd {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   margin-top: 20px;
 }
 
 .voteMeta {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .tallyCard {
@@ -734,7 +734,7 @@
   padding: 16px var(--card-padding);
   font-size: var(--font-size-title);
   font-weight: 500;
-  color: #ffffff;
+  color: var(--bui-color-text);
   border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
 }
 
@@ -758,13 +758,13 @@
 
 .tallyLabel {
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .tallyValue {
   font-size: var(--font-size);
   font-weight: 500;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .statusPill {
@@ -894,7 +894,7 @@
 .voteModalTitle {
   font-size: 18px;
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .voteModalClose {
@@ -902,7 +902,7 @@
   height: 28px;
   border: 0;
   background: transparent;
-  color: #fff;
+  color: var(--bui-color-text);
   cursor: pointer;
   position: relative;
   opacity: 0.7;
@@ -947,7 +947,7 @@
   border-radius: var(--radius-md);
   border: var(--border-width) solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.04);
-  color: rgba(234, 245, 235, 0.82);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: 500;
   cursor: pointer;
@@ -962,7 +962,7 @@
 .voteOptionButtonActive {
   border-color: rgba(82, 196, 26, 0.7);
   background: rgba(82, 196, 26, 0.22);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .voteOptionButton:disabled {

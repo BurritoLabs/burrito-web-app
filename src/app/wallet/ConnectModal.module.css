@@ -32,14 +32,14 @@
   font-size: var(--font-size-title-lg);
   font-weight: var(--bold);
   letter-spacing: -0.01em;
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .subtitle {
   font-size: var(--font-size-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   margin-top: 2px;
 }
 
@@ -52,7 +52,7 @@
   display: grid;
   place-items: center;
   gap: 0;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   position: relative;
 }
 
@@ -109,19 +109,19 @@
   font-size: var(--font-size-xxxs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
 }
 
 .connectedName {
   font-size: var(--font-size);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
   margin-top: 2px;
 }
 
 .connectedAddress {
   font-size: var(--font-size);
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   margin-top: 2px;
 }
 
@@ -161,7 +161,7 @@
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  color: var(--bui-color-text);
   text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
@@ -183,7 +183,7 @@
 
 .walletMeta {
   font-size: var(--font-size-xs);
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
   margin-top: 2px;
 }
 
@@ -194,7 +194,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
   background: rgba(255, 255, 255, 0.08);
 }
 

@@ -13,7 +13,7 @@
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.035);
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   white-space: nowrap;
   cursor: pointer;
@@ -81,12 +81,12 @@
 
 .summary span,
 .modalHeader span {
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
 }
 
 .summary strong {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 18px;
   font-weight: var(--bold);
 }
@@ -151,7 +151,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -159,7 +159,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 15px;
   font-weight: var(--bold);
 }
@@ -187,12 +187,12 @@
 }
 
 .stateBand strong {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: var(--font-size-title);
 }
 
 .stateBand span {
-  color: rgba(234, 245, 235, 0.6);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   line-height: 1.45;
 }
@@ -211,7 +211,7 @@
 
 .limitNotice {
   text-align: center;
-  color: rgba(234, 245, 235, 0.55);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
 }
 
@@ -219,7 +219,7 @@
   padding: 18px 0;
   border-top: var(--border-width) solid var(--card-border);
   border-bottom: var(--border-width) solid var(--card-border);
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   line-height: 1.5;
   text-align: center;
@@ -273,7 +273,7 @@
 .modalHeader h2 {
   margin: 0;
   overflow-wrap: anywhere;
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: 20px;
   line-height: 1.2;
   letter-spacing: 0;
@@ -289,7 +289,7 @@
   border: var(--border-width) solid var(--card-border);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.04);
-  color: rgba(234, 245, 235, 0.72);
+  color: var(--bui-color-text-secondary);
   cursor: pointer;
 }
 
@@ -324,14 +324,14 @@
 .fieldHint,
 .transferWarning {
   margin: 0;
-  color: rgba(234, 245, 235, 0.7);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
 .descriptionMuted {
-  color: rgba(234, 245, 235, 0.44);
+  color: var(--bui-color-text-secondary);
 }
 
 .detailList {
@@ -355,12 +355,12 @@
 }
 
 .detailList dt {
-  color: rgba(234, 245, 235, 0.5);
+  color: var(--bui-color-text-secondary);
 }
 
 .detailList dd {
   overflow-wrap: anywhere;
-  color: #ffffff;
+  color: var(--bui-color-text);
   text-align: right;
 }
 
@@ -388,12 +388,12 @@
 }
 
 .attributes span {
-  color: rgba(234, 245, 235, 0.5);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-xs);
 }
 
 .attributes strong {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: var(--font-size-small);
 }
 
@@ -414,7 +414,7 @@
 }
 
 .fieldLabel {
-  color: rgba(234, 245, 235, 0.82);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
 }
@@ -426,7 +426,7 @@
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font: inherit;
   font-size: 14px;
   outline: none;
@@ -490,7 +490,7 @@
 .secondaryButton {
   border-color: var(--card-border);
   background: rgba(255, 255, 255, 0.04);
-  color: rgba(234, 245, 235, 0.76);
+  color: var(--bui-color-text-secondary);
 }
 
 .loadingCard {

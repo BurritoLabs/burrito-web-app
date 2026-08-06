@@ -36,7 +36,7 @@
 .title {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .closeButton {
@@ -46,7 +46,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.06);
   position: relative;
-  color: rgba(234, 245, 235, 0.8);
+  color: var(--bui-color-text-secondary);
 }
 
 .closeButton span {
@@ -106,7 +106,7 @@
 .optionTitle {
   font-size: var(--font-size-title);
   font-weight: var(--bold);
-  color: #ffffff;
+  color: var(--bui-color-text);
 }
 
 .optionTitleRow {
@@ -133,7 +133,7 @@
 .optionMeta {
   margin-top: 2px;
   font-size: var(--font-size-small);
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
 }
 
 .primaryLink {

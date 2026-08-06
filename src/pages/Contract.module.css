@@ -25,7 +25,7 @@
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(234, 245, 235, 0.58);
+  color: var(--bui-color-text-secondary);
 }
 
 .searchInput {
@@ -52,7 +52,7 @@
   justify-items: center;
   gap: 12px;
   text-align: center;
-  color: rgba(234, 245, 235, 0.78);
+  color: var(--bui-color-text-secondary);
 }
 
 .stateIcon {
@@ -73,7 +73,7 @@
 
 .stateText {
   font-size: var(--font-size-label);
-  color: rgba(234, 245, 235, 0.75);
+  color: var(--bui-color-text-secondary);
 }
 
 .resultCard {
@@ -93,7 +93,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-title);
   font-weight: var(--normal);
 }
@@ -140,7 +140,7 @@
 }
 
 .metaValue {
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-size: var(--font-size);
   font-weight: var(--bold);
 }
@@ -152,7 +152,7 @@
 
 .initMsgTitle {
   font-size: var(--font-size-label);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
 }
 
@@ -167,7 +167,7 @@
   border-radius: var(--radius-lg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.03);
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New",
     monospace;
   font-size: var(--font-size-small);
@@ -215,7 +215,7 @@
 
 .queryTitle {
   font-size: var(--font-size-title);
-  color: #ffffff;
+  color: var(--bui-color-text);
   font-weight: var(--bold);
 }
 
@@ -224,7 +224,7 @@
   height: 28px;
   border: 0;
   background: transparent;
-  color: rgba(234, 245, 235, 0.78);
+  color: var(--bui-color-text-secondary);
   padding: 0;
   position: relative;
 }
@@ -254,7 +254,7 @@
 }
 
 .queryLabel {
-  color: rgba(234, 245, 235, 0.86);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-label);
   font-weight: var(--bold);
 }
@@ -300,7 +300,7 @@
   border-radius: var(--radius-lg);
   border: var(--border-width) solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.03);
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New",
     monospace;
   font-size: var(--font-size-small);
@@ -324,7 +324,7 @@
 }
 
 .txLabel {
-  color: rgba(234, 245, 235, 0.86);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-label);
   font-weight: var(--bold);
 }
@@ -356,7 +356,7 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  color: var(--bui-color-text);
   padding: 0 12px;
   margin-right: 10px;
   font-size: var(--font-size-small);
@@ -381,7 +381,7 @@
 
 .txHint {
   margin-top: -2px;
-  color: rgba(234, 245, 235, 0.56);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
 }
 
@@ -400,7 +400,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: rgba(234, 245, 235, 0.82);
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--normal);
 }
@@ -416,7 +416,7 @@
   border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.28);
   border-radius: var(--radius-lg);
   background: rgba(var(--active-chain-rgb), 0.08);
-  color: rgba(234, 245, 235, 0.9);
+  color: var(--bui-color-text-secondary);
   padding: 10px 12px;
   font-size: var(--font-size-small);
 }
