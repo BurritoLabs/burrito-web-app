@@ -21,7 +21,18 @@ import { fetchWithEndpointFallback } from "./endpointFallback"
 import { fetchVerifiedTokenRegistry } from "./tokenRegistry"
 import { writeLocalStorageValue } from "../utils/safeStorage"
 
-export type Cw20Token = {
+export type AssetProvenance = {
+  verificationStatus?: string
+  verificationMethod?: string
+  originChainId?: string
+  originDenom?: string
+  issuer?: string
+  transport?: string
+  provenanceLabel?: string
+  source?: string
+}
+
+export type Cw20Token = AssetProvenance & {
   protocol?: string
   symbol: string
   token: string
@@ -31,7 +42,7 @@ export type Cw20Token = {
   name?: string
 }
 
-export type IbcToken = {
+export type IbcToken = AssetProvenance & {
   denom: string
   base_denom: string
   symbol: string
@@ -495,6 +506,7 @@ const mergeCw20TokenMetadata = ({
     fallback?.symbol?.trim()
   const name = resolveSafeDisplayName(nameCandidate, symbol)
   return {
+    ...fallback,
     token: contract,
     symbol,
     name,

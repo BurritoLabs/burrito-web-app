@@ -4,6 +4,7 @@ import WalletAssetIcon from "../../app/wallet/WalletAssetIcon"
 import type { WalletAssetRow } from "../../app/wallet/useWalletAssets"
 import { formatTokenAmount, formatUsd } from "../../app/utils/format"
 import styles from "../Wallet.module.css"
+import { getAssetProvenanceLabel } from "../../app/utils/assetProvenance"
 
 type WalletAsset = WalletAssetRow
 
@@ -164,7 +165,12 @@ export const CoinsSection = memo(
                             candidates={asset.iconCandidates ?? []}
                           />
                         </div>
-                        <div className={styles.assetName}>{asset.symbol}</div>
+                        <div className={styles.assetName}>
+                          <span>{asset.symbol}</span>
+                          {getAssetProvenanceLabel(asset) ? (
+                            <small>{getAssetProvenanceLabel(asset)}</small>
+                          ) : null}
+                        </div>
                       </div>
                       <div className={styles.assetActions}>
                         {showBuy ? (
@@ -274,7 +280,12 @@ export const TokensSection = memo(
                             candidates={asset.iconCandidates ?? []}
                           />
                         </div>
-                        <div className={styles.assetName}>{asset.symbol}</div>
+                        <div className={styles.assetName}>
+                          <span>{asset.symbol}</span>
+                          {getAssetProvenanceLabel(asset) ? (
+                            <small>{getAssetProvenanceLabel(asset)}</small>
+                          ) : null}
+                        </div>
                       </div>
                       <div className={styles.assetActions}>
                         <button type="button" onClick={() => onSendAsset(asset)}>

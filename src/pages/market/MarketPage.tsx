@@ -34,6 +34,7 @@ import {
   resolveNativeAssetIdentity
 } from "../../app/utils/assetIdentity"
 import { splitDexLabel } from "../../app/utils/dexDisplay"
+import { getAssetProvenanceLabel } from "../../app/utils/assetProvenance"
 import {
   formatUsdCompact,
   numberToPlainString,
@@ -68,6 +69,10 @@ type ResolvedAsset = {
   iconCandidates: string[]
   isLunc: boolean
   isUstc: boolean
+  provenanceLabel?: string
+  originChainId?: string
+  issuer?: string
+  transport?: string
 }
 
 type MarketCard = {
@@ -456,7 +461,11 @@ const Market = () => {
               baseDenom: ibc?.base_denom
             }),
             isLunc: false,
-            isUstc: false
+            isUstc: false,
+            provenanceLabel: ibc?.provenanceLabel,
+            originChainId: ibc?.originChainId,
+            issuer: ibc?.issuer,
+            transport: ibc?.transport
           }
         }
         const nativeToken = nativeWhitelist[denom.toLowerCase()]
@@ -493,7 +502,11 @@ const Market = () => {
         decimals: token?.decimals ?? 6,
         iconCandidates: buildCw20IconCandidates(token?.icon, token?.symbol),
         isLunc: false,
-        isUstc: false
+        isUstc: false,
+        provenanceLabel: token?.provenanceLabel,
+        originChainId: token?.originChainId,
+        issuer: token?.issuer,
+        transport: token?.transport
       }
     },
     [chainKey, cw20Whitelist, ibcWhitelist, nativeWhitelist]
@@ -1310,6 +1323,13 @@ const Market = () => {
                         value: card.liquidityUsd
                       }
                 const { dexName, dexVersion } = splitDexLabel(card.dexLabel)
+                const provenanceTags = Array.from(
+                  new Set(
+                    [card.left, card.right]
+                      .map((asset) => getAssetProvenanceLabel(asset, true))
+                      .filter((label): label is string => Boolean(label))
+                  )
+                )
                 return (
                   <Link
                     key={card.id}
@@ -1358,6 +1378,9 @@ const Market = () => {
                           <div className={styles.tags}>
                             <span className={styles.dexTag}>{dexName}</span>
                             {dexVersion ? <span className={styles.dexVersionTag}>{dexVersion}</span> : null}
+                            {provenanceTags.map((label) => (
+                              <span key={label} className={styles.provenanceTag}>{label}</span>
+                            ))}
                           </div>
                         </div>
                       </header>

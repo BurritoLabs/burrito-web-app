@@ -49,6 +49,7 @@ import {
   resolveNativeAssetIdentity
 } from "../../app/utils/assetIdentity"
 import { splitDexLabel } from "../../app/utils/dexDisplay"
+import { getAssetProvenanceLabel } from "../../app/utils/assetProvenance"
 import { formatUsdCompact } from "../../app/utils/numberDisplay"
 import {
   MIN_CANDLES_FOR_CHART,
@@ -108,6 +109,11 @@ type ResolvedAsset = {
   iconCandidates: string[]
   isLunc: boolean
   isUstc: boolean
+  provenanceLabel?: string
+  originChainId?: string
+  originDenom?: string
+  issuer?: string
+  transport?: string
 }
 
 type DetailCopyItem = {
@@ -478,7 +484,12 @@ const MarketPairDetails = () => {
               baseDenom: ibc?.base_denom
             }),
           isLunc: false,
-          isUstc: false
+          isUstc: false,
+          provenanceLabel: ibc?.provenanceLabel,
+          originChainId: ibc?.originChainId,
+          originDenom: ibc?.originDenom,
+          issuer: ibc?.issuer,
+          transport: ibc?.transport
         }
       }
       const nativeToken = nativeWhitelist[denom.toLowerCase()]
@@ -515,7 +526,12 @@ const MarketPairDetails = () => {
       decimals: token?.decimals ?? 6,
       iconCandidates: buildCw20IconCandidates(token?.icon, token?.symbol),
       isLunc: false,
-      isUstc: false
+      isUstc: false,
+      provenanceLabel: token?.provenanceLabel,
+      originChainId: token?.originChainId,
+      originDenom: token?.originDenom,
+      issuer: token?.issuer,
+      transport: token?.transport
     }
   }
 
@@ -1242,6 +1258,16 @@ const MarketPairDetails = () => {
     buildDetailCopyItem("base", detail.left),
     buildDetailCopyItem("quote", detail.right)
   ]
+  const provenanceRows = [detail.left, detail.right].flatMap((asset) => {
+    const label = getAssetProvenanceLabel(asset)
+    if (!label) return []
+    return [{
+      key: asset.id,
+      symbol: asset.symbol,
+      label,
+      issuer: asset.issuer
+    }]
+  })
   const handleCopyDetailAddress = (key: string, value: string) => {
     void navigator.clipboard
       ?.writeText(value)
@@ -1301,6 +1327,15 @@ const MarketPairDetails = () => {
               <div className={styles.tags}>
                 <span className={styles.dexTag}>{dexName}</span>
                 {dexVersion ? <span className={styles.dexVersionTag}>{dexVersion}</span> : null}
+                {provenanceRows.map((item) => (
+                  <span
+                    key={item.key}
+                    className={styles.provenanceTag}
+                    title={item.issuer ? `${item.label}, issued by ${item.issuer}` : item.label}
+                  >
+                    {item.symbol}: {item.label}
+                  </span>
+                ))}
               </div>
             </div>
           </div>

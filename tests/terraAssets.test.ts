@@ -8,6 +8,7 @@ import {
   mergeResolvedIbcAssets,
   pickChainAssets
 } from "../src/app/data/terraAssets"
+import { mapVerifiedRegistryAssets } from "../src/app/data/tokenRegistry"
 
 describe("Terra asset registry selection", () => {
   const registry = {
@@ -152,6 +153,43 @@ describe("Terra asset registry selection", () => {
       icon: registryLogo,
       decimals: 18,
       decimalsVerified: true
+    })
+  })
+
+  it("preserves verified IBC provenance from the Burrito registry", () => {
+    const hash = "B".repeat(64)
+    const registry = mapVerifiedRegistryAssets([
+      {
+        chainId: "columbus-5",
+        type: "ibc",
+        assetKey: `ibc/${hash}`,
+        name: "USD Coin (Noble)",
+        symbol: "USDC",
+        decimals: 6,
+        logoUrl: null,
+        baseDenom: "uusdc",
+        path: "transfer/channel-113",
+        verificationStatus: "trace_verified",
+        verificationMethod: "ibc_trace_hash",
+        originChainId: "noble-1",
+        originDenom: "uusdc",
+        issuer: "Circle",
+        transport: "ibc",
+        provenanceLabel: "Noble",
+        source: "cosmos_chain_registry",
+        verifiedAt: 1,
+        updatedAt: 1
+      }
+    ])
+
+    expect(registry.ibc[hash]).toMatchObject({
+      symbol: "USDC",
+      name: "USD Coin (Noble)",
+      path: "transfer/channel-113",
+      verificationStatus: "trace_verified",
+      originChainId: "noble-1",
+      issuer: "Circle",
+      provenanceLabel: "Noble"
     })
   })
 

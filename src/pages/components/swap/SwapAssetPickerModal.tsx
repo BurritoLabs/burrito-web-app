@@ -2,6 +2,7 @@ import { createPortal } from "react-dom"
 import styles from "../../Swap.module.css"
 import { formatTokenAmount } from "../../../app/utils/format"
 import SwapAssetIcon from "./SwapAssetIcon"
+import { getAssetProvenanceLabel } from "../../../app/utils/assetProvenance"
 
 type SwapPickerTarget = "from" | "to"
 
@@ -12,6 +13,10 @@ type SwapPickerAsset = {
   name: string
   decimals: number
   iconCandidates: string[]
+  provenanceLabel?: string
+  originChainId?: string
+  issuer?: string
+  transport?: string
 }
 
 type SwapAssetPickerModalProps = {
@@ -71,6 +76,7 @@ const SwapAssetPickerModal = ({
         </div>
         <div className={styles.pickerList}>
           {pickerAssets.map((asset) => {
+            const provenance = getAssetProvenanceLabel(asset)
             const isSelected =
               (pickerTarget === "from" && asset.id === fromAssetId) ||
               (pickerTarget === "to" && asset.id === toAssetId)
@@ -95,6 +101,7 @@ const SwapAssetPickerModal = ({
                     <strong>{asset.symbol}</strong>
                     <small>
                       {asset.name !== asset.symbol ? `${asset.name} · ` : ""}
+                      {provenance ? `${provenance} · ` : ""}
                       {formatAssetIdentity(asset)} · Balance{" "}
                       {formatTokenAmount(
                         (assetBalanceMap.get(asset.id) ?? 0n).toString(),

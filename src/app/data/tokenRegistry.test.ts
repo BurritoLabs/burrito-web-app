@@ -27,6 +27,14 @@ describe("mapVerifiedRegistryAssets", () => {
         logoUrl: null,
         baseDenom: "uatom",
         path: "transfer/channel-0",
+        verificationStatus: "trace_verified",
+        verificationMethod: "ibc_trace_hash",
+        originChainId: "cosmoshub-4",
+        originDenom: "uatom",
+        issuer: "Cosmos Hub",
+        transport: "ibc",
+        provenanceLabel: "Cosmos Hub",
+        source: "cosmos_chain_registry",
         verifiedAt: 1,
         updatedAt: 1
       }
@@ -36,6 +44,9 @@ describe("mapVerifiedRegistryAssets", () => {
     expect(mapped.ibc[hash]?.symbol).toBe("ATOM")
     expect(mapped.ibc[hash]?.base_denom).toBe("uatom")
     expect(mapped.ibc[hash]?.path).toBe("transfer/channel-0")
+    expect(mapped.ibc[hash]?.verificationStatus).toBe("trace_verified")
+    expect(mapped.ibc[hash]?.originChainId).toBe("cosmoshub-4")
+    expect(mapped.ibc[hash]?.provenanceLabel).toBe("Cosmos Hub")
   })
 
   it("ignores malformed verified records", () => {

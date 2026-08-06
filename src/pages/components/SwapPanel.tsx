@@ -41,6 +41,7 @@ import {
   resolveSafeDisplayName,
   resolveSafeDisplaySymbol
 } from "../../app/utils/assetIdentity"
+import { getAssetProvenanceLabel } from "../../app/utils/assetProvenance"
 import {
   isTxAlreadyInCacheError,
   parseSequenceMismatchExpected
@@ -95,6 +96,10 @@ type SwapAsset = {
   denom?: string
   contract?: string
   iconCandidates: string[]
+  provenanceLabel?: string
+  originChainId?: string
+  issuer?: string
+  transport?: string
 }
 
 const EMPTY_BALANCES: Array<{ denom: string; amount: string }> = []
@@ -932,6 +937,10 @@ const SwapPanel = ({
           name: resolveSafeDisplayName(token?.name, symbol),
           denom,
           decimals: token?.decimals ?? 6,
+          provenanceLabel: token?.provenanceLabel,
+          originChainId: token?.originChainId,
+          issuer: token?.issuer,
+          transport: token?.transport,
           iconCandidates: buildIbcAssetIconCandidates([token?.icon], "/system/ibc.svg", {
             baseDenom: token?.base_denom,
             symbol
@@ -1039,6 +1048,10 @@ const SwapPanel = ({
           decimals: Number.isFinite(decimals) ? decimals : 6,
           decimalsVerified: token.decimalsVerified,
           contract,
+          provenanceLabel: token.provenanceLabel,
+          originChainId: token.originChainId,
+          issuer: token.issuer,
+          transport: token.transport,
           iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
         } satisfies SwapAsset)
       })
@@ -1442,7 +1455,7 @@ const SwapPanel = ({
       .filter((asset) => {
         if (pickerTarget === "to" && asset.id === fromAsset.id) return false
         if (!query) return true
-        const source = `${asset.symbol} ${asset.name} ${asset.contract ?? asset.denom ?? ""}`.toLowerCase()
+        const source = `${asset.symbol} ${asset.name} ${getAssetProvenanceLabel(asset) ?? ""} ${asset.issuer ?? ""} ${asset.contract ?? asset.denom ?? ""}`.toLowerCase()
         return source.includes(query)
       })
       .sort((a, b) => {

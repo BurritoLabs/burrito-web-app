@@ -51,6 +51,10 @@ export type WalletAssetRow = {
   whitelisted: boolean
   isBuyable: boolean
   iconCandidates: string[]
+  provenanceLabel?: string
+  originChainId?: string
+  issuer?: string
+  transport?: string
 }
 
 export type WalletTokenCatalogItem = {
@@ -804,6 +808,10 @@ export const useWalletAssets = (accountAddress?: string) => {
             chainCount: 1,
             whitelisted: Boolean(ibcToken),
             isBuyable: false,
+            provenanceLabel: ibcToken?.provenanceLabel,
+            originChainId: ibcToken?.originChainId,
+            issuer: ibcToken?.issuer,
+            transport: ibcToken?.transport,
             iconCandidates: buildWalletIconCandidates({
               icon: ibcToken?.icon,
               denom: baseDenom,
@@ -933,6 +941,10 @@ export const useWalletAssets = (accountAddress?: string) => {
           chainCount: 1,
           whitelisted: true,
           isBuyable: false,
+          provenanceLabel: token.provenanceLabel,
+          originChainId: token.originChainId,
+          issuer: token.issuer,
+          transport: token.transport,
           iconCandidates: buildCw20IconCandidates(token.icon, token.symbol)
         }
       })

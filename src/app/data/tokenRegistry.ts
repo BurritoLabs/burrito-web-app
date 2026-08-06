@@ -18,6 +18,14 @@ type VerifiedRegistryAsset = {
   logoUrl: string | null
   baseDenom?: string
   path?: string
+  verificationStatus?: string
+  verificationMethod?: string
+  originChainId?: string
+  originDenom?: string
+  issuer?: string
+  transport?: string
+  provenanceLabel?: string
+  source?: string
   aliases?: string[]
   verifiedAt: number | null
   updatedAt: number
@@ -58,7 +66,15 @@ export const mapVerifiedRegistryAssets = (
         symbol,
         name,
         decimals: validDecimals(asset.decimals),
-        icon
+        icon,
+        verificationStatus: asset.verificationStatus,
+        verificationMethod: asset.verificationMethod,
+        originChainId: asset.originChainId,
+        originDenom: asset.originDenom,
+        issuer: asset.issuer,
+        transport: asset.transport,
+        provenanceLabel: asset.provenanceLabel,
+        source: asset.source
       }
       return
     }
@@ -74,7 +90,15 @@ export const mapVerifiedRegistryAssets = (
       name,
       decimals: validDecimals(asset.decimals),
       icon,
-      path: asset.path?.trim() || undefined
+      path: asset.path?.trim() || undefined,
+      verificationStatus: asset.verificationStatus,
+      verificationMethod: asset.verificationMethod,
+      originChainId: asset.originChainId,
+      originDenom: asset.originDenom,
+      issuer: asset.issuer,
+      transport: asset.transport,
+      provenanceLabel: asset.provenanceLabel,
+      source: asset.source
     }
   })
   return result
