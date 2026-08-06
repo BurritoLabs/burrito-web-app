@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent
+} from "react"
 import { createPortal } from "react-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import PageShell from "../PageShell"
@@ -17,11 +23,18 @@ import {
   type OwnedNft
 } from "../../app/data/nfts"
 import { getAddressExplorerUrl } from "../../app/explorer"
+import {
+  readLocalStorageValue,
+  writeLocalStorageValue
+} from "../../app/utils/safeStorage"
 import { formatTxError } from "../../app/utils/txError"
 import { useWallet } from "../../app/wallet/WalletContext"
 
 const PAGE_SIZE = 24
 const NFT_IMAGE_TIMEOUT_MS = 4_000
+const HIDE_UNAVAILABLE_NFTS_KEY = "burritoHideUnavailableNfts"
+
+type NftImageAvailability = "available" | "unavailable"
 
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -54,7 +67,15 @@ const ExternalIcon = () => (
   </svg>
 )
 
-const NftImage = ({ alt, image }: { alt: string; image?: string }) => {
+const NftImage = ({
+  alt,
+  image,
+  onAvailabilityChange
+}: {
+  alt: string
+  image?: string
+  onAvailabilityChange?: (availability: NftImageAvailability) => void
+}) => {
   const candidates = useMemo(() => buildNftImageCandidates(image), [image])
   const [resolvedSrc, setResolvedSrc] = useState(DEFAULT_NFT_IMAGE)
 
@@ -64,7 +85,11 @@ const NftImage = ({ alt, image }: { alt: string; image?: string }) => {
     let timeoutId: number | undefined
 
     const tryCandidate = (index: number) => {
-      if (cancelled || index >= candidates.length) return
+      if (cancelled) return
+      if (index >= candidates.length) {
+        onAvailabilityChange?.("unavailable")
+        return
+      }
       const candidate = candidates[index]
       const preload = new Image()
       activeImage = preload
@@ -80,7 +105,10 @@ const NftImage = ({ alt, image }: { alt: string; image?: string }) => {
       preload.referrerPolicy = "no-referrer"
       preload.onload = () => {
         cleanup()
-        if (!cancelled) setResolvedSrc(candidate)
+        if (!cancelled) {
+          setResolvedSrc(candidate)
+          onAvailabilityChange?.("available")
+        }
       }
       preload.onerror = tryNext
       timeoutId = window.setTimeout(tryNext, NFT_IMAGE_TIMEOUT_MS)
@@ -96,7 +124,7 @@ const NftImage = ({ alt, image }: { alt: string; image?: string }) => {
         activeImage.onerror = null
       }
     }
-  }, [candidates])
+  }, [candidates, onAvailabilityChange])
 
   return <img src={resolvedSrc} alt={alt} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
 }
@@ -111,7 +139,22 @@ const mergeItemMetadata = (item: OwnedNft, metadata?: NftMetadata): OwnedNft => 
   attributes: item.attributes.length ? item.attributes : (metadata?.attributes ?? [])
 })
 
-const NftCard = ({ item, onOpen }: { item: OwnedNft; onOpen: (item: OwnedNft) => void }) => {
+const NftCard = ({
+  hidden,
+  item,
+  itemKey,
+  onImageAvailabilityChange,
+  onOpen
+}: {
+  hidden: boolean
+  item: OwnedNft
+  itemKey: string
+  onImageAvailabilityChange: (
+    itemKey: string,
+    availability: NftImageAvailability
+  ) => void
+  onOpen: (item: OwnedNft) => void
+}) => {
   const metadataQuery = useQuery({
     queryKey: ["nft-metadata", item.contract, item.tokenId, item.tokenUri],
     queryFn: () => fetchNftMetadata(item.tokenUri ?? ""),
@@ -120,11 +163,23 @@ const NftCard = ({ item, onOpen }: { item: OwnedNft; onOpen: (item: OwnedNft) =>
   })
   const resolvedItem = mergeItemMetadata(item, metadataQuery.data)
   const name = resolvedItem.name ?? `#${item.tokenId}`
+  const handleAvailabilityChange = useCallback(
+    (availability: NftImageAvailability) => {
+      if (availability === "unavailable" && metadataQuery.isLoading) return
+      onImageAvailabilityChange(itemKey, availability)
+    },
+    [itemKey, metadataQuery.isLoading, onImageAvailabilityChange]
+  )
 
   return (
-    <button type="button" className={styles.nftCard} onClick={() => onOpen(resolvedItem)} aria-label={`View ${name}`}>
+    <button type="button" className={styles.nftCard} onClick={() => onOpen(resolvedItem)} aria-label={`View ${name}`} hidden={hidden}>
       <div className={styles.media}>
-        <NftImage key={resolvedItem.image ?? DEFAULT_NFT_IMAGE} alt={name} image={resolvedItem.image} />
+        <NftImage
+          key={resolvedItem.image ?? DEFAULT_NFT_IMAGE}
+          alt={name}
+          image={resolvedItem.image}
+          onAvailabilityChange={handleAvailabilityChange}
+        />
       </div>
       <div className={styles.cardBody}>
         <div className={styles.collectionName}>{item.collectionName}</div>
@@ -171,6 +226,12 @@ const NftPage = () => {
   const [recipient, setRecipient] = useState("")
   const [sendError, setSendError] = useState<string>()
   const [sendSubmitting, setSendSubmitting] = useState(false)
+  const [hideUnavailable, setHideUnavailable] = useState(
+    () => readLocalStorageValue(HIDE_UNAVAILABLE_NFTS_KEY) !== "false"
+  )
+  const [imageAvailability, setImageAvailability] = useState<
+    Record<string, NftImageAvailability>
+  >({})
 
   const closeDetails = () => {
     setSelectedItem(undefined)
@@ -208,10 +269,15 @@ const NftPage = () => {
   const detailedItem = selectedItem ? mergeItemMetadata(selectedItem, selectedMetadataQuery.data) : undefined
 
   useEffect(() => {
+    writeLocalStorageValue(HIDE_UNAVAILABLE_NFTS_KEY, String(hideUnavailable))
+  }, [hideUnavailable])
+
+  useEffect(() => {
     setSelectedItem(undefined)
     setAddCollectionOpen(false)
     setSendOpen(false)
     setRecipient("")
+    setImageAvailability({})
   }, [chain.chainId, accountAddress])
 
   useEffect(() => {
@@ -239,6 +305,24 @@ const NftPage = () => {
   const visibleCount = pagination.key === paginationKey ? pagination.count : PAGE_SIZE
   const visibleItems = items.slice(0, visibleCount)
   const collectionCount = new Set(items.map((item) => item.contract)).size
+  const getItemKey = (item: OwnedNft) => `${item.contract}:${item.tokenId}`
+  const visibleImageChecksComplete = visibleItems.every(
+    (item) => imageAvailability[getItemKey(item)] !== undefined
+  )
+  const visibleAvailableCount = visibleItems.filter(
+    (item) => imageAvailability[getItemKey(item)] === "available"
+  ).length
+
+  const handleImageAvailabilityChange = useCallback(
+    (itemKey: string, availability: NftImageAvailability) => {
+      setImageAvailability((current) =>
+        current[itemKey] === availability
+          ? current
+          : { ...current, [itemKey]: availability }
+      )
+    },
+    []
+  )
 
   const handleRefresh = () => {
     if (!accountAddress) return
@@ -323,6 +407,14 @@ const NftPage = () => {
       title="NFT"
       extra={accountAddress ? (
         <div className={styles.headerActions}>
+          <label className={styles.availabilityFilter}>
+            <input
+              type="checkbox"
+              checked={hideUnavailable}
+              onChange={(event) => setHideUnavailable(event.target.checked)}
+            />
+            <span>Hide unavailable</span>
+          </label>
           <button type="button" className={styles.addButton} onClick={openAddCollection}><PlusIcon /><span>Add collection</span></button>
           <button type="button" className={styles.refreshButton} onClick={handleRefresh} disabled={nftQuery.isFetching}><RefreshIcon /><span>Refresh</span></button>
         </div>
@@ -348,7 +440,25 @@ const NftPage = () => {
           </div>
           {items.length ? (
             <>
-              <div className={styles.nftGrid}>{visibleItems.map((item) => <NftCard key={`${item.contract}:${item.tokenId}`} item={item} onOpen={openDetails} />)}</div>
+              <div className={styles.nftGrid}>{visibleItems.map((item) => {
+                const itemKey = getItemKey(item)
+                const availability = imageAvailability[itemKey]
+                return (
+                  <NftCard
+                    key={itemKey}
+                    hidden={hideUnavailable && availability !== "available"}
+                    item={item}
+                    itemKey={itemKey}
+                    onImageAvailabilityChange={handleImageAvailabilityChange}
+                    onOpen={openDetails}
+                  />
+                )
+              })}</div>
+              {hideUnavailable && visibleImageChecksComplete && visibleAvailableCount === 0 ? (
+                <div className={styles.filterNotice}>
+                  All NFTs on this page have unavailable images. Turn off the filter to view them.
+                </div>
+              ) : null}
               {visibleCount < items.length ? <button type="button" className={styles.loadMoreButton} onClick={() => setPagination({ key: paginationKey, count: visibleCount + PAGE_SIZE })}>Load more</button> : null}
               {nftQuery.data?.truncated ? <div className={styles.limitNotice}>Showing the first 400 NFTs in this wallet.</div> : null}
             </>
