@@ -1,11 +1,22 @@
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .refreshButton,
+.addButton,
 .retryButton,
-.loadMoreButton {
+.loadMoreButton,
+.primaryButton,
+.secondaryButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
+  min-height: 34px;
   border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.55);
+  border-radius: var(--radius-md);
   background: rgba(var(--active-chain-rgb), 0.12);
   color: var(--chain-accent);
   font: inherit;
@@ -14,13 +25,16 @@
   cursor: pointer;
 }
 
-.refreshButton {
-  min-height: 34px;
+.refreshButton,
+.addButton {
   padding: 7px 12px;
-  border-radius: var(--radius-md);
 }
 
-.refreshButton:disabled {
+.refreshButton:disabled,
+.addButton:disabled,
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.closeButton:disabled {
   cursor: wait;
   opacity: 0.55;
 }
@@ -42,7 +56,8 @@
   border-left: var(--border-width) solid var(--card-border);
 }
 
-.summary span {
+.summary span,
+.modalHeader span {
   color: rgba(234, 245, 235, 0.58);
   font-size: var(--font-size-small);
 }
@@ -68,6 +83,24 @@
   background: var(--card-bg);
 }
 
+.nftCard {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.nftCard:hover,
+.nftCard:focus-visible {
+  z-index: 1;
+  border-color: rgba(var(--active-chain-rgb), 0.7);
+  box-shadow: 0 0 0 1px rgba(var(--active-chain-rgb), 0.16), 0 10px 26px rgba(0, 0, 0, 0.22);
+  transform: translateY(-2px);
+  outline: none;
+}
+
 .media,
 .loadingMedia {
   width: 100%;
@@ -76,7 +109,8 @@
   background: rgba(255, 255, 255, 0.035);
 }
 
-.media img {
+.media img,
+.detailMedia img {
   width: 100%;
   height: 100%;
   display: block;
@@ -142,9 +176,7 @@
 
 .retryButton {
   margin-left: auto;
-  min-height: 34px;
   padding: 7px 14px;
-  border-radius: var(--radius-md);
 }
 
 .loadMoreButton {
@@ -152,13 +184,280 @@
   min-width: 128px;
   min-height: 38px;
   padding: 8px 18px;
-  border-radius: var(--radius-md);
 }
 
 .limitNotice {
   text-align: center;
   color: rgba(234, 245, 235, 0.55);
   font-size: var(--font-size-small);
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 8, 7, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.modalPanel {
+  width: min(900px, 100%);
+  max-height: min(820px, calc(100dvh - 48px));
+  overflow: auto;
+  border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.34);
+  border-radius: var(--radius-lg);
+  background: #071712;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+}
+
+.compactModal {
+  width: min(520px, 100%);
+}
+
+.modalHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: var(--border-width) solid var(--card-border);
+  background: rgba(7, 23, 18, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.modalHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.closeButton {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: var(--border-width) solid var(--card-border);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(234, 245, 235, 0.72);
+  cursor: pointer;
+}
+
+.detailLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.92fr) minmax(320px, 1.08fr);
+  min-height: 460px;
+}
+
+.detailMedia {
+  min-width: 0;
+  min-height: 420px;
+  overflow: hidden;
+  border-right: var(--border-width) solid var(--card-border);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.detailMedia img {
+  object-fit: contain;
+}
+
+.detailBody,
+.modalForm {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 22px;
+}
+
+.description,
+.descriptionMuted,
+.fieldHint,
+.transferWarning {
+  margin: 0;
+  color: rgba(234, 245, 235, 0.7);
+  font-size: var(--font-size-small);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.descriptionMuted {
+  color: rgba(234, 245, 235, 0.44);
+}
+
+.detailList {
+  display: grid;
+  margin: 0;
+  border-top: var(--border-width) solid var(--card-border);
+}
+
+.detailList > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.45fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: var(--border-width) solid var(--card-border);
+}
+
+.detailList dt,
+.detailList dd {
+  margin: 0;
+  font-size: var(--font-size-small);
+}
+
+.detailList dt {
+  color: rgba(234, 245, 235, 0.5);
+}
+
+.detailList dd {
+  overflow-wrap: anywhere;
+  color: #ffffff;
+  text-align: right;
+}
+
+.attributes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.attributes > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px 11px;
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.attributes span,
+.attributes strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attributes span {
+  color: rgba(234, 245, 235, 0.5);
+  font-size: var(--font-size-xs);
+}
+
+.attributes strong {
+  color: #ffffff;
+  font-size: var(--font-size-small);
+}
+
+.detailLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 14px;
+}
+
+.detailLinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--chain-accent);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+  text-decoration: none;
+}
+
+.fieldLabel {
+  color: rgba(234, 245, 235, 0.82);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+.textInput {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: var(--border-width) solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.textInput:focus {
+  border-color: rgba(var(--active-chain-rgb), 0.75);
+  box-shadow: 0 0 0 2px rgba(var(--active-chain-rgb), 0.12);
+}
+
+.modalForm .fieldLabel + .textInput,
+.sendForm .fieldLabel + .textInput {
+  margin-top: -10px;
+}
+
+.fieldHint,
+.transferWarning {
+  margin-top: -10px;
+}
+
+.transferWarning {
+  color: #ffd59e;
+}
+
+.formError {
+  padding: 10px 12px;
+  border: var(--border-width) solid rgba(248, 113, 113, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
+  font-size: var(--font-size-small);
+  line-height: 1.45;
+}
+
+.sendForm {
+  display: grid;
+  gap: 16px;
+  padding-top: 18px;
+  border-top: var(--border-width) solid var(--card-border);
+}
+
+.formActions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  gap: 10px;
+}
+
+.primaryButton,
+.secondaryButton {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 16px;
+}
+
+.primaryButton {
+  border-color: var(--chain-accent);
+  background: var(--chain-accent);
+  color: #03100c;
+}
+
+.secondaryButton {
+  border-color: var(--card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(234, 245, 235, 0.76);
 }
 
 .loadingCard {
@@ -176,12 +475,7 @@
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.07),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
   transform: translateX(-100%);
   animation: nftLoading 1.4s ease-in-out infinite;
 }
@@ -198,16 +492,16 @@
 }
 
 @keyframes nftLoading {
-  to {
-    transform: translateX(100%);
-  }
+  to { transform: translateX(100%); }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
+  .addButton span,
   .refreshButton span {
     display: none;
   }
 
+  .addButton,
   .refreshButton {
     width: 34px;
     padding: 0;
@@ -238,5 +532,51 @@
   .retryButton {
     width: 100%;
     margin-left: 0;
+  }
+
+  .modalBackdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .modalPanel,
+  .compactModal {
+    width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .modalHeader {
+    padding: 16px 18px;
+  }
+
+  .detailLayout {
+    display: block;
+    min-height: 0;
+  }
+
+  .detailMedia {
+    min-height: 0;
+    aspect-ratio: 1;
+    border-right: 0;
+    border-bottom: var(--border-width) solid var(--card-border);
+  }
+
+  .detailBody,
+  .modalForm {
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nftCard,
+  .loadingMedia::after,
+  .loadingLine::after {
+    transition: none;
+    animation: none;
   }
 }

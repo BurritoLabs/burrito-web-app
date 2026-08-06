@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildNftMetadataCandidates,
   buildNftImageCandidates,
+  buildNftTransferExecuteMsg,
+  extractNftContractCandidates,
   extractNftTokenEntries,
   mapNftRegistry,
+  mergeNftCollections,
   normalizeNftUri,
+  parseCachedNftCollections,
   parseNftMetadata
 } from "../src/app/data/nfts"
 
@@ -60,13 +65,94 @@ describe("NFT data normalization", () => {
       parseNftMetadata({
         title: "Burrito #1",
         description: "Genesis",
-        image_url: "ipfs://QmImage"
+        image_url: "ipfs://QmImage",
+        attributes: [
+          { trait_type: "Layer", value: "Classic" },
+          { name: "Edition", value: 1 }
+        ]
       })
     ).toEqual({
       name: "Burrito #1",
       description: "Genesis",
-      image: "https://ipfs.io/ipfs/QmImage"
+      image: "https://ipfs.io/ipfs/QmImage",
+      animationUrl: undefined,
+      externalUrl: undefined,
+      attributes: [
+        { traitType: "Layer", value: "Classic" },
+        { traitType: "Edition", value: "1" }
+      ]
     })
+  })
+
+  it("uses multiple gateways for IPFS metadata", () => {
+    expect(buildNftMetadataCandidates("ipfs://QmMetadata/1.json")).toEqual([
+      "https://dweb.link/ipfs/QmMetadata/1.json",
+      "https://ipfs.io/ipfs/QmMetadata/1.json",
+      "https://gateway.pinata.cloud/ipfs/QmMetadata/1.json"
+    ])
+  })
+
+  it("merges duplicate collections without losing curated links", () => {
+    const contract = "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqe36rgt"
+    expect(
+      mergeNftCollections(
+        [{ contract, name: "Curated", marketplace: ["https://market.example"] }],
+        [{ contract, name: "On-chain", symbol: "NFT", marketplace: [] }]
+      )
+    ).toEqual([
+      {
+        contract,
+        name: "Curated",
+        symbol: "NFT",
+        marketplace: ["https://market.example"]
+      }
+    ])
+  })
+
+  it("rejects stale collection cache entries", () => {
+    const contract = "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqe36rgt"
+    const cached = JSON.stringify({
+      updatedAt: 100,
+      collections: [{ contract, name: "Cached", marketplace: [] }]
+    })
+    expect(parseCachedNftCollections(cached, 200)).toHaveLength(1)
+    expect(parseCachedNftCollections(cached, 31 * 24 * 60 * 60 * 1000)).toEqual([])
+  })
+
+  it("builds the standard CW721 transfer message", () => {
+    expect(
+      buildNftTransferExecuteMsg({
+        recipient: " TERRA1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0L8Z5 ",
+        tokenId: "burrito-1"
+      })
+    ).toEqual({
+      transfer_nft: {
+        recipient: "terra1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0l8z5",
+        token_id: "burrito-1"
+      }
+    })
+  })
+
+  it("discovers collection contracts from messages and wasm events", () => {
+    const messageContract = "terra1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqe36rgt"
+    const eventContract = "terra1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0l8z5"
+    expect(
+      extractNftContractCandidates({
+        txs: [{ body: { messages: [{ contract: messageContract }] } }],
+        tx_responses: [
+          {
+            events: [
+              {
+                type: "wasm",
+                attributes: [
+                  { key: "_contract_address", value: eventContract }
+                ]
+              }
+            ]
+          }
+        ]
+      })
+    ).toEqual([messageContract, eventContract])
   })
 
   it("supports standard and legacy CW721 owner token responses", () => {
