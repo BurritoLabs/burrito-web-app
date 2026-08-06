@@ -62,4 +62,17 @@ describe("wallet storage metadata", () => {
     expect(isWalletManualDisconnectStored()).toBe(false)
     expect(getStoredWalletConnectorId()).toBe("keplr")
   })
+
+  it("persists the Burrito native connector without storing wallet secrets", () => {
+    const localStorage = createLocalStorage()
+    vi.stubGlobal("window", { localStorage })
+
+    rememberWalletConnectorId("burrito-native")
+
+    expect(getStoredWalletConnectorId()).toBe("burrito-native")
+    expect(localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)).toBe(
+      "burrito-native"
+    )
+    expect(localStorage.getItem("mnemonic")).toBeNull()
+  })
 })

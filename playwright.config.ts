@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test"
 
+const e2ePort = process.env.BURRITO_E2E_PORT || "4173"
+const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`
+
 export default defineConfig({
   testDir: "./tests/e2e",
   testIgnore: /production-smoke\.spec\.ts/,
@@ -8,7 +11,7 @@ export default defineConfig({
     timeout: 10_000
   },
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: e2eBaseUrl,
     trace: "on-first-retry"
   },
   projects: [
@@ -32,8 +35,8 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4173 --strictPort",
-    url: "http://127.0.0.1:4173/market",
+    command: `npm run dev -- --host 127.0.0.1 --port ${e2ePort} --strictPort`,
+    url: `${e2eBaseUrl}/market`,
     env: {
       VITE_BURRITO_REGISTRY_API_URL: "/__registry-test"
     },

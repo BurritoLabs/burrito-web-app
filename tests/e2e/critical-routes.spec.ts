@@ -128,6 +128,75 @@ test("mobile navigation and wallet panel remain operable", async ({ page }) => {
     .toBe("false")
 })
 
+test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) => {
+  await selectStoredChain(page, "lunc")
+  await page.addInitScript(() => {
+    const bridgeCalls: string[] = []
+    Object.defineProperty(window, "__burritoBridgeCalls", {
+      value: bridgeCalls
+    })
+    Object.defineProperty(window, "BurritoNative", {
+      configurable: false,
+      writable: false,
+      value: {
+        version: 1,
+        request: async (method: string) => {
+          bridgeCalls.push(method)
+          if (method === "bridge.getCapabilities") {
+            return {
+              platform: "ios",
+              protocolVersion: 1,
+              capabilities: {
+                localWallet: true,
+                transactionSigning: true,
+                supportedDirectSignTypeUrls: [
+                  "/cosmos.bank.v1beta1.MsgSend"
+                ]
+              }
+            }
+          }
+          if (method === "wallet.open") {
+            return {
+              source: "burrito",
+              accounts: [
+                {
+                  source: "burrito",
+                  chainId: "columbus-5",
+                  address: "terra1amdttz2937a3dytmxmkany53pp6ma6dy4vsllv",
+                  algorithm: "secp256k1",
+                  publicKey:
+                    "Aqy0vCZ9t3dGFL9gEcWZKbAGwlVDhqMJC6/ws/xBjsBE"
+                }
+              ]
+            }
+          }
+          throw new Error(`Unexpected native method: ${method}`)
+        }
+      }
+    })
+  })
+
+  await page.goto("/")
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const nativeWallet = page
+    .getByRole("button")
+    .filter({ hasText: "Burrito Wallet" })
+  await expect(nativeWallet).toBeEnabled()
+  await nativeWallet.click()
+
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect(page.getByText("terra1...sllv", { exact: true })).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __burritoBridgeCalls?: string[] })
+            .__burritoBridgeCalls
+      )
+    )
+    .toEqual(["bridge.getCapabilities", "wallet.open"])
+})
+
 test("wallet recovers from a full local asset cache", async ({ page }) => {
   const pageErrors: string[] = []
   page.on("pageerror", (error) => pageErrors.push(error.message))

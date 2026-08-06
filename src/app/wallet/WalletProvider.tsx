@@ -13,6 +13,7 @@ import {
   isCosmosConnectorId
 } from "./cosmosKit"
 import { getGalaxyConnector } from "./galaxyWallet"
+import { getBurritoNativeConnector } from "./burritoNativeWallet"
 import {
   WalletContext,
   type WalletAccount,
@@ -781,6 +782,7 @@ export const WalletProvider = ({
     () => {
       void connectorRefreshNonce
       return [
+        getBurritoNativeConnector(),
         getCosmosConnector("keplr"),
         getCosmosConnector("keplr-mobile"),
         getGalaxyConnector()

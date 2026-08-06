@@ -33,6 +33,7 @@ import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
 const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
 
 type WalletWindow = Window & {
+  BurritoNative?: { version?: number }
   keplr?: unknown
   galaxyStation?: unknown
 }
@@ -51,6 +52,10 @@ const getFallbackConnectors = (): WalletConnector[] => {
     !(walletWindow?.galaxyStation instanceof HTMLElement)
 
   return [
+    {
+      ...CONNECTOR_META["burrito-native"],
+      available: walletWindow?.BurritoNative?.version === 1
+    },
     {
       ...CONNECTOR_META.keplr,
       available: desktopKeplr
