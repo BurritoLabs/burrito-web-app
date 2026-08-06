@@ -50,7 +50,7 @@
   min-width: var(--bui-chain-trigger-min-width);
   height: var(--bui-chain-trigger-height);
   padding: 0 9px 0 5px;
-  border: 1px solid rgba(234, 245, 235, 0.14);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
   border-radius: var(--bui-radius-control);
   background: var(--bui-color-surface);
   color: var(--bui-color-text-secondary);
@@ -283,7 +283,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--bui-color-text) 30%, transparent);
   box-shadow: none;
 }
 
@@ -308,7 +308,7 @@
 }
 
 .statusOffline .statusDot {
-  background: rgba(255, 255, 255, 0.25);
+  background: color-mix(in srgb, var(--bui-color-text) 25%, transparent);
 }
 
 .iconButton {
@@ -421,7 +421,7 @@
   min-width: 220px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background: rgba(12, 20, 17, 0.9);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
   display: grid;
@@ -436,8 +436,8 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   color: #eaf5eb;
   font-size: 13px;
   font-weight: 600;
@@ -586,7 +586,7 @@
     position: static;
     transform: none;
     margin-left: auto;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     flex-shrink: 1;
   }

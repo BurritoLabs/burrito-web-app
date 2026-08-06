@@ -76,7 +76,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--bui-color-text) 30%, transparent);
 }
 
 @keyframes blockPulse {

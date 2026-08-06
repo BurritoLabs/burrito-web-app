@@ -24,9 +24,9 @@
   width: 100%;
   height: 40px;
   border-radius: 10px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
-  color: #f8fbff;
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
+  color: var(--bui-color-text);
   outline: 0;
   font-family: var(--font-ui);
   font-size: 13px;
@@ -54,11 +54,11 @@
   justify-content: center;
   padding: 0;
   border-radius: 10px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(16, 26, 20, 0.9);
-  color: rgba(245, 249, 255, 0.96);
+    linear-gradient(180deg, color-mix(in srgb, var(--bui-color-text) 5%, transparent), color-mix(in srgb, var(--bui-color-text) 2%, transparent)),
+    var(--bui-color-surface-raised);
+  color: var(--bui-color-text);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: var(--bold);
@@ -69,8 +69,8 @@
 .directionButton:hover {
   border-color: rgba(var(--active-chain-rgb), 0.3);
   background:
-    linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.08), rgba(255, 255, 255, 0.02)),
-    rgba(18, 29, 22, 0.96);
+    linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.08), color-mix(in srgb, var(--bui-color-text) 2%, transparent)),
+    var(--bui-color-surface-hover);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 
@@ -89,7 +89,7 @@
   display: block;
   height: 2px;
   border-radius: 999px;
-  background: rgba(234, 245, 235, 0.82);
+  background: color-mix(in srgb, var(--bui-color-text) 82%, transparent);
 }
 
 .directionBarLong {
@@ -107,8 +107,8 @@
 .directionArrow {
   width: 7px;
   height: 7px;
-  border-right: 2px solid rgba(234, 245, 235, 0.76);
-  border-bottom: 2px solid rgba(234, 245, 235, 0.76);
+  border-right: 2px solid color-mix(in srgb, var(--bui-color-text) 76%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--bui-color-text) 76%, transparent);
   transform: rotate(45deg);
   margin-top: -1px;
 }
@@ -132,11 +132,11 @@
   gap: 10px;
   padding: 0 12px;
   border-radius: 10px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(16, 26, 20, 0.9);
-  color: rgba(245, 249, 255, 0.96);
+    linear-gradient(180deg, color-mix(in srgb, var(--bui-color-text) 5%, transparent), color-mix(in srgb, var(--bui-color-text) 2%, transparent)),
+    var(--bui-color-surface-raised);
+  color: var(--bui-color-text);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: var(--bold);
@@ -149,8 +149,8 @@
 .sortButtonOpen {
   border-color: rgba(var(--active-chain-rgb), 0.3);
   background:
-    linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.08), rgba(255, 255, 255, 0.02)),
-    rgba(18, 29, 22, 0.96);
+    linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.08), color-mix(in srgb, var(--bui-color-text) 2%, transparent)),
+    var(--bui-color-surface-hover);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 
@@ -162,8 +162,8 @@
 .sortButtonChevron {
   width: 8px;
   height: 8px;
-  border-right: 2px solid rgba(234, 245, 235, 0.76);
-  border-bottom: 2px solid rgba(234, 245, 235, 0.76);
+  border-right: 2px solid color-mix(in srgb, var(--bui-color-text) 76%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--bui-color-text) 76%, transparent);
   transform: translateY(-1px) rotate(45deg);
   transition: transform 0.18s ease;
 }
@@ -183,8 +183,8 @@
   gap: 2px;
   padding: 6px;
   border-radius: 10px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  background: rgba(16, 24, 20, 0.98);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
+  background: var(--bui-color-surface-raised);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(16px) saturate(130%);
 }
@@ -206,7 +206,7 @@
 }
 
 .sortOption:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text);
 }
 
@@ -236,8 +236,8 @@
   gap: 6px;
   padding: 4px;
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(10, 17, 13, 0.72);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: var(--bui-color-surface-sunken);
 }
 
 .timeButton {
@@ -274,9 +274,9 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   border-radius: 999px;
-  background: rgba(10, 17, 13, 0.58);
+  background: var(--bui-color-surface-sunken);
   color: var(--bui-color-text-secondary);
   font-family: var(--font-ui);
   font-size: 12px;
@@ -288,7 +288,7 @@
 
 .dexFilterButton:hover {
   border-color: rgba(var(--active-chain-rgb), 0.28);
-  color: rgba(246, 255, 246, 0.94);
+  color: var(--bui-color-text);
 }
 
 .dexFilterButtonOpen {
@@ -303,7 +303,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: 10px;
   font-weight: var(--bold);
@@ -350,8 +350,8 @@
   gap: 2px;
   padding: 6px;
   border-radius: 10px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  background: rgba(16, 24, 20, 0.98);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
+  background: var(--bui-color-surface-raised);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(16px) saturate(130%);
 }
@@ -377,7 +377,7 @@
 }
 
 .dexMoreOption:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text);
 }
 
@@ -488,7 +488,7 @@
 .pairIcons img,
 .assetIconFallback {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
   background: rgba(15, 24, 20, 0.86);
 }
 
@@ -563,14 +563,14 @@
 
 .dexTag {
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
   font-size: 10px;
   line-height: 1;
   padding: 3px 7px;
 }
 
 .dexTag {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
   color: var(--bui-color-text-secondary);
 }
 

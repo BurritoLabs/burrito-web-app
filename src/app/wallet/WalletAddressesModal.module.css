@@ -12,7 +12,7 @@
 .modal {
   width: min(420px, 90vw);
   background: rgba(12, 20, 17, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   border-radius: 16px;
   padding: 18px 20px 22px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
@@ -46,7 +46,7 @@
   top: 50%;
   width: 16px;
   height: 2px;
-  background: rgba(234, 245, 235, 0.8);
+  background: color-mix(in srgb, var(--bui-color-text) 80%, transparent);
   border-radius: 999px;
 }
 
@@ -59,10 +59,10 @@
 }
 
 .addressCard {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   border-radius: 12px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   display: grid;
   gap: 10px;
 }
@@ -170,7 +170,7 @@
   width: 520px;
   max-width: 90vw;
   background: rgba(12, 20, 17, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   border-radius: 16px;
   padding: 28px 28px 26px;
   display: grid;
@@ -199,7 +199,7 @@
   top: 50%;
   width: 16px;
   height: 2px;
-  background: rgba(234, 245, 235, 0.85);
+  background: color-mix(in srgb, var(--bui-color-text) 85%, transparent);
   border-radius: 999px;
 }
 

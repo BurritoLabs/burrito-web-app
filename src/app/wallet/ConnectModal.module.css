@@ -47,8 +47,8 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 15%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   display: grid;
   place-items: center;
   gap: 0;
@@ -80,8 +80,8 @@
   gap: 16px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
 }
 
 .connectedInfo {
@@ -159,15 +159,15 @@
   gap: 12px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
   color: var(--bui-color-text);
   text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .walletRow:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: color-mix(in srgb, var(--bui-color-text) 20%, transparent);
 }
 
 .walletRow:disabled {
@@ -193,9 +193,9 @@
   text-transform: uppercase;
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   color: var(--bui-color-text-secondary);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .error {

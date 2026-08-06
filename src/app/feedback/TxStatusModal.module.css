@@ -15,11 +15,11 @@
   width: min(420px, calc(100vw - 36px));
   padding: 24px 22px 20px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   background: rgba(12, 20, 17, 0.92);
   box-shadow:
     0 26px 56px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   text-align: center;
 }
 
@@ -45,7 +45,7 @@
   right: 4px;
   top: 10px;
   height: 1.5px;
-  background: rgba(234, 245, 235, 0.75);
+  background: color-mix(in srgb, var(--bui-color-text) 75%, transparent);
 }
 
 .closeButton span:first-child {
@@ -69,7 +69,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
 }
 
 .iconCircle svg {
@@ -79,7 +79,7 @@
 
 .pending {
   color: var(--bui-color-text-secondary);
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
 }
 
 .success {
@@ -98,7 +98,7 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  border: 2.5px solid rgba(234, 245, 235, 0.24);
+  border: 2.5px solid color-mix(in srgb, var(--bui-color-text) 24%, transparent);
   border-top-color: #52c41a;
   animation: spin 0.8s linear infinite;
 }
@@ -141,9 +141,9 @@
 }
 
 .diagnosticsButton {
-  border: 1px solid rgba(234, 245, 235, 0.2);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
   color: var(--bui-color-text-secondary);
   font: inherit;
   font-size: 12px;

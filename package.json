@@ -26,7 +26,7 @@
     "upgrade:launchpad": "node scripts/upgrade-launchpad-contracts.mjs"
   },
   "dependencies": {
-    "@burritolabs/ui": "github:BurritoLabs/burrito-design-system#8b5ee0f",
+    "@burritolabs/ui": "github:BurritoLabs/burrito-design-system#b887e8a",
     "@cosmjs/amino": "^0.36.2",
     "@cosmjs/cosmwasm-stargate": "^0.36.2",
     "@cosmjs/encoding": "^0.36.2",

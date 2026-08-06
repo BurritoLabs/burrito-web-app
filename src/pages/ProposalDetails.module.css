@@ -38,7 +38,7 @@
   border-radius: 50%;
   padding: 8px;
   background: var(--button-default-bg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.18);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -69,8 +69,8 @@
   margin-top: 8px;
   padding: 2px 8px;
   border-radius: 8px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text);
   font-size: var(--font-size-xxs);
   font-weight: 600;
@@ -165,7 +165,7 @@
   overflow: auto;
   padding-right: 6px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(82, 196, 26, 0.6) rgba(255, 255, 255, 0.06);
+  scrollbar-color: rgba(82, 196, 26, 0.6) color-mix(in srgb, var(--bui-color-text) 6%, transparent);
 }
 
 .summaryValue::-webkit-scrollbar {
@@ -173,7 +173,7 @@
 }
 
 .summaryValue::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   border-radius: 999px;
 }
 
@@ -223,7 +223,7 @@
   font-size: var(--font-size-title);
   font-weight: 500;
   color: var(--bui-color-text);
-  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .sectionBody {
@@ -257,8 +257,8 @@
   gap: 6px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
 }
 
 .depositMetricLabel {
@@ -306,7 +306,7 @@
   height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .depositProgressFill {
@@ -325,8 +325,8 @@
   gap: 10px;
   padding: 14px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
 }
 
 .depositModalRow {
@@ -361,8 +361,8 @@
   gap: 12px;
   padding: 14px 16px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
 }
 
 .depositAmountInput {
@@ -430,8 +430,8 @@
   gap: 12px;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   font-size: var(--font-size-small);
 }
 
@@ -453,10 +453,10 @@
   gap: 16px;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--bui-color-text) 18%, transparent),
     0 8px 20px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
@@ -470,9 +470,9 @@
 }
 
 .validatorLink:hover {
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: color-mix(in srgb, var(--bui-color-text) 22%, transparent);
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.28),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--bui-color-text) 28%, transparent),
     0 10px 24px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
 }
@@ -515,8 +515,8 @@
   font-weight: var(--bold);
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   text-transform: capitalize;
   flex-shrink: 0;
   z-index: 2;
@@ -527,7 +527,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   object-fit: cover;
   flex-shrink: 0;
   display: block;
@@ -604,12 +604,12 @@
   gap: 6px;
   padding: 16px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   font-size: var(--font-size-small);
   line-height: 1.4;
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--bui-color-text) 18%, transparent),
     0 10px 22px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
@@ -622,12 +622,12 @@
 
 .voteItemClickable:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: color-mix(in srgb, var(--bui-color-text) 18%, transparent);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
 .voteItemActive {
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: color-mix(in srgb, var(--bui-color-text) 28%, transparent);
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
 }
 
@@ -668,7 +668,7 @@
   position: relative;
   height: 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   overflow: hidden;
   display: flex;
   z-index: 1;
@@ -708,8 +708,8 @@
   display: block;
   width: 2px;
   height: 14px;
-  background: rgba(234, 245, 235, 0.9);
-  box-shadow: 0 0 6px rgba(234, 245, 235, 0.6);
+  background: color-mix(in srgb, var(--bui-color-text) 90%, transparent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--bui-color-text) 60%, transparent);
 }
 
 .voteEnd {
@@ -735,7 +735,7 @@
   font-size: var(--font-size-title);
   font-weight: 500;
   color: var(--bui-color-text);
-  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .tallyBody {
@@ -775,15 +775,15 @@
   box-sizing: border-box;
   padding: 4px 10px;
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.1);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 10%, transparent);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: capitalize;
   line-height: 1;
   box-shadow:
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--bui-color-text) 25%, transparent),
     0 6px 16px rgba(0, 0, 0, 0.14);
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
@@ -874,7 +874,7 @@
 .voteModal {
   width: min(460px, 100%);
   border-radius: var(--radius-lg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
   background: rgba(8, 18, 15, 0.92);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(14px) saturate(130%);
@@ -888,7 +888,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 18px;
-  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .voteModalTitle {
@@ -945,8 +945,8 @@
 .voteOptionButton {
   height: 40px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: 500;

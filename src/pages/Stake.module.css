@@ -80,7 +80,7 @@
   height: 16px;
   border-radius: 50%;
   background-color: var(--card-bg-muted);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background-image: url("/brand/icon-192.png");
   background-size: cover;
   background-position: center;
@@ -320,7 +320,7 @@
   gap: 20px;
   padding: 14px 16px;
   border-radius: 12px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   background: rgba(0, 0, 0, 0.18);
 }
 
@@ -344,8 +344,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   flex-shrink: 0;
 }
 
@@ -459,8 +459,8 @@
   margin: 0;
   height: 40px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   display: flex;
   align-items: center;
   flex: 1;
@@ -507,7 +507,7 @@
 
 .validatorTable {
   display: grid;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   border-radius: 12px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.16);
@@ -522,8 +522,8 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--bui-color-text-secondary);
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
+  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   align-items: center;
 }
 
@@ -597,7 +597,7 @@
   display: flex;
   justify-content: center;
   padding: 14px 16px;
-  border-top: var(--border-width) solid rgba(255, 255, 255, 0.06);
+  border-top: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 6%, transparent);
 }
 
 .validatorLoadMoreButton {
@@ -636,7 +636,7 @@
   align-items: center;
   min-height: 56px;
   padding: 12px 16px;
-  border-top: var(--border-width) solid rgba(255, 255, 255, 0.06);
+  border-top: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   background: transparent;
 }
 
@@ -648,7 +648,7 @@
 }
 
 .validatorRow:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
 }
 
 .validatorMonikerCell {
@@ -662,8 +662,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;

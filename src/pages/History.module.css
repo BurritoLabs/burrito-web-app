@@ -55,7 +55,7 @@
   height: 16px;
   border-radius: 50%;
   background-color: var(--card-bg-muted);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background-image: url("/brand/icon-192.png");
   background-size: cover;
   background-position: center;
@@ -115,7 +115,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   background: var(--button-default-bg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   font-size: var(--font-size-handle);
   font-weight: var(--bold);
 }
@@ -299,7 +299,7 @@
 
 .pending {
   color: #0c1411;
-  background: rgba(234, 245, 235, 0.7);
+  background: color-mix(in srgb, var(--bui-color-text) 70%, transparent);
 }
 
 .success {

@@ -86,8 +86,8 @@
   gap: 6px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .assetTopRow,
@@ -243,8 +243,8 @@
   min-height: 58px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.035);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--bui-color-text) 3.5%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 7%, transparent);
 }
 
 .assetLoadingIcon,
@@ -252,7 +252,7 @@
 .assetLoadingValue {
   position: relative;
   overflow: hidden;
-  background: rgba(234, 245, 235, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .assetLoadingIcon::after,
@@ -265,7 +265,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.12),
+    color-mix(in srgb, var(--bui-color-text) 12%, transparent),
     transparent
   );
   animation: walletLoadingShimmer 1.35s ease-in-out infinite;

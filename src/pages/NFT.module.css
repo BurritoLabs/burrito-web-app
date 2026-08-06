@@ -12,7 +12,7 @@
   padding: 7px 10px;
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--bui-color-text) 3.5%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   white-space: nowrap;
@@ -129,7 +129,7 @@
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--bui-color-text) 3.5%, transparent);
 }
 
 .media img,
@@ -517,7 +517,7 @@
   height: 12px;
   margin: 13px 14px 0;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.055);
+  background: color-mix(in srgb, var(--bui-color-text) 5.5%, transparent);
 }
 
 .loadingLineShort {

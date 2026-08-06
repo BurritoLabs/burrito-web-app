@@ -78,6 +78,8 @@
 
 @media (max-width: 991.98px) {
   :root {
+    --header-height: 56px;
+    --main-padding: 16px;
     --font-size-page-title: 28px;
   }
 }
@@ -250,8 +252,8 @@ textarea::placeholder {
   border-radius: var(--radius-lg);
   padding: var(--card-padding);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+    inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 10%, transparent),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--bui-color-text) 18%, transparent),
     0 10px 28px rgba(0, 0, 0, 0.16);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -268,7 +270,7 @@ textarea::placeholder {
 
 .cardDivider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   margin: 12px calc(-1 * var(--card-padding));
 }
 
@@ -308,7 +310,7 @@ textarea::placeholder {
 }
 
 .statCard {
-  background: rgba(255, 255, 255, 0.055);
+  background: color-mix(in srgb, var(--bui-color-text) 5.5%, transparent);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
   padding: 18px 20px;
@@ -342,8 +344,8 @@ textarea::placeholder {
   align-items: center;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
   font-size: var(--font-size-xxs);
   color: var(--bui-color-text-secondary);
 }
@@ -370,8 +372,8 @@ textarea::placeholder {
   gap: 10px;
   padding: 10px 16px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.055);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 5.5%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   min-height: 44px;
 }
 
@@ -404,14 +406,14 @@ textarea::placeholder {
   font-size: var(--font-size);
   font-weight: var(--bold);
   line-height: 1;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   color: var(--bui-color-text);
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .uiButton:hover {
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: color-mix(in srgb, var(--bui-color-text) 28%, transparent);
 }
 
 .uiButtonOutline {
@@ -440,8 +442,8 @@ textarea::placeholder {
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--bold);

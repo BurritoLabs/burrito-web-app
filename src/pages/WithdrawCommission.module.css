@@ -19,7 +19,7 @@
 }
 
 .emptyState {
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   border-radius: 8px;
   padding: 14px 16px;
   font-size: var(--font-size-small);
@@ -67,7 +67,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   font-size: 13px;
   color: var(--bui-color-text-secondary);
 }
@@ -86,7 +86,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: 700;
@@ -102,7 +102,7 @@
 }
 
 .commissionIconFallback {
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
 }
 
 .commissionRow:last-child {
@@ -151,7 +151,7 @@
   min-width: 62px;
   padding: 0 22px 0 8px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   background: rgba(0, 0, 0, 0.2);
   color: var(--bui-color-text);
   font-size: 11px;
@@ -182,7 +182,7 @@
   gap: 4px;
   padding: 6px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background: rgba(12, 20, 17, 0.95);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
   z-index: 20;

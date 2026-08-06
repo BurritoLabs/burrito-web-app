@@ -48,7 +48,7 @@
   justify-content: space-between;
   padding-bottom: 10px;
   margin-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .validatorHeader dt,
@@ -70,7 +70,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--bui-color-text) 6%, transparent);
 }
 
 .validatorRow:first-child {
@@ -170,7 +170,7 @@
 
 .summaryDividerLine {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   margin-left: calc(var(--reward-icon-size) + var(--reward-icon-gap));
 }
 
@@ -190,8 +190,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   font-size: 10px;
   font-weight: 700;
   color: var(--bui-color-text);
@@ -204,7 +204,7 @@
 }
 
 .rewardIconFallback {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--bui-color-text) 12%, transparent);
 }
 
 @media (max-width: 991.98px) {
@@ -251,7 +251,7 @@
   height: 24px;
   padding: 0 22px 0 8px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background: rgba(0, 0, 0, 0.2);
   color: var(--bui-color-text);
   font-size: 11px;
@@ -280,7 +280,7 @@
   padding: 6px;
   border-radius: 8px;
   background: rgba(18, 24, 20, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   display: grid;
   gap: 4px;

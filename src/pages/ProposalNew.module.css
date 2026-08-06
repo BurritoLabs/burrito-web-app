@@ -107,7 +107,7 @@
   height: 16px;
   margin-left: 6px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: 10px;
   line-height: 1;
@@ -122,7 +122,7 @@
   transform: translateX(-50%);
   background: #0f1916;
   color: var(--bui-color-text-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: var(--font-size-xxs);
@@ -286,7 +286,7 @@ select.input:focus {
   min-width: 68px;
   border-radius: 8px;
   border: var(--border-width) solid var(--card-border);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
   color: var(--bui-color-text);
   padding: 0 10px;
   font-size: var(--font-size-small);
@@ -304,7 +304,7 @@ select.input:focus {
   top: calc(100% + 6px);
   min-width: 100%;
   background: #0f1916;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   border-radius: 8px;
   padding: 4px;
   display: grid;
@@ -325,13 +325,13 @@ select.input:focus {
 }
 
 .feeSelectOption:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
+  border-color: color-mix(in srgb, var(--bui-color-text) 16%, transparent);
 }
 
 .feeSelectOptionActive {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border-color: color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   color: var(--bui-color-text);
 }
 
@@ -385,7 +385,7 @@ select.input:focus {
 
 .submitButton:disabled:hover,
 .submitButton[disabled]:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   background: var(--chain-accent);
   color: #0c1411;
 }
@@ -420,8 +420,8 @@ select.input:focus {
 select.input {
   appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, rgba(234, 245, 235, 0.8) 50%),
-    linear-gradient(135deg, rgba(234, 245, 235, 0.8) 50%, transparent 50%),
+    linear-gradient(45deg, transparent 50%, color-mix(in srgb, var(--bui-color-text) 80%, transparent) 50%),
+    linear-gradient(135deg, color-mix(in srgb, var(--bui-color-text) 80%, transparent) 50%, transparent 50%),
     linear-gradient(to right, transparent, transparent);
   background-position:
     calc(100% - 16px) 50%,
@@ -481,7 +481,7 @@ select.input option {
   left: 0;
   right: 0;
   background: #0f1916;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   border-radius: var(--radius-lg);
   padding: 6px;
   display: grid;
@@ -504,14 +504,14 @@ select.input option {
 }
 
 .selectOption:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
+  border-color: color-mix(in srgb, var(--bui-color-text) 18%, transparent);
   color: var(--bui-color-text);
 }
 
 .selectOptionActive {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border-color: color-mix(in srgb, var(--bui-color-text) 24%, transparent);
   color: var(--bui-color-text);
 }
 

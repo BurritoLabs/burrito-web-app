@@ -31,9 +31,9 @@
 .searchInput {
   width: 100%;
   height: var(--input-height);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
   color: var(--text);
   font-size: var(--font-size);
   font-weight: var(--normal);
@@ -59,8 +59,8 @@
   width: 52px;
   height: 52px;
   border-radius: 16px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -165,8 +165,8 @@
   white-space: pre-wrap;
   word-break: break-word;
   border-radius: var(--radius-lg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
   color: var(--bui-color-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New",
     monospace;
@@ -264,8 +264,8 @@
   width: 100%;
   resize: vertical;
   border-radius: var(--radius-lg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New",
     monospace;
@@ -298,8 +298,8 @@
   overflow: auto;
   padding: 12px;
   border-radius: var(--radius-lg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
   color: var(--bui-color-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New",
     monospace;
@@ -333,8 +333,8 @@
 .txTextarea {
   width: 100%;
   border-radius: var(--radius-lg);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
   color: var(--text);
   font-size: var(--font-size);
   font-weight: var(--normal);
@@ -354,8 +354,8 @@
 .txInput[type="file"]::file-selector-button {
   height: 28px;
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   color: var(--bui-color-text);
   padding: 0 12px;
   margin-right: 10px;

@@ -226,7 +226,7 @@
   border-bottom: var(--border-width) solid var(--card-border);
   background: rgba(10, 17, 14, 0.9);
   height: fit-content;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 5%, transparent);
 }
 
 .kicker {
@@ -321,19 +321,19 @@
   padding: 16px;
   border-radius: 50%;
   border: var(--border-width) solid var(--card-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--bui-color-text-secondary);
   transition: border-color 0.2s ease, color 0.2s ease;
   box-shadow:
-    inset 0px 1.5px 0px 0px rgba(255, 255, 255, 0.08),
+    inset 0px 1.5px 0px 0px color-mix(in srgb, var(--bui-color-text) 8%, transparent),
     0px 4px 24px 0px rgba(36, 36, 40, 0.3);
 }
 
 .actionButton:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: color-mix(in srgb, var(--bui-color-text) 30%, transparent);
   color: var(--bui-color-text);
 }
 
@@ -342,7 +342,7 @@
   border-color: var(--chain-accent);
   color: #0c1411;
   box-shadow:
-    inset 0px 1.5px 0px 0px rgba(255, 255, 255, 0.3),
+    inset 0px 1.5px 0px 0px color-mix(in srgb, var(--bui-color-text) 30%, transparent),
     0px 4px 24px 0px rgba(36, 36, 40, 0.3);
 }
 
@@ -407,17 +407,17 @@
   gap: 14px;
   padding: 18px;
   border-radius: 18px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, color-mix(in srgb, var(--bui-color-text) 5%, transparent), color-mix(in srgb, var(--bui-color-text) 2%, transparent)),
     radial-gradient(circle at top right, rgba(var(--active-chain-rgb), 0.16), transparent 48%),
     var(--card-bg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 5%, transparent);
 }
 
 .receiveHeroCard {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, color-mix(in srgb, var(--bui-color-text) 5%, transparent), color-mix(in srgb, var(--bui-color-text) 2%, transparent)),
     radial-gradient(circle at top right, rgba(92, 169, 255, 0.14), transparent 48%),
     var(--card-bg);
 }
@@ -440,8 +440,8 @@
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -506,7 +506,7 @@
   gap: 4px;
   padding: 12px 14px;
   border-radius: 14px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   background: rgba(8, 14, 11, 0.44);
 }
 
@@ -598,8 +598,8 @@
 
 .inlineActionButton {
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--bold);
@@ -691,8 +691,8 @@
   min-width: 0;
   padding: 10px 12px;
   border-radius: 14px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   color: var(--bui-color-text-secondary);
   text-align: left;
 }
@@ -718,7 +718,7 @@
   gap: 4px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   font-size: var(--font-size-xs);
   line-height: 1.5;
 }
@@ -730,7 +730,7 @@
 }
 
 .memoHintNeutral {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
   color: var(--bui-color-text-secondary);
 }
 
@@ -749,7 +749,7 @@
   gap: 10px;
   padding: 12px;
   border-radius: 18px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background: rgba(8, 14, 11, 0.44);
 }
 
@@ -783,8 +783,8 @@
 
 .maxButton {
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: var(--font-size-xs);
   padding: 2px 8px;
@@ -826,7 +826,7 @@
   font-size: var(--font-size-small);
   line-height: 1.5;
   padding: 12px 14px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .formNoticeContent {
@@ -867,7 +867,7 @@
 }
 
 .formNoticeNeutral {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text-secondary);
 }
 
@@ -878,7 +878,7 @@
   gap: 12px;
   padding: 16px;
   border-radius: 18px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
   background: rgba(8, 14, 11, 0.44);
 }
 
@@ -908,8 +908,8 @@
   border-radius: 18px;
   background:
     radial-gradient(circle at center, rgba(var(--active-chain-rgb), 0.12), transparent 68%),
-    rgba(255, 255, 255, 0.02);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.06);
+    color-mix(in srgb, var(--bui-color-text) 2%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 6%, transparent);
 }
 
 .receiveQrBox {
@@ -947,8 +947,8 @@
   min-height: 42px;
   padding: 0 14px;
   border-radius: 12px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
@@ -1022,7 +1022,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid rgba(234, 245, 235, 0.6);
+  border: 2px solid color-mix(in srgb, var(--bui-color-text) 60%, transparent);
 }
 
 .searchIcon::after {
@@ -1032,7 +1032,7 @@
   bottom: -4px;
   width: 8px;
   height: 2px;
-  background: rgba(234, 245, 235, 0.6);
+  background: color-mix(in srgb, var(--bui-color-text) 60%, transparent);
   border-radius: 999px;
   transform: rotate(45deg);
 }
@@ -1073,7 +1073,7 @@
   height: 18px;
   border-radius: 50%;
   background-color: var(--card-bg-muted);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background-image: url("/brand/icon-192.png");
   background-size: cover;
   background-position: center;
@@ -1085,7 +1085,7 @@
   gap: 14px;
   padding: 14px;
   border-radius: 16px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
   background: rgba(8, 14, 11, 0.44);
 }
 
@@ -1108,14 +1108,14 @@
   gap: 14px;
   padding: 12px 14px;
   border-radius: 14px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 3%, transparent);
 }
 
 .summaryPrimaryAccent {
   background:
     linear-gradient(180deg, rgba(var(--active-chain-rgb), 0.12), rgba(var(--active-chain-rgb), 0.05)),
-    rgba(255, 255, 255, 0.02);
+    color-mix(in srgb, var(--bui-color-text) 2%, transparent);
   border-color: rgba(133, 230, 91, 0.18);
 }
 
@@ -1145,7 +1145,7 @@
 
 .summaryDivider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .sendAssetChip {
@@ -1155,7 +1155,7 @@
   align-self: stretch;
   min-width: 0;
   padding: 0 0 0 12px;
-  border-left: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  border-left: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
   color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: var(--bold);
@@ -1167,10 +1167,10 @@
   width: 160px;
   height: 160px;
   border-radius: 18px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.08),
+    color-mix(in srgb, var(--bui-color-text) 8%, transparent),
     rgba(var(--active-chain-rgb), 0.08)
   );
   justify-self: center;
@@ -1200,7 +1200,7 @@
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   font-size: var(--font-size-small);
   color: var(--bui-color-text-secondary);
 }
@@ -1211,7 +1211,7 @@
 
 .addressButton {
   border-radius: 999px;
-  border: var(--border-width) solid rgba(255, 255, 255, 0.2);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   padding: 4px 10px;
   font-size: var(--font-size-xs);
   color: var(--bui-color-text-secondary);
@@ -1246,8 +1246,8 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1395,7 +1395,7 @@
   display: grid;
   gap: 8px;
   padding-top: 8px;
-  border-top: var(--border-width) solid rgba(255, 255, 255, 0.08);
+  border-top: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .chainHeader {
@@ -1412,8 +1412,8 @@
   justify-content: space-between;
   padding: 8px 10px;
   border-radius: var(--radius-md);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   font-size: var(--font-size-small);
   color: var(--bui-color-text-secondary);
 }
@@ -1511,7 +1511,7 @@
   gap: 12px;
   min-height: 54px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--bui-color-text) 3.5%, transparent);
   padding: 10px;
 }
 
@@ -1520,7 +1520,7 @@
 .assetLoadingValue {
   position: relative;
   overflow: hidden;
-  background: rgba(234, 245, 235, 0.08);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
 }
 
 .assetLoadingIcon::after,
@@ -1533,7 +1533,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.12),
+    color-mix(in srgb, var(--bui-color-text) 12%, transparent),
     transparent
   );
   animation: walletLoadingShimmer 1.35s ease-in-out infinite;
@@ -1600,8 +1600,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: var(--border-width) solid rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
