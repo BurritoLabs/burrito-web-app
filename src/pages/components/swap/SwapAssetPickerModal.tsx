@@ -31,11 +31,14 @@ type SwapAssetPickerModalProps = {
   toAssetId: string
 }
 
-const formatAssetIdentity = (asset: SwapPickerAsset) => {
+const formatAssetIdentity = (
+  asset: SwapPickerAsset,
+  provenance?: string
+) => {
   const raw = asset.id.replace(/^(?:native|cw20):/, "")
   const compact = raw.length > 20 ? `${raw.slice(0, 10)}…${raw.slice(-6)}` : raw
   const type = asset.id.includes("ibc/") ? "IBC" : asset.type === "native" ? "Native" : "CW20"
-  return `${type} · ${compact}`
+  return `${provenance || type} · ${compact}`
 }
 
 const SwapAssetPickerModal = ({
@@ -101,8 +104,7 @@ const SwapAssetPickerModal = ({
                     <strong>{asset.symbol}</strong>
                     <small>
                       {asset.name !== asset.symbol ? `${asset.name} · ` : ""}
-                      {provenance ? `${provenance} · ` : ""}
-                      {formatAssetIdentity(asset)} · Balance{" "}
+                      {formatAssetIdentity(asset, provenance)} · Balance{" "}
                       {formatTokenAmount(
                         (assetBalanceMap.get(asset.id) ?? 0n).toString(),
                         asset.decimals,
