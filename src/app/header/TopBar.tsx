@@ -192,8 +192,6 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
         >
           <BrandLogo textSize={20} iconSize={24} gap={6} />
         </Link>
-      </div>
-      <div className={styles.actions}>
         <div
           className={styles.chainSwitcher}
           ref={chainMenuRef}
@@ -281,6 +279,8 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
               )
             : null}
         </div>
+      </div>
+      <div className={styles.actions}>
         <BurritoThemeSwitcher />
         {showValidator ? (
           <button

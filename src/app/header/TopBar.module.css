@@ -51,7 +51,7 @@
   height: var(--bui-chain-trigger-height);
   padding: 0 9px 0 5px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
-  border-radius: var(--bui-radius-control);
+  border-radius: 999px;
   background: var(--bui-color-surface);
   color: var(--bui-color-text-secondary);
   cursor: pointer;
