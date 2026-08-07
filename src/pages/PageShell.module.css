@@ -104,6 +104,7 @@
 .content {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 @media (max-width: 991.98px) {
@@ -146,6 +147,12 @@
     width: 100%;
     justify-content: flex-end;
     flex-wrap: wrap;
+  }
+
+  .small .content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 

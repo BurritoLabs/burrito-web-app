@@ -1230,6 +1230,43 @@
   font-size: 12px;
 }
 
+:global(:root[data-theme="light"]) :is(
+  .heroAddressButton strong,
+  .tradingUnavailable strong,
+  .tradePricePrimary,
+  .liquidityReceiveAsset,
+  .liquidityDetailsTitle,
+  .liquidityEstimateRows strong,
+  .liquidityReceiveBox strong
+) {
+  color: var(--bui-color-text);
+}
+
+:global(:root[data-theme="light"]) .sidePanelTabs {
+  border-color: var(--card-border);
+  background: var(--card-bg-muted);
+}
+
+:global(:root[data-theme="light"]) .sidePanelTabs :is(button:hover, .sidePanelTabActive) {
+  color: var(--bui-color-text) !important;
+  background: rgba(var(--active-chain-rgb), 0.14) !important;
+}
+
+:global(:root[data-theme="light"]) :is(.liquidityAssetBox, .liquidityReceiveBox) {
+  border-color: var(--card-border);
+  background: var(--card-bg-muted);
+}
+
+:global(:root[data-theme="light"]) .liquidityAssetInputRow input,
+:global(:root[data-theme="light"]) .liquidityAssetPill {
+  color: var(--bui-color-text);
+}
+
+:global(:root[data-theme="light"]) :is(.liquidityLpIconPrimary, .liquidityLpIconSecondary) {
+  background: var(--card-bg);
+  box-shadow: 0 0 0 2px var(--card-bg-muted);
+}
+
 .liquidityTxLink {
   color: rgba(104, 216, 63, 0.94);
   font-size: 12px;

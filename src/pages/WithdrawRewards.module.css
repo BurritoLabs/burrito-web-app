@@ -323,6 +323,36 @@
   margin-top: 6px;
 }
 
+:global(:root[data-theme="light"]) :is(
+  .validatorHeader dt,
+  .validatorHeader dd,
+  .validatorReward,
+  .empty,
+  .feeRow,
+  .feeLabel,
+  .feeOption
+) {
+  color: var(--bui-color-text-secondary);
+}
+
+:global(:root[data-theme="light"]) .summaryDivider {
+  color: color-mix(in srgb, var(--bui-color-text) 48%, transparent);
+}
+
+:global(:root[data-theme="light"]) .feeSelectButton {
+  background: var(--card-bg);
+}
+
+:global(:root[data-theme="light"]) .feeCaret {
+  border-top-color: var(--bui-color-text-secondary);
+}
+
+:global(:root[data-theme="light"]) .feeDropdown {
+  border-color: var(--card-border);
+  background: var(--card-bg);
+  box-shadow: 0 10px 24px rgba(24, 48, 31, 0.14);
+}
+
 .submit {
   margin-top: 12px;
   width: 100%;
