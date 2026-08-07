@@ -149,11 +149,6 @@
     flex-wrap: wrap;
   }
 
-  .small .content {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
 }
 
 @media (max-width: 500px) {
@@ -183,6 +178,14 @@
   margin: 0 auto;
   width: var(--max-width-small);
   max-width: 100%;
+}
+
+@media (max-width: 600px) {
+  .small .content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 
 
