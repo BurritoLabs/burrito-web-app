@@ -1982,6 +1982,36 @@
   }
 }
 
+:global(:root[data-theme="light"]) :is(
+  .heroCopy,
+  .heroPanel,
+  .rulesCard,
+  .manageHero,
+  .systemStatus,
+  .packageCard,
+  .emptyState,
+  .planCard,
+  .recordCard
+) {
+  border-color: var(--card-border);
+  background: var(--card-bg);
+  color: var(--bui-color-text);
+}
+
+:global(:root[data-theme="light"]) .phasePill {
+  color: var(--bui-color-brand-text);
+}
+
+:global(:root[data-theme="light"]) :is(.stepHint, .confirmBox, .warningList div) {
+  border-color: rgba(171, 111, 0, 0.3);
+  background: rgba(255, 193, 7, 0.14);
+  color: #6f4b00;
+}
+
+:global(:root[data-theme="light"]) :is(.noticeBox, .txResult, .ownerSyncNote, .ownerEmptyHint) {
+  color: var(--bui-color-brand-text);
+}
+
 @media (max-width: 700px) {
   .formGrid,
   .liquidityInputs,

@@ -33,6 +33,12 @@
   color: rgba(255, 230, 173, 0.9);
 }
 
+:global(:root[data-theme="light"]) .noticeWarning {
+  background: rgba(255, 193, 7, 0.16);
+  border-color: rgba(171, 111, 0, 0.32);
+  color: #6f4b00;
+}
+
 .formGrid {
   display: grid;
   gap: var(--grid-gap);
