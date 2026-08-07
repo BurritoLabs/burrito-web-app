@@ -165,10 +165,6 @@
     clip-path: none;
   }
 
-  .closed .close {
-    display: none;
-  }
-
   .closeIcon {
     display: none;
   }
