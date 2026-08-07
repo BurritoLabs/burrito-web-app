@@ -313,7 +313,7 @@
 .dexFilterButtonActive {
   border-color: rgba(var(--active-chain-rgb), 0.44);
   background: rgba(var(--active-chain-rgb), 0.16);
-  color: var(--chain-accent-soft);
+  color: var(--chain-accent-strong);
 }
 
 .dexFilterButtonActive strong {
@@ -578,7 +578,7 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.34);
   background: rgba(var(--active-chain-rgb), 0.14);
-  color: rgba(133, 230, 91, 0.92);
+  color: var(--bui-color-brand-text);
   font-size: 10px;
   line-height: 1;
   font-weight: var(--bold);
@@ -589,7 +589,7 @@
   border: var(--border-width) solid rgba(67, 185, 255, 0.34);
   border-radius: 999px;
   background: rgba(67, 185, 255, 0.1);
-  color: rgba(155, 220, 255, 0.92);
+  color: var(--bui-color-info);
   font-size: 10px;
   font-weight: var(--semibold);
   line-height: 1;

@@ -2033,6 +2033,13 @@
 }
 
 :global(:root[data-theme="light"]) :is(
+  .lockStrip strong,
+  .progressHeader strong
+) {
+  color: var(--bui-color-brand-text);
+}
+
+:global(:root[data-theme="light"]) :is(
   .statusPill,
   .manageHeroSteps small,
   .ownerReadinessGrid strong

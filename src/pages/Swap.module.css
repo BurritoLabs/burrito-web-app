@@ -468,6 +468,10 @@
   line-height: 1;
 }
 
+:global(:root[data-theme="light"]) .maxButton {
+  color: var(--bui-color-brand-text);
+}
+
 .switchRow {
   display: flex;
   justify-content: center;

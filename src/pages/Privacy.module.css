@@ -37,6 +37,10 @@
   overflow-wrap: anywhere;
 }
 
+:global(:root[data-theme="light"]) .policy a {
+  color: var(--bui-color-info);
+}
+
 .intro {
   display: grid;
   gap: 12px;

@@ -191,7 +191,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--green);
+  color: var(--bui-color-brand-text);
   font-weight: 500;
   text-decoration: none;
 }
@@ -204,7 +204,7 @@
 
 .summaryLink:hover {
   text-decoration: underline;
-  color: rgba(82, 196, 26, 0.85);
+  color: var(--bui-color-brand-text);
 }
 
 .summaryLink::after {
@@ -802,9 +802,14 @@
 }
 
 .statusPassed {
-  color: #52c41a;
+  color: var(--bui-color-brand-text);
   border-color: rgba(82, 196, 26, 0.4);
   background: rgba(82, 196, 26, 0.12);
+}
+
+:global(:root[data-theme="light"]) .validatorVoteBadge {
+  color: var(--bui-color-text) !important;
+  background: var(--bui-color-surface-raised);
 }
 
 .statusRejected {

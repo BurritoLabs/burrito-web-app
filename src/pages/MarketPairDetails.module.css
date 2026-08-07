@@ -274,7 +274,7 @@
 }
 
 .heroAddressButton span {
-  color: rgba(133, 230, 91, 0.92);
+  color: var(--bui-color-brand-text);
   font-size: 11px;
   font-weight: var(--semibold);
 }
@@ -307,7 +307,7 @@
   border-radius: 999px;
   border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.34);
   background: rgba(var(--active-chain-rgb), 0.14);
-  color: rgba(133, 230, 91, 0.92);
+  color: var(--bui-color-brand-text);
   font-size: 10px;
   line-height: 1;
   font-weight: var(--bold);
@@ -318,7 +318,7 @@
   border: var(--border-width) solid rgba(67, 185, 255, 0.34);
   border-radius: 999px;
   background: rgba(67, 185, 255, 0.1);
-  color: rgba(155, 220, 255, 0.92);
+  color: var(--bui-color-info);
   font-size: 10px;
   font-weight: var(--semibold);
   line-height: 1;
@@ -458,7 +458,7 @@
 }
 
 .ohlcUp {
-  color: rgba(88, 232, 77, 0.95);
+  color: var(--bui-color-brand-text);
 }
 
 .ohlcDown {
@@ -724,7 +724,7 @@
 }
 
 .tradesLink {
-  color: rgba(133, 230, 91, 0.95);
+  color: var(--bui-color-brand-text);
   text-decoration: none;
   font-weight: var(--bold);
 }
@@ -1240,6 +1240,10 @@
   .liquidityReceiveBox strong
 ) {
   color: var(--bui-color-text);
+}
+
+:global(:root[data-theme="light"]) .timeframe {
+  background: var(--bui-color-surface-sunken);
 }
 
 :global(:root[data-theme="light"]) .sidePanelTabs {

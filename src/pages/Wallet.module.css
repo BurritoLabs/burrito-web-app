@@ -333,6 +333,10 @@
   cursor: pointer;
 }
 
+:global(:root[data-theme="light"]) .sideLink {
+  color: var(--bui-color-info);
+}
+
 @media (max-width: 991.98px) {
   .layout {
     grid-template-columns: 1fr;
