@@ -86,7 +86,7 @@
   display: grid;
   grid-template-rows: 1fr auto;
   background: var(--glass-sidebar);
-  border-right: var(--border-width) solid var(--shell-divider);
+  border-right: var(--border-width) solid var(--shell-divider-solid);
   position: relative;
   overflow: hidden;
   backdrop-filter: none;
@@ -110,7 +110,7 @@
   bottom: 0;
   width: 100vw;
   height: var(--border-width);
-  background: var(--shell-divider);
+  background: var(--shell-divider-solid);
   pointer-events: none;
   z-index: 3;
 }

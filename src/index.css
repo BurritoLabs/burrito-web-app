@@ -32,6 +32,11 @@
   --border-width: 1px;
   --card-border: var(--bui-color-border);
   --shell-divider: var(--bui-color-shell-divider);
+  --shell-divider-solid: color-mix(
+    in srgb,
+    var(--bui-color-text) 20%,
+    var(--bui-color-surface)
+  );
   --button-height: 48px;
   --button-height-small: 32px;
   --button-radius: 15px;

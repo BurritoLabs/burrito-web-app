@@ -8,14 +8,15 @@
 }
 
 .leftRail {
-  width: calc(100% - var(--wallet-offset));
-  max-width: var(--max-width);
-  margin: 0 auto;
+  width: auto;
+  max-width: none;
+  margin: 0 0 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
   height: 100%;
-  transform: translateX(calc(var(--wallet-offset) / -2));
+  transform: none;
+  flex: 0 0 auto;
   transition:
     width 340ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -246,10 +247,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  transform: none;
   color: var(--menu-text);
   z-index: 200;
 }
