@@ -1,20 +1,8 @@
 {
-  "reviewedAt": "2026-07-25",
-  "reviewBy": "2026-10-25",
+  "reviewedAt": "2026-08-08",
+  "reviewBy": "2026-11-08",
   "maxLow": 12,
-  "allowedElevatedAdvisories": [
-    {
-      "severity": "high",
-      "urls": [
-        "https://github.com/advisories/GHSA-qwww-vcr4-c8h2"
-      ],
-      "packages": [
-        "react-router",
-        "react-router-dom"
-      ],
-      "reason": "Only affects unstable React Server Components APIs; this Vite SPA does not use RSC."
-    }
-  ],
+  "allowedElevatedAdvisories": [],
   "allowedLowPackages": [
     "@chain-registry/keplr",
     "@cosmos-kit/core",

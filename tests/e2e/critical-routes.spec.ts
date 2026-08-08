@@ -210,6 +210,33 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
       )
     )
     .toEqual(["bridge.getCapabilities", "wallet.getStatus", "wallet.open"])
+
+  const walletLabel = page.locator('span[class*="walletButtonLabel"]').first()
+  await walletLabel.evaluate((element) => {
+    element.textContent =
+      "Burrito Validator Operations Wallet With An Intentionally Long Display Name"
+  })
+  const walletButton = walletLabel.locator("xpath=ancestor::button")
+  const [labelStyle, buttonBox] = await Promise.all([
+    walletLabel.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        overflow: style.overflow,
+        textOverflow: style.textOverflow,
+        whiteSpace: style.whiteSpace
+      }
+    }),
+    walletButton.boundingBox()
+  ])
+  expect(labelStyle).toEqual({
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
+  })
+  expect(buttonBox).not.toBeNull()
+  expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(
+    await page.evaluate(() => window.innerWidth)
+  )
 })
 
 test("wallet recovers from a full local asset cache", async ({ page }) => {

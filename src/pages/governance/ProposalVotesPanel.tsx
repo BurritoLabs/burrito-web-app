@@ -212,7 +212,7 @@ const ProposalVotesPanel = ({
                             {vote.validator?.moniker ?? truncateHash(vote.voter)}
                           </div>
                           {!vote.validator?.moniker ? (
-                            <div className={styles.validatorAddress}>
+                            <div className={styles.validatorAddress} title={vote.voter}>
                               {vote.voter}
                             </div>
                           ) : null}
@@ -258,7 +258,7 @@ const ProposalVotesPanel = ({
                             {vote.validator?.moniker ?? truncateHash(vote.voter)}
                           </div>
                           {!vote.validator?.moniker ? (
-                            <div className={styles.validatorAddress}>
+                            <div className={styles.validatorAddress} title={vote.voter}>
                               {vote.voter}
                             </div>
                           ) : null}

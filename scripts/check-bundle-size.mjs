@@ -4,12 +4,13 @@ import path from "node:path"
 
 const distDir = path.resolve("dist")
 const assetsDir = path.join(distDir, "assets")
-const maxInitialJsBytes = 700 * 1024
+const maxInitialJsBytes = 500 * 1024
+const maxInitialJsGzipBytes = 150 * 1024
 const maxAsyncJsBytes = 1200 * 1024
 const maxAsyncGzipBytes = 320 * 1024
-const maxWalletRuntimeBytes = 1600 * 1024
-const maxWalletRuntimeGzipBytes = 450 * 1024
-const maxWalletRuntimeStaticGzipBytes = 1050 * 1024
+const maxWalletRuntimeBytes = 1450 * 1024
+const maxWalletRuntimeGzipBytes = 410 * 1024
+const maxWalletRuntimeStaticGzipBytes = 1025 * 1024
 const walletRuntimeChunks = [/WalletRuntimeProvider/i]
 
 const formatBytes = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`
@@ -41,6 +42,9 @@ const initialScriptSet = new Set(initialScripts)
 const initialBytes = jsStats
   .filter((item) => initialScriptSet.has(item.file))
   .reduce((sum, item) => sum + item.size, 0)
+const initialGzipBytes = jsStats
+  .filter((item) => initialScriptSet.has(item.file))
+  .reduce((sum, item) => sum + item.gzipSize, 0)
 
 if (initialBytes > maxInitialJsBytes) {
   fail(
@@ -90,6 +94,14 @@ for (const item of jsStats) {
   }
 }
 
+if (initialGzipBytes > maxInitialJsGzipBytes) {
+  fail(
+    `Initial JS gzip budget exceeded: ${formatBytes(initialGzipBytes)} > ${formatBytes(
+      maxInitialJsGzipBytes
+    )}`
+  )
+}
+
 const manifestPath = path.join(distDir, ".vite", "manifest.json")
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
 const walletRuntimeEntry = Object.values(manifest).find((entry) =>
@@ -131,7 +143,9 @@ if (!walletRuntimeEntry) {
 
 if (!process.exitCode) {
   const largest = [...jsStats].sort((a, b) => b.size - a.size).slice(0, 5)
-  console.log(`Initial JS: ${formatBytes(initialBytes)}`)
+  console.log(
+    `Initial JS: ${formatBytes(initialBytes)} (${formatBytes(initialGzipBytes)} gzip)`
+  )
   console.log("Largest JS chunks:")
   for (const item of largest) {
     console.log(

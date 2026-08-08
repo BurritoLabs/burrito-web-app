@@ -17,7 +17,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium-desktop",
-      testMatch: /critical-routes\.spec\.ts/,
+      testIgnore: [/production-smoke\.spec\.ts/, /mobile-layout\.spec\.ts/],
       use: {
         browserName: "chromium",
         viewport: { width: 1440, height: 900 }

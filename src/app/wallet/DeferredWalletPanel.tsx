@@ -38,7 +38,10 @@ const WalletPanelHandle = ({
   onOpen,
   onPrepare
 }: WalletPanelHandleProps) => (
-  <aside className={`${styles.wallet} ${styles.closed}`} aria-hidden="true">
+  <aside
+    className={`${styles.wallet} ${styles.closed}`}
+    aria-label="Wallet panel"
+  >
     <button
       className={styles.close}
       onClick={onOpen}
@@ -49,7 +52,7 @@ const WalletPanelHandle = ({
       disabled={loading || !onOpen}
       type="button"
     >
-      <span>{loading ? "Loading" : "Wallet"}</span>
+      <span aria-hidden="true">{loading ? "Loading" : "Wallet"}</span>
       <WalletIcon className={styles.walletIcon} />
     </button>
   </aside>

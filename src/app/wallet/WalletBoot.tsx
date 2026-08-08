@@ -30,8 +30,9 @@ import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import { getBurritoNativeConnector } from "./burritoNativeWallet"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
+import { loadWalletRuntimeProvider } from "./walletRuntimeLoader"
 
-const WalletRuntimeProvider = lazy(() => import("./WalletRuntimeProvider"))
+const WalletRuntimeProvider = lazy(loadWalletRuntimeProvider)
 
 type WalletWindow = Window & {
   keplr?: unknown

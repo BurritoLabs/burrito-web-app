@@ -501,6 +501,7 @@
 
 .validatorText {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
 }
 
@@ -549,7 +550,9 @@
 .validatorAddress {
   font-size: var(--font-size-xxs);
   color: var(--bui-color-text-secondary);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .loadMoreWrap {

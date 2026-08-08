@@ -1399,7 +1399,7 @@ const WalletPanel = () => {
             </>
           ) : (
             <>
-              <span>Wallet</span>
+              <span aria-hidden="true">Wallet</span>
               <WalletIcon className={styles.walletIcon} />
             </>
           )}

@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import styles from "./ConnectModal.module.css"
 import { useWallet } from "./WalletContext"
 import {
@@ -8,6 +8,7 @@ import {
 } from "./walletMeta"
 import { useAppChain } from "../appChainContext"
 import { getAddressExplorerUrl } from "../explorer"
+import { preloadWalletRuntime } from "./walletRuntimeLoader"
 
 type ConnectModalProps = {
   open: boolean
@@ -23,6 +24,14 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
     useWallet()
   const isConnecting = status === "connecting"
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    if (!connectors.some((connector) => connector.id === "keplr-mobile" && connector.available)) {
+      return
+    }
+    preloadWalletRuntime()
+  }, [connectors, open])
 
   const walletLabel = account?.name?.trim()
     ? account.name.trim()
@@ -117,6 +126,12 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
               className={styles.walletRow}
               type="button"
               disabled={!connector.available || isConnecting}
+              onFocus={
+                connector.id === "keplr-mobile" ? preloadWalletRuntime : undefined
+              }
+              onPointerEnter={
+                connector.id === "keplr-mobile" ? preloadWalletRuntime : undefined
+              }
               onClick={() => connect(connector.id)}
             >
               <div>

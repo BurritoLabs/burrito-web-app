@@ -313,7 +313,7 @@
 .dexFilterButtonActive {
   border-color: rgba(var(--active-chain-rgb), 0.44);
   background: rgba(var(--active-chain-rgb), 0.16);
-  color: var(--chain-accent-strong);
+  color: var(--bui-color-text);
 }
 
 .dexFilterButtonActive strong {

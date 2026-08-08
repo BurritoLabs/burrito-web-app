@@ -9,9 +9,11 @@ import App from "./App"
 import { AppChainProvider } from "./app/AppChainProvider"
 import AppErrorBoundary from "./app/feedback/AppErrorBoundary"
 import { installRuntimeErrorReporting } from "./app/feedback/runtimeErrorReporter"
+import { installClientWebVitals } from "./app/feedback/clientWebVitals"
 import WalletBoot from "./app/wallet/WalletBoot"
 
 installRuntimeErrorReporting()
+installClientWebVitals()
 
 const shouldRetryQuery = (failureCount: number, error: unknown) => {
   if (failureCount >= 1) return false

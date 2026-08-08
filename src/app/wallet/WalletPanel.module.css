@@ -50,7 +50,7 @@
   transform: translate(-100%, 0);
   z-index: 260;
   padding: 10px 8px;
-  background-color: var(--card-bg);
+  background-color: var(--bui-color-surface);
   border-radius: 10px 0 0 10px;
   border: var(--border-width) solid var(--card-border);
   display: flex;
@@ -59,7 +59,23 @@
   align-items: center;
   justify-content: center;
   transition: 300ms;
-  color: var(--bui-color-text-secondary);
+  color: var(--bui-color-text);
+}
+
+.close:disabled {
+  opacity: 1;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;
+}
+
+:global(:root[data-theme="dark"]) .close {
+  background-color: #0b1411;
+  color: #eaf5eb;
+}
+
+:global(:root[data-theme="light"]) .close {
+  background-color: #ffffff;
+  color: #142019;
 }
 
 .close span {
