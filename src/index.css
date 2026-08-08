@@ -77,6 +77,14 @@
   --font-ui: "Montserrat", "Nunito Sans", system-ui, sans-serif;
 }
 
+:root[data-app-chain="lunc"] {
+  --chain-accent-strong: #0284c7;
+}
+
+:root[data-app-chain="luna"] {
+  --chain-accent-strong: #ea580c;
+}
+
 :root[data-theme="light"][data-app-chain="lunc"] {
   --chain-accent-strong: #0369a1;
 }
