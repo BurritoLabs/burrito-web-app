@@ -743,7 +743,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
-  background: rgba(15, 24, 20, 0.86);
+  background: var(--asset-logo-surface);
   overflow: hidden;
 }
 
@@ -2022,10 +2022,6 @@
   background:
     linear-gradient(135deg, rgba(82, 196, 26, 0.07), transparent 44%),
     var(--card-bg);
-}
-
-:global(:root[data-theme="light"]) .launchLogo {
-  background: var(--card-bg);
 }
 
 :global(:root[data-theme="light"]) .phasePill {

@@ -24,6 +24,11 @@
   --menu-text: var(--bui-color-text);
   --card-bg: var(--bui-color-surface);
   --card-bg-muted: var(--bui-color-surface-raised);
+  --asset-logo-surface: color-mix(
+    in srgb,
+    var(--bui-color-text) 8%,
+    var(--bui-color-surface)
+  );
   --text: var(--bui-color-text);
   --text-muted: var(--bui-color-text-secondary);
   --button-default-bg: var(--bui-color-surface-hover);

@@ -489,7 +489,7 @@
 .assetIconFallback {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
-  background: rgba(15, 24, 20, 0.86);
+  background: var(--asset-logo-surface);
 }
 
 .pairIconPrimary,
