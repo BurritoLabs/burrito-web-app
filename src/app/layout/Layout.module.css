@@ -86,19 +86,17 @@
   display: grid;
   grid-template-rows: 1fr auto;
   background: var(--glass-sidebar);
+  border-right: var(--border-width) solid var(--shell-divider);
   position: relative;
   overflow: hidden;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 6%, transparent),
-    10px 0 28px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
 }
 
 .header {
   grid-area: header;
   min-width: 0;
-  border-left: var(--border-width) solid var(--card-border);
   background: transparent;
   position: sticky;
   top: 0;
@@ -112,7 +110,7 @@
   bottom: 0;
   width: 100vw;
   height: var(--border-width);
-  background: var(--card-border);
+  background: var(--shell-divider);
   pointer-events: none;
   z-index: 3;
 }
@@ -132,7 +130,7 @@
   background: var(--glass-header);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 6%, transparent);
+  box-shadow: none;
 }
 
 .main {
@@ -141,7 +139,6 @@
   overflow: hidden;
   position: relative;
   background: var(--app-background);
-  border-left: var(--border-width) solid var(--card-border);
 }
 
 .mainContainer {
@@ -215,9 +212,8 @@
     overflow: visible;
   }
 
-  .header,
-  .main {
-    border-left: none;
+  .sidebar {
+    border-right: 0;
   }
 
   .header::after {
