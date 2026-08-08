@@ -67,9 +67,11 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
             <div className={styles.connected}>
               <div className={styles.connectedInfo}>
                 <span className={styles.connectedIcon}>{walletBadge}</span>
-                <div>
+                <div className={styles.connectedText}>
                   <div className={styles.connectedLabel}>Connected</div>
-                  <div className={styles.connectedName}>{walletLabel}</div>
+                  <div className={styles.connectedName} title={walletLabel}>
+                    {walletLabel}
+                  </div>
                   <div className={styles.connectedAddress}>
                     {shortenAddress(account.address)}
                   </div>

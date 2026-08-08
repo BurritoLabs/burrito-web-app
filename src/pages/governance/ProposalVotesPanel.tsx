@@ -170,7 +170,6 @@ const ProposalVotesPanel = ({
                 vote.weight,
                 totalVoteWeight
               )
-              const badgeRight = Math.min(98, Math.max(0, weightPercent + 1))
               const txHash = vote.txhash ?? voteTxHashes[vote.voter]
               const txUrl = txHash ? getTxExplorerUrl(chainKey, txHash) : ""
               return (
@@ -189,15 +188,6 @@ const ProposalVotesPanel = ({
                           backgroundColor: getVoteColor(vote.option)
                         }}
                       />
-                      <span
-                        className={styles.validatorVoteBadge}
-                        style={{
-                          color: getVoteColor(vote.option),
-                          right: `${badgeRight}%`
-                        }}
-                      >
-                        {formatVoteOption(vote.option)}
-                      </span>
                       <div className={styles.validatorInfo}>
                         <img
                           className={styles.validatorAvatar}
@@ -214,8 +204,11 @@ const ProposalVotesPanel = ({
                             target.src = "/system/validator.png"
                           }}
                         />
-                        <div>
-                          <div className={styles.validatorName}>
+                        <div className={styles.validatorText}>
+                          <div
+                            className={styles.validatorName}
+                            title={vote.validator?.moniker ?? vote.voter}
+                          >
                             {vote.validator?.moniker ?? truncateHash(vote.voter)}
                           </div>
                           {!vote.validator?.moniker ? (
@@ -225,6 +218,12 @@ const ProposalVotesPanel = ({
                           ) : null}
                         </div>
                       </div>
+                      <span
+                        className={styles.validatorVoteBadge}
+                        style={{ color: getVoteColor(vote.option) }}
+                      >
+                        {formatVoteOption(vote.option)}
+                      </span>
                     </a>
                   ) : (
                     <div className={styles.validatorRow}>
@@ -235,15 +234,6 @@ const ProposalVotesPanel = ({
                           backgroundColor: getVoteColor(vote.option)
                         }}
                       />
-                      <span
-                        className={styles.validatorVoteBadge}
-                        style={{
-                          color: getVoteColor(vote.option),
-                          right: `${badgeRight}%`
-                        }}
-                      >
-                        {formatVoteOption(vote.option)}
-                      </span>
                       <div className={styles.validatorInfo}>
                         <img
                           className={styles.validatorAvatar}
@@ -260,8 +250,11 @@ const ProposalVotesPanel = ({
                             target.src = "/system/validator.png"
                           }}
                         />
-                        <div>
-                          <div className={styles.validatorName}>
+                        <div className={styles.validatorText}>
+                          <div
+                            className={styles.validatorName}
+                            title={vote.validator?.moniker ?? vote.voter}
+                          >
                             {vote.validator?.moniker ?? truncateHash(vote.voter)}
                           </div>
                           {!vote.validator?.moniker ? (
@@ -271,6 +264,12 @@ const ProposalVotesPanel = ({
                           ) : null}
                         </div>
                       </div>
+                      <span
+                        className={styles.validatorVoteBadge}
+                        style={{ color: getVoteColor(vote.option) }}
+                      >
+                        {formatVoteOption(vote.option)}
+                      </span>
                     </div>
                   )}
                 </div>

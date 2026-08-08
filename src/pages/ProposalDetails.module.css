@@ -494,8 +494,14 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
   position: relative;
   z-index: 1;
+}
+
+.validatorText {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .validatorStatus {
@@ -505,9 +511,7 @@
 }
 
 .validatorVoteBadge {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -537,6 +541,9 @@
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   color: var(--bui-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .validatorAddress {

@@ -299,6 +299,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
               account ? styles.connected : ""
             }`}
             type="button"
+            title={account ? connectLabel : undefined}
             ref={walletButtonRef}
             onClick={() => {
               if (account) {
@@ -316,7 +317,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
                 >
                   <WalletIcon width={16} height={16} aria-hidden="true" />
                 </span>
-                <span>{connectLabel}</span>
+                <span className={styles.walletButtonLabel}>{connectLabel}</span>
               </span>
             ) : (
               connectLabel

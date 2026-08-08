@@ -257,6 +257,8 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: 180px;
 }
 
 .actionGroup {
@@ -366,6 +368,7 @@
   box-shadow: none;
   height: var(--button-height-small);
   min-width: 100px;
+  max-width: 180px;
   padding: 0 20px;
   line-height: 1;
   font-weight: var(--bold);
@@ -396,6 +399,16 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.walletButtonLabel {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .walletBadge {
@@ -596,7 +609,7 @@
 
   .connectButton {
     min-width: 0;
-    max-width: none;
+    max-width: 180px;
     padding-left: 20px;
     padding-right: 20px;
   }
@@ -605,13 +618,6 @@
     min-width: 0;
   }
 
-  .walletButtonContent > span:last-child {
-    display: inline-block;
-    max-width: none;
-    overflow: visible;
-    text-overflow: clip;
-    white-space: nowrap;
-  }
 }
 
 @media (max-width: 390px) {
@@ -621,10 +627,8 @@
     padding-right: 12px;
   }
 
-  .walletButtonContent > span:last-child {
+  .walletButtonLabel {
     max-width: 90px;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 }
 

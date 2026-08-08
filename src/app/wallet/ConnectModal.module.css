@@ -78,6 +78,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
@@ -88,6 +89,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.connectedText {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .connectedIcon {
@@ -117,6 +125,13 @@
   font-weight: var(--bold);
   color: var(--bui-color-text);
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connected > button {
+  flex-shrink: 0;
 }
 
 .connectedAddress {
