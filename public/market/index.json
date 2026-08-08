@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-08-08T13:18:41.228Z",
+  "generatedAt": "2026-08-08T19:04:42.699Z",
   "lcd": "https://terra-classic-lcd.publicnode.com",
   "chainId": "columbus-5",
   "pairCount": 4073,
-  "freshPairCount": 4073,
-  "carriedPairCount": 0,
+  "freshPairCount": 4069,
+  "carriedPairCount": 4,
   "dexes": [
     {
       "id": "terraswap",
@@ -5337,11 +5337,11 @@
       "poolAssets": [
         {
           "id": "native:uusd",
-          "amount": "5676107665709"
+          "amount": "5676282633529"
         },
         {
           "id": "native:uluna",
-          "amount": "560619448920033"
+          "amount": "560602202743211"
         }
       ]
     },
@@ -9017,11 +9017,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra16hzl7lge3jjnlazvut2ypt7upk68z5dycc9rwy608fah8q0y3fuslkenzc",
-          "amount": "915862738123"
+          "amount": "919451758551"
         },
         {
           "id": "native:uluna",
-          "amount": "13596124482972"
+          "amount": "13543159003667"
         }
       ]
     },
@@ -9077,11 +9077,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1le9l8gpwl2f48xluphnwkqrnhwxqt27xhducfzqvncmsh9swavlqjpy7c9",
-          "amount": "23551360"
+          "amount": "23247027"
         },
         {
           "id": "cw20:terra1nuwdr5zaul2gnq88xapq8ythmaw4092kt8lxsl6jd36h47u8vpcqnrmdcm",
-          "amount": "11533417679275"
+          "amount": "11684708441275"
         }
       ]
     },
@@ -9137,11 +9137,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt",
-          "amount": "133434854169974771"
+          "amount": "135683496982094603"
         },
         {
           "id": "native:ibc/EC029D782B5E87EF523FF6716DEF58CACD1D207602E510B6B9D0DABA21057DFB",
-          "amount": "107694017"
+          "amount": "105912757"
         }
       ]
     },
@@ -9537,11 +9537,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1ctvrh09s3q2tgxm88vt6zexle8wcf22qwhxe5qa2wchc9e2ynw3qhvksyl",
-          "amount": "379516596375421216"
+          "amount": "379021172557919883"
         },
         {
           "id": "native:uluna",
-          "amount": "84956760362739"
+          "amount": "85068055145430"
         }
       ]
     },
@@ -9657,11 +9657,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1vs5xa8jr5ek5shxvqz3zyyvrexfxs0myd7gqhplmz46xldg7k7lscc8fyj",
-          "amount": "510240405102"
+          "amount": "513908985478"
         },
         {
           "id": "cw20:terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2",
-          "amount": "10995527703991"
+          "amount": "10917191585974"
         }
       ]
     },
@@ -9797,11 +9797,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1wwrg00jczxf4czy4jr4wc2nvgpl4un4g8fjvm2zy54neel7ygqgsmlhhvp",
-          "amount": "661577705917808"
+          "amount": "672316133035153"
         },
         {
           "id": "native:uusd",
-          "amount": "6534840545"
+          "amount": "6430670231"
         }
       ]
     },
@@ -9997,11 +9997,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a",
-          "amount": "379638005486"
+          "amount": "382681517646"
         },
         {
           "id": "native:uluna",
-          "amount": "24229059582251"
+          "amount": "24036765731838"
         }
       ]
     },
@@ -10217,11 +10217,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt",
-          "amount": "23887303277965087084"
+          "amount": "23885263338452469526"
         },
         {
           "id": "native:uluna",
-          "amount": "511175012874196"
+          "amount": "511225623957000"
         }
       ]
     },
@@ -10257,11 +10257,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra19fufgpaec6c85nrw9j2a40rshdgcm9rhn6hlj2zmx03utpqkh2ls8jnxkz",
-          "amount": "200756344594"
+          "amount": "200637587672"
         },
         {
           "id": "native:uluna",
-          "amount": "1564950956893"
+          "amount": "1565879109622"
         }
       ]
     },
@@ -10417,11 +10417,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra12f3f5fzfzxckc0qlv3rmwwkjfhzevpwmx77345n0zuu2678vxf0sm6vvcw",
-          "amount": "71127094569"
+          "amount": "71637581616"
         },
         {
           "id": "cw20:terra1vs5xa8jr5ek5shxvqz3zyyvrexfxs0myd7gqhplmz46xldg7k7lscc8fyj",
-          "amount": "934715116990"
+          "amount": "928067634410"
         }
       ]
     },
@@ -10717,11 +10717,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2",
-          "amount": "1783552268853096"
+          "amount": "1782989412154302"
         },
         {
           "id": "native:uluna",
-          "amount": "121416916086265"
+          "amount": "121457437813340"
         }
       ]
     },
@@ -11037,11 +11037,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra16hzl7lge3jjnlazvut2ypt7upk68z5dycc9rwy608fah8q0y3fuslkenzc",
-          "amount": "2131680356514"
+          "amount": "2130615089567"
         },
         {
           "id": "cw20:terra12f3f5fzfzxckc0qlv3rmwwkjfhzevpwmx77345n0zuu2678vxf0sm6vvcw",
-          "amount": "1642293145553"
+          "amount": "1645951395552"
         }
       ]
     },
@@ -11157,11 +11157,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra12f3f5fzfzxckc0qlv3rmwwkjfhzevpwmx77345n0zuu2678vxf0sm6vvcw",
-          "amount": "3252132993694"
+          "amount": "3251620970578"
         },
         {
           "id": "native:uusd",
-          "amount": "622400106590"
+          "amount": "622498311090"
         }
       ]
     },
@@ -11197,11 +11197,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra14nfst294yvtdhrt4hk0njyszyh08q7e0g8rwknht7gyvw24ceyeqw42npg",
-          "amount": "6960003631581"
+          "amount": "6948379429576"
         },
         {
           "id": "native:uluna",
-          "amount": "8411132626823"
+          "amount": "8425232206990"
         }
       ]
     },
@@ -11337,11 +11337,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1ftp7z26px8l7tf4c02g54ekpnzsgtt8dl7tx2dy4072plzqemjvqtlkq3l",
-          "amount": "18293747043"
+          "amount": "18492519927"
         },
         {
           "id": "native:uluna",
-          "amount": "11399091006250"
+          "amount": "11276807375741"
         }
       ]
     },
@@ -11637,11 +11637,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1genyaw32qah4544m0sfgmchegf7emft77u7hug63cc6a72mvpntsfupzmd",
-          "amount": "14373961460591"
+          "amount": "14383401814311"
         },
         {
           "id": "native:uluna",
-          "amount": "55642016953661"
+          "amount": "55605570280019"
         }
       ]
     },
@@ -11777,11 +11777,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra12f3f5fzfzxckc0qlv3rmwwkjfhzevpwmx77345n0zuu2678vxf0sm6vvcw",
-          "amount": "7592149145331"
+          "amount": "7593413261745"
         },
         {
           "id": "native:uluna",
-          "amount": "142744495596177"
+          "amount": "142720947729369"
         }
       ]
     },
@@ -11797,11 +11797,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1wwrg00jczxf4czy4jr4wc2nvgpl4un4g8fjvm2zy54neel7ygqgsmlhhvp",
-          "amount": "29023973078807035"
+          "amount": "29030313663427757"
         },
         {
           "id": "native:uluna",
-          "amount": "27194392873316"
+          "amount": "27188505705249"
         }
       ]
     },
@@ -11877,11 +11877,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra16hzl7lge3jjnlazvut2ypt7upk68z5dycc9rwy608fah8q0y3fuslkenzc",
-          "amount": "649112948605"
+          "amount": "648415051753"
         },
         {
           "id": "cw20:terra1vs5xa8jr5ek5shxvqz3zyyvrexfxs0myd7gqhplmz46xldg7k7lscc8fyj",
-          "amount": "6145286527714"
+          "amount": "6151914067847"
         }
       ]
     },
@@ -12017,11 +12017,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a",
-          "amount": "96651223997"
+          "amount": "97651660644"
         },
         {
           "id": "native:uusd",
-          "amount": "63147508589"
+          "amount": "62501850763"
         }
       ]
     },
@@ -13337,11 +13337,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra14nfst294yvtdhrt4hk0njyszyh08q7e0g8rwknht7gyvw24ceyeqw42npg",
-          "amount": "536645012878"
+          "amount": "548234342277"
         },
         {
           "id": "cw20:terra1v0z94pr8ynzq8zmuyv3j0eraqjs4m5zpm4ptgru459y5fye2at7q0e4jtd",
-          "amount": "4198202143"
+          "amount": "4109629062"
         }
       ]
     },
@@ -13657,11 +13657,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1vs5xa8jr5ek5shxvqz3zyyvrexfxs0myd7gqhplmz46xldg7k7lscc8fyj",
-          "amount": "20954665811051"
+          "amount": "20957928164541"
         },
         {
           "id": "native:uluna",
-          "amount": "30356713387081"
+          "amount": "30351997477413"
         }
       ]
     },
@@ -33983,11 +33983,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1x6e64es6yhauhvs3prvpdg2gkqdtfru840wgnhs935x8axr7zxkqzysuxz",
-          "amount": "25378259772343"
+          "amount": "25388886684793"
         },
         {
           "id": "native:uluna",
-          "amount": "5681120338275"
+          "amount": "5678747648638"
         }
       ]
     },
@@ -34539,11 +34539,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1vhgq25vwuhdhn9xjll0rhl2s67jzw78a4g2t78y5kz89q9lsdskq2pxcj2",
-          "amount": "10428748753061788"
+          "amount": "10424460057712669"
         },
         {
           "id": "native:uluna",
-          "amount": "714620882921196"
+          "amount": "714915542921196"
         }
       ],
       "volumes": {
@@ -36593,11 +36593,11 @@
       "poolAssets": [
         {
           "id": "native:uluna",
-          "amount": "25745193671647"
+          "amount": "25685958374793"
         },
         {
           "id": "native:ibc/E1E3674A0E4E1EF9C69646F9AF8D9497173821826074622D831BAB73CCB99A2D",
-          "amount": "1203412015"
+          "amount": "1206193477"
         }
       ],
       "volumes": {
@@ -37713,11 +37713,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1cstkhheqvklg82vm5qgyaktlulja7y0d0547mpfnf68qtesd8ams9xd4m0",
-          "amount": "11057006006413"
+          "amount": "11078179291783"
         },
         {
           "id": "native:ibc/386A4031D68DE6370B85F9FF7E89CEF8DE7CDE01CC193CBD87BD3ED60F6662CE",
-          "amount": "44574700"
+          "amount": "44660057"
         }
       ]
     },
@@ -42795,11 +42795,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1gcr97yaq923qaxa3gzn70kpx29c28m2c3prxn66vev3segea7y4qps5vj4",
-          "amount": "11323120276453479"
+          "amount": "10848484813059141"
         },
         {
           "id": "cw20:terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp",
-          "amount": "5700993069"
+          "amount": "5950993069"
         }
       ]
     },
@@ -44165,11 +44165,11 @@
       "poolAssets": [
         {
           "id": "native:uluna",
-          "amount": "213982155498444"
+          "amount": "215249087392924"
         },
         {
           "id": "cw20:terra1ex0hjv3wurhj4wgup4jzlzaqj4av6xqd8le4etml7rg9rs207y4s8cdvrp",
-          "amount": "7939665439041"
+          "amount": "7893037524290"
         }
       ],
       "volumes": {
@@ -45089,11 +45089,11 @@
       "poolAssets": [
         {
           "id": "native:uluna",
-          "amount": "10725052526883"
+          "amount": "10735965751083"
         },
         {
           "id": "cw20:terra1nv36kq4dpxf4d00w4mv4w095ek8kv48f54v46qduruy4fwd2dtzq2uk70j",
-          "amount": "10557022863264"
+          "amount": "10546315548822"
         }
       ]
     },
@@ -46769,11 +46769,11 @@
       "poolAssets": [
         {
           "id": "native:uluna",
-          "amount": "12255004669601"
+          "amount": "12249726103620"
         },
         {
           "id": "cw20:terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt",
-          "amount": "562113332544562996"
+          "amount": "562356088730895283"
         }
       ],
       "volumes": {
@@ -47899,11 +47899,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra15p8su45k45axng8ue59rl6zph4at27s49u3agr6uqrx3dhcxpg3qt0ekdt",
-          "amount": "21563625730322695"
+          "amount": "21465385940657500"
         },
         {
           "id": "cw20:terra19fufgpaec6c85nrw9j2a40rshdgcm9rhn6hlj2zmx03utpqkh2ls8jnxkz",
-          "amount": "54570011171"
+          "amount": "54820312157"
         }
       ]
     },
@@ -48367,11 +48367,11 @@
       "poolAssets": [
         {
           "id": "native:uluna",
-          "amount": "416989104469574"
+          "amount": "417089104469574"
         },
         {
           "id": "native:ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5",
-          "amount": "20301659805"
+          "amount": "20296736905"
         }
       ],
       "volumes": {
@@ -48443,7 +48443,7 @@
       "poolAssets": [
         {
           "id": "cw20:terra1uewxz67jhhhs2tj97pfm2egtk7zqxuhenm4y4m",
-          "amount": "287386290797"
+          "amount": "291650671576"
         },
         {
           "id": "native:uusd",
@@ -48463,11 +48463,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra16hzl7lge3jjnlazvut2ypt7upk68z5dycc9rwy608fah8q0y3fuslkenzc",
-          "amount": "485916009688"
+          "amount": "487188009688"
         },
         {
           "id": "cw20:terra12f3f5fzfzxckc0qlv3rmwwkjfhzevpwmx77345n0zuu2678vxf0sm6vvcw",
-          "amount": "379974974912"
+          "amount": "378984881861"
         }
       ]
     },
@@ -48683,7 +48683,7 @@
       "poolAssets": [
         {
           "id": "cw20:terra13ryrrlcskwa05cd94h54c8rnztff9l82pp0zqnfvlwt77za8wjjsld36ms",
-          "amount": "943976467"
+          "amount": "944917430"
         },
         {
           "id": "native:uluna",
@@ -53179,11 +53179,11 @@
       "poolAssets": [
         {
           "id": "native:uluna",
-          "amount": "422826764647631"
+          "amount": "422923474647631"
         },
         {
           "id": "native:ibc/0BB9D8513E8E8E9AE6A9D211D9136E6DA42288DDE6CFAA453A150A4566054DC5",
-          "amount": "20863533874"
+          "amount": "20858777319"
         }
       ],
       "volumes": {
@@ -55329,11 +55329,11 @@
       "poolAssets": [
         {
           "id": "native:ukrw",
-          "amount": "2916768382808"
+          "amount": "2917346609301"
         },
         {
           "id": "native:uluna",
-          "amount": "1453736732349"
+          "amount": "1453449461945"
         }
       ]
     },
@@ -56229,11 +56229,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1mm8tdp40r2slzwqxk8jsz66ayc4zp69muxeateq37x2xquttzsaqy7275a",
-          "amount": "537096251482"
+          "amount": "536283183714"
         },
         {
           "id": "native:uluna",
-          "amount": "33608497762608"
+          "amount": "33659605965029"
         }
       ],
       "volumes": {
@@ -56879,11 +56879,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1zra7m9w59sxwxqy8lqs3yeqleedrvtgg2qf938nk2wf8pq2ejkqsn0heln",
-          "amount": "272150860"
+          "amount": "271085952"
         },
         {
           "id": "native:uluna",
-          "amount": "2537959192615"
+          "amount": "2547959192615"
         }
       ]
     },
@@ -57679,11 +57679,11 @@
       "poolAssets": [
         {
           "id": "native:uusd",
-          "amount": "874401815807"
+          "amount": "876364611105"
         },
         {
           "id": "native:uluna",
-          "amount": "85671045728572"
+          "amount": "85481665678366"
         }
       ],
       "volumes": {
@@ -58153,11 +58153,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1vs5xa8jr5ek5shxvqz3zyyvrexfxs0myd7gqhplmz46xldg7k7lscc8fyj",
-          "amount": "3108969710738"
+          "amount": "3105339921505"
         },
         {
           "id": "native:uluna",
-          "amount": "4487657851808"
+          "amount": "4492920137017"
         }
       ]
     },
@@ -85045,11 +85045,11 @@
       "poolAssets": [
         {
           "id": "cw20:terra1klz458efcl7md99vafn5sdxtluauem0q5nqjtn",
-          "amount": "1000000001000000"
+          "amount": "0"
         },
         {
           "id": "native:uusd",
-          "amount": "200000"
+          "amount": "0"
         }
       ]
     },
