@@ -31,7 +31,7 @@
 
 .poweredByLine {
   margin-top: 8px;
-  color: var(--green);
+  color: var(--bui-color-brand-text);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   white-space: nowrap;
@@ -113,11 +113,11 @@
 }
 
 .up {
-  color: #52c41a;
+  color: var(--bui-color-success);
 }
 
 .down {
-  color: #ff7a7a;
+  color: var(--bui-color-danger);
 }
 
 .neutral {

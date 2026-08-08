@@ -656,11 +656,11 @@
 }
 
 .changeUp {
-  color: rgba(88, 232, 77, 0.95);
+  color: var(--bui-color-success);
 }
 
 .changeDown {
-  color: rgba(255, 105, 105, 0.95);
+  color: var(--bui-color-danger);
 }
 
 .changeFlat {

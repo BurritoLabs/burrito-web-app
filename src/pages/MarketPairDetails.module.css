@@ -357,15 +357,15 @@
 }
 
 .changeUp {
-  color: rgba(88, 232, 77, 0.95);
-  border-color: rgba(88, 232, 77, 0.16);
-  background: rgba(88, 232, 77, 0.12);
+  color: var(--bui-color-success);
+  border-color: color-mix(in srgb, var(--bui-color-success) 28%, transparent);
+  background: var(--bui-color-success-soft);
 }
 
 .changeDown {
-  color: rgba(255, 105, 105, 0.95);
-  border-color: rgba(255, 105, 105, 0.16);
-  background: rgba(255, 105, 105, 0.12);
+  color: var(--bui-color-danger);
+  border-color: color-mix(in srgb, var(--bui-color-danger) 28%, transparent);
+  background: var(--bui-color-danger-soft);
 }
 
 .changeFlat {
@@ -462,7 +462,7 @@
 }
 
 .ohlcDown {
-  color: rgba(255, 105, 105, 0.95);
+  color: var(--bui-color-danger);
 }
 
 .ohlcFlat {
@@ -693,15 +693,15 @@
 }
 
 .sideBuy {
-  color: rgba(88, 232, 77, 0.95);
-  background: rgba(88, 232, 77, 0.12);
-  border-color: rgba(88, 232, 77, 0.35);
+  color: var(--bui-color-success);
+  background: var(--bui-color-success-soft);
+  border-color: color-mix(in srgb, var(--bui-color-success) 38%, transparent);
 }
 
 .sideSell {
-  color: rgba(255, 105, 105, 0.95);
-  background: rgba(255, 105, 105, 0.12);
-  border-color: rgba(255, 105, 105, 0.35);
+  color: var(--bui-color-danger);
+  background: var(--bui-color-danger-soft);
+  border-color: color-mix(in srgb, var(--bui-color-danger) 38%, transparent);
 }
 
 .tradePriceCell {
