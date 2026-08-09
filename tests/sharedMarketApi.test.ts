@@ -38,7 +38,7 @@ describe("shared market candle API", () => {
 })
 
 describe("shared market activation", () => {
-  it("deduplicates activation requests for one pair", async () => {
+  it("deduplicates activation requests by exact chain and pair", async () => {
     const originalFetch = globalThis.fetch
     let calls = 0
     globalThis.fetch = vi.fn(async () => {
@@ -47,9 +47,14 @@ describe("shared market activation", () => {
     }) as typeof fetch
     try {
       const pair = "terra1activation000000000000000000000000000000"
-      expect(await requestSharedPairActivation(pair)).toBe(true)
-      expect(await requestSharedPairActivation(pair)).toBe(false)
-      expect(calls).toBe(1)
+      expect(await requestSharedPairActivation("columbus-5", pair)).toBe(true)
+      expect(await requestSharedPairActivation("columbus-5", pair)).toBe(false)
+      expect(await requestSharedPairActivation("phoenix-1", pair)).toBe(true)
+      expect(calls).toBe(2)
+      const bodies = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map(
+        (call) => JSON.parse(String(call[1]?.body)) as { chain: string }
+      )
+      expect(bodies.map((body) => body.chain)).toEqual(["columbus-5", "phoenix-1"])
     } finally {
       globalThis.fetch = originalFetch
     }

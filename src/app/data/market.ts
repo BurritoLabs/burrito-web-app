@@ -1,11 +1,12 @@
 import { CLASSIC_CHAIN } from "../chain"
-import { getActiveAppChainKey } from "../activeChain"
+import { getActiveAppChainKey, getActiveAppChainRuntime } from "../activeChain"
 import {
   fetchLaunchRegistryLaunches,
   isLaunchRegistryConfigured
 } from "../launchpad/registry"
 import {
   ASSET_DEX_PAIRS_URL,
+  BURRITO_MARKET_API_URL,
   LOCAL_MARKET_CANDLES_BASE_URL,
   LOCAL_MARKET_INDEX_URL
 } from "../config/externalServices"
@@ -213,15 +214,19 @@ let factoryPairDexInFlight: {
 let localMarketIndexCache:
   | {
       at: number
+      chainId: string
       pairs: MarketDexPair[]
       pools: Map<string, MarketPoolSnapshot>
     }
   | null = null
 let localMarketIndexInFlight:
-  | Promise<{
-      pairs: MarketDexPair[]
-      pools: Map<string, MarketPoolSnapshot>
-    } | null>
+  | {
+      chainId: string
+      promise: Promise<{
+        pairs: MarketDexPair[]
+        pools: Map<string, MarketPoolSnapshot>
+      } | null>
+    }
   | null = null
 const LOCAL_CANDLES_CACHE_TTL = 5 * 60 * 1000
 const PAIR_TX_LCD_TIMEOUT_MS = 3_500
@@ -879,6 +884,7 @@ const toFallbackAsset = (assetId: string) => {
 const normalizeMarketAssetId = (value: string) => normalizeSafeMarketAssetId(value)
 
 type MarketIndexPayload = {
+  chainId?: string
   generatedAt?: string
   pairs?: Array<{
     pair?: string
@@ -1030,28 +1036,50 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
 }
 
 const fetchLocalMarketIndex = async () => {
-  if (CLASSIC_CHAIN.chainId !== "columbus-5") return null
-  if (localMarketIndexCache && Date.now() - localMarketIndexCache.at < LOCAL_INDEX_CACHE_TTL) {
+  const chainId = getActiveAppChainRuntime().chain.chainId
+  if (
+    localMarketIndexCache?.chainId === chainId &&
+    Date.now() - localMarketIndexCache.at < LOCAL_INDEX_CACHE_TTL
+  ) {
     return localMarketIndexCache
   }
-  if (localMarketIndexInFlight) return localMarketIndexInFlight
+  if (localMarketIndexInFlight?.chainId === chainId) {
+    return localMarketIndexInFlight.promise
+  }
 
-  localMarketIndexInFlight = fetch(LOCAL_MARKET_INDEX_URL)
-    .then(async (response) => {
-      if (!response.ok) return null
-      const payload = (await response.json()) as MarketIndexPayload
-      const parsed = parseLocalMarketIndex(payload)
-      if (!parsed.pairs.length) return null
-      const next = { at: Date.now(), ...parsed }
-      localMarketIndexCache = next
-      return next
-    })
-    .catch(() => null)
+  const remoteUrl = `${BURRITO_MARKET_API_URL}/v1/market/index?${new URLSearchParams({ chain: chainId })}`
+  const fallbackUrl = chainId === "columbus-5" ? LOCAL_MARKET_INDEX_URL : null
+  const fetchIndex = async () => {
+    for (const url of [remoteUrl, fallbackUrl]) {
+      if (!url) continue
+      try {
+        const response = await fetch(url, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(8_000)
+        })
+        if (!response.ok) continue
+        const payload = (await response.json()) as MarketIndexPayload
+        if (payload.chainId && payload.chainId !== chainId) continue
+        const parsed = parseLocalMarketIndex(payload)
+        if (!parsed.pairs.length) continue
+        const next = { at: Date.now(), chainId, ...parsed }
+        localMarketIndexCache = next
+        return next
+      } catch {
+        // Continue to the packaged Classic snapshot when the shared API is unavailable.
+      }
+    }
+    return null
+  }
+  const promise = fetchIndex()
     .finally(() => {
-      localMarketIndexInFlight = null
+      if (localMarketIndexInFlight?.promise === promise) {
+        localMarketIndexInFlight = null
+      }
     })
+  localMarketIndexInFlight = { chainId, promise }
 
-  return localMarketIndexInFlight
+  return promise
 }
 
 const fetchLaunchpadMarketPairs = async (): Promise<MarketDexPair[]> => {
@@ -1682,8 +1710,9 @@ export const fetchPairCandles = async ({
 
   // Burrito API is the shared, cached K-line source. Keep the existing direct
   // chain and static paths as resilience fallbacks while pair coverage grows.
-  if (getActiveAppChainKey() === "lunc") {
+  {
     const sharedCandles = await fetchSharedPairCandles({
+      chainId: getActiveAppChainRuntime().chain.chainId,
       pairAddress,
       leftAssetKey,
       rightAssetKey,
