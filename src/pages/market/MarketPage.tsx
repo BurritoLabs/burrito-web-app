@@ -43,7 +43,10 @@ import {
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
-import { supportsReserveRatioPricing } from "../../app/market/poolPricing"
+import {
+  resolveBondingSpotPrice,
+  supportsReserveRatioPricing
+} from "../../app/market/poolPricing"
 import {
   getMarketDexFilterOptions,
   type MarketDexFilter
@@ -591,9 +594,14 @@ const Market = () => {
       const priceBase = left
       const priceQuote = right
       const usesReserveRatioPricing = supportsReserveRatioPricing(pool.type)
-      const priceValue = usesReserveRatioPricing
-        ? rightAmount / leftAmount
-        : undefined
+      const priceValue =
+        resolveBondingSpotPrice({
+          priceBaseId: priceBase.id,
+          priceQuoteId: priceQuote.id,
+          spotPriceAmount: pool.bonding?.spotPriceAmount,
+          spotPriceAssetId: pool.bonding?.spotPriceAssetId
+        }) ??
+        (usesReserveRatioPricing ? rightAmount / leftAmount : undefined)
 
       const leftUsd = getAssetUsdPrice(left)
       const rightUsd = getAssetUsdPrice(right)

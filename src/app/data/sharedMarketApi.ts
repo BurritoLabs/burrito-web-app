@@ -28,12 +28,22 @@ export type SharedPairCandle = {
 
 const activationRequested = new Set<string>()
 
-export const requestSharedPairActivation = async (pairAddress: string) => {
+export const requestSharedPairActivation = async (
+  chainId: string,
+  pairAddress: string
+) => {
+  const normalizedChainId = chainId.trim()
   const normalized = pairAddress.trim().toLowerCase()
-  if (!BURRITO_MARKET_API_URL || !normalized || activationRequested.has(normalized)) {
+  const activationKey = `${normalizedChainId}:${normalized}`
+  if (
+    !BURRITO_MARKET_API_URL ||
+    !normalizedChainId ||
+    !normalized ||
+    activationRequested.has(activationKey)
+  ) {
     return false
   }
-  activationRequested.add(normalized)
+  activationRequested.add(activationKey)
   try {
     const response = await fetch(`${BURRITO_MARKET_API_URL}/v1/market/activate`, {
       method: "POST",
@@ -41,12 +51,12 @@ export const requestSharedPairActivation = async (pairAddress: string) => {
         Accept: "application/json",
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ chain: "columbus-5", pair: normalized }),
+      body: JSON.stringify({ chain: normalizedChainId, pair: normalized }),
       signal: AbortSignal.timeout(8_000)
     })
     return response.status === 202
   } catch {
-    activationRequested.delete(normalized)
+    activationRequested.delete(activationKey)
     return false
   }
 }
@@ -130,12 +140,14 @@ export const normalizeSharedCandles = ({
 }
 
 export const fetchSharedPairCandles = async ({
+  chainId,
   pairAddress,
   leftAssetKey,
   rightAssetKey,
   bucketMs,
   maxCandles
 }: {
+  chainId: string
   pairAddress: string
   leftAssetKey: string
   rightAssetKey: string
@@ -143,10 +155,11 @@ export const fetchSharedPairCandles = async ({
   maxCandles: number
 }) => {
   const interval = sharedIntervalForBucketMs(bucketMs)
-  if (!BURRITO_MARKET_API_URL || !interval) return []
+  const normalizedChainId = chainId.trim()
+  if (!BURRITO_MARKET_API_URL || !normalizedChainId || !interval) return []
 
   const params = new URLSearchParams({
-    chain: "columbus-5",
+    chain: normalizedChainId,
     pair: pairAddress,
     interval,
     limit: String(Math.max(1, Math.min(5000, maxCandles))),
@@ -162,7 +175,7 @@ export const fetchSharedPairCandles = async ({
     const payload = (await response.json()) as SharedCandleResponse
     if (payload.status === "unavailable") {
       if (payload.limitations?.includes("candles_not_indexed")) {
-        void requestSharedPairActivation(pairAddress)
+        void requestSharedPairActivation(normalizedChainId, pairAddress)
       }
       return []
     }
