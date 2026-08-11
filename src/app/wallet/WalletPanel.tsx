@@ -1385,7 +1385,10 @@ const WalletPanel = () => {
 
   return (
     <>
-      <aside className={`${styles.wallet} ${!isOpen ? styles.closed : ""}`}>
+      <aside
+        aria-label="Wallet panel"
+        className={`${styles.wallet} ${!isOpen ? styles.closed : ""}`}
+      >
         <button
           className={styles.close}
           onClick={() => setIsOpen((open) => !open)}

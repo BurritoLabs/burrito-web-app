@@ -37,7 +37,10 @@ import {
   rememberWalletManualDisconnect,
   rememberWalletConnectorId
 } from "./walletMeta"
-import { isWalletInitializationError } from "./walletInitialization"
+import {
+  isWalletInitializationError,
+  runWithWalletInitializationRetry
+} from "./walletInitialization"
 const MOBILE_CONNECT_HANDOFF_TIMEOUT_MS = 90
 const MOBILE_ACCOUNT_HYDRATION_DELAYS_MS = [250, 1000, 2500, 5000] as const
 const AUTO_RECONNECT_RETRY_COOLDOWN_MS = 15_000
@@ -368,20 +371,14 @@ export const WalletProvider = ({
     ): Promise<T> => {
       await ensureCosmosWalletSession(id, wallet)
 
-      try {
-        return await operation()
-      } catch (err) {
-        if (
-          COSMOS_CONNECTOR_CONFIGS[id].type !== "mobile" ||
-          !isWalletInitializationError(err)
-        ) {
-          throw err
-        }
-
-        wallet.offlineSigner = undefined
-        await ensureCosmosWalletSession(id, wallet, { forceConnect: true })
+      if (COSMOS_CONNECTOR_CONFIGS[id].type !== "mobile") {
         return operation()
       }
+
+      return runWithWalletInitializationRetry(operation, async () => {
+        wallet.offlineSigner = undefined
+        await ensureCosmosWalletSession(id, wallet, { forceConnect: true })
+      })
     },
     [ensureCosmosWalletSession]
   )
@@ -397,16 +394,23 @@ export const WalletProvider = ({
 
       const wallet =
         getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
-      if (
-        !wallet ||
-        wallet.isWalletNotExist ||
-        !getActiveWalletConnectSession(wallet, chain.chainId)
-      ) {
+      if (!wallet || wallet.isWalletNotExist) {
+        return false
+      }
+
+      const hasActiveSession = Boolean(
+        getActiveWalletConnectSession(wallet, chain.chainId)
+      )
+      if (!hasActiveSession && !options?.allowWalletOpen) {
         return false
       }
 
       try {
-        await wallet.update({ connect: false })
+        if (hasActiveSession) {
+          await wallet.update({ connect: false })
+        } else {
+          await ensureCosmosWalletSession(id, wallet, { forceConnect: true })
+        }
         await waitForWalletAddress(wallet, 8, 150)
         if (!wallet.address && options?.allowWalletOpen) {
           await wallet.connect(false)
@@ -428,7 +432,9 @@ export const WalletProvider = ({
             } else {
               try {
                 wallet.offlineSigner = undefined
-                await wallet.connect(false)
+                await ensureCosmosWalletSession(id, wallet, {
+                  forceConnect: true
+                })
                 await waitForWalletAddress(wallet, 12, 200)
                 if (!wallet.address) {
                   return false
@@ -452,6 +458,7 @@ export const WalletProvider = ({
     [
       chain.chainId,
       desktopKeplrAvailable,
+      ensureCosmosWalletSession,
       getCosmosWallet,
       syncCosmosWalletAccount
     ]
@@ -755,12 +762,17 @@ export const WalletProvider = ({
               client,
               signerAddress,
               (messages, fee, memo = "") =>
-                wallet.signAndBroadcast(
-                  [...messages],
-                  fee as never,
-                  memo,
-                  "stargate"
-                )
+                runWithCosmosWalletSessionRetry(id, wallet, async () => {
+                  if (isMobileWallet) {
+                    wallet.offlineSigner = undefined
+                  }
+                  return wallet.signAndBroadcast(
+                    [...messages],
+                    fee as never,
+                    memo,
+                    "stargate"
+                  )
+                })
             )
         })
       } catch {
@@ -1126,7 +1138,18 @@ export const WalletProvider = ({
           ? undefined
           : isCosmosConnectorId(id)
             ? await getCosmosOfflineSigner(id)
-            : undefined
+            : undefined,
+      runWithSessionRetry: async (id, operation) => {
+        if (!isCosmosConnectorId(id)) {
+          return operation()
+        }
+        const wallet =
+          getCosmosWallet(id, { preferConnected: true }) ?? getCosmosWallet(id)
+        if (!wallet) {
+          throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} not available`)
+        }
+        return runWithCosmosWalletSessionRetry(id, wallet, operation)
+      }
     })
     return () => {
       registerWalletAdapterRuntime(undefined)
@@ -1139,6 +1162,8 @@ export const WalletProvider = ({
     getCosmosConnector,
     getCosmosSigningStargateClient,
     getCosmosOfflineSigner,
+    getCosmosWallet,
+    runWithCosmosWalletSessionRetry,
     desktopKeplrAvailable
   ])
 

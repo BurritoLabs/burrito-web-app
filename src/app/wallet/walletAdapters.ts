@@ -38,6 +38,10 @@ type WalletAdapterRuntime = {
     id: WalletConnectorId,
     feeDenom?: string
   ) => Promise<ClassicStargateClient | undefined>
+  runWithSessionRetry?: <T>(
+    id: WalletConnectorId,
+    operation: () => Promise<T>
+  ) => Promise<T>
 }
 
 type EncodeObjectLike = {
@@ -428,13 +432,58 @@ export const getAminoOfflineSignerForConnector = async (
 export const connectClassicSigningClientForConnector = async (
   id: WalletConnectorId
 ) => {
-  const { connectSigningClient } = await import("./signingClient")
-  const signer =
-    (await getAminoOfflineSignerForConnector(id)) ??
-    (await getOfflineSignerForConnector(id))
-  const signerAddress = await getSignerAddress(signer)
-  const client = await connectSigningClient(signer, getActiveChain())
-  return bindSignerAddress(client as ClassicStargateClient, signerAddress, signer)
+  const createClient = async () => {
+    const { connectSigningClient } = await import("./signingClient")
+    const signer =
+      (await getAminoOfflineSignerForConnector(id)) ??
+      (await getOfflineSignerForConnector(id))
+    const signerAddress = await getSignerAddress(signer)
+    const client = await connectSigningClient(signer, getActiveChain())
+    return bindSignerAddress(
+      client as ClassicStargateClient,
+      signerAddress,
+      signer
+    )
+  }
+
+  const client = await createClient()
+  const runWithSessionRetry = walletAdapterRuntime?.runWithSessionRetry
+  if (id !== "keplr-mobile" || !runWithSessionRetry) {
+    return client
+  }
+
+  const withFreshClient = async <T>(
+    operation: (activeClient: ClassicStargateClient) => Promise<T>
+  ) => {
+    let isFirstAttempt = true
+    return runWithSessionRetry(id, async () => {
+      if (isFirstAttempt) {
+        isFirstAttempt = false
+        return operation(client)
+      }
+      return operation(await createClient())
+    })
+  }
+
+  return {
+    ...client,
+    sign: (...args: Parameters<ClassicStargateClient["sign"]>) =>
+      withFreshClient((activeClient) => activeClient.sign(...args)),
+    signAndBroadcast: (
+      ...args: Parameters<ClassicStargateClient["signAndBroadcast"]>
+    ) =>
+      withFreshClient((activeClient) =>
+        activeClient.signAndBroadcast(...args)
+      ),
+    delegateTokens: (
+      ...args: Parameters<ClassicStargateClient["delegateTokens"]>
+    ) =>
+      withFreshClient((activeClient) => activeClient.delegateTokens(...args)),
+    undelegateTokens: (
+      ...args: Parameters<ClassicStargateClient["undelegateTokens"]>
+    ) =>
+      withFreshClient((activeClient) => activeClient.undelegateTokens(...args))
+  } satisfies ClassicStargateClient
 }
 
 export const connectClassicStargateClientForConnector = async (

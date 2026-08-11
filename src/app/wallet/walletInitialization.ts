@@ -16,3 +16,19 @@ export const isWalletInitializationError = (error: unknown) => {
     (message.includes("out of sync") && message.includes("wallet"))
   )
 }
+
+export const runWithWalletInitializationRetry = async <T>(
+  operation: () => Promise<T>,
+  recover: () => Promise<void>
+): Promise<T> => {
+  try {
+    return await operation()
+  } catch (error) {
+    if (!isWalletInitializationError(error)) {
+      throw error
+    }
+
+    await recover()
+    return operation()
+  }
+}
