@@ -4,18 +4,18 @@
   --burrito-brand-gap: 6px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 991.98px) {
   .burrito-responsive-brand {
-    gap: 5px !important;
+    gap: 6px !important;
     padding-left: 0 !important;
   }
 
   .burrito-responsive-brand__icon {
-    width: 20px !important;
-    height: 20px !important;
+    width: 24px !important;
+    height: 24px !important;
   }
 
   .burrito-responsive-brand__wordmark {
-    font-size: 16px !important;
+    font-size: 20px !important;
   }
 }

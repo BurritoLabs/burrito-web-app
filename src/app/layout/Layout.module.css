@@ -225,7 +225,7 @@
   }
 
   .headerInner {
-    padding: 0 var(--main-padding);
+    padding: 0 16px;
     background: var(--bui-color-surface-raised);
   }
 
