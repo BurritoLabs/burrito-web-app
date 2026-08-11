@@ -117,7 +117,18 @@ test("mobile navigation and wallet panel remain operable", async ({ page }) => {
   await expect(mobileBrandIcon).toBeVisible()
   const mobileBrandBox = await mobileBrandIcon.boundingBox()
   expect(mobileBrandBox).not.toBeNull()
-  expect(Math.abs(mobileBrandBox!.x - 24)).toBeLessThan(0.5)
+  expect(Math.abs(mobileBrandBox!.x - 16)).toBeLessThan(0.5)
+  expect(Math.abs(mobileBrandBox!.y - 16)).toBeLessThan(0.5)
+  expect(Math.abs(mobileBrandBox!.width - 24)).toBeLessThan(0.5)
+  expect(Math.abs(mobileBrandBox!.height - 24)).toBeLessThan(0.5)
+
+  const mobileBrandWordmark = page.locator(
+    'header a[aria-label="Go to dashboard"] .burrito-responsive-brand__wordmark'
+  )
+  const mobileWordmarkBox = await mobileBrandWordmark.boundingBox()
+  expect(mobileWordmarkBox).not.toBeNull()
+  expect(Math.abs(mobileWordmarkBox!.x - (mobileBrandBox!.x + 30))).toBeLessThan(0.5)
+  await expect(mobileBrandWordmark).toHaveCSS("font-size", "20px")
 
   await page.getByRole("button", { name: "Open menu" }).click()
   await expect(page.getByRole("link", { name: "NFT", exact: true })).toBeVisible()
