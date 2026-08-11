@@ -118,6 +118,8 @@ test("mobile navigation and wallet panel remain operable", async ({ page }) => {
   const mobileBrandBox = await mobileBrandIcon.boundingBox()
   expect(mobileBrandBox).not.toBeNull()
   expect(Math.abs(mobileBrandBox!.x - 24)).toBeLessThan(0.5)
+  expect(Math.abs(mobileBrandBox!.width - 22)).toBeLessThan(0.5)
+  expect(Math.abs(mobileBrandBox!.height - 22)).toBeLessThan(0.5)
 
   await page.getByRole("button", { name: "Open menu" }).click()
   await expect(page.getByRole("link", { name: "NFT", exact: true })).toBeVisible()
