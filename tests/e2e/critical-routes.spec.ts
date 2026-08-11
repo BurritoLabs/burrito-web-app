@@ -111,6 +111,14 @@ test("mobile navigation and wallet panel remain operable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto("/")
 
+  const mobileBrandIcon = page.locator(
+    'header a[aria-label="Go to dashboard"] img'
+  )
+  await expect(mobileBrandIcon).toBeVisible()
+  const mobileBrandBox = await mobileBrandIcon.boundingBox()
+  expect(mobileBrandBox).not.toBeNull()
+  expect(Math.abs(mobileBrandBox!.x - 24)).toBeLessThan(0.5)
+
   await page.getByRole("button", { name: "Open menu" }).click()
   await expect(page.getByRole("link", { name: "NFT", exact: true })).toBeVisible()
   await page.getByRole("link", { name: "NFT", exact: true }).click()
