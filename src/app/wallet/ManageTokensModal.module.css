@@ -204,10 +204,17 @@
 .toggle {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  min-width: 24px;
+  min-height: 24px;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  appearance: none;
+  -webkit-appearance: none;
   font-weight: var(--bold);
   font-size: var(--font-size-small);
 }

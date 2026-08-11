@@ -119,6 +119,38 @@ test("mobile navigation and wallet panel remain operable", async ({ page }) => {
   await page.locator('button[aria-label="Open wallet"]').click()
   const walletToggle = page.locator('button[aria-label="Toggle wallet"]')
   await expect(walletToggle).toBeVisible()
+  const walletActions = ["Send", "Receive", "Buy"].map((name) =>
+    page.getByRole("button", { name, exact: true })
+  )
+  for (const action of walletActions) {
+    await expect(action).toBeVisible()
+    const geometry = await action.evaluate((button) => {
+      const buttonRect = button.getBoundingClientRect()
+      const iconRect = button.querySelector("svg")?.getBoundingClientRect()
+      return {
+        width: buttonRect.width,
+        height: buttonRect.height,
+        buttonCenter: {
+          x: buttonRect.left + buttonRect.width / 2,
+          y: buttonRect.top + buttonRect.height / 2
+        },
+        iconCenter: iconRect
+          ? {
+              x: iconRect.left + iconRect.width / 2,
+              y: iconRect.top + iconRect.height / 2
+            }
+          : undefined
+      }
+    })
+    expect(Math.abs(geometry.width - geometry.height)).toBeLessThan(0.1)
+    expect(geometry.iconCenter).toBeDefined()
+    expect(
+      Math.abs(geometry.buttonCenter.x - geometry.iconCenter!.x)
+    ).toBeLessThan(0.1)
+    expect(
+      Math.abs(geometry.buttonCenter.y - geometry.iconCenter!.y)
+    ).toBeLessThan(0.1)
+  }
   await expect
     .poll(() => page.evaluate(() => window.localStorage.getItem("burritoWalletOpen")))
     .toBe("true")

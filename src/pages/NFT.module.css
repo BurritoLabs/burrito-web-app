@@ -282,15 +282,20 @@
 .closeButton {
   width: 34px;
   height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  aspect-ratio: 1;
   flex: 0 0 auto;
   display: inline-grid;
   place-items: center;
   padding: 0;
   border: var(--border-width) solid var(--card-border);
-  border-radius: 50%;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--bui-color-text-secondary);
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .detailLayout {

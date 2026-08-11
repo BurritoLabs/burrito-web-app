@@ -63,11 +63,18 @@
   gap: 6px;
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  padding: 0;
   color: var(--bui-color-text-secondary);
   text-decoration: none;
   border-radius: 50%;
   border: 0;
   background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
   transition: color 0.2s ease;
 }
 

@@ -481,6 +481,11 @@
 .switchButton {
   width: 38px;
   height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  padding: 0;
   border-radius: 999px;
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
   background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
@@ -490,6 +495,8 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 

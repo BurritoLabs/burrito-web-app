@@ -357,18 +357,33 @@
 .actionButton {
   width: 54px;
   height: 54px;
-  padding: 16px;
-  border-radius: 50%;
+  min-width: 54px;
+  min-height: 54px;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 999px;
   border: var(--border-width) solid var(--card-border);
   background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
+  background-clip: padding-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--bui-color-text-secondary);
+  appearance: none;
+  -webkit-appearance: none;
   transition: border-color 0.2s ease, color 0.2s ease;
   box-shadow:
-    inset 0px 1.5px 0px 0px color-mix(in srgb, var(--bui-color-text) 8%, transparent),
-    0px 4px 24px 0px rgba(36, 36, 40, 0.3);
+    inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 8%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--bui-color-text) 3%, transparent),
+    0 0 16px rgba(36, 36, 40, 0.12);
+}
+
+.actionButton svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
 }
 
 .actionButton:hover {
@@ -381,8 +396,9 @@
   border-color: var(--chain-accent);
   color: #0c1411;
   box-shadow:
-    inset 0px 1.5px 0px 0px color-mix(in srgb, var(--bui-color-text) 30%, transparent),
-    0px 4px 24px 0px rgba(36, 36, 40, 0.3);
+    inset 0 1px 0 color-mix(in srgb, var(--bui-color-text) 30%, transparent),
+    0 0 0 1px rgba(var(--active-chain-rgb), 0.12),
+    0 0 18px rgba(var(--active-chain-rgb), 0.14);
 }
 
 .actionPrimary:hover {
@@ -1780,6 +1796,8 @@
   .actionButton {
     width: 52px;
     height: 52px;
+    min-width: 52px;
+    min-height: 52px;
   }
 
   .sendHeroTop,

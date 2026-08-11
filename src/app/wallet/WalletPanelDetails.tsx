@@ -64,6 +64,7 @@ const WalletPanelDetails = ({
       <div className={styles.networthActions}>
         <div className={styles.actionItem}>
           <button
+            aria-label="Send"
             className={`${styles.actionButton} ${styles.actionPrimary}`}
             type="button"
             onClick={onSend}
@@ -73,13 +74,23 @@ const WalletPanelDetails = ({
           <span>Send</span>
         </div>
         <div className={styles.actionItem}>
-          <button className={styles.actionButton} type="button" onClick={onReceive}>
+          <button
+            aria-label="Receive"
+            className={styles.actionButton}
+            type="button"
+            onClick={onReceive}
+          >
             <ReceiveIcon />
           </button>
           <span>Receive</span>
         </div>
         <div className={styles.actionItem}>
-          <button className={styles.actionButton} type="button" onClick={onBuy}>
+          <button
+            aria-label="Buy"
+            className={styles.actionButton}
+            type="button"
+            onClick={onBuy}
+          >
             <BuyIcon />
           </button>
           <span>Buy</span>
