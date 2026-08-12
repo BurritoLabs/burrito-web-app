@@ -206,6 +206,13 @@
   }
 }
 
+@media (pointer: coarse) and (max-width: 1366px) {
+  .brand {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
 
 @media (max-height: 1000px) {
   .backgroundBlurPrimary {

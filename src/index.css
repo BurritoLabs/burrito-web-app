@@ -111,6 +111,12 @@
   }
 }
 
+@media (pointer: coarse) and (max-width: 1366px) {
+  :root {
+    --header-height: 56px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

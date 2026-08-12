@@ -133,6 +133,13 @@
   box-shadow: none;
 }
 
+@media (pointer: coarse) and (max-width: 1366px) {
+  .headerInner {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
 .main {
   grid-area: main;
   min-width: 0;

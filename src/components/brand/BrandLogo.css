@@ -4,7 +4,7 @@
   --burrito-brand-gap: 6px;
 }
 
-@media (max-width: 991.98px) {
+@media (max-width: 991.98px), (pointer: coarse) and (max-width: 1366px) {
   .burrito-responsive-brand {
     gap: 6px !important;
     padding-left: 0 !important;
