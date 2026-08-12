@@ -17,7 +17,7 @@ export type MetricItem = {
   layout?: MetricLayout
 }
 
-export type DashboardRange = "1h" | "24h" | "7d"
+export type DashboardRange = "24h" | "7d" | "30d" | "90d"
 
 export const formatValue = (value?: number, decimals = 2) => {
   if (value === undefined || value === null || Number.isNaN(value)) return "--"
@@ -85,25 +85,36 @@ export const dashboardRanges: Record<
     rangeMs: number
     ttlMs: number
     activityFrequency: BinodesDashboardFrequency
+    activityBuckets: number
   }
 > = {
-  "1h": {
-    label: "1h",
-    rangeMs: 60 * 60 * 1000,
-    ttlMs: 5 * 60 * 1000,
-    activityFrequency: "HOUR"
-  },
   "24h": {
-    label: "24h",
+    label: "24H",
     rangeMs: 24 * 60 * 60 * 1000,
     ttlMs: 15 * 60 * 1000,
-    activityFrequency: "DAY"
+    activityFrequency: "HOUR",
+    activityBuckets: 24
   },
   "7d": {
-    label: "7d",
+    label: "7D",
     rangeMs: 7 * 24 * 60 * 60 * 1000,
     ttlMs: 60 * 60 * 1000,
-    activityFrequency: "WEEK"
+    activityFrequency: "DAY",
+    activityBuckets: 7
+  },
+  "30d": {
+    label: "30D",
+    rangeMs: 30 * 24 * 60 * 60 * 1000,
+    ttlMs: 2 * 60 * 60 * 1000,
+    activityFrequency: "DAY",
+    activityBuckets: 30
+  },
+  "90d": {
+    label: "90D",
+    rangeMs: 90 * 24 * 60 * 60 * 1000,
+    ttlMs: 6 * 60 * 60 * 1000,
+    activityFrequency: "DAY",
+    activityBuckets: 90
   }
 }
 

@@ -4,25 +4,22 @@ import PageShell from "../PageShell"
 import styles from "../Dashboard.module.css"
 import {
   fetchCurrentDashboardSnapshot,
-  fetchCurrentPhoenixDashboardSnapshot,
-  fetchHistoricalDashboardSnapshot,
-  type DashboardSnapshot
+  fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import {
-  fetchBinodesDashboardActivity
-} from "../../app/data/binodes"
+import { fetchBinodesDashboardActivity } from "../../app/data/binodes"
 import { fetchPrices } from "../../app/data/classic"
+import {
+  calculateHistoryChange,
+  fetchDashboardPriceHistory,
+  type DashboardHistoryPoint
+} from "../../app/data/dashboardHistory"
 import { formatNumber, formatPercent } from "../../app/utils/format"
 import {
   dashboardRangeOptions,
   dashboardRanges,
   formatBlockInterval,
-  formatDelta,
-  formatOracleDelta,
   formatUsdCompact,
   formatUsdSmart,
-  formatUsdStandard,
-  formatUtcHour,
   formatValue,
   getIsMobileDashboard,
   type DashboardRange,
@@ -32,6 +29,12 @@ import {
   DashboardMetricCard,
   DashboardMetricSkeletons
 } from "./DashboardMetricCard"
+import {
+  BarChart,
+  GroupedBurnChart,
+  LineChart,
+  MiniTrend
+} from "./DashboardCharts"
 import { useAppChain } from "../../app/appChainContext"
 
 const useDeferredHistoryEnabled = () => {
@@ -50,22 +53,128 @@ const useDeferredHistoryEnabled = () => {
     }
 
     if (walletWindow.requestIdleCallback) {
-      const handle = walletWindow.requestIdleCallback(run, { timeout: 6000 })
+      const handle = walletWindow.requestIdleCallback(run, { timeout: 4500 })
       return () => walletWindow.cancelIdleCallback?.(handle)
     }
 
-    const timer = window.setTimeout(run, 4500)
+    const timer = window.setTimeout(run, 2500)
     return () => window.clearTimeout(timer)
   }, [enabled])
 
   return enabled
 }
 
+const compactAssetAmount = (value?: number, symbol?: string) => {
+  if (!Number.isFinite(value)) return "--"
+  return `${new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2
+  }).format(Number(value))}${symbol ? ` ${symbol}` : ""}`
+}
+
+const buildFallbackTrend = (
+  currentPrice: number | undefined,
+  percentageChange: number | undefined,
+  rangeMs: number
+): DashboardHistoryPoint[] => {
+  if (!Number.isFinite(currentPrice) || !Number.isFinite(percentageChange)) return []
+  const divisor = 1 + Number(percentageChange) / 100
+  if (!divisor) return []
+  return [
+    { time: Date.now() - rangeMs, value: Number(currentPrice) / divisor },
+    { time: Date.now(), value: Number(currentPrice) }
+  ]
+}
+
+const marketChange = ({
+  range,
+  history,
+  change24h,
+  change7d
+}: {
+  range: DashboardRange
+  history?: DashboardHistoryPoint[]
+  change24h?: number
+  change7d?: number
+}) => {
+  if (range === "24h") return change24h
+  const historicalChange = calculateHistoryChange(history)
+  if (historicalChange !== undefined) return historicalChange
+  return range === "7d" ? change7d : undefined
+}
+
+const MarketCard = ({
+  symbol,
+  price,
+  marketCap,
+  change,
+  points,
+  color,
+  tone
+}: {
+  symbol: string
+  price?: number
+  marketCap?: number
+  change?: number
+  points: DashboardHistoryPoint[]
+  color: string
+  tone: "lunc" | "ustc" | "luna"
+}) => (
+  <article className={`card ${styles.marketCard} ${styles[`marketCard${tone}`]}`}>
+    <div className={styles.marketHeading}>
+      <span className={`${styles.assetDot} ${styles[`assetDot${tone}`]}`} />
+      <span>{symbol}</span>
+    </div>
+    <div className={styles.marketPriceRow}>
+      <strong className={styles.marketPrice}>{formatUsdSmart(price)}</strong>
+      {Number.isFinite(change) ? (
+        <span
+          className={`${styles.marketChange} ${
+            Number(change) >= 0 ? styles.up : styles.down
+          }`}
+        >
+          {formatPercent(Number(change))}
+        </span>
+      ) : null}
+    </div>
+    <MiniTrend points={points} color={color} label={`${symbol} price trend`} />
+    <div className={styles.marketFooter}>
+      <span>Market cap</span>
+      <strong>{formatUsdCompact(marketCap)}</strong>
+    </div>
+  </article>
+)
+
+const TrendCard = ({
+  title,
+  value,
+  meta,
+  children,
+  legend
+}: {
+  title: string
+  value: string
+  meta?: string
+  children: React.ReactNode
+  legend?: React.ReactNode
+}) => (
+  <article className={`card ${styles.trendCard}`}>
+    <div className={styles.trendHeader}>
+      <div>
+        <div className={styles.trendTitle}>{title}</div>
+        <div className={styles.trendValue}>{value}</div>
+      </div>
+      {meta ? <span className={styles.trendMeta}>{meta}</span> : null}
+    </div>
+    {legend ? <div className={styles.chartLegend}>{legend}</div> : null}
+    <div className={styles.chartArea}>{children}</div>
+  </article>
+)
+
 const Dashboard = () => {
   const { chain, chainKey } = useAppChain()
   const isClassic = chainKey === "lunc"
-  const [dashboardRange, setDashboardRange] =
-    useState<DashboardRange>("24h")
+  const [dashboardRange, setDashboardRange] = useState<DashboardRange>("24h")
   const activeRange = dashboardRanges[dashboardRange]
   const historyEnabled = useDeferredHistoryEnabled()
 
@@ -85,18 +194,32 @@ const Dashboard = () => {
     refetchInterval: 5 * 60 * 1000
   })
 
-  const { data: previousSnapshot, isFetching: previousSnapshotLoading } =
-    useQuery({
-      queryKey: ["dashboard", chain.chainId, "snapshot", "historical", dashboardRange],
-      queryFn: () =>
-        fetchHistoricalDashboardSnapshot(
-          dashboardRange,
-          activeRange.rangeMs,
-          activeRange.ttlMs
-        ),
-      enabled: isClassic && Boolean(currentSnapshot) && historyEnabled,
-      staleTime: activeRange.ttlMs
-    })
+  const { data: luncPriceHistory } = useQuery({
+    queryKey: ["dashboard", "price-history", "lunc", dashboardRange],
+    queryFn: () =>
+      fetchDashboardPriceHistory("lunc", activeRange.rangeMs, prices?.lunc?.usd),
+    enabled: isClassic && historyEnabled && dashboardRange !== "24h",
+    staleTime: activeRange.ttlMs,
+    retry: 1
+  })
+
+  const { data: ustcPriceHistory } = useQuery({
+    queryKey: ["dashboard", "price-history", "ustc", dashboardRange],
+    queryFn: () =>
+      fetchDashboardPriceHistory("ustc", activeRange.rangeMs, prices?.ustc?.usd),
+    enabled: isClassic && historyEnabled && dashboardRange !== "24h",
+    staleTime: activeRange.ttlMs,
+    retry: 1
+  })
+
+  const { data: lunaPriceHistory } = useQuery({
+    queryKey: ["dashboard", "price-history", "luna", dashboardRange],
+    queryFn: () =>
+      fetchDashboardPriceHistory("luna", activeRange.rangeMs, prices?.luna?.usd),
+    enabled: !isClassic && historyEnabled && dashboardRange !== "24h",
+    staleTime: activeRange.ttlMs,
+    retry: 1
+  })
 
   const {
     data: activity,
@@ -108,73 +231,71 @@ const Dashboard = () => {
       "dashboard",
       chain.chainId,
       "activity",
-      activeRange.activityFrequency
+      activeRange.activityFrequency,
+      activeRange.activityBuckets
     ],
     queryFn: () =>
-      fetchBinodesDashboardActivity(activeRange.activityFrequency, 1),
-    enabled: isClassic,
+      fetchBinodesDashboardActivity(
+        activeRange.activityFrequency,
+        activeRange.activityBuckets
+      ),
+    enabled: isClassic && historyEnabled,
     staleTime: activeRange.ttlMs,
     refetchInterval: 10 * 60 * 1000,
     retry: 1
   })
 
-  const activityTimestamp =
-    activity?.network?.dt ??
-    activity?.dex?.dt ??
-    activity?.burns?.dt ??
-    activity?.ibc?.dt ??
-    activity?.stake?.dt ??
-    activity?.fees?.dt ??
-    activity?.governance?.dt
+  const luncChange = marketChange({
+    range: dashboardRange,
+    history: luncPriceHistory,
+    change24h: prices?.lunc?.usd_24h_change,
+    change7d: prices?.lunc?.usd_7d_change
+  })
+  const ustcChange = marketChange({
+    range: dashboardRange,
+    history: ustcPriceHistory,
+    change24h: prices?.ustc?.usd_24h_change,
+    change7d: prices?.ustc?.usd_7d_change
+  })
+  const lunaChange = marketChange({
+    range: dashboardRange,
+    history: lunaPriceHistory,
+    change24h: prices?.luna?.usd_24h_change,
+    change7d: prices?.luna?.usd_7d_change
+  })
 
-  const activitySeries = useMemo(() => activity?.series ?? [], [activity?.series])
-  const activityLatest = activitySeries.at(-1)
+  const luncTrend =
+    luncPriceHistory?.length && dashboardRange !== "24h"
+      ? luncPriceHistory
+      : buildFallbackTrend(prices?.lunc?.usd, luncChange, activeRange.rangeMs)
+  const ustcTrend =
+    ustcPriceHistory?.length && dashboardRange !== "24h"
+      ? ustcPriceHistory
+      : buildFallbackTrend(prices?.ustc?.usd, ustcChange, activeRange.rangeMs)
+  const lunaTrend =
+    lunaPriceHistory?.length && dashboardRange !== "24h"
+      ? lunaPriceHistory
+      : buildFallbackTrend(prices?.luna?.usd, lunaChange, activeRange.rangeMs)
 
   const metrics = useMemo<MetricItem[]>(() => {
     if (!currentSnapshot) return []
-    const prev: DashboardSnapshot | undefined = previousSnapshot
-    const deltaFromPrev = (current: number, previous?: number) =>
-      previous === undefined ? undefined : current - previous
-
     if (!isClassic) {
-      const lunaPrice = prices?.luna?.usd
-      const lunaChange = prices?.luna?.usd_24h_change
-      const lunaMarketCap = lunaPrice
-        ? lunaPrice * currentSnapshot.circulatingLunc
-        : undefined
       return [
         {
-          key: "lunaPrice",
-          label: "LUNA Price",
-          value: formatUsdSmart(lunaPrice),
-          delta: lunaChange === undefined ? undefined : formatPercent(lunaChange),
-          deltaRaw: lunaChange
-        },
-        {
-          key: "lunaMarketCap",
-          label: "LUNA Market Cap",
-          value: formatUsdStandard(lunaMarketCap),
-          delta: lunaChange === undefined ? undefined : formatPercent(lunaChange),
-          deltaRaw: lunaChange
-        },
-        {
           key: "lunaCirc",
-          label: "LUNA Circulating Estimate",
+          label: "LUNA Circulating Supply",
           value: formatValue(currentSnapshot.circulatingLunc, 0),
-          unit: "LUNA",
-          size: "large",
-          group: "lunc"
+          unit: "LUNA"
         },
         {
           key: "lunaTotal",
           label: "LUNA Total Supply",
           value: formatValue(currentSnapshot.luncSupply, 0),
-          unit: "LUNA",
-          group: "lunc"
+          unit: "LUNA"
         },
         {
           key: "communityPoolLuna",
-          label: "Community Pool (LUNA)",
+          label: "Community Pool",
           value: formatValue(currentSnapshot.luncCommunity, 2),
           unit: "LUNA"
         },
@@ -188,11 +309,10 @@ const Dashboard = () => {
           unit: currentSnapshot.inflation === undefined ? undefined : "%"
         },
         {
-          key: "stakedLuna",
+          key: "staked",
           label: "Total Staked",
           value: formatValue(currentSnapshot.stakedLunc, 0),
-          unit: "LUNA",
-          size: "large"
+          unit: "LUNA"
         },
         {
           key: "stakingRatio",
@@ -211,175 +331,49 @@ const Dashboard = () => {
             : "--"
         },
         {
-          key: "unbonding",
-          label: "Unbonding Period",
-          value: currentSnapshot.unbondingTimeSec
-            ? `${formatNumber(currentSnapshot.unbondingTimeSec / 86400, 0)} days`
-            : "--"
-        },
-        {
-          key: "blockHeight",
-          label: "Block Height",
-          value: currentSnapshot.blockHeight
-            ? formatNumber(currentSnapshot.blockHeight, 0)
-            : "--"
-        },
-        {
           key: "blockTime",
-          label: "Block time",
-          value: currentSnapshot.blockTimeMs
-            ? formatBlockInterval(currentSnapshot.blockTimeMs)
-            : "--"
+          label: "Block Time",
+          value: formatBlockInterval(currentSnapshot.blockTimeMs)
         }
       ]
     }
-
-    const luncPrice = prices?.lunc?.usd
-    const ustcPrice = prices?.ustc?.usd
-    const luncChange =
-      dashboardRange === "1h"
-        ? prices?.lunc?.usd_1h_change
-        : dashboardRange === "7d"
-          ? prices?.lunc?.usd_7d_change
-          : prices?.lunc?.usd_24h_change
-    const ustcChange =
-      dashboardRange === "1h"
-        ? prices?.ustc?.usd_1h_change
-        : dashboardRange === "7d"
-          ? prices?.ustc?.usd_7d_change
-          : prices?.ustc?.usd_24h_change
-    const luncMarketCap =
-      luncPrice && currentSnapshot.circulatingLunc
-        ? luncPrice * currentSnapshot.circulatingLunc
-        : undefined
-    const ustcMarketCap =
-      ustcPrice && currentSnapshot.circulatingUstc
-        ? ustcPrice * currentSnapshot.circulatingUstc
-        : undefined
-
-    const stakingRatio = currentSnapshot.stakingRatio * 100
-    const stakingRatioDeltaRaw = deltaFromPrev(
-      currentSnapshot.stakingRatio,
-      prev?.stakingRatio
-    )
-    const stakingRatioDelta =
-      stakingRatioDeltaRaw === undefined ? undefined : stakingRatioDeltaRaw * 100
 
     return [
       {
         key: "luncCirc",
         label: "LUNC Circulating Supply",
         value: formatValue(currentSnapshot.circulatingLunc, 0),
-        unit: "LUNC",
-        size: "large",
-        group: "lunc",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.circulatingLunc, prev?.circulatingLunc), 0, "LUNC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.circulatingLunc, prev?.circulatingLunc)
+        unit: "LUNC"
       },
       {
         key: "ustcCirc",
         label: "USTC Circulating Supply",
         value: formatValue(currentSnapshot.circulatingUstc, 0),
-        unit: "USTC",
-        size: "large",
-        group: "ustc",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.circulatingUstc, prev?.circulatingUstc), 0, "USTC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.circulatingUstc, prev?.circulatingUstc)
-      },
-      {
-        key: "luncPrice",
-        label: "LUNC Price",
-        value: formatUsdSmart(luncPrice),
-        delta: luncChange === undefined ? undefined : formatPercent(luncChange),
-        deltaRaw: luncChange
-      },
-      {
-        key: "ustcPrice",
-        label: "USTC Price",
-        value: formatUsdSmart(ustcPrice),
-        delta: ustcChange === undefined ? undefined : formatPercent(ustcChange),
-        deltaRaw: ustcChange
-      },
-      {
-        key: "luncMarketCap",
-        label: "LUNC Market Cap",
-        value: formatUsdStandard(luncMarketCap),
-        delta: luncChange === undefined ? undefined : formatPercent(luncChange),
-        deltaRaw: luncChange
-      },
-      {
-        key: "ustcMarketCap",
-        label: "USTC Market Cap",
-        value: formatUsdStandard(ustcMarketCap),
-        delta: ustcChange === undefined ? undefined : formatPercent(ustcChange),
-        deltaRaw: ustcChange
-      },
-      {
-        key: "luncTotal",
-        label: "LUNC Total Supply",
-        value: formatValue(currentSnapshot.luncSupply, 0),
-        unit: "LUNC",
-        group: "lunc",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.luncSupply, prev?.luncSupply), 0, "LUNC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.luncSupply, prev?.luncSupply)
-      },
-      {
-        key: "ustcTotal",
-        label: "USTC Total Supply",
-        value: formatValue(currentSnapshot.ustcSupply, 0),
-        unit: "USTC",
-        group: "ustc",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.ustcSupply, prev?.ustcSupply), 0, "USTC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.ustcSupply, prev?.ustcSupply)
+        unit: "USTC"
       },
       {
         key: "communityPoolLunc",
         label: "Community Pool (LUNC)",
         value: formatValue(currentSnapshot.luncCommunity, 2),
-        unit: "LUNC",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.luncCommunity, prev?.luncCommunity), 2, "LUNC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.luncCommunity, prev?.luncCommunity)
+        unit: "LUNC"
       },
       {
         key: "communityPoolUstc",
         label: "Community Pool (USTC)",
         value: formatValue(currentSnapshot.ustcCommunity, 2),
-        unit: "USTC",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.ustcCommunity, prev?.ustcCommunity), 2, "USTC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.ustcCommunity, prev?.ustcCommunity)
+        unit: "USTC"
+      },
+      {
+        key: "staked",
+        label: "Total Staked",
+        value: formatValue(currentSnapshot.stakedLunc, 0),
+        unit: "LUNC"
       },
       {
         key: "stakingRatio",
         label: "Staking Ratio",
-        value: formatValue(stakingRatio, 2),
-        unit: "%",
-        delta: formatDelta(stakingRatioDelta, 2, "%"),
-        deltaRaw: stakingRatioDelta
-      },
-      {
-        key: "oraclePoolLunc",
-        label: "Oracle Pool (LUNC)",
-        value: formatValue(currentSnapshot.luncOracle, 2),
-        unit: "LUNC",
-        delta: formatOracleDelta(deltaFromPrev(currentSnapshot.luncOracle, prev?.luncOracle), "LUNC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.luncOracle, prev?.luncOracle)
-      },
-      {
-        key: "oraclePoolUstc",
-        label: "Oracle Pool (USTC)",
-        value: formatValue(currentSnapshot.ustcOracle, 2),
-        unit: "USTC",
-        delta: formatOracleDelta(deltaFromPrev(currentSnapshot.ustcOracle, prev?.ustcOracle), "USTC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.ustcOracle, prev?.ustcOracle)
-      },
-      {
-        key: "stakedLunc",
-        label: "Total Staked",
-        value: formatValue(currentSnapshot.stakedLunc, 0),
-        unit: "LUNC",
-        size: "large",
-        delta: formatDelta(deltaFromPrev(currentSnapshot.stakedLunc, prev?.stakedLunc), 0, "LUNC"),
-        deltaRaw: deltaFromPrev(currentSnapshot.stakedLunc, prev?.stakedLunc)
+        value: formatValue(currentSnapshot.stakingRatio * 100, 2),
+        unit: "%"
       },
       {
         key: "validators",
@@ -389,62 +383,71 @@ const Dashboard = () => {
               currentSnapshot.maxValidators ?? 0,
               0
             )}`
-          : "--",
-        delta: undefined,
-        deltaRaw: undefined
-      },
-      {
-        key: "unbonding",
-        label: "Unbonding Period",
-        value: currentSnapshot.unbondingTimeSec
-          ? `${formatNumber(currentSnapshot.unbondingTimeSec / 86400, 0)} days`
-          : "--",
-        delta: undefined,
-        deltaRaw: undefined
-      },
-      {
-        key: "blockHeight",
-        label: "Block Height",
-        value: currentSnapshot.blockHeight
-          ? formatNumber(currentSnapshot.blockHeight, 0)
-          : "--",
-        delta: undefined,
-        deltaRaw: undefined
+          : "--"
       },
       {
         key: "blockTime",
-        label: "Block time",
-        value: currentSnapshot.blockTimeMs
-          ? formatBlockInterval(currentSnapshot.blockTimeMs)
-          : "--",
-        delta: undefined,
-        deltaRaw: undefined
+        label: "Block Time",
+        value: formatBlockInterval(currentSnapshot.blockTimeMs)
       }
     ]
-  }, [
-    currentSnapshot,
-    dashboardRange,
-    isClassic,
-    previousSnapshot,
-    prices?.luna?.usd,
-    prices?.luna?.usd_24h_change,
-    prices?.lunc?.usd,
-    prices?.lunc?.usd_1h_change,
-    prices?.lunc?.usd_24h_change,
-    prices?.lunc?.usd_7d_change,
-    prices?.ustc?.usd,
-    prices?.ustc?.usd_1h_change,
-    prices?.ustc?.usd_24h_change,
-    prices?.ustc?.usd_7d_change
-  ])
+  }, [currentSnapshot, isClassic])
 
-  const hasMetrics = metrics.length > 0
+  const supplyMetrics = metrics.filter((item) =>
+    ["luncCirc", "ustcCirc", "lunaCirc", "lunaTotal"].includes(item.key)
+  )
+  const treasuryMetrics = metrics.filter((item) =>
+    ["communityPoolLunc", "communityPoolUstc", "communityPoolLuna", "inflation"].includes(
+      item.key
+    )
+  )
+  const chainMetrics = metrics.filter((item) =>
+    ["staked", "stakingRatio", "validators", "blockTime"].includes(item.key)
+  )
+
+  const activitySeries = activity?.series ?? []
+  const toPoint = (
+    field: "transferAmountUsd" | "activeAddressCount"
+  ): DashboardHistoryPoint[] =>
+    activitySeries.map((point) => ({
+      time: new Date(point.dt).getTime(),
+      value: point[field] ?? 0
+    }))
+  const volumeSeries = toPoint("transferAmountUsd")
+  const walletSeries = toPoint("activeAddressCount")
+  const burnSeries = activitySeries.map((point) => ({
+    time: new Date(point.dt).getTime(),
+    value: point.luncBurnUsd ?? 0,
+    secondaryValue: point.ustcBurnUsd ?? 0
+  }))
+  const volumeTotal = volumeSeries.reduce((sum, point) => sum + point.value, 0)
+  const latestWalletCount = walletSeries.at(-1)?.value
+  const stakedValueUsd =
+    (currentSnapshot?.stakedLunc ?? 0) * (prices?.lunc?.usd ?? 0)
+  const annualizationFactor =
+    activeRange.activityFrequency === "HOUR" ? 24 * 365 : 365
+  const stakingReturn = activitySeries
+    .map((point) => ({
+      time: new Date(point.dt).getTime(),
+      value: stakedValueUsd
+        ? ((point.feeGasUsd ?? 0) * annualizationFactor * 100) / stakedValueUsd
+        : 0
+    }))
+    .filter((point) => point.value > 0)
+  const latestStakingReturn = stakingReturn.at(-1)?.value
+  const luncBurnAmount =
+    (activity?.luncBurns?.fee_burn_amt_actual ?? 0) +
+    (activity?.luncBurns?.voluntary_burn_amt_actual ?? 0)
+  const ustcBurnAmount =
+    (activity?.ustcBurns?.fee_burn_amt_actual ?? 0) +
+    (activity?.ustcBurns?.voluntary_burn_amt_actual ?? 0)
 
   return (
     <PageShell
       title="Dashboard"
+      inlineExtraOnMobile
       extra={
-        isClassic ? <div className={styles.rangeSwitch} aria-label="Dashboard range">
+        <div className={styles.rangeSwitch} aria-label="Dashboard range">
           {dashboardRangeOptions.map((range) => (
             <button
               key={range}
@@ -453,180 +456,153 @@ const Dashboard = () => {
                 dashboardRange === range ? styles.rangeButtonActive : ""
               }`}
               onClick={() => setDashboardRange(range)}
+              aria-pressed={dashboardRange === range}
             >
               {dashboardRanges[range].label}
             </button>
           ))}
-        </div> : null
+        </div>
       }
     >
       <div className={styles.page}>
         <section className={styles.section}>
-          <div className={styles.sectionTitleRow}>
-            <div>
-              <div className={styles.sectionHeader}>Market</div>
-              <p className={styles.sectionSubtext}>
-                {isClassic
-                  ? `Showing ${activeRange.label} price changes and chain deltas${previousSnapshotLoading ? "..." : "."}`
-                  : "Live Phoenix network market data."}
-              </p>
-            </div>
-          </div>
-          <div className={styles.metricsTop}>
-            {hasMetrics
-              ? metrics
-              .filter(
-                (item) =>
-                  item.key === "luncPrice" ||
-                  item.key === "ustcPrice" ||
-                  item.key === "luncMarketCap" ||
-                  item.key === "ustcMarketCap" ||
-                  item.key === "lunaPrice" ||
-                  item.key === "lunaMarketCap"
-              )
-              .map((item) => (
-                <DashboardMetricCard key={item.key} item={item} forceLarge />
-              ))
-              : <DashboardMetricSkeletons count={4} large />}
+          <div className={styles.sectionHeader}>Market</div>
+          <div className={`${styles.marketGrid} ${!isClassic ? styles.marketGridSingle : ""}`}>
+            {isClassic ? (
+              <>
+                <MarketCard
+                  symbol="LUNC"
+                  price={prices?.lunc?.usd}
+                  marketCap={prices?.lunc?.usd_market_cap}
+                  change={luncChange}
+                  points={luncTrend}
+                  color="var(--dashboard-lunc)"
+                  tone="lunc"
+                />
+                <MarketCard
+                  symbol="USTC"
+                  price={prices?.ustc?.usd}
+                  marketCap={prices?.ustc?.usd_market_cap}
+                  change={ustcChange}
+                  points={ustcTrend}
+                  color="var(--dashboard-ustc)"
+                  tone="ustc"
+                />
+              </>
+            ) : (
+              <MarketCard
+                symbol="LUNA"
+                price={prices?.luna?.usd}
+                marketCap={prices?.luna?.usd_market_cap}
+                change={lunaChange}
+                points={lunaTrend}
+                color="var(--dashboard-luna)"
+                tone="luna"
+              />
+            )}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Supply</div>
-          <div className={styles.metricsSupply}>
-            {hasMetrics
-              ? metrics
-              .filter(
-                (item) =>
-                  item.key === "luncCirc" ||
-                  item.key === "luncTotal" ||
-                  item.key === "ustcCirc" ||
-                  item.key === "ustcTotal" ||
-                  item.key === "lunaCirc" ||
-                  item.key === "lunaTotal"
-              )
-              .map((item) => (
-                <DashboardMetricCard key={item.key} item={item} />
-              ))
-              : <DashboardMetricSkeletons count={4} large />}
+          <div className={styles.dualMetrics}>
+            {supplyMetrics.length ? (
+              supplyMetrics.map((item) => <DashboardMetricCard key={item.key} item={item} />)
+            ) : (
+              <DashboardMetricSkeletons count={2} />
+            )}
           </div>
         </section>
 
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Treasury</div>
-          <div className={styles.metricsSupply}>
-            {hasMetrics
-              ? metrics
-              .filter(
-                (item) =>
-                  item.key === "communityPoolLunc" ||
-                  item.key === "communityPoolUstc" ||
-                  item.key === "oraclePoolLunc" ||
-                  item.key === "oraclePoolUstc" ||
-                  item.key === "communityPoolLuna" ||
-                  item.key === "inflation"
-              )
-              .map((item) => (
+          <div className={styles.dualMetrics}>
+            {treasuryMetrics.length ? (
+              treasuryMetrics.map((item) => (
                 <DashboardMetricCard key={item.key} item={item} />
               ))
-              : <DashboardMetricSkeletons count={4} />}
+            ) : (
+              <DashboardMetricSkeletons count={2} />
+            )}
           </div>
         </section>
 
         <section className={styles.section}>
-          <div className={styles.sectionHeader}>Staking</div>
-          <div className={styles.metrics}>
-            {hasMetrics
-              ? metrics
-              .filter(
-                (item) =>
-                  item.key === "stakedLunc" ||
-                  item.key === "stakedLuna" ||
-                  item.key === "stakingRatio" ||
-                  item.key === "unbonding"
-              )
-              .sort((a, b) => {
-                const rank = (item: { key: string }) => {
-                  if (item.key === "stakedLunc" || item.key === "stakedLuna") return 0
-                  if (item.key === "stakingRatio") return 1
-                  if (item.key === "unbonding") return 2
-                  return 9
+          <div className={styles.sectionHeader}>Staking &amp; Chain</div>
+          <div className={styles.compactMetrics}>
+            {chainMetrics.length ? (
+              chainMetrics.map((item) => <DashboardMetricCard key={item.key} item={item} />)
+            ) : (
+              <DashboardMetricSkeletons count={4} />
+            )}
+          </div>
+        </section>
+
+        {isClassic ? (
+          <section className={styles.section}>
+            <div className={styles.sectionTitleRow}>
+              <div>
+                <div className={styles.sectionHeader}>Network Trends</div>
+                <p className={styles.sectionSubtext}>Terra Classic network activity</p>
+              </div>
+              <span className={styles.poweredByLine}>Data by BiNodes</span>
+            </div>
+            {activityError ? (
+              <div className={styles.dataNotice}>Network trend data is temporarily unavailable.</div>
+            ) : null}
+            <div className={styles.trendGrid} aria-busy={activityLoading}>
+              <TrendCard title="Transaction Volume" value={formatUsdCompact(volumeTotal)}>
+                <BarChart
+                  points={volumeSeries}
+                  color="var(--dashboard-chain)"
+                  label="Transaction volume"
+                  valuePrefix="$"
+                />
+              </TrendCard>
+              <TrendCard
+                title="Staking Return"
+                value={
+                  Number.isFinite(latestStakingReturn)
+                    ? formatPercent(Number(latestStakingReturn))
+                    : "--"
                 }
-                return rank(a) - rank(b)
-              })
-              .map((item) => (
-                <DashboardMetricCard key={item.key} item={item} />
-              ))
-              : <DashboardMetricSkeletons count={3} />}
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>Chain</div>
-          <div className={styles.metrics}>
-            {hasMetrics
-              ? metrics
-              .filter(
-                (item) =>
-                  item.key === "blockHeight" ||
-                  item.key === "blockTime" ||
-                  item.key === "validators"
-              )
-              .map((item) => (
-                <DashboardMetricCard key={item.key} item={item} />
-              ))
-              : <DashboardMetricSkeletons count={3} />}
-          </div>
-        </section>
-
-        {isClassic ? <section className={styles.section}>
-          <div className={styles.sectionTitleRow}>
-            <div>
-              <div className={styles.sectionHeader}>Network Activity</div>
-              <p className={styles.sectionSubtext}>
-                Latest {activeRange.label} bucket from BiNodes. Updated:{" "}
-                {formatUtcHour(activityTimestamp)}
-              </p>
+                meta={stakingReturn.length ? "Estimated annualized" : "Data unavailable"}
+              >
+                <LineChart
+                  points={stakingReturn}
+                  color="var(--dashboard-staking)"
+                  label="Annualized staking return"
+                  valueSuffix="%"
+                />
+              </TrendCard>
+              <TrendCard
+                title="Burn Activity"
+                value={`${compactAssetAmount(luncBurnAmount, "LUNC")} · ${compactAssetAmount(
+                  ustcBurnAmount,
+                  "USTC"
+                )}`}
+                legend={
+                  <>
+                    <span><i className={styles.legendLunc} />LUNC</span>
+                    <span><i className={styles.legendUstc} />USTC</span>
+                  </>
+                }
+              >
+                <GroupedBurnChart points={burnSeries} label="LUNC and USTC burn activity" />
+              </TrendCard>
+              <TrendCard
+                title="Active Wallets"
+                value={formatValue(latestWalletCount, 0)}
+              >
+                <LineChart
+                  points={walletSeries}
+                  color="var(--dashboard-chain)"
+                  label="Active wallet addresses"
+                />
+              </TrendCard>
             </div>
-            <div className={styles.poweredByLine}>
-              {activityLoading
-                ? "Loading BiNodes"
-                : activityError
-                  ? "BiNodes unavailable"
-                : "Powered by BiNodes"}
-            </div>
-          </div>
-          <div className={styles.metrics}>
-            <div className={`card ${styles.metricCard}`}>
-              <div className={styles.metricLabel}>Total Fee Accrued</div>
-              <div className={styles.metricValue}>
-                {formatUsdCompact(activityLatest?.totalFeeUsd)}
-              </div>
-              <div className={`${styles.delta} ${styles.neutral}`}>
-                Includes gas, pool fees, and burn tax
-              </div>
-            </div>
-            <div className={`card ${styles.metricCard}`}>
-              <div className={styles.metricLabel}>Total Transactions</div>
-              <div className={styles.metricValue}>
-                {formatValue(activityLatest?.txTotalCnt, 0)}
-              </div>
-              <div className={`${styles.delta} ${styles.neutral}`}>
-                Latest {activeRange.label} transaction count
-              </div>
-            </div>
-            <div className={`card ${styles.metricCard}`}>
-              <div className={styles.metricLabel}>Burn</div>
-              <div className={styles.metricValue}>
-                {formatUsdCompact(activityLatest?.burnUsd)}
-              </div>
-              <div className={`${styles.delta} ${styles.neutral}`}>
-                Fee burn and voluntary burn
-              </div>
-            </div>
-          </div>
-        </section> : null}
-
+          </section>
+        ) : null}
       </div>
     </PageShell>
   )

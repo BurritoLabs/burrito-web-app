@@ -10,6 +10,7 @@ type PageShellProps = PropsWithChildren<{
   backTo?: string
   backLabel?: string
   onBack?: () => void
+  inlineExtraOnMobile?: boolean
 }>
 
 const PageShell = ({
@@ -20,6 +21,7 @@ const PageShell = ({
   backTo,
   backLabel = "Back",
   onBack,
+  inlineExtraOnMobile = false,
   children
 }: PageShellProps) => {
   return (
@@ -31,7 +33,11 @@ const PageShell = ({
     >
       {banner ? <div className={styles.banner}>{banner}</div> : null}
       <div className={styles.grid}>
-        <header className={styles.header}>
+        <header
+          className={`${styles.header} ${
+            inlineExtraOnMobile ? styles.inlineExtraOnMobile : ""
+          }`}
+        >
           <div className={styles.titleWrapper}>
             {onBack ? (
               <button

@@ -1,17 +1,24 @@
 .page {
+  --dashboard-lunc: #e5b91f;
+  --dashboard-ustc: #27aee4;
+  --dashboard-luna: #6366f1;
+  --dashboard-chain: var(--chain-accent-strong);
+  --dashboard-staking: var(--bui-color-success);
   display: grid;
-  gap: 20px;
+  gap: 26px;
+  min-width: 0;
 }
 
 .section {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .sectionHeader {
+  color: var(--bui-color-text-secondary);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
-  color: var(--bui-color-text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -30,50 +37,46 @@
 }
 
 .poweredByLine {
-  margin-top: 8px;
   color: var(--bui-color-brand-text);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   white-space: nowrap;
 }
 
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-  grid-auto-flow: dense;
-}
-
-.metricsTop {
+.marketGrid,
+.dualMetrics,
+.trendGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+  min-width: 0;
 }
 
-.metricsSupply {
+.marketGridSingle {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.compactMetrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .metricCard {
   display: grid;
+  align-content: start;
   gap: 8px;
-  padding: 20px 22px;
-  min-height: 120px;
+  min-height: 112px;
+  padding: 18px 20px;
+}
+
+.compactMetrics .metricCard {
+  min-height: 106px;
+  padding: 16px;
 }
 
 .metricCardLarge {
   min-height: 120px;
-  padding: 20px 22px;
-}
-
-.metricCardLarge .metricValue {
-  font-size: 22px;
-}
-
-.metricCardLarge .metricLabel {
-  font-size: var(--font-size-small);
 }
 
 .metricWide {
@@ -85,31 +88,38 @@
 }
 
 .metricLabel {
-  font-size: var(--font-size-small);
   color: var(--bui-color-text-secondary);
+  font-size: var(--font-size-small);
   letter-spacing: 0.02em;
 }
 
 .metricValue {
-  font-size: 22px;
-  font-weight: var(--bold);
-  color: var(--bui-color-text);
   min-width: 0;
+  color: var(--bui-color-text);
+  font-size: 21px;
+  font-weight: var(--bold);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.compactMetrics .metricValue {
+  font-size: 18px;
 }
 
 .metricValue span {
-  font-size: var(--font-size-small);
-  font-weight: var(--normal);
-  color: var(--bui-color-text-muted);
   margin-left: 6px;
+  color: var(--bui-color-text-muted);
+  font-size: 12px;
+  font-weight: var(--normal);
 }
 
-.delta {
+.delta,
+.marketChange {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: var(--font-size-small);
-  color: var(--bui-color-text-muted);
+  font-weight: var(--bold);
 }
 
 .up {
@@ -124,6 +134,239 @@
   color: var(--bui-color-text-muted);
 }
 
+.marketCard {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(92px, 1fr) auto;
+  gap: 12px;
+  min-width: 0;
+  min-height: 238px;
+  padding: 20px 22px 18px;
+  overflow: hidden;
+}
+
+.marketCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--dashboard-luna);
+}
+
+.marketCardlunc::before {
+  background: var(--dashboard-lunc);
+}
+
+.marketCardustc::before {
+  background: var(--dashboard-ustc);
+}
+
+.marketHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bui-color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+.assetDot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: var(--dashboard-luna);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--dashboard-luna) 52%, transparent);
+}
+
+.assetDotlunc {
+  background: var(--dashboard-lunc);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--dashboard-lunc) 52%, transparent);
+}
+
+.assetDotustc {
+  background: var(--dashboard-ustc);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--dashboard-ustc) 52%, transparent);
+}
+
+.marketPriceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.marketPrice {
+  min-width: 0;
+  color: var(--bui-color-text);
+  font-size: 28px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.marketFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--bui-color-text) 9%, transparent);
+  color: var(--bui-color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.marketFooter strong {
+  color: var(--bui-color-text-secondary);
+  font-size: var(--font-size-label);
+}
+
+.miniTrend,
+.chartSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.miniTrend {
+  min-height: 92px;
+}
+
+.chartUnavailable,
+.chartEmpty {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+  color: var(--bui-color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.chartGridLine {
+  stroke: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chartAxisLabel {
+  fill: var(--bui-color-text-muted);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.trendCard {
+  display: grid;
+  grid-template-rows: auto auto minmax(176px, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 288px;
+  padding: 18px 20px 16px;
+  overflow: hidden;
+}
+
+.trendHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.trendTitle {
+  color: var(--bui-color-text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: var(--bold);
+}
+
+.trendValue {
+  margin-top: 6px;
+  color: var(--bui-color-text);
+  font-size: 20px;
+  font-weight: var(--bold);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.trendMeta {
+  color: var(--bui-color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.chartLegend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 14px;
+  color: var(--bui-color-text-muted);
+  font-size: 11px;
+}
+
+.chartLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chartLegend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.legendLunc {
+  background: var(--dashboard-lunc);
+}
+
+.legendUstc {
+  background: var(--dashboard-ustc);
+}
+
+.chartArea {
+  min-width: 0;
+  min-height: 176px;
+}
+
+.dataNotice {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--bui-color-danger) 35%, transparent);
+  border-radius: 8px;
+  color: var(--bui-color-danger);
+  background: color-mix(in srgb, var(--bui-color-danger) 7%, transparent);
+  font-size: var(--font-size-small);
+}
+
+.rangeSwitch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
+}
+
+.rangeButton {
+  min-width: 40px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--bui-color-text-secondary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: var(--bold);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.rangeButton:hover {
+  color: var(--bui-color-text);
+}
+
+.rangeButtonActive {
+  color: var(--bui-color-text);
+  background: color-mix(in srgb, var(--chain-accent-strong) 22%, transparent);
+}
+
 .metricSkeleton {
   align-content: start;
 }
@@ -133,9 +376,9 @@
 .skeletonDelta {
   position: relative;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--bui-color-text) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--bui-color-text) 6%, transparent);
 }
 
 .skeletonLabel::after,
@@ -169,118 +412,97 @@
   height: 12px;
 }
 
-.rangeSwitch {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
-}
-
-.rangeButton {
-  border: none;
-  background: transparent;
-  color: var(--bui-color-text-secondary);
-  font-size: var(--font-size-small);
-  font-weight: var(--bold);
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease;
-}
-
-.rangeButton:hover {
-  color: var(--bui-color-text);
-}
-
-.rangeButtonActive {
-  background: rgba(82, 196, 26, 0.2);
-  color: var(--bui-color-text);
-}
-
 @keyframes dashboardShimmer {
   100% {
     transform: translateX(100%);
   }
 }
 
-@media (max-width: 991.98px) {
-  .metricsTop {
+@media (max-width: 1100px) {
+  .compactMetrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .metricsSupply {
-    grid-template-columns: 1fr;
-  }
-
-  .metrics {
-    grid-template-columns: 1fr;
-  }
-
-  .metricWide {
-    grid-column: span 1;
-  }
-
-  .metricTall {
-    grid-row: span 1;
   }
 }
 
 @media (max-width: 640px) {
-  .sectionTitleRow {
-    flex-direction: column;
+  .page {
+    gap: 24px;
+  }
+
+  .marketGrid,
+  .dualMetrics,
+  .trendGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .compactMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
-  .rangeSwitch {
-    width: 100%;
-  }
-
-  .rangeButton {
-    flex: 1;
+  .sectionTitleRow {
+    align-items: flex-end;
   }
 
   .poweredByLine {
-    margin-top: 0;
-    white-space: normal;
+    font-size: 11px;
   }
 
-  .metricsTop {
-    grid-template-columns: 1fr;
+  .marketCard {
+    min-height: 220px;
+    padding: 17px 18px 15px;
   }
 
-  .page {
-    padding: 0 16px 20px;
-  }
-
-  .section {
-    gap: 10px;
+  .marketPrice {
+    font-size: 25px;
   }
 
   .metricCard,
-  .metricCardLarge {
-    padding: 14px 14px;
-    min-height: 108px;
+  .compactMetrics .metricCard {
+    min-height: 100px;
+    padding: 14px;
   }
 
   .metricValue,
-  .metricCardLarge .metricValue {
-    font-size: clamp(18px, 5vw, 22px);
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+  .compactMetrics .metricValue {
+    font-size: 17px;
   }
 
-  .metricValue span {
-    font-size: 12px;
-    margin-left: 4px;
+  .trendCard {
+    min-height: 272px;
+    padding: 16px 14px 12px;
+  }
+
+  .trendValue {
+    font-size: 18px;
+  }
+
+  .rangeSwitch {
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .rangeButton {
+    min-width: 35px;
+    padding: 5px 6px;
+    font-size: 10px;
   }
 }
 
-@media (max-width: 420px) {
-  .page {
-    padding: 0 14px 18px;
+@media (max-width: 380px) {
+  .rangeButton {
+    min-width: 28px;
+    padding-inline: 2px;
+    font-size: 9px;
+  }
+
+  .metricLabel {
+    font-size: 11px;
+  }
+
+  .metricValue,
+  .compactMetrics .metricValue {
+    font-size: 16px;
   }
 }

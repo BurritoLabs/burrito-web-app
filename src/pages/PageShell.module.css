@@ -156,6 +156,18 @@
     flex-wrap: wrap;
   }
 
+  .inlineExtraOnMobile {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .inlineExtraOnMobile .extra {
+    width: auto;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+
 }
 
 @media (max-width: 500px) {
@@ -170,6 +182,12 @@
     gap: 8px;
     padding: 12px 6px;
     font-size: var(--font-size-small);
+  }
+}
+
+@media (max-width: 360px) {
+  .inlineExtraOnMobile .title {
+    font-size: 24px;
   }
 }
 

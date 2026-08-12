@@ -52,6 +52,17 @@ export type BinodesBurnOverview = {
   voluntary_burn_usd?: number
 }
 
+export type BinodesBurnAssetOverview = {
+  dt?: string
+  denom?: string
+  symbol?: string
+  fee_burn_amt_actual?: number
+  fee_burn_amt_usd?: number
+  voluntary_burn_cnt?: number
+  voluntary_burn_amt_actual?: number
+  voluntary_burn_usd?: number
+}
+
 export type BinodesIbcOverview = {
   dt?: string
   ibc_tx_in_cnt?: number
@@ -112,11 +123,15 @@ export type BinodesDashboardActivity = {
   stake?: BinodesStakeOverview
   fees?: BinodesFeesOverview
   governance?: BinodesGovernanceOverview
+  luncBurns?: BinodesBurnAssetOverview
+  ustcBurns?: BinodesBurnAssetOverview
 }
 
 export type BinodesDashboardSeriesPoint = {
   dt: string
   txTotalCnt?: number
+  transferAmountUsd?: number
+  activeAddressCount?: number
   feeGasUsd?: number
   feeCpUsd?: number
   feeOpUsd?: number
@@ -124,6 +139,12 @@ export type BinodesDashboardSeriesPoint = {
   voluntaryBurnUsd?: number
   totalFeeUsd?: number
   burnUsd?: number
+  stakingDelegateUsd?: number
+  stakingUndelegateUsd?: number
+  luncBurnAmount?: number
+  luncBurnUsd?: number
+  ustcBurnAmount?: number
+  ustcBurnUsd?: number
 }
 
 export type BinodesDexTxDetail = {
@@ -286,6 +307,25 @@ const aggregateBurnOverview = (
   }
 }
 
+const aggregateBurnAssetOverview = (
+  items: BinodesBurnAssetOverview[]
+): BinodesBurnAssetOverview | undefined => {
+  if (!items.length) return undefined
+  return {
+    dt: latestDate(items),
+    denom: items.find((item) => item.denom)?.denom,
+    symbol: items.find((item) => item.symbol)?.symbol,
+    fee_burn_amt_actual: sumOrUndefined(items, (item) => item.fee_burn_amt_actual),
+    fee_burn_amt_usd: sumOrUndefined(items, (item) => item.fee_burn_amt_usd),
+    voluntary_burn_cnt: sumOrUndefined(items, (item) => item.voluntary_burn_cnt),
+    voluntary_burn_amt_actual: sumOrUndefined(
+      items,
+      (item) => item.voluntary_burn_amt_actual
+    ),
+    voluntary_burn_usd: sumOrUndefined(items, (item) => item.voluntary_burn_usd)
+  }
+}
+
 const aggregateIbcOverview = (
   items: BinodesIbcOverview[]
 ): BinodesIbcOverview | undefined => {
@@ -382,7 +422,10 @@ const aggregateGovernanceOverview = (
 const buildDashboardSeries = (
   networkItems: BinodesNetworkOverview[],
   burnsItems: BinodesBurnOverview[],
-  feesItems: BinodesFeesOverview[]
+  feesItems: BinodesFeesOverview[],
+  stakeItems: BinodesStakeOverview[],
+  luncBurnItems: BinodesBurnAssetOverview[],
+  ustcBurnItems: BinodesBurnAssetOverview[]
 ): BinodesDashboardSeriesPoint[] => {
   const byDate = new Map<string, BinodesDashboardSeriesPoint>()
 
@@ -407,6 +450,8 @@ const buildDashboardSeries = (
   networkItems.forEach((item) => {
     const point = ensurePoint(item.dt)
     setFinite(point, "txTotalCnt", item.tx_total_cnt)
+    setFinite(point, "transferAmountUsd", item.transfer_amt_usd)
+    setFinite(point, "activeAddressCount", item.active_addr_cnt)
     setFinite(point, "feeGasUsd", item.fee_gas_usd)
     setFinite(point, "feeCpUsd", item.fee_cp_usd)
     setFinite(point, "feeOpUsd", item.fee_op_usd)
@@ -425,6 +470,31 @@ const buildDashboardSeries = (
     setFinite(point, "feeBurnUsd", item.fee_burn_usd)
     setFinite(point, "voluntaryBurnUsd", item.voluntary_burn_usd)
   })
+
+  stakeItems.forEach((item) => {
+    const point = ensurePoint(item.dt)
+    setFinite(point, "stakingDelegateUsd", item.staking_delegate_usd)
+    setFinite(point, "stakingUndelegateUsd", item.staking_undelegate_usd)
+  })
+
+  const appendBurnAsset = (
+    items: BinodesBurnAssetOverview[],
+    amountKey: "luncBurnAmount" | "ustcBurnAmount",
+    usdKey: "luncBurnUsd" | "ustcBurnUsd"
+  ) => {
+    items.forEach((item) => {
+      const point = ensurePoint(item.dt)
+      const amount =
+        (item.fee_burn_amt_actual ?? 0) +
+        (item.voluntary_burn_amt_actual ?? 0)
+      const usd = (item.fee_burn_amt_usd ?? 0) + (item.voluntary_burn_usd ?? 0)
+      setFinite(point, amountKey, amount)
+      setFinite(point, usdKey, usd)
+    })
+  }
+
+  appendBurnAsset(luncBurnItems, "luncBurnAmount", "luncBurnUsd")
+  appendBurnAsset(ustcBurnItems, "ustcBurnAmount", "ustcBurnUsd")
 
   return Array.from(byDate.values())
     .map((point) => {
@@ -499,10 +569,26 @@ export const fetchBinodesDashboardActivity = async (
     limit: String(limit),
     freq: frequency
   }
-  const [networkResult, burnsResult, feesResult] = await Promise.all([
+  const [
+    networkResult,
+    burnsResult,
+    feesResult,
+    stakeResult,
+    luncBurnResult,
+    ustcBurnResult
+  ] = await Promise.all([
     settleList<BinodesNetworkOverview>("/v1/network/overview", params),
     settleList<BinodesBurnOverview>("/v1/burns/overview", params),
-    settleList<BinodesFeesOverview>("/v1/fees/overview", params)
+    settleList<BinodesFeesOverview>("/v1/fees/overview", params),
+    settleList<BinodesStakeOverview>("/v1/stake/overview", params),
+    settleList<BinodesBurnAssetOverview>("/v1/burns/assets_info", {
+      ...params,
+      asset: "LUNC"
+    }),
+    settleList<BinodesBurnAssetOverview>("/v1/burns/assets_info", {
+      ...params,
+      asset: "USTC"
+    })
   ])
   if ([networkResult, burnsResult, feesResult].every((result) => result.failed)) {
     throw new Error("BiNodes dashboard activity unavailable")
@@ -512,7 +598,9 @@ export const fetchBinodesDashboardActivity = async (
   const feesItems = feesResult.items
   const dexItems: BinodesDexOverview[] = []
   const ibcItems: BinodesIbcOverview[] = []
-  const stakeItems: BinodesStakeOverview[] = []
+  const stakeItems = stakeResult.items
+  const luncBurnItems = luncBurnResult.items
+  const ustcBurnItems = ustcBurnResult.items
   const governanceItems: BinodesGovernanceOverview[] = []
 
   return {
@@ -527,13 +615,22 @@ export const fetchBinodesDashboardActivity = async (
       governanceItems.length
     ),
     frequency,
-    series: buildDashboardSeries(networkItems, burnsItems, feesItems),
+    series: buildDashboardSeries(
+      networkItems,
+      burnsItems,
+      feesItems,
+      stakeItems,
+      luncBurnItems,
+      ustcBurnItems
+    ),
     network: aggregateNetworkOverview(networkItems),
     dex: aggregateDexOverview(dexItems),
     burns: aggregateBurnOverview(burnsItems),
     ibc: aggregateIbcOverview(ibcItems),
     stake: aggregateStakeOverview(stakeItems),
     fees: aggregateFeesOverview(feesItems),
-    governance: aggregateGovernanceOverview(governanceItems)
+    governance: aggregateGovernanceOverview(governanceItems),
+    luncBurns: aggregateBurnAssetOverview(luncBurnItems),
+    ustcBurns: aggregateBurnAssetOverview(ustcBurnItems)
   }
 }
