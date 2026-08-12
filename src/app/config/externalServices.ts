@@ -8,6 +8,7 @@ export const COINPAPRIKA_LUNA_URL =
   "https://api.coinpaprika.com/v1/tickers/luna-terra-v2"
 export const COINPAPRIKA_USTC_URL =
   "https://api.coinpaprika.com/v1/tickers/ust-terrausd"
+export const BINANCE_MARKET_API_URL = "https://api.binance.com"
 
 export const ASSET_URL = "https://assets.terra.dev"
 export const ASSET_DEX_PAIRS_URL = `${ASSET_URL}/cw20/pairs.dex.json`

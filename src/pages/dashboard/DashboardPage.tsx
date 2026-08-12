@@ -166,8 +166,31 @@ const TrendCard = ({
       </div>
       {meta ? <span className={styles.trendMeta}>{meta}</span> : null}
     </div>
-    {legend ? <div className={styles.chartLegend}>{legend}</div> : null}
+    <div className={styles.chartLegend}>{legend}</div>
     <div className={styles.chartArea}>{children}</div>
+  </article>
+)
+
+const AssetMetricCard = ({
+  label,
+  rows
+}: {
+  label: string
+  rows: Array<{ symbol: string; value: string; tone?: "lunc" | "ustc" | "luna" }>
+}) => (
+  <article className={`card ${styles.assetMetricCard}`}>
+    <div className={styles.metricLabel}>{label}</div>
+    <div className={styles.assetMetricRows}>
+      {rows.map((row) => (
+        <div className={styles.assetMetricRow} key={row.symbol}>
+          <span className={styles.assetMetricValue}>{row.value}</span>
+          <span className={styles.assetMetricSymbol}>
+            <i className={`${styles.assetMetricDot} ${row.tone ? styles[`assetMetricDot${row.tone}`] : ""}`} />
+            {row.symbol}
+          </span>
+        </div>
+      ))}
+    </div>
   </article>
 )
 
@@ -198,7 +221,7 @@ const Dashboard = () => {
     queryKey: ["dashboard", "price-history", "lunc", dashboardRange],
     queryFn: () =>
       fetchDashboardPriceHistory("lunc", activeRange.rangeMs, prices?.lunc?.usd),
-    enabled: isClassic && historyEnabled && dashboardRange !== "24h",
+    enabled: isClassic,
     staleTime: activeRange.ttlMs,
     retry: 1
   })
@@ -207,7 +230,7 @@ const Dashboard = () => {
     queryKey: ["dashboard", "price-history", "ustc", dashboardRange],
     queryFn: () =>
       fetchDashboardPriceHistory("ustc", activeRange.rangeMs, prices?.ustc?.usd),
-    enabled: isClassic && historyEnabled && dashboardRange !== "24h",
+    enabled: isClassic,
     staleTime: activeRange.ttlMs,
     retry: 1
   })
@@ -216,7 +239,7 @@ const Dashboard = () => {
     queryKey: ["dashboard", "price-history", "luna", dashboardRange],
     queryFn: () =>
       fetchDashboardPriceHistory("luna", activeRange.rangeMs, prices?.luna?.usd),
-    enabled: !isClassic && historyEnabled && dashboardRange !== "24h",
+    enabled: !isClassic,
     staleTime: activeRange.ttlMs,
     retry: 1
   })
@@ -265,15 +288,15 @@ const Dashboard = () => {
   })
 
   const luncTrend =
-    luncPriceHistory?.length && dashboardRange !== "24h"
+    luncPriceHistory?.length
       ? luncPriceHistory
       : buildFallbackTrend(prices?.lunc?.usd, luncChange, activeRange.rangeMs)
   const ustcTrend =
-    ustcPriceHistory?.length && dashboardRange !== "24h"
+    ustcPriceHistory?.length
       ? ustcPriceHistory
       : buildFallbackTrend(prices?.ustc?.usd, ustcChange, activeRange.rangeMs)
   const lunaTrend =
-    lunaPriceHistory?.length && dashboardRange !== "24h"
+    lunaPriceHistory?.length
       ? lunaPriceHistory
       : buildFallbackTrend(prices?.luna?.usd, lunaChange, activeRange.rangeMs)
 
@@ -281,33 +304,6 @@ const Dashboard = () => {
     if (!currentSnapshot) return []
     if (!isClassic) {
       return [
-        {
-          key: "lunaCirc",
-          label: "LUNA Circulating Supply",
-          value: formatValue(currentSnapshot.circulatingLunc, 0),
-          unit: "LUNA"
-        },
-        {
-          key: "lunaTotal",
-          label: "LUNA Total Supply",
-          value: formatValue(currentSnapshot.luncSupply, 0),
-          unit: "LUNA"
-        },
-        {
-          key: "communityPoolLuna",
-          label: "Community Pool",
-          value: formatValue(currentSnapshot.luncCommunity, 2),
-          unit: "LUNA"
-        },
-        {
-          key: "inflation",
-          label: "Inflation Rate",
-          value:
-            currentSnapshot.inflation === undefined
-              ? "--"
-              : formatValue(currentSnapshot.inflation * 100, 2),
-          unit: currentSnapshot.inflation === undefined ? undefined : "%"
-        },
         {
           key: "staked",
           label: "Total Staked",
@@ -340,30 +336,6 @@ const Dashboard = () => {
 
     return [
       {
-        key: "luncCirc",
-        label: "LUNC Circulating Supply",
-        value: formatValue(currentSnapshot.circulatingLunc, 0),
-        unit: "LUNC"
-      },
-      {
-        key: "ustcCirc",
-        label: "USTC Circulating Supply",
-        value: formatValue(currentSnapshot.circulatingUstc, 0),
-        unit: "USTC"
-      },
-      {
-        key: "communityPoolLunc",
-        label: "Community Pool (LUNC)",
-        value: formatValue(currentSnapshot.luncCommunity, 2),
-        unit: "LUNC"
-      },
-      {
-        key: "communityPoolUstc",
-        label: "Community Pool (USTC)",
-        value: formatValue(currentSnapshot.ustcCommunity, 2),
-        unit: "USTC"
-      },
-      {
         key: "staked",
         label: "Total Staked",
         value: formatValue(currentSnapshot.stakedLunc, 0),
@@ -393,14 +365,6 @@ const Dashboard = () => {
     ]
   }, [currentSnapshot, isClassic])
 
-  const supplyMetrics = metrics.filter((item) =>
-    ["luncCirc", "ustcCirc", "lunaCirc", "lunaTotal"].includes(item.key)
-  )
-  const treasuryMetrics = metrics.filter((item) =>
-    ["communityPoolLunc", "communityPoolUstc", "communityPoolLuna", "inflation"].includes(
-      item.key
-    )
-  )
   const chainMetrics = metrics.filter((item) =>
     ["staked", "stakingRatio", "validators", "blockTime"].includes(item.key)
   )
@@ -506,8 +470,27 @@ const Dashboard = () => {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Supply</div>
           <div className={styles.dualMetrics}>
-            {supplyMetrics.length ? (
-              supplyMetrics.map((item) => <DashboardMetricCard key={item.key} item={item} />)
+            {currentSnapshot ? (
+              <>
+                <AssetMetricCard
+                  label="Circulating Supply"
+                  rows={isClassic ? [
+                    { symbol: "LUNC", value: formatValue(currentSnapshot.circulatingLunc, 0), tone: "lunc" },
+                    { symbol: "USTC", value: formatValue(currentSnapshot.circulatingUstc, 0), tone: "ustc" }
+                  ] : [
+                    { symbol: "LUNA", value: formatValue(currentSnapshot.circulatingLunc, 0), tone: "luna" }
+                  ]}
+                />
+                <AssetMetricCard
+                  label="Total Supply"
+                  rows={isClassic ? [
+                    { symbol: "LUNC", value: formatValue(currentSnapshot.luncSupply, 0), tone: "lunc" },
+                    { symbol: "USTC", value: formatValue(currentSnapshot.ustcSupply, 0), tone: "ustc" }
+                  ] : [
+                    { symbol: "LUNA", value: formatValue(currentSnapshot.luncSupply, 0), tone: "luna" }
+                  ]}
+                />
+              </>
             ) : (
               <DashboardMetricSkeletons count={2} />
             )}
@@ -517,10 +500,33 @@ const Dashboard = () => {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Treasury</div>
           <div className={styles.dualMetrics}>
-            {treasuryMetrics.length ? (
-              treasuryMetrics.map((item) => (
-                <DashboardMetricCard key={item.key} item={item} />
-              ))
+            {currentSnapshot ? (
+              <>
+                <AssetMetricCard
+                  label="Community Pool"
+                  rows={isClassic ? [
+                    { symbol: "LUNC", value: formatValue(currentSnapshot.luncCommunity, 2), tone: "lunc" },
+                    { symbol: "USTC", value: formatValue(currentSnapshot.ustcCommunity, 2), tone: "ustc" }
+                  ] : [
+                    { symbol: "LUNA", value: formatValue(currentSnapshot.luncCommunity, 2), tone: "luna" }
+                  ]}
+                />
+                <AssetMetricCard
+                  label={isClassic ? "Oracle Pool" : "Inflation Rate"}
+                  rows={isClassic ? [
+                    { symbol: "LUNC", value: formatValue(currentSnapshot.luncOracle, 2), tone: "lunc" },
+                    { symbol: "USTC", value: formatValue(currentSnapshot.ustcOracle, 2), tone: "ustc" }
+                  ] : [
+                    {
+                      symbol: "ANNUAL",
+                      value: currentSnapshot.inflation === undefined
+                        ? "--"
+                        : `${formatValue(currentSnapshot.inflation * 100, 2)}%`,
+                      tone: "luna"
+                    }
+                  ]}
+                />
+              </>
             ) : (
               <DashboardMetricSkeletons count={2} />
             )}

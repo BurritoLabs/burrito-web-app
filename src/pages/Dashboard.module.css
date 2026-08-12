@@ -113,6 +113,71 @@
   font-weight: var(--normal);
 }
 
+.assetMetricCard {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 8px;
+  min-width: 0;
+  min-height: 142px;
+  padding: 18px 20px 14px;
+}
+
+.assetMetricRows {
+  display: grid;
+  align-content: stretch;
+}
+
+.assetMetricRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 9px 0;
+}
+
+.assetMetricRow + .assetMetricRow {
+  border-top: 1px solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+}
+
+.assetMetricValue {
+  min-width: 0;
+  color: var(--bui-color-text);
+  font-size: 19px;
+  font-weight: var(--bold);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.assetMetricSymbol {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  color: var(--bui-color-text-secondary);
+  font-size: 11px;
+  font-weight: var(--bold);
+}
+
+.assetMetricDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dashboard-chain);
+}
+
+.assetMetricDotlunc {
+  background: var(--dashboard-lunc);
+}
+
+.assetMetricDotustc {
+  background: var(--dashboard-ustc);
+}
+
+.assetMetricDotluna {
+  background: var(--dashboard-luna);
+}
+
 .delta,
 .marketChange {
   display: inline-flex;
@@ -237,7 +302,7 @@
 .chartEmpty {
   display: grid;
   place-items: center;
-  min-height: 150px;
+  min-height: 120px;
   color: var(--bui-color-text-muted);
   font-size: var(--font-size-small);
 }
@@ -256,11 +321,11 @@
 
 .trendCard {
   display: grid;
-  grid-template-rows: auto auto minmax(176px, 1fr);
-  gap: 12px;
+  grid-template-rows: auto 14px 132px;
+  gap: 8px;
   min-width: 0;
-  min-height: 288px;
-  padding: 18px 20px 16px;
+  min-height: 0;
+  padding: 16px 18px 14px;
   overflow: hidden;
 }
 
@@ -323,7 +388,8 @@
 
 .chartArea {
   min-width: 0;
-  min-height: 176px;
+  height: 132px;
+  min-height: 0;
 }
 
 .dataNotice {
@@ -464,18 +530,32 @@
     padding: 14px;
   }
 
+  .assetMetricCard {
+    min-height: 136px;
+    padding: 15px 16px 12px;
+  }
+
+  .assetMetricValue {
+    font-size: 17px;
+  }
+
   .metricValue,
   .compactMetrics .metricValue {
     font-size: 17px;
   }
 
   .trendCard {
-    min-height: 272px;
-    padding: 16px 14px 12px;
+    grid-template-rows: auto 14px 124px;
+    min-height: 0;
+    padding: 14px 14px 12px;
   }
 
   .trendValue {
     font-size: 18px;
+  }
+
+  .chartArea {
+    height: 124px;
   }
 
   .rangeSwitch {
