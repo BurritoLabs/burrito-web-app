@@ -13,6 +13,7 @@ import {
   fetchDashboardPriceHistory,
   type DashboardHistoryPoint
 } from "../../app/data/dashboardHistory"
+import { fetchLunaDashboardMetric } from "../../app/data/dashboardMetrics"
 import { formatNumber, formatPercent } from "../../app/utils/format"
 import {
   dashboardRangeOptions,
@@ -268,6 +269,30 @@ const Dashboard = () => {
     retry: 1
   })
 
+  const { data: lunaStakedHistory, isLoading: lunaStakedLoading } = useQuery({
+    queryKey: ["dashboard", "luna", "total_staked", dashboardRange],
+    queryFn: () => fetchLunaDashboardMetric("total_staked", dashboardRange),
+    enabled: !isClassic && historyEnabled,
+    staleTime: activeRange.ttlMs,
+    retry: 1
+  })
+
+  const { data: lunaUnbondingHistory, isLoading: lunaUnbondingLoading } = useQuery({
+    queryKey: ["dashboard", "luna", "unbonding", dashboardRange],
+    queryFn: () => fetchLunaDashboardMetric("unbonding", dashboardRange),
+    enabled: !isClassic && historyEnabled,
+    staleTime: activeRange.ttlMs,
+    retry: 1
+  })
+
+  const { data: lunaDelegatorHistory, isLoading: lunaDelegatorLoading } = useQuery({
+    queryKey: ["dashboard", "luna", "delegators", dashboardRange],
+    queryFn: () => fetchLunaDashboardMetric("delegators", dashboardRange),
+    enabled: !isClassic && historyEnabled,
+    staleTime: activeRange.ttlMs,
+    retry: 1
+  })
+
   const luncChange = marketChange({
     range: dashboardRange,
     history: luncPriceHistory,
@@ -405,6 +430,10 @@ const Dashboard = () => {
   const ustcBurnAmount =
     (activity?.ustcBurns?.fee_burn_amt_actual ?? 0) +
     (activity?.ustcBurns?.voluntary_burn_amt_actual ?? 0)
+  const lunaMetricLoading =
+    lunaStakedLoading || lunaUnbondingLoading || lunaDelegatorLoading
+  const lunaMetricStatus = (status?: string) =>
+    status === "limited" ? "Limited history" : undefined
 
   return (
     <PageShell
@@ -428,7 +457,7 @@ const Dashboard = () => {
         </div>
       }
     >
-      <div className={styles.page}>
+      <div className={`${styles.page} ${!isClassic ? styles.pageLuna : ""}`}>
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Market</div>
           <div className={`${styles.marketGrid} ${!isClassic ? styles.marketGridSingle : ""}`}>
@@ -608,7 +637,67 @@ const Dashboard = () => {
               </TrendCard>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className={styles.section}>
+            <div className={styles.sectionTitleRow}>
+              <div>
+                <div className={styles.sectionHeader}>Network Trends</div>
+                <p className={styles.sectionSubtext}>Terra network activity</p>
+              </div>
+              <span className={styles.poweredByLine}>Data by Burrito Monitor</span>
+            </div>
+            <div className={styles.trendGrid} aria-busy={lunaMetricLoading}>
+              <TrendCard
+                title="LUNA Price"
+                value={formatUsdSmart(prices?.luna?.usd)}
+                meta={Number.isFinite(lunaChange) ? formatPercent(Number(lunaChange)) : undefined}
+              >
+                <LineChart
+                  points={lunaTrend}
+                  color="var(--dashboard-luna)"
+                  label="LUNA price history"
+                  valuePrefix="$"
+                />
+              </TrendCard>
+              <TrendCard
+                title="Total Staked"
+                value={compactAssetAmount(
+                  lunaStakedHistory?.latestValue ?? currentSnapshot?.stakedLunc,
+                  "LUNA"
+                )}
+                meta={lunaMetricStatus(lunaStakedHistory?.status)}
+              >
+                <LineChart
+                  points={lunaStakedHistory?.points ?? []}
+                  color="var(--dashboard-luna-deep)"
+                  label="LUNA total staked history"
+                />
+              </TrendCard>
+              <TrendCard
+                title="Unbonding"
+                value={compactAssetAmount(lunaUnbondingHistory?.latestValue, "LUNA")}
+                meta={lunaMetricStatus(lunaUnbondingHistory?.status)}
+              >
+                <LineChart
+                  points={lunaUnbondingHistory?.points ?? []}
+                  color="var(--dashboard-luna-warm)"
+                  label="LUNA unbonding history"
+                />
+              </TrendCard>
+              <TrendCard
+                title="Delegators"
+                value={formatValue(lunaDelegatorHistory?.latestValue, 0)}
+                meta={lunaMetricStatus(lunaDelegatorHistory?.status)}
+              >
+                <LineChart
+                  points={lunaDelegatorHistory?.points ?? []}
+                  color="var(--dashboard-luna-soft)"
+                  label="Terra delegator history"
+                />
+              </TrendCard>
+            </div>
+          </section>
+        )}
       </div>
     </PageShell>
   )

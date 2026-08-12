@@ -98,6 +98,11 @@ export default defineConfig({
         target: "https://keybase.burrito.money",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/keybase/, "")
+      },
+      "/burrito-api": {
+        target: "https://api.burrito.money",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/burrito-api/, "")
       }
     }
   }

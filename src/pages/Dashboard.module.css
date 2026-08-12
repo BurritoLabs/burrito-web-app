@@ -1,12 +1,35 @@
 .page {
   --dashboard-lunc: #e5b91f;
   --dashboard-ustc: #27aee4;
-  --dashboard-luna: #6366f1;
+  --dashboard-luna: #f59e0b;
+  --dashboard-luna-deep: #ea580c;
+  --dashboard-luna-warm: #f97316;
+  --dashboard-luna-soft: #fb923c;
   --dashboard-chain: var(--chain-accent-strong);
   --dashboard-staking: var(--bui-color-success);
   display: grid;
   gap: 26px;
   min-width: 0;
+}
+
+.pageLuna {
+  --dashboard-chain: var(--dashboard-luna);
+  --dashboard-staking: var(--dashboard-luna-warm);
+}
+
+.pageLuna .sectionHeader,
+.pageLuna .poweredByLine {
+  color: color-mix(in srgb, var(--dashboard-luna) 78%, var(--bui-color-text));
+}
+
+.pageLuna .rangeButtonActive {
+  background: color-mix(in srgb, var(--dashboard-luna) 24%, transparent);
+}
+
+.pageLuna .metricCard,
+.pageLuna .assetMetricCard,
+.pageLuna .trendCard {
+  border-color: color-mix(in srgb, var(--dashboard-luna) 16%, var(--bui-color-border));
 }
 
 .section {
@@ -54,6 +77,10 @@
 
 .marketGridSingle {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.marketGridSingle .marketCard {
+  height: 290px;
 }
 
 .compactMetrics {
@@ -518,6 +545,10 @@
   .marketCard {
     min-height: 220px;
     padding: 17px 18px 15px;
+  }
+
+  .marketGridSingle .marketCard {
+    height: auto;
   }
 
   .marketPrice {

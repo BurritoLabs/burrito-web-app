@@ -16,6 +16,11 @@ const compactNumber = (value: number) =>
     maximumFractionDigits: 1
   }).format(value)
 
+const chartNumber = (value: number) =>
+  Math.abs(value) < 1 && value !== 0
+    ? value.toLocaleString("en-US", { maximumFractionDigits: 6 })
+    : compactNumber(value)
+
 const dateLabel = (time: number, hourly: boolean) =>
   new Date(time).toLocaleString("en-US",
     hourly
@@ -71,11 +76,13 @@ export const LineChart = ({
   points,
   color,
   label,
+  valuePrefix = "",
   valueSuffix = ""
 }: {
   points: ChartPoint[]
   color: string
   label: string
+  valuePrefix?: string
   valueSuffix?: string
 }) => {
   const data = normalized(points)
@@ -105,7 +112,7 @@ export const LineChart = ({
       {data.map((point, index) => {
         const x = xAt(index, data.length)
         const y = TOP + ((max - point.value) / range) * (HEIGHT - TOP - BOTTOM)
-        return <circle key={`${point.time}-${index}`} cx={x} cy={y} r="7" fill="transparent"><title>{`${dateLabel(point.time, hourly)}: ${compactNumber(point.value)}${valueSuffix}`}</title></circle>
+        return <circle key={`${point.time}-${index}`} cx={x} cy={y} r="7" fill="transparent"><title>{`${dateLabel(point.time, hourly)}: ${valuePrefix}${chartNumber(point.value)}${valueSuffix}`}</title></circle>
       })}
       {labelIndexes(data.length).map((index) => (
         <text key={index} className={styles.chartAxisLabel} x={xAt(index, data.length)} y={HEIGHT - 5} textAnchor={index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"}>{dateLabel(data[index].time, hourly)}</text>
