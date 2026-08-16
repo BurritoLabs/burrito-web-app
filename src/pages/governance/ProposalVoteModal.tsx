@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { createPortal } from "react-dom"
 import type { VoteChoice } from "../../app/governance/proposalFormat"
 import styles from "../ProposalDetails.module.css"
@@ -21,6 +22,20 @@ const ProposalVoteModal = ({
   onClose,
   onSubmit
 }: ProposalVoteModalProps) => {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !voteSubmitting) onClose()
+    }
+
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [onClose, voteSubmitting])
+
   if (typeof document === "undefined") return null
 
   return createPortal(
@@ -28,6 +43,7 @@ const ProposalVoteModal = ({
       className={styles.voteModalBackdrop}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="proposal-vote-modal-title"
       onClick={() => {
         if (voteSubmitting) return
         onClose()
@@ -38,7 +54,9 @@ const ProposalVoteModal = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.voteModalHeader}>
-          <div className={styles.voteModalTitle}>Vote proposal</div>
+          <div id="proposal-vote-modal-title" className={styles.voteModalTitle}>
+            Vote proposal
+          </div>
           <button
             type="button"
             className={styles.voteModalClose}

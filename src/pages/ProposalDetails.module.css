@@ -213,7 +213,9 @@
 
 .sectionCard {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
+  min-width: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -227,6 +229,8 @@
 }
 
 .sectionBody {
+  width: 100%;
+  min-width: 0;
   padding: var(--card-padding);
   background: var(--card-bg-muted);
 }
@@ -401,7 +405,15 @@
 
 .list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.list > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .listMeta {
@@ -461,6 +473,9 @@
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -585,6 +600,7 @@
   font-size: inherit;
   font-weight: 500;
   color: var(--bui-color-text);
+  overflow-wrap: anywhere;
 }
 
 .voteTotalPercent {
@@ -657,6 +673,7 @@
   font-size: var(--font-size-small);
   color: var(--bui-color-text-secondary);
   font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .progressBlock {
@@ -880,7 +897,9 @@
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(0, 0, 0, 0.55);
+  background: color-mix(in srgb, var(--bui-color-canvas) 68%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
   padding: 20px;
@@ -888,12 +907,13 @@
 
 .voteModal {
   width: min(460px, 100%);
+  max-height: min(720px, calc(100dvh - 40px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   border-radius: var(--radius-lg);
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
-  background: rgba(8, 18, 15, 0.92);
+  background: var(--card-bg);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
   overflow: hidden;
 }
 
@@ -948,7 +968,12 @@
 .voteModalBody {
   display: grid;
   gap: 12px;
+  min-height: 0;
   padding: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--chain-accent-strong) 55%, transparent) transparent;
 }
 
 .voteOptionList {
@@ -997,6 +1022,23 @@
   padding: 0 18px 18px;
 }
 
+:global(:root[data-theme="light"]) .voteModalBackdrop {
+  background: rgba(20, 32, 25, 0.24);
+}
+
+:global(:root[data-theme="light"]) .voteModal {
+  box-shadow:
+    0 20px 48px rgba(20, 32, 25, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+:global(:root[data-theme="light"]) :is(.voteItem, .validatorRow) {
+  background: var(--bui-color-surface-raised);
+  box-shadow:
+    inset 0 0 0 0.5px color-mix(in srgb, var(--bui-color-text) 12%, transparent),
+    0 6px 16px rgba(20, 32, 25, 0.09);
+}
+
 @media (max-width: 991.98px) {
   .detailGrid {
     grid-template-columns: 1fr;
@@ -1020,12 +1062,64 @@
     gap: 12px;
   }
 
-  .voteOptionList {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {
+  .sectionHeader,
+  .sectionBody {
+    padding-inline: 16px;
+  }
+
+  .voteList {
+    gap: 10px;
+  }
+
+  .voteItem {
+    padding: 12px;
+  }
+
+  .validatorRow {
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .validatorVoteBadge {
+    max-width: 104px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .voteModalBackdrop {
+    padding:
+      max(12px, env(safe-area-inset-top))
+      12px
+      max(12px, env(safe-area-inset-bottom));
+  }
+
+  .voteModal {
+    width: 100%;
+    max-height: calc(
+      100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+  }
+
+  .voteModalHeader {
+    padding: 14px 16px;
+  }
+
+  .voteModalBody {
+    padding: 16px;
+  }
+
+  .voteModalActions {
+    padding: 0 16px 16px;
+  }
+
+  .voteModalActions > button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .depositSummaryGrid {
     grid-template-columns: 1fr;
   }

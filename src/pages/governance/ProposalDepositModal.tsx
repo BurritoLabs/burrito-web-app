@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { createPortal } from "react-dom"
 import {
   formatAmountInput,
@@ -48,6 +49,21 @@ const ProposalDepositModal = ({
   onUpdateAmount
 }: ProposalDepositModalProps) => {
   const { chain } = useAppChain()
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !depositSubmitting) onClose()
+    }
+
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [depositSubmitting, onClose])
+
   if (typeof document === "undefined") return null
 
   return createPortal(
@@ -55,6 +71,7 @@ const ProposalDepositModal = ({
       className={styles.voteModalBackdrop}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="proposal-deposit-modal-title"
       onClick={() => {
         if (depositSubmitting) return
         onClose()
@@ -65,7 +82,9 @@ const ProposalDepositModal = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.voteModalHeader}>
-          <div className={styles.voteModalTitle}>Deposit to proposal</div>
+          <div id="proposal-deposit-modal-title" className={styles.voteModalTitle}>
+            Deposit to proposal
+          </div>
           <button
             type="button"
             className={styles.voteModalClose}
