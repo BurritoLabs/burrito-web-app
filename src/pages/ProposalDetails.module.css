@@ -516,6 +516,7 @@
 
 .validatorText {
   min-width: 0;
+  max-width: min(32ch, 100%);
   flex: 1 1 auto;
   overflow: hidden;
 }
@@ -1081,6 +1082,10 @@
   .validatorRow {
     gap: 10px;
     padding-inline: 12px;
+  }
+
+  .validatorText {
+    max-width: min(20ch, 100%);
   }
 
   .validatorVoteBadge {
