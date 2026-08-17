@@ -290,6 +290,166 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
   )
 })
 
+test("Chrome extension provider connects, follows the active chain, and disconnects", async ({
+  page
+}) => {
+  await selectStoredChain(page, "lunc")
+  await page.addInitScript(() => {
+    const calls: Array<{ method: string; chainIds?: string[] }> = []
+    Object.defineProperty(window, "__burritoExtensionCalls", {
+      value: calls
+    })
+    Object.defineProperty(window, "BurritoWallet", {
+      configurable: false,
+      writable: false,
+      value: {
+        version: 1,
+        request: async (
+          method: string,
+          params: Record<string, unknown> = {}
+        ) => {
+          const chainIds = Array.isArray(params.chainIds)
+            ? params.chainIds.filter(
+                (chainId): chainId is string => typeof chainId === "string"
+              )
+            : undefined
+          calls.push({ method, ...(chainIds ? { chainIds } : {}) })
+
+          if (method === "wallet.getCapabilities") {
+            return {
+              protocolVersion: 1,
+              platform: "chrome",
+              supportedChainIds: ["columbus-5", "phoenix-1"],
+              supportedDirectSignTypeUrls: [
+                "/cosmos.bank.v1beta1.MsgSend",
+                "/cosmos.staking.v1beta1.MsgDelegate",
+                "/cosmos.gov.v1beta1.MsgVote"
+              ],
+              transactionSigning: true
+            }
+          }
+          if (method === "wallet.connect") {
+            const chainId = chainIds?.[0]
+            if (chainId !== "columbus-5" && chainId !== "phoenix-1") {
+              throw new Error("Unexpected chain")
+            }
+            return {
+              source: "burrito",
+              accounts: [
+                {
+                  source: "burrito",
+                  chainId,
+                  address: "terra1amdttz2937a3dytmxmkany53pp6ma6dy4vsllv",
+                  algorithm: "secp256k1",
+                  publicKey:
+                    "Aqy0vCZ9t3dGFL9gEcWZKbAGwlVDhqMJC6/ws/xBjsBE"
+                }
+              ]
+            }
+          }
+          if (method === "wallet.disconnect") {
+            return { disconnected: true }
+          }
+          throw new Error(`Unexpected extension method: ${method}`)
+        }
+      }
+    })
+  })
+
+  await page.goto("/")
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const extensionWallet = page
+    .getByRole("button")
+    .filter({ hasText: "Burrito Wallet" })
+    .filter({ hasText: "Extension" })
+  await expect(extensionWallet).toBeEnabled()
+  await extensionWallet.click()
+
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect(page.getByText("terra1...sllv", { exact: true })).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as Window & {
+              __burritoExtensionCalls?: Array<{
+                method: string
+                chainIds?: string[]
+              }>
+            }
+          ).__burritoExtensionCalls
+      )
+    )
+    .toEqual([
+      { method: "wallet.getCapabilities" },
+      { method: "wallet.connect", chainIds: ["columbus-5"] }
+    ])
+
+  await page.getByRole("button", { name: "Close" }).click()
+  await page.getByRole("button", { name: "Switch network" }).click()
+  await page.getByRole("menuitem").filter({ hasText: "LUNA" }).click()
+
+  await expect(page.locator("html")).toHaveAttribute("data-app-chain", "luna")
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => ({
+          calls: (
+              window as Window & {
+                __burritoExtensionCalls?: Array<{
+                  method: string
+                  chainIds?: string[]
+                }>
+              }
+            ).__burritoExtensionCalls,
+          connector: window.localStorage.getItem("burritoWalletConnector"),
+          manuallyDisconnected: window.localStorage.getItem(
+            "burritoWalletManuallyDisconnected"
+          )
+        })
+      )
+    )
+    .toEqual({
+      calls: [
+        { method: "wallet.getCapabilities" },
+        { method: "wallet.connect", chainIds: ["columbus-5"] },
+        { method: "wallet.getCapabilities" },
+        { method: "wallet.connect", chainIds: ["phoenix-1"] }
+      ],
+      connector: "burrito-extension",
+      manuallyDisconnected: null
+    })
+
+  await page
+    .getByRole("button", { name: "Burrito Wallet", exact: true })
+    .click()
+  const disconnectButton = page.getByRole("button", {
+    name: "Disconnect",
+    exact: true
+  })
+  await expect(disconnectButton).toBeVisible()
+  await disconnectButton.click()
+  await expect(
+    page.getByRole("button", { name: "Connect", exact: true }).first()
+  ).toBeVisible()
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as Window & {
+              __burritoExtensionCalls?: Array<{
+                method: string
+                chainIds?: string[]
+              }>
+            }
+          ).__burritoExtensionCalls?.at(-1)
+      )
+    )
+    .toEqual({ method: "wallet.disconnect" })
+})
+
 test("wallet recovers from a full local asset cache", async ({ page }) => {
   const pageErrors: string[] = []
   page.on("pageerror", (error) => pageErrors.push(error.message))

@@ -265,19 +265,6 @@ export const WalletProvider = ({
   }, [])
 
   useEffect(() => {
-    if (previousChainKeyRef.current === chainKey) return
-
-    previousChainKeyRef.current = chainKey
-    setAccount(undefined)
-    setError(undefined)
-    setTxState({ status: "idle" })
-    setStatus("disconnected")
-    setAutoConnectAttempted(false)
-    lastAutoConnectRetryAtRef.current = 0
-    refreshConnectors()
-  }, [chainKey, refreshConnectors])
-
-  useEffect(() => {
     accountAddressRef.current = account?.address
     connectorIdRef.current = connectorId
     walletStatusRef.current = status
@@ -837,6 +824,33 @@ export const WalletProvider = ({
     },
     [connectCosmosConnector, desktopKeplrAvailable]
   )
+
+  useEffect(() => {
+    if (previousChainKeyRef.current === chainKey) return
+
+    previousChainKeyRef.current = chainKey
+    const reconnectId = connectorIdRef.current ?? storedAutoConnectId
+    const shouldReconnect = Boolean(
+      reconnectId &&
+        !manualDisconnectRef.current &&
+        !isWalletManualDisconnectStored()
+    )
+
+    setAccount(undefined)
+    setError(undefined)
+    setTxState({ status: "idle" })
+    setStatus("disconnected")
+    setAutoConnectAttempted(true)
+    lastAutoConnectRetryAtRef.current = 0
+    refreshConnectors()
+
+    if (!shouldReconnect || !reconnectId) return
+
+    const timer = window.setTimeout(() => {
+      void connect(reconnectId)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [chainKey, connect, refreshConnectors, storedAutoConnectId])
 
   useEffect(() => {
     const requestDesktopWalletReconnect = (id: WalletConnectorId) => {

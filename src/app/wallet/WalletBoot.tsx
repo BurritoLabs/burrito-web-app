@@ -32,6 +32,7 @@ import { getBurritoExtensionConnector } from "./burritoExtensionWallet"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
 import { loadWalletRuntimeProvider } from "./walletRuntimeLoader"
+import { useAppChain } from "../appChainContext"
 
 const WalletRuntimeProvider = lazy(loadWalletRuntimeProvider)
 
@@ -121,6 +122,7 @@ const WalletFallbackProvider = ({
   autoConnectId?: WalletConnectorId
   onRuntimeRequested?: (id: WalletConnectorId) => void
 }) => {
+  const { chainKey } = useAppChain()
   const [status, setStatus] = useState<WalletStatus>("disconnected")
   const [connectorId, setConnectorId] = useState<WalletConnectorId>()
   const [account, setAccount] = useState<WalletContextValue["account"]>()
@@ -130,6 +132,7 @@ const WalletFallbackProvider = ({
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const currentTxLabelRef = useRef<string | undefined>(undefined)
   const currentTxStartedAtRef = useRef<number | undefined>(undefined)
+  const previousChainKeyRef = useRef(chainKey)
   const connectors = useMemo(() => {
     void connectorRefreshNonce
     return getFallbackConnectors()
@@ -179,6 +182,19 @@ const WalletFallbackProvider = ({
     },
     [reconnectConnector]
   )
+
+  useEffect(() => {
+    if (previousChainKeyRef.current === chainKey) return
+
+    previousChainKeyRef.current = chainKey
+    setTxState({ status: "idle" })
+    if (isWalletManualDisconnectStored()) return
+
+    const reconnectId = connectorId ?? getStoredWalletConnectorId()
+    if (!reconnectId || reconnectId === "keplr-mobile") return
+
+    void reconnectConnector(reconnectId)
+  }, [chainKey, connectorId, reconnectConnector])
 
   const disconnect = useCallback(async () => {
     if (connectorId) {
