@@ -244,9 +244,10 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
 
   await page.goto("/")
   await page.getByRole("button", { name: "Connect", exact: true }).first().click()
-  const nativeWallet = page
-    .getByRole("button")
-    .filter({ hasText: "Burrito Wallet" })
+  const nativeWallet = page.getByRole("button", {
+    name: "Burrito Wallet Mobile",
+    exact: true
+  })
   await expect(nativeWallet).toBeEnabled()
   await nativeWallet.click()
 
