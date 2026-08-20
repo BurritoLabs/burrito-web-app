@@ -3,11 +3,16 @@ import { expect, test, type Page } from "@playwright/test"
 
 const routes = [
   ["/", "Dashboard"],
+  ["/wallet", "Wallet"],
+  ["/swap", "Swap"],
   ["/market", "Market"],
+  ["/launchpad", "Launchpad"],
+  ["/history", "History"],
   ["/stake", "Stake"],
   ["/gov", "Governance"],
-  ["/launchpad", "Launchpad"],
-  ["/contract", "Contract"]
+  ["/nft", "NFT"],
+  ["/contract", "Contract"],
+  ["/privacy", "Privacy Policy"]
 ] as const
 
 const themes = ["light", "dark"] as const
@@ -21,6 +26,32 @@ const setTheme = async (page: Page, theme: (typeof themes)[number]) => {
     })
     .click()
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
+}
+
+const expectDialogSurface = async (page: Page) => {
+  const dialog = page.getByRole("dialog")
+  await expect(dialog).toBeVisible()
+  const surface = dialog.locator(":scope > div, :scope > section").first()
+  const metrics = await surface.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const style = window.getComputedStyle(element)
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth
+    }
+  })
+  expect(metrics.background).not.toBe("rgba(0, 0, 0, 0)")
+  expect(metrics.color).not.toBe("rgba(0, 0, 0, 0)")
+  expect(metrics.left).toBeGreaterThanOrEqual(0)
+  expect(metrics.top).toBeGreaterThanOrEqual(0)
+  expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+  expect(metrics.bottom).toBeLessThanOrEqual(metrics.viewportHeight + 1)
 }
 
 const getVisibleHeaderControls = (page: Page) =>
@@ -99,7 +130,42 @@ for (const theme of themes) {
 
     expect(pageErrors).toEqual([])
   })
+
+  test(`${theme} theme keeps public dialogs readable and inside the viewport`, async ({
+    page
+  }) => {
+    await page.goto("/")
+    await setTheme(page, theme)
+    await page.getByRole("button", { name: "Connect", exact: true }).click()
+    await expectDialogSurface(page)
+    await page.getByRole("button", { name: "Close" }).click()
+
+    await page.goto("/swap")
+    await setTheme(page, theme)
+    await page.locator("main button").filter({ hasText: /LUNC|LUNA/ }).first().click()
+    await expect(page.getByRole("heading", { name: "Select token" })).toBeVisible()
+    await expectDialogSurface(page)
+    await page.getByRole("button", { name: "Close" }).click()
+  })
 }
+
+test("market cards keep a loaded local fallback under remote asset logos", async ({
+  page
+}) => {
+  await page.goto("/market")
+  await expect(page.getByRole("heading", { name: "Market" })).toBeVisible()
+  const fallbacks = page.locator('main article img[alt=""]')
+  await expect(fallbacks.first()).toBeVisible()
+  const fallbackState = await fallbacks.evaluateAll((images) =>
+    images.map((image) => ({
+      loaded: image instanceof HTMLImageElement && image.naturalWidth > 0,
+      src: image.getAttribute("src") ?? ""
+    }))
+  )
+  expect(fallbackState.length).toBeGreaterThan(0)
+  expect(fallbackState.every((image) => image.src.startsWith("/system/"))).toBe(true)
+  expect(fallbackState.every((image) => image.loaded)).toBe(true)
+})
 
 test("mobile wallet runtime stays deferred until the connect flow begins", async ({
   page

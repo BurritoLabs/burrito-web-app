@@ -75,7 +75,7 @@ test("closed wallet handle does not cover page actions", async ({ page }) => {
   await selectStoredChain(page, "lunc")
   await page.setViewportSize({ width: 320, height: 812 })
   const cases = [
-    ["/", "7d"],
+    ["/", "7D"],
     ["/stake", "Withdraw all rewards"],
     ["/gov", "New proposal"],
     ["/contract", "Instantiate"]

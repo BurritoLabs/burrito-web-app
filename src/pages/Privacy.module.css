@@ -35,6 +35,9 @@
 .policy a {
   color: var(--chain-accent);
   overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 :global(:root[data-theme="light"]) .policy a {

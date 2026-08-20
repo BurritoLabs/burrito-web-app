@@ -178,7 +178,7 @@
   position: fixed;
   inset: 0;
   z-index: 210;
-  background: rgba(5, 9, 8, 0.66);
+  background: var(--overlay-backdrop);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -191,7 +191,7 @@
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--overlay-shadow);
 }
 
 .txModal {
@@ -201,7 +201,7 @@
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--overlay-shadow);
 }
 
 .queryHeader {
