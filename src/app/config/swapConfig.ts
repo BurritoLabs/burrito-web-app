@@ -13,7 +13,11 @@ const parseFeeBps = (value: string | undefined) => {
 
 export const GAS_PRICE_MICRO_LUNC = 28.325
 export const FALLBACK_GAS_NATIVE_SWAP = 220_000
-export const FALLBACK_GAS_CW20_SWAP = 300_000
+// A CW20 swap can execute both the token send hook and the pair contract. The
+// previous 300k fallback produced a 525k limit for fee-bearing swaps and caused
+// otherwise valid transactions to run out of gas when simulation was
+// unavailable. Keep enough headroom for the complete multi-contract route.
+export const FALLBACK_GAS_CW20_SWAP = 700_000
 export const FALLBACK_GAS_NATIVE_FEE = 80_000
 export const FALLBACK_GAS_CW20_FEE = 120_000
 export const SWAP_GAS_ADJUSTMENT = 1.6

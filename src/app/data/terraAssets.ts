@@ -178,7 +178,7 @@ const IBC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 const IBC_UNRESOLVED_CACHE_TTL = 5 * 60 * 1000
 const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV2"
 const NATIVE_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV2"
+const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV3"
 const CW20_TOKEN_INFO_CACHE_TTL = 24 * 60 * 60 * 1000
 let ibcCache: Record<string, IbcCacheEntry> | null = null
 let nativeTokenCache: Record<string, NativeTokenCacheEntry> | null = null
@@ -511,7 +511,7 @@ const mergeCw20TokenMetadata = ({
     symbol,
     name,
     protocol: localOverride?.protocol?.trim() || fallback?.protocol?.trim(),
-    icon: sanitizeAssetIconUrl(localOverride?.icon ?? fallback?.icon ?? onChain?.icon),
+    icon: sanitizeAssetIconUrl(localOverride?.icon ?? onChain?.icon ?? fallback?.icon),
     decimals:
       (Number.isFinite(onChain?.decimals)
         ? onChain?.decimals
@@ -1024,20 +1024,18 @@ export const fetchCw20TokenInfos = async (
         const name = info?.name?.trim()
         const parsedDecimals = Number(info?.decimals)
         let icon: string | undefined
-        if (!fallbackWithFinder[contract]?.icon) {
-          try {
-            const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
-            const marketingResponse = await fetchWithEndpointFallback(
-              `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
-            )
-            if (marketingResponse.ok) {
-              const marketingPayload =
-                (await marketingResponse.json()) as Cw20MarketingInfoResponse
-              icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
-            }
-          } catch {
-            icon = undefined
+        try {
+          const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
+          const marketingResponse = await fetchWithEndpointFallback(
+            `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
+          )
+          if (marketingResponse.ok) {
+            const marketingPayload =
+              (await marketingResponse.json()) as Cw20MarketingInfoResponse
+            icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
           }
+        } catch {
+          icon = undefined
         }
         const onChain = {
           symbol: symbol || undefined,

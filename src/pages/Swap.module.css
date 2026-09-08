@@ -723,7 +723,7 @@
   position: fixed;
   inset: 0;
   z-index: 220;
-  background: rgba(0, 8, 6, 0.66);
+  background: var(--overlay-backdrop);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   display: grid;
@@ -736,8 +736,8 @@
   max-height: min(80vh, 680px);
   border-radius: 14px;
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 18%, transparent);
-  background: rgba(11, 20, 16, 0.96);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  background: var(--overlay-surface);
+  box-shadow: var(--overlay-shadow);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
@@ -816,7 +816,7 @@
 .pickerList::-webkit-scrollbar-thumb {
   background: rgba(82, 196, 26, 0.55);
   border-radius: 10px;
-  border: 2px solid rgba(11, 20, 16, 0.96);
+  border: 2px solid var(--overlay-surface);
 }
 
 .pickerList::-webkit-scrollbar-thumb:hover {

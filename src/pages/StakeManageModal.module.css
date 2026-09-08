@@ -1,7 +1,7 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(6, 10, 8, 0.6);
+  background: var(--overlay-backdrop);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: flex;
@@ -19,7 +19,7 @@
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
   border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--overlay-shadow);
   padding: 18px 18px 20px;
   display: grid;
   gap: 16px;
@@ -292,7 +292,7 @@
 
 .feeError {
   font-size: 12px;
-  color: #ff6b6b;
+  color: var(--danger-text);
 }
 
 .submit {

@@ -34,6 +34,14 @@
   --button-default-bg: var(--bui-color-surface-hover);
   --button-default-text: var(--bui-color-text);
   --wallet-shadow: 1px 0px 10px 2px rgba(0, 0, 0, 0.31);
+  --overlay-backdrop: rgba(4, 9, 8, 0.62);
+  --overlay-backdrop-strong: rgba(0, 8, 7, 0.78);
+  --overlay-surface: color-mix(in srgb, var(--bui-color-surface) 96%, transparent);
+  --overlay-header: color-mix(in srgb, var(--bui-color-surface-raised) 96%, transparent);
+  --overlay-shadow: 0 20px 48px rgba(0, 0, 0, 0.42);
+  --danger-text: #ff8c8c;
+  --warning-text: #ffd59e;
+  --success-text: #85e65b;
   --border-width: 1px;
   --card-border: var(--bui-color-border);
   --shell-divider: var(--bui-color-shell-divider);
@@ -93,6 +101,15 @@
 
 :root[data-app-chain="luna"] {
   --chain-accent-strong: #ea580c;
+}
+
+:root[data-theme="light"] {
+  --overlay-backdrop: rgba(20, 32, 25, 0.24);
+  --overlay-backdrop-strong: rgba(20, 32, 25, 0.32);
+  --overlay-shadow: 0 20px 48px rgba(20, 32, 25, 0.18);
+  --danger-text: #b42318;
+  --warning-text: #7a4b00;
+  --success-text: #256d1b;
 }
 
 :root[data-theme="light"][data-app-chain="lunc"] {

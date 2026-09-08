@@ -55,7 +55,7 @@
 .validatorHeader dd {
   font-weight: 600;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--bui-color-text-secondary);
   margin: 0;
 }
 
@@ -105,7 +105,7 @@
 .validatorReward {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--bui-color-text-secondary);
   text-align: right;
   min-width: 120px;
 }
@@ -113,14 +113,14 @@
 .empty {
   padding: 16px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--bui-color-text-secondary);
 }
 
 .summaryDivider {
   display: flex;
   justify-content: center;
   margin: 10px 0 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--bui-color-text) 48%, transparent);
 }
 
 .summaryDivider svg {
@@ -227,7 +227,7 @@
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--bui-color-text-secondary);
 }
 
 .feeLeft {
@@ -244,7 +244,7 @@
 
 .feeLabel {
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--bui-color-text-secondary);
 }
 
 .feeSelectButton {
@@ -252,7 +252,7 @@
   padding: 0 22px 0 8px;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
-  background: rgba(0, 0, 0, 0.2);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text);
   font-size: 11px;
   font-weight: 600;
@@ -279,7 +279,7 @@
   min-width: 100%;
   padding: 6px;
   border-radius: 8px;
-  background: rgba(18, 24, 20, 0.95);
+  background: var(--overlay-surface);
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   display: grid;
@@ -292,7 +292,7 @@
   border-radius: 6px;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: 600;
   text-align: left;
@@ -319,7 +319,7 @@
 
 .feeError {
   font-size: 12px;
-  color: #ff8c8c;
+  color: var(--danger-text);
   margin-top: 6px;
 }
 
@@ -373,7 +373,7 @@
 .submitError {
   margin-top: 10px;
   font-size: 12px;
-  color: #ff8c8c;
+  color: var(--danger-text);
 }
 
 @media (max-width: 767.98px) {

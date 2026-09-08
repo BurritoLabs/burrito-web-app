@@ -38,8 +38,27 @@ const MarketPairAssetIconInner = ({
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const src = candidates[index]
+  const systemFallback = candidates.find((candidate) =>
+    candidate.startsWith("/system/")
+  )
 
-  const fallback = (
+  const fallback = systemFallback ? (
+    <img
+      aria-hidden="true"
+      alt=""
+      src={systemFallback}
+      width={size}
+      height={size}
+      decoding="async"
+      style={{
+        inset: 0,
+        position: "absolute",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover"
+      }}
+    />
+  ) : (
     <span
       aria-hidden="true"
       className={styles.assetIconFallback}
@@ -59,16 +78,20 @@ const MarketPairAssetIconInner = ({
     >
       {fallback}
       {!failed && src ? (
-      <img
-        loading="lazy"
+        <img
+          loading="lazy"
           src={src}
           alt={symbol}
           width={size}
           height={size}
           decoding="async"
+          referrerPolicy="no-referrer"
           style={{
             inset: 0,
             position: "absolute",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
             opacity: loaded ? 1 : 0,
             transition: "opacity 120ms ease"
           }}

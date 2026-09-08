@@ -152,7 +152,7 @@
   padding: 0 22px 0 8px;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
-  background: rgba(0, 0, 0, 0.2);
+  background: color-mix(in srgb, var(--bui-color-text) 6%, transparent);
   color: var(--bui-color-text);
   font-size: 11px;
   font-weight: 600;
@@ -170,7 +170,7 @@
   height: 0;
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
-  border-top: 5px solid rgba(255, 255, 255, 0.75);
+  border-top: 5px solid var(--bui-color-text-secondary);
 }
 
 .feeDropdown {
@@ -183,8 +183,8 @@
   padding: 6px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
-  background: rgba(12, 20, 17, 0.95);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  background: var(--overlay-surface);
+  box-shadow: var(--overlay-shadow);
   z-index: 20;
 }
 
@@ -193,7 +193,7 @@
   border-radius: 6px;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--bui-color-text-secondary);
   font-size: 11px;
   font-weight: 600;
   text-align: left;
@@ -221,7 +221,7 @@
 .feeError {
   margin-top: 8px;
   font-size: 12px;
-  color: #ff8c8c;
+  color: var(--danger-text);
 }
 
 .submit {
@@ -244,7 +244,7 @@
 .submitError {
   margin-top: 4px;
   font-size: 12px;
-  color: #ff8c8c;
+  color: var(--danger-text);
 }
 
 @media (max-width: 767.98px) {

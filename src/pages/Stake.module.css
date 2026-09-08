@@ -510,7 +510,7 @@
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.16);
+  background: color-mix(in srgb, var(--bui-color-text) 2%, var(--card-bg-muted));
 }
 
 .validatorHeaderRow {

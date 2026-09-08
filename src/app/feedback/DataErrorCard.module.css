@@ -5,8 +5,8 @@
   padding: 24px;
   background:
     radial-gradient(circle at 50% 0%, rgba(82, 222, 47, 0.12), transparent 38%),
-    #06120d;
-  color: #f4fff3;
+    var(--bui-color-canvas);
+  color: var(--bui-color-text);
 }
 
 .card {
@@ -14,10 +14,10 @@
   display: grid;
   gap: 14px;
   padding: 24px;
-  border: 1px solid rgba(209, 255, 211, 0.18);
+  border: 1px solid var(--card-border);
   border-radius: 18px;
-  background: rgba(11, 28, 19, 0.92);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+  background: var(--overlay-surface);
+  box-shadow: var(--overlay-shadow);
 }
 
 .title {
@@ -28,7 +28,7 @@
 
 .message {
   margin: 0;
-  color: rgba(244, 255, 243, 0.68);
+  color: var(--bui-color-text-secondary);
   font-weight: 700;
   line-height: 1.5;
 }
@@ -57,7 +57,7 @@
 }
 
 .secondaryButton {
-  border: 1px solid rgba(209, 255, 211, 0.24);
+  border: 1px solid var(--card-border);
   background: transparent;
-  color: #f4fff3;
+  color: var(--bui-color-text);
 }

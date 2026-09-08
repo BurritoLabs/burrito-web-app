@@ -433,8 +433,8 @@
   padding: 10px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
-  background: rgba(12, 20, 17, 0.9);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+  background: var(--overlay-surface);
+  box-shadow: var(--overlay-shadow);
   display: grid;
   gap: 8px;
   z-index: 9999;
@@ -449,7 +449,7 @@
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
   background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
-  color: #eaf5eb;
+  color: var(--bui-color-text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

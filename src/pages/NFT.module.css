@@ -232,7 +232,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 8, 7, 0.78);
+  background: var(--overlay-backdrop-strong);
   backdrop-filter: blur(12px);
 }
 
@@ -242,8 +242,8 @@
   overflow: auto;
   border: var(--border-width) solid rgba(var(--active-chain-rgb), 0.34);
   border-radius: var(--radius-lg);
-  background: #071712;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  background: var(--overlay-surface);
+  box-shadow: var(--overlay-shadow);
 }
 
 .compactModal {
@@ -260,7 +260,7 @@
   gap: 16px;
   padding: 20px 22px;
   border-bottom: var(--border-width) solid var(--card-border);
-  background: rgba(7, 23, 18, 0.96);
+  background: var(--overlay-header);
   backdrop-filter: blur(12px);
 }
 
@@ -291,7 +291,7 @@
   padding: 0;
   border: var(--border-width) solid var(--card-border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   color: var(--bui-color-text-secondary);
   cursor: pointer;
   appearance: none;
@@ -309,7 +309,7 @@
   min-height: 420px;
   overflow: hidden;
   border-right: var(--border-width) solid var(--card-border);
-  background: rgba(255, 255, 255, 0.025);
+  background: color-mix(in srgb, var(--bui-color-text) 2.5%, transparent);
 }
 
 .detailMedia img {
@@ -382,7 +382,7 @@
   padding: 10px 11px;
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.025);
+  background: color-mix(in srgb, var(--bui-color-text) 2.5%, transparent);
 }
 
 .attributes span,
@@ -430,7 +430,7 @@
   padding: 10px 12px;
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   color: var(--bui-color-text);
   font: inherit;
   font-size: 14px;
@@ -453,7 +453,7 @@
 }
 
 .transferWarning {
-  color: #ffd59e;
+  color: var(--warning-text);
 }
 
 .formError {
@@ -461,7 +461,7 @@
   border: var(--border-width) solid rgba(248, 113, 113, 0.35);
   border-radius: var(--radius-md);
   background: rgba(248, 113, 113, 0.08);
-  color: #fca5a5;
+  color: var(--danger-text);
   font-size: var(--font-size-small);
   line-height: 1.45;
 }
@@ -494,7 +494,7 @@
 
 .secondaryButton {
   border-color: var(--card-border);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--bui-color-text) 4%, transparent);
   color: var(--bui-color-text-secondary);
 }
 
@@ -513,7 +513,7 @@
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bui-color-text) 7%, transparent), transparent);
   transform: translateX(-100%);
   animation: nftLoading 1.4s ease-in-out infinite;
 }

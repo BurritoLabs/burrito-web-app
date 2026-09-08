@@ -126,7 +126,7 @@
   left: 50%;
   bottom: calc(100% + 8px);
   transform: translateX(-50%);
-  background: #0f1916;
+  background: var(--overlay-surface);
   color: var(--bui-color-text-secondary);
   border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
   border-radius: 8px;
@@ -238,7 +238,7 @@ select.input:focus {
   border-radius: var(--radius-lg);
   background: rgba(255, 77, 79, 0.12);
   border: 1px solid rgba(255, 77, 79, 0.45);
-  color: #ffb3b5;
+  color: var(--danger-text);
 }
 
 .success {
@@ -246,7 +246,7 @@ select.input:focus {
   border-radius: var(--radius-lg);
   background: rgba(var(--active-chain-rgb), 0.12);
   border: 1px solid rgba(var(--active-chain-rgb), 0.45);
-  color: #bff5c0;
+  color: var(--success-text);
   font-size: var(--font-size-small);
 }
 
@@ -309,7 +309,7 @@ select.input:focus {
   left: 0;
   top: calc(100% + 6px);
   min-width: 100%;
-  background: #0f1916;
+  background: var(--overlay-surface);
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   border-radius: 8px;
   padding: 4px;
@@ -366,13 +366,13 @@ select.input:focus {
 }
 
 .feeNegative {
-  color: #ffb3b5 !important;
+  color: var(--danger-text) !important;
 }
 
 .feeError {
   margin-top: 8px;
   font-size: var(--font-size-xxs);
-  color: rgba(255, 180, 180, 0.9);
+  color: var(--danger-text);
 }
 
 .submitButton {
@@ -439,8 +439,8 @@ select.input {
 }
 
 select.input option {
-  background: #0f1916;
-  color: #eaf5eb;
+  background: var(--bui-color-surface);
+  color: var(--bui-color-text);
   font-size: var(--font-size);
   font-weight: var(--normal);
   font-family: var(--font-ui);
@@ -486,7 +486,7 @@ select.input option {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: #0f1916;
+  background: var(--overlay-surface);
   border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 16%, transparent);
   border-radius: var(--radius-lg);
   padding: 6px;
