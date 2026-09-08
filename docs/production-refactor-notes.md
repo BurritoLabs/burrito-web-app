@@ -212,3 +212,16 @@
 - Added browser-native offscreen rendering containment to the Market, Stake, and Governance long lists.
 - Added raw, gzip, wallet-runtime dependency-chain, and signing-client reachability checks to the bundle budget.
 - The optimized build keeps initial JavaScript at about 110 KiB and the wallet runtime static dependency chain below 1 MiB gzip.
+
+## Extension Integration Reliability — 2026-09-08
+
+- Integrated the current main-branch theme, asset-logo fallback, and CW20 gas-fallback fixes into the wallet integration branch without reverting the existing extension connector.
+- Updated `burritoExtensionWallet.ts` to accept the extension's optional boolean `messageSigning` capability. The previous exact-key check rejected the actual extension response even though older test fixtures passed.
+- Added extension session invalidation for lock, account changes, and revoked site access. Cached signers and late connection/signature responses cannot survive a disconnected or replaced session; a fresh user connection is required.
+- Updated both `WalletBoot.tsx` and `WalletProvider.tsx` so the rendered account and stored auto-connect state follow extension invalidation events, with balanced React event-listener cleanup.
+- Added connection-attempt ownership in both providers: late failures and slow disconnects cannot replace newer sessions, and an invalidated lazy adapter load cannot start a new wallet approval.
+- Added adapter and desktop/mobile browser regressions for invalidation, explicit reconnection, and refresh without automatic reconnection. Browser fixtures and real compiled MV3 integration were both used, since fixtures alone had missed capability drift.
+- Preserved the public routes, storage key names, transaction message construction, community/platform fee policy, brand assets, and typography.
+- Validation artifacts and the production build were written outside the repository. Tracked `dist` deployment artifacts are not included in this source change.
+- No store upload, real-wallet signing, transaction broadcast, production deployment, or production wallet-data changes were performed.
+- Checks include 160 unit tests, TypeScript, ESLint, the bundle budget, six desktop/mobile session-race checks, and real compiled MV3-to-WebApp connection/lock/unlock/revocation. One full-suite Keplr Mobile handoff timed out; three targeted repeats on both the updated and isolated original provider code passed, so that intermittent result remains recorded rather than hidden by a relaxed assertion.
