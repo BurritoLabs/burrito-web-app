@@ -123,7 +123,7 @@ test("mobile navigation and wallet panel remain operable", async ({ page }) => {
   expect(Math.abs(mobileBrandBox!.height - 24)).toBeLessThan(0.5)
 
   const mobileBrandWordmark = page.locator(
-    'header a[aria-label="Go to dashboard"] .burrito-responsive-brand__wordmark'
+    'header a[aria-label="Go to dashboard"] .bui-brand-wordmark'
   )
   const mobileWordmarkBox = await mobileBrandWordmark.boundingBox()
   expect(mobileWordmarkBox).not.toBeNull()

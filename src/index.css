@@ -60,7 +60,7 @@
   --max-width-small: 640px;
   --input-height: 45px;
 
-  --header-height: 72px;
+  --header-height: calc(56px + env(safe-area-inset-top, 0px));
   --sidebar-width: 220px;
   --wallet-width: 420px;
   --wallet-offset: 0px;
@@ -122,17 +122,11 @@
 
 @media (max-width: 991.98px) {
   :root {
-    --header-height: 56px;
     --main-padding: 24px;
     --font-size-page-title: 28px;
   }
 }
 
-@media (pointer: coarse) and (max-width: 1366px) {
-  :root {
-    --header-height: 56px;
-  }
-}
 
 * {
   box-sizing: border-box;
@@ -570,3 +564,9 @@ textarea::placeholder {
 }
 
 
+
+@media (max-width: 420px) {
+  :root {
+    --header-height: calc(100px + env(safe-area-inset-top, 0px));
+  }
+}
