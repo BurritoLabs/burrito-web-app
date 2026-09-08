@@ -229,7 +229,7 @@
 ## Shared brand geometry (2026-09-08)
 
 - Replaced the private BrandLogo rendering with @burritolabs/ui v0.3.0 pinned to 2a92bfc0e88044884fd986b7521b4a3296605c47.
-- All primary brand rows now use a 24px mark at 16px top/leading insets in a 56px row, with platform safe-area padding applied first. The shared bundled Montserrat font uses 20px type, zero tracking, and the shared optical baseline correction.
+- All primary brand rows now use a 24px mark at 16px top/leading insets in a 56px row, with platform safe-area padding applied first. The shared bundled Montserrat font uses 20px type, -1px tracking for the Burrito word and product suffix, and the shared optical baseline correction.
 - At widths up to 420px, network and wallet controls use a second row to preserve the full wordmark and readable buttons. Menu branding retains the same first-row geometry.
 - The production release is isolated from source 6e2f6f817b7d; unrelated wallet integration branch changes are excluded. Navigation, signing, balances, quotes, and transaction behavior are unchanged.
 - Validation: lint, TypeScript and production build; rendered geometry at 1440/768/390/320; mobile menu open, brand return-home and close checks.
