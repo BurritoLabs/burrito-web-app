@@ -656,3 +656,42 @@
 }
 
 
+
+@media (max-width: 420px) {
+  .leftRail {
+    height: 56px;
+    align-self: flex-start;
+  }
+
+  .chainSwitcher {
+    position: absolute;
+    top: 60px;
+    left: 0;
+  }
+
+  .actions {
+    display: contents;
+  }
+
+  .actions > :global(.bui-theme-toggle) {
+    position: absolute;
+    top: 11px;
+    right: 50px;
+  }
+
+  .walletMenuWrapper {
+    position: absolute;
+    top: 61px;
+    right: 0;
+  }
+
+  .connectButton {
+    min-width: 88px;
+  }
+
+  .menuButton {
+    position: absolute;
+    top: 4px;
+    right: 0;
+  }
+}

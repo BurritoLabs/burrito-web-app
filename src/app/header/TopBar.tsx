@@ -190,7 +190,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
           className={`${styles.mobileBrand} ${styles.mobileBrandLink}`}
           aria-label="Go to dashboard"
         >
-          <BrandLogo textSize={20} iconSize={24} gap={6} />
+          <BrandLogo />
         </Link>
         <div
           className={styles.chainSwitcher}

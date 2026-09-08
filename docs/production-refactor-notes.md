@@ -225,3 +225,11 @@
 - Validation artifacts and the production build were written outside the repository. Tracked `dist` deployment artifacts are not included in this source change.
 - No store upload, real-wallet signing, transaction broadcast, production deployment, or production wallet-data changes were performed.
 - Checks include 160 unit tests, TypeScript, ESLint, the bundle budget, six desktop/mobile session-race checks, and real compiled MV3-to-WebApp connection/lock/unlock/revocation. One full-suite Keplr Mobile handoff timed out; three targeted repeats on both the updated and isolated original provider code passed, so that intermittent result remains recorded rather than hidden by a relaxed assertion.
+
+## Shared brand geometry (2026-09-08)
+
+- Replaced the private BrandLogo rendering with @burritolabs/ui v0.3.0 pinned to 2a92bfc0e88044884fd986b7521b4a3296605c47.
+- All primary brand rows now use a 24px mark at 16px top/leading insets in a 56px row, with platform safe-area padding applied first. The shared bundled Montserrat font uses 20px type, zero tracking, and the shared optical baseline correction.
+- At widths up to 420px, network and wallet controls use a second row to preserve the full wordmark and readable buttons. Menu branding retains the same first-row geometry.
+- The production release is isolated from source 6e2f6f817b7d; unrelated wallet integration branch changes are excluded. Navigation, signing, balances, quotes, and transaction behavior are unchanged.
+- Validation: lint, TypeScript and production build; rendered geometry at 1440/768/390/320; mobile menu open, brand return-home and close checks.

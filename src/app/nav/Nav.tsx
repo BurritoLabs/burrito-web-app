@@ -28,7 +28,7 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
           aria-label="Go to dashboard"
           onClick={handleNavigate}
         >
-          <BrandLogo textSize={20} iconSize={24} gap={6} />
+          <BrandLogo />
         </Link>
         {isOpen ? (
           <button
