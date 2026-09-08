@@ -14,6 +14,8 @@ import { AuthInfo, SignDoc, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import type { WalletAccount, WalletConnector } from "./WalletContext"
 
 const EXTENSION_PROTOCOL_VERSION = 1
+export const BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT =
+  "burrito:wallet-accounts-changed-v1"
 const SUPPORTED_CHAIN_IDS = ["columbus-5", "phoenix-1"] as const
 const HASH = /^[A-F0-9]{64}$/
 const UNSIGNED_INTEGER = /^(0|[1-9][0-9]*)$/
@@ -36,6 +38,8 @@ declare global {
 }
 
 let connectedAccount: ExtensionWalletAccount | undefined
+let sessionVersion = 0
+let sessionEventTarget: Window | undefined
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -53,9 +57,23 @@ const equalBytes = (left: Uint8Array, right: Uint8Array) => {
   return true
 }
 
-const clearConnectedAccount = () => {
+export const invalidateBurritoExtensionSession = () => {
+  sessionVersion += 1
   connectedAccount?.pubkey.fill(0)
   connectedAccount = undefined
+}
+
+const observeSessionChanges = () => {
+  if (sessionEventTarget === window) return
+  sessionEventTarget?.removeEventListener?.(
+    BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
+    invalidateBurritoExtensionSession
+  )
+  sessionEventTarget = window
+  sessionEventTarget.addEventListener?.(
+    BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
+    invalidateBurritoExtensionSession
+  )
 }
 
 const getProvider = () => {
@@ -95,11 +113,13 @@ const validateCapabilities = (value: unknown, chainId: SupportedChainId) => {
       "platform",
       "supportedChainIds",
       "supportedDirectSignTypeUrls",
-      "transactionSigning"
+      "transactionSigning",
+      "messageSigning"
     ]) ||
     value.protocolVersion !== EXTENSION_PROTOCOL_VERSION ||
     value.platform !== "chrome" ||
     value.transactionSigning !== true ||
+    (value.messageSigning !== undefined && typeof value.messageSigning !== "boolean") ||
     !Array.isArray(value.supportedChainIds) ||
     !value.supportedChainIds.includes(chainId) ||
     value.supportedChainIds.some(
@@ -187,25 +207,31 @@ export const connectBurritoExtensionWallet = async (
   }
   const supportedChainId = chainId as SupportedChainId
   const provider = getProvider()
+  observeSessionChanges()
+  invalidateBurritoExtensionSession()
+  const connectingVersion = sessionVersion
   validateCapabilities(
     await provider.request("wallet.getCapabilities", {}),
     supportedChainId
   )
+  if (connectingVersion !== sessionVersion) {
+    throw new Error("Burrito Wallet Extension connection changed; reconnect")
+  }
   const account = parseExtensionAccounts(
     await provider.request("wallet.connect", { chainIds: [supportedChainId] }),
     supportedChainId
   )
-  clearConnectedAccount()
+  if (connectingVersion !== sessionVersion) {
+    account.pubkey.fill(0)
+    throw new Error("Burrito Wallet Extension connection changed; reconnect")
+  }
   connectedAccount = account
   return { address: account.address, name: "Burrito Wallet" }
 }
 
 export const disconnectBurritoExtensionWallet = async () => {
-  try {
-    await getProvider().request("wallet.disconnect", {})
-  } finally {
-    clearConnectedAccount()
-  }
+  invalidateBurritoExtensionSession()
+  await getProvider().request("wallet.disconnect", {})
 }
 
 const requireActiveAccount = (chainId: string) => {
@@ -273,6 +299,7 @@ export const getBurritoExtensionOfflineSigner = (
     throw new Error("Burrito Wallet Extension does not support this chain")
   }
   const account = requireActiveAccount(chainId)
+  const signerVersion = sessionVersion
   const accountData: AccountData = {
     address: account.address,
     algo: account.algo,
@@ -280,15 +307,20 @@ export const getBurritoExtensionOfflineSigner = (
   }
 
   return {
-    getAccounts: async () => [
-      { ...accountData, pubkey: accountData.pubkey.slice() }
-    ],
+    getAccounts: async () => {
+      if (signerVersion !== sessionVersion) {
+        throw new Error("Burrito Wallet Extension signing context changed")
+      }
+      requireActiveAccount(chainId)
+      return [{ ...accountData, pubkey: accountData.pubkey.slice() }]
+    },
     signDirect: async (
       signerAddress: string,
       signDoc: SignDoc
     ): Promise<DirectSignResponse> => {
       const current = requireActiveAccount(chainId)
       if (
+        signerVersion !== sessionVersion ||
         signerAddress !== current.address ||
         signDoc.chainId !== chainId ||
         signDoc.accountNumber < 0n
@@ -303,6 +335,9 @@ export const getBurritoExtensionOfflineSigner = (
         bodyBytes: toBase64(signDoc.bodyBytes),
         authInfoBytes: toBase64(signDoc.authInfoBytes)
       })
+      if (signerVersion !== sessionVersion) {
+        throw new Error("Burrito Wallet Extension signing context changed")
+      }
       const signature = validateSignedTransaction(response, current, signDoc)
       return {
         signed: signDoc,

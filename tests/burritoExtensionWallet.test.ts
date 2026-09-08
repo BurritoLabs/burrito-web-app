@@ -9,6 +9,7 @@ import {
 } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
   connectBurritoExtensionWallet,
   disconnectBurritoExtensionWallet,
   getBurritoExtensionConnector,
@@ -53,7 +54,8 @@ const installProvider = ({
           platform: "chrome",
           supportedChainIds: ["columbus-5", "phoenix-1"],
           supportedDirectSignTypeUrls: ["/cosmos.bank.v1beta1.MsgSend"],
-          transactionSigning
+          transactionSigning,
+          messageSigning: true
         }
       }
       if (method === "wallet.connect") {
@@ -99,7 +101,7 @@ const installProvider = ({
       throw new Error(`Unexpected extension method: ${method}`)
     })
   }
-  vi.stubGlobal("window", { BurritoWallet: provider })
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { BurritoWallet: provider }))
   return provider
 }
 
@@ -109,6 +111,89 @@ afterEach(async () => {
 })
 
 describe("Burrito Wallet Extension provider", () => {
+  it("accepts the original capability response without optional message signing", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    provider.request.mockImplementation(async (method, params) => {
+      const result = await original(method, params)
+      if (method === "wallet.getCapabilities") {
+        const legacy = { ...result } as Record<string, unknown>
+        delete legacy.messageSigning
+        return legacy as typeof result
+      }
+      return result
+    })
+    await expect(connectBurritoExtensionWallet("columbus-5")).resolves.toMatchObject({ address })
+  })
+
+  it("rejects malformed optional message signing capabilities", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    provider.request.mockImplementation(async (method, params) => {
+      const result = await original(method, params)
+      return method === "wallet.getCapabilities"
+        ? { ...result, messageSigning: "true" } as unknown as typeof result
+        : result
+    })
+    await expect(connectBurritoExtensionWallet("columbus-5")).rejects.toThrow("protocol is incompatible")
+  })
+
+  it("invalidates cached signers when the extension locks or changes accounts", async () => {
+    const provider = installProvider()
+    await connectBurritoExtensionWallet("columbus-5")
+    const signer = getBurritoExtensionOfflineSigner("columbus-5")
+    window.dispatchEvent(new Event(BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT))
+    await expect(signer.getAccounts()).rejects.toThrow("signing context changed")
+    await expect(signer.signDirect(address, createSignDoc())).rejects.toThrow("Reconnect")
+    expect(provider.request.mock.calls.some(([method]) => method === "wallet.signDirect")).toBe(false)
+  })
+
+  it("rejects an old signer even after reconnecting the same account", async () => {
+    installProvider()
+    await connectBurritoExtensionWallet("columbus-5")
+    const signer = getBurritoExtensionOfflineSigner("columbus-5")
+    await connectBurritoExtensionWallet("columbus-5")
+    await expect(signer.getAccounts()).rejects.toThrow("signing context changed")
+    await expect(signer.signDirect(address, createSignDoc())).rejects.toThrow("signing context changed")
+  })
+
+  it("discards a signature returned after the session was revoked", async () => {
+    const provider = installProvider()
+    await connectBurritoExtensionWallet("columbus-5")
+    const signer = getBurritoExtensionOfflineSigner("columbus-5")
+    const original = provider.request.getMockImplementation()!
+    let release!: (response: unknown) => void
+    let response: unknown
+    provider.request.mockImplementationOnce((method, params) => {
+      response = original(method, params)
+      return new Promise((resolve) => { release = resolve })
+    })
+    const pending = signer.signDirect(address, createSignDoc())
+    const rejected = expect(pending).rejects.toThrow("signing context changed")
+    window.dispatchEvent(new Event(BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT))
+    release(await response)
+    await rejected
+  })
+
+  it("does not resurrect a connection cancelled while wallet approval is pending", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    let release!: (response: unknown) => void
+    let response: unknown
+    provider.request.mockImplementation((method, params) => {
+      if (method !== "wallet.connect") return original(method, params)
+      response = original(method, params)
+      return new Promise((resolve) => { release = resolve })
+    })
+    const pending = connectBurritoExtensionWallet("columbus-5")
+    const rejected = expect(pending).rejects.toThrow("connection changed")
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"))
+    await disconnectBurritoExtensionWallet()
+    release(await response)
+    await rejected
+    expect(() => getBurritoExtensionOfflineSigner("columbus-5")).toThrow("Reconnect")
+  })
+
   it("is available only when the versioned provider is injected", () => {
     vi.stubGlobal("window", {})
     expect(isBurritoExtensionWalletAvailable()).toBe(false)

@@ -291,7 +291,7 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
   )
 })
 
-test("Chrome extension provider connects, follows the active chain, and disconnects", async ({
+test("Chrome extension provider connects, follows the active chain, invalidates, and disconnects", async ({
   page
 }) => {
   await selectStoredChain(page, "lunc")
@@ -421,6 +421,49 @@ test("Chrome extension provider connects, follows the active chain, and disconne
       connector: "burrito-extension",
       manuallyDisconnected: null
     })
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("burrito:wallet-accounts-changed-v1"))
+  })
+  await expect(
+    page.getByRole("button", { name: "Connect", exact: true }).first()
+  ).toBeVisible()
+  expect(
+    await page.evaluate(() => ({
+      connector: window.localStorage.getItem("burritoWalletConnector"),
+      manuallyDisconnected: window.localStorage.getItem(
+        "burritoWalletManuallyDisconnected"
+      ),
+      connectionCount: (
+        window as Window & {
+          __burritoExtensionCalls?: Array<{ method: string }>
+        }
+      ).__burritoExtensionCalls?.filter(
+        (call) => call.method === "wallet.connect"
+      ).length
+    }))
+  ).toEqual({
+    connector: null,
+    manuallyDisconnected: "true",
+    connectionCount: 2
+  })
+
+  // An extension account change must not silently reconnect or reopen approval.
+  await page.reload()
+  await expect(
+    page.getByRole("button", { name: "Connect", exact: true }).first()
+  ).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => (window as Window & {
+        __burritoExtensionCalls?: Array<{ method: string }>
+      }).__burritoExtensionCalls
+    )
+  ).toEqual([])
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  await extensionWallet.click()
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "Close" }).click()
 
   await page
     .getByRole("button", { name: "Burrito Wallet", exact: true })
