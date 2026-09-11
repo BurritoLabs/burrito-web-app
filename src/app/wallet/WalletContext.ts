@@ -3,6 +3,7 @@ import { createContext, useContext } from "react"
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error"
 export type WalletConnectorId =
   | "burrito-native"
+  | "burrito-extension"
   | "keplr"
   | "keplr-mobile"
   | "galaxy"

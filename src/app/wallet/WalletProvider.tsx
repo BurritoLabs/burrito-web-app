@@ -14,6 +14,7 @@ import {
 } from "./cosmosKit"
 import { getGalaxyConnector } from "./galaxyWallet"
 import { getBurritoNativeConnector } from "./burritoNativeWallet"
+import { getBurritoExtensionConnector } from "./burritoExtensionWallet"
 import {
   WalletContext,
   type WalletAccount,
@@ -795,6 +796,7 @@ export const WalletProvider = ({
       void connectorRefreshNonce
       return [
         getBurritoNativeConnector(),
+        getBurritoExtensionConnector(),
         getCosmosConnector("keplr"),
         getCosmosConnector("keplr-mobile"),
         getGalaxyConnector()
@@ -858,14 +860,20 @@ export const WalletProvider = ({
     const handleKeplrChange = () => requestDesktopWalletReconnect("keplr")
     const handleGalaxyChange = () => requestDesktopWalletReconnect("galaxy")
     const handleBurritoNativeReady = () => refreshConnectors()
+    const handleBurritoExtensionReady = () => refreshConnectors()
 
     window.addEventListener("burrito:native-ready", handleBurritoNativeReady)
+    window.addEventListener("burrito:wallet-ready", handleBurritoExtensionReady)
     window.addEventListener("keplr_keystorechange", handleKeplrChange)
     window.addEventListener("galaxy_station_wallet_change", handleGalaxyChange)
     window.addEventListener("galaxy_station_network_change", handleGalaxyChange)
 
     return () => {
       window.removeEventListener("burrito:native-ready", handleBurritoNativeReady)
+      window.removeEventListener(
+        "burrito:wallet-ready",
+        handleBurritoExtensionReady
+      )
       window.removeEventListener("keplr_keystorechange", handleKeplrChange)
       window.removeEventListener(
         "galaxy_station_wallet_change",
