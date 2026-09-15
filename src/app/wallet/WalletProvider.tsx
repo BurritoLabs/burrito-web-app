@@ -13,7 +13,7 @@ import {
   isCosmosConnectorId
 } from "./cosmosKit"
 import { getGalaxyConnector } from "./galaxyWallet"
-import { getBurritoNativeConnector } from "./burritoNativeWallet"
+import { getBurritoNativeConnector, invalidateBurritoNativeSession } from "./burritoNativeWallet"
 import {
   BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
   getBurritoExtensionConnector,
@@ -801,6 +801,11 @@ export const WalletProvider = ({
   const connect = useCallback(
     async (id: WalletConnectorId) => {
       const attempt = ++connectionAttemptRef.current
+      if (
+        id === "burrito-native" ||
+        pendingConnectorRef.current === "burrito-native" ||
+        connectorIdRef.current === "burrito-native"
+      ) invalidateBurritoNativeSession()
       pendingConnectorRef.current = id
       manualDisconnectRef.current = false
       setStatus("connecting")
@@ -845,6 +850,7 @@ export const WalletProvider = ({
     connectionAttemptRef.current += 1
     pendingConnectorRef.current = undefined
     if (reconnectId === "burrito-extension") invalidateBurritoExtensionSession()
+    if (reconnectId === "burrito-native") invalidateBurritoNativeSession()
     const shouldReconnect = Boolean(
       reconnectId &&
         !manualDisconnectRef.current &&
@@ -942,6 +948,7 @@ export const WalletProvider = ({
     const attempt = ++connectionAttemptRef.current
     pendingConnectorRef.current = undefined
     if (disconnectId === "burrito-extension") invalidateBurritoExtensionSession()
+    if (disconnectId === "burrito-native") invalidateBurritoNativeSession()
     manualDisconnectRef.current = true
     rememberWalletManualDisconnect()
     forgetStoredWalletSession()

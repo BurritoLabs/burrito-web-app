@@ -13,6 +13,7 @@ import {
   disconnectBurritoNativeWallet,
   getBurritoNativeConnector,
   getBurritoNativeOfflineSigner,
+  invalidateBurritoNativeSession,
   isBurritoNativeWalletAvailable
 } from "../src/app/wallet/burritoNativeWallet"
 import { getWalletConnectors } from "../src/app/wallet/walletAdapters"
@@ -98,6 +99,34 @@ const installBridge = ({
   }
   vi.stubGlobal("window", { BurritoNative: bridge })
   return bridge
+}
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
+// Only public-account fixtures and fabricated responses are used; no native
+// wallet, private key, signature generation, or network is involved.
+const pauseNextRequest = (
+  bridge: ReturnType<typeof installBridge>,
+  pausedMethod: string
+) => {
+  const entered = deferred<void>()
+  const release = deferred<void>()
+  const originalRequest = bridge.request.getMockImplementation()!
+  let paused = false
+  bridge.request.mockImplementation(async (method, params) => {
+    const response = await originalRequest(method, params)
+    if (method === pausedMethod && !paused) {
+      paused = true
+      entered.resolve()
+      await release.promise
+    }
+    return response
+  })
+  return { entered: entered.promise, release: () => release.resolve() }
 }
 
 afterEach(async () => {
@@ -202,5 +231,103 @@ describe("Burrito native wallet bridge", () => {
       "device-owner authentication"
     )
     expect(bridge.request).not.toHaveBeenCalledWith("wallet.open", {})
+  })
+
+  it.each(["bridge.getCapabilities", "wallet.getStatus", "wallet.open"])(
+    "does not resume a disconnected connection after a late %s response",
+    async (method) => {
+      const bridge = installBridge()
+      const gate = pauseNextRequest(bridge, method)
+      const connecting = connectBurritoNativeWallet("columbus-5")
+      const rejected = expect(connecting).rejects.toThrow(/Reconnect Burrito Wallet/)
+      await gate.entered
+      const callsBeforeDisconnect = bridge.request.mock.calls.length
+      await disconnectBurritoNativeWallet()
+      gate.release()
+      await rejected
+      expect(bridge.request).toHaveBeenCalledTimes(callsBeforeDisconnect)
+      expect(() => getBurritoNativeOfflineSigner("columbus-5")).toThrow(/Reconnect/)
+    }
+  )
+
+  it("discards an older connect without invalidating the newer connection", async () => {
+    const bridge = installBridge()
+    const gate = pauseNextRequest(bridge, "wallet.open")
+    const oldConnect = connectBurritoNativeWallet("columbus-5")
+    const rejected = expect(oldConnect).rejects.toThrow(/Reconnect/)
+    await gate.entered
+    await connectBurritoNativeWallet("phoenix-1")
+    const freshSigner = getBurritoNativeOfflineSigner("phoenix-1")
+    gate.release()
+    await rejected
+    await expect(freshSigner.getAccounts()).resolves.toEqual([
+      { address, algo: "secp256k1", pubkey: publicKey }
+    ])
+  })
+
+  it.each([false, true])(
+    "invalidates retained signers after disconnect (same-account reconnect: %s)",
+    async (reconnect) => {
+      const bridge = installBridge()
+      await connectBurritoNativeWallet("columbus-5")
+      const staleSigner = getBurritoNativeOfflineSigner("columbus-5")
+      await disconnectBurritoNativeWallet()
+      if (reconnect) await connectBurritoNativeWallet("columbus-5")
+      await expect(staleSigner.getAccounts()).rejects.toThrow(/Reconnect/)
+      await expect(staleSigner.signDirect(address, createSignDoc())).rejects.toThrow(/Reconnect/)
+      expect(bridge.request).not.toHaveBeenCalledWith("wallet.signDirect", expect.anything())
+      if (reconnect) {
+        await expect(getBurritoNativeOfflineSigner("columbus-5").getAccounts())
+          .resolves.toHaveLength(1)
+      }
+    }
+  )
+
+  it("discards a late fabricated signature response after same-account reconnect", async () => {
+    const bridge = installBridge()
+    await connectBurritoNativeWallet("columbus-5")
+    const staleSigner = getBurritoNativeOfflineSigner("columbus-5")
+    const gate = pauseNextRequest(bridge, "wallet.signDirect")
+    const signing = staleSigner.signDirect(address, createSignDoc())
+    const rejected = expect(signing).rejects.toThrow(/Reconnect/)
+    await gate.entered
+    await disconnectBurritoNativeWallet()
+    await connectBurritoNativeWallet("columbus-5")
+    gate.release()
+    await rejected
+    await expect(getBurritoNativeOfflineSigner("columbus-5").getAccounts())
+      .resolves.toHaveLength(1)
+  })
+
+  it("does not reuse an old account when the next connection is rejected", async () => {
+    const bridge = installBridge()
+    await connectBurritoNativeWallet("columbus-5")
+    const staleSigner = getBurritoNativeOfflineSigner("columbus-5")
+    bridge.request.mockRejectedValueOnce(new Error("User cancelled"))
+    await expect(connectBurritoNativeWallet("columbus-5")).rejects.toThrow("User cancelled")
+    expect(() => getBurritoNativeOfflineSigner("columbus-5")).toThrow(/Reconnect/)
+    await expect(staleSigner.getAccounts()).rejects.toThrow(/Reconnect/)
+  })
+
+  it("cancels pending requests synchronously on newer native hosts", async () => {
+    const bridge = installBridge()
+    const cancelPending = vi.fn()
+    Object.assign(bridge, { cancelPending })
+    await connectBurritoNativeWallet("columbus-5")
+    const signer = getBurritoNativeOfflineSigner("columbus-5")
+    cancelPending.mockClear()
+    invalidateBurritoNativeSession()
+    expect(cancelPending).toHaveBeenCalledTimes(1)
+    await expect(signer.getAccounts()).rejects.toThrow(/Reconnect/)
+  })
+
+  it("still invalidates locally if the optional native cancellation fails", async () => {
+    const bridge = installBridge()
+    await connectBurritoNativeWallet("columbus-5")
+    const signer = getBurritoNativeOfflineSigner("columbus-5")
+    Object.assign(bridge, { cancelPending: () => { throw new Error("Bridge unavailable") } })
+    expect(() => invalidateBurritoNativeSession()).not.toThrow()
+    await expect(signer.getAccounts()).rejects.toThrow(/Reconnect/)
+    expect(() => getBurritoNativeOfflineSigner("columbus-5")).toThrow(/Reconnect/)
   })
 })

@@ -27,7 +27,7 @@ import {
   rememberWalletManualDisconnect
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
-import { getBurritoNativeConnector } from "./burritoNativeWallet"
+import { getBurritoNativeConnector, invalidateBurritoNativeSession } from "./burritoNativeWallet"
 import {
   BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
   getBurritoExtensionConnector,
@@ -159,6 +159,11 @@ const WalletFallbackProvider = ({
   const reconnectConnector = useCallback(
     async (id: WalletConnectorId) => {
       const attempt = ++connectionAttemptRef.current
+      if (
+        id === "burrito-native" ||
+        pendingConnectorRef.current === "burrito-native" ||
+        getStoredWalletConnectorId() === "burrito-native"
+      ) invalidateBurritoNativeSession()
       pendingConnectorRef.current = id
       setStatus("connecting")
       setConnectorId(id)
@@ -204,6 +209,7 @@ const WalletFallbackProvider = ({
     connectionAttemptRef.current += 1
     pendingConnectorRef.current = undefined
     if (reconnectId === "burrito-extension") invalidateBurritoExtensionSession()
+    if (reconnectId === "burrito-native") invalidateBurritoNativeSession()
     setTxState({ status: "idle" })
     if (isWalletManualDisconnectStored()) return
 
@@ -217,6 +223,7 @@ const WalletFallbackProvider = ({
     const attempt = ++connectionAttemptRef.current
     pendingConnectorRef.current = undefined
     if (disconnectId === "burrito-extension") invalidateBurritoExtensionSession()
+    if (disconnectId === "burrito-native") invalidateBurritoNativeSession()
     setStatus("disconnected")
     setConnectorId(undefined)
     setAccount(undefined)
