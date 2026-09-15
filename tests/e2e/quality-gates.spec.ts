@@ -75,13 +75,15 @@ const overlapArea = (left: HeaderControl, right: HeaderControl) =>
   Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top))
 
 for (const theme of themes) {
-  test(`${theme} theme passes representative visual and accessibility gates`, async ({
-    page
-  }, testInfo) => {
-    const pageErrors: string[] = []
-    page.on("pageerror", (error) => pageErrors.push(error.message))
+  // Each route gets the existing 30-second budget. Eleven navigations plus
+  // eleven Axe scans must not compete for a single page's timeout on CI.
+  for (const [path, heading] of routes) {
+    test(`${theme} ${heading} passes visual and accessibility gates`, async ({
+      page
+    }, testInfo) => {
+      const pageErrors: string[] = []
+      page.on("pageerror", (error) => pageErrors.push(error.message))
 
-    for (const [path, heading] of routes) {
       await page.goto(path)
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible()
       await setTheme(page, theme)
@@ -126,10 +128,9 @@ for (const theme of themes) {
           }
         )
       }
-    }
-
-    expect(pageErrors).toEqual([])
-  })
+      expect(pageErrors).toEqual([])
+    })
+  }
 
   test(`${theme} theme keeps public dialogs readable and inside the viewport`, async ({
     page
