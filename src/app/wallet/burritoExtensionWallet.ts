@@ -13,50 +13,33 @@ import type {
 import { AuthInfo, SignDoc, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import type { WalletAccount, WalletConnector } from "./WalletContext"
 
-const NATIVE_PROTOCOL_VERSION = 1
+const EXTENSION_PROTOCOL_VERSION = 1
+export const BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT =
+  "burrito:wallet-accounts-changed-v1"
 const SUPPORTED_CHAIN_IDS = ["columbus-5", "phoenix-1"] as const
 const HASH = /^[A-F0-9]{64}$/
 const UNSIGNED_INTEGER = /^(0|[1-9][0-9]*)$/
 
-type NativeBridge = {
+type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number]
+
+type ExtensionProvider = {
   version: number
   request: (method: string, params?: Record<string, unknown>) => Promise<unknown>
-  cancelPending?: () => void
 }
 
-type NativeWalletAccount = AccountData & {
+type ExtensionWalletAccount = AccountData & {
   chainId: SupportedChainId
 }
 
-type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number]
-
 declare global {
   interface Window {
-    BurritoNative?: NativeBridge
+    BurritoWallet?: ExtensionProvider
   }
 }
 
-let connectedAccounts: NativeWalletAccount[] | undefined
+let connectedAccount: ExtensionWalletAccount | undefined
 let sessionVersion = 0
-
-export const invalidateBurritoNativeSession = () => {
-  sessionVersion += 1
-  connectedAccounts?.forEach((account) => account.pubkey.fill(0))
-  connectedAccounts = undefined
-  // Newer native hosts also dismiss this document's pending approval. Older
-  // hosts remain compatible: local generation checks still reject late replies.
-  try {
-    if (typeof window !== "undefined") window.BurritoNative?.cancelPending?.()
-  } catch {
-    // A failed native cancellation must never keep the local session alive.
-  }
-}
-
-const requireCurrentSession = (version: number) => {
-  if (version !== sessionVersion) {
-    throw new Error("Reconnect Burrito Wallet before continuing")
-  }
-}
+let sessionEventTarget: Window | undefined
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -74,76 +57,90 @@ const equalBytes = (left: Uint8Array, right: Uint8Array) => {
   return true
 }
 
-const getBridge = () => {
-  const bridge = typeof window === "undefined" ? undefined : window.BurritoNative
-  if (
-    !bridge ||
-    bridge.version !== NATIVE_PROTOCOL_VERSION ||
-    typeof bridge.request !== "function"
-  ) {
-    throw new Error("Burrito native wallet is unavailable")
-  }
-  return bridge
+export const invalidateBurritoExtensionSession = () => {
+  sessionVersion += 1
+  connectedAccount?.pubkey.fill(0)
+  connectedAccount = undefined
 }
 
-export const isBurritoNativeWalletAvailable = () => {
+const observeSessionChanges = () => {
+  if (sessionEventTarget === window) return
+  sessionEventTarget?.removeEventListener?.(
+    BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
+    invalidateBurritoExtensionSession
+  )
+  sessionEventTarget = window
+  sessionEventTarget.addEventListener?.(
+    BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
+    invalidateBurritoExtensionSession
+  )
+}
+
+const getProvider = () => {
+  const provider =
+    typeof window === "undefined" ? undefined : window.BurritoWallet
+  if (
+    !provider ||
+    provider.version !== EXTENSION_PROTOCOL_VERSION ||
+    typeof provider.request !== "function"
+  ) {
+    throw new Error("Burrito Wallet Extension is unavailable")
+  }
+  return provider
+}
+
+export const isBurritoExtensionWalletAvailable = () => {
   try {
-    getBridge()
+    getProvider()
     return true
   } catch {
     return false
   }
 }
 
-export const getBurritoNativeConnector = (): WalletConnector => ({
-  id: "burrito-native",
+export const getBurritoExtensionConnector = (): WalletConnector => ({
+  id: "burrito-extension",
   label: "Burrito Wallet",
-  type: "mobile",
-  available: isBurritoNativeWalletAvailable()
+  type: "extension",
+  available: isBurritoExtensionWalletAvailable()
 })
 
-const validateCapabilities = (value: unknown) => {
+const validateCapabilities = (value: unknown, chainId: SupportedChainId) => {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ["platform", "protocolVersion", "capabilities"]) ||
-    (value.platform !== "ios" && value.platform !== "android") ||
-    value.protocolVersion !== NATIVE_PROTOCOL_VERSION
-  ) {
-    throw new Error("Burrito native protocol is incompatible")
-  }
-  const capabilities = value.capabilities
-  if (
-    !isRecord(capabilities) ||
-    capabilities.localWallet !== true ||
-    capabilities.transactionSigning !== true ||
-    !Array.isArray(capabilities.supportedDirectSignTypeUrls) ||
-    capabilities.supportedDirectSignTypeUrls.length === 0 ||
-    capabilities.supportedDirectSignTypeUrls.some(
+    !hasOnlyKeys(value, [
+      "protocolVersion",
+      "platform",
+      "supportedChainIds",
+      "supportedDirectSignTypeUrls",
+      "transactionSigning",
+      "messageSigning"
+    ]) ||
+    value.protocolVersion !== EXTENSION_PROTOCOL_VERSION ||
+    value.platform !== "chrome" ||
+    value.transactionSigning !== true ||
+    (value.messageSigning !== undefined && typeof value.messageSigning !== "boolean") ||
+    !Array.isArray(value.supportedChainIds) ||
+    !value.supportedChainIds.includes(chainId) ||
+    value.supportedChainIds.some(
+      (candidate) =>
+        typeof candidate !== "string" ||
+        !SUPPORTED_CHAIN_IDS.includes(candidate as SupportedChainId)
+    ) ||
+    !Array.isArray(value.supportedDirectSignTypeUrls) ||
+    value.supportedDirectSignTypeUrls.length === 0 ||
+    value.supportedDirectSignTypeUrls.some(
       (typeUrl) => typeof typeUrl !== "string"
     )
   ) {
-    throw new Error("Burrito native signing is unavailable")
+    throw new Error("Burrito Wallet Extension protocol is incompatible")
   }
 }
 
-const validateWalletStatus = (value: unknown) => {
-  if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, ["exists", "deviceProtectionAvailable"]) ||
-    typeof value.exists !== "boolean" ||
-    typeof value.deviceProtectionAvailable !== "boolean"
-  ) {
-    throw new Error("Burrito native wallet protection status is invalid")
-  }
-  if (!value.deviceProtectionAvailable) {
-    throw new Error("Secure device-owner authentication is required")
-  }
-}
-
-const parseNativeAccount = (
+const parseExtensionAccount = (
   value: unknown,
   chainId: SupportedChainId
-): NativeWalletAccount => {
+): ExtensionWalletAccount => {
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, [
@@ -159,14 +156,14 @@ const parseNativeAccount = (
     typeof value.address !== "string" ||
     typeof value.publicKey !== "string"
   ) {
-    throw new Error("Burrito native account is invalid")
+    throw new Error("Burrito Wallet Extension account is invalid")
   }
 
   let pubkey: Uint8Array
   try {
     pubkey = fromBase64(value.publicKey)
   } catch {
-    throw new Error("Burrito native public key is invalid")
+    throw new Error("Burrito Wallet Extension public key is invalid")
   }
   if (
     pubkey.length !== 33 ||
@@ -174,7 +171,8 @@ const parseNativeAccount = (
     toBase64(pubkey) !== value.publicKey ||
     pubkeyToAddress(encodeSecp256k1Pubkey(pubkey), "terra") !== value.address
   ) {
-    throw new Error("Burrito native public key does not match the account")
+    pubkey.fill(0)
+    throw new Error("Burrito Wallet Extension public key does not match the account")
   }
 
   return {
@@ -185,68 +183,67 @@ const parseNativeAccount = (
   }
 }
 
-const parseNativeAccounts = (value: unknown): NativeWalletAccount[] => {
+const parseExtensionAccounts = (
+  value: unknown,
+  chainId: SupportedChainId
+): ExtensionWalletAccount => {
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, ["source", "accounts"]) ||
     value.source !== "burrito" ||
     !Array.isArray(value.accounts) ||
-    value.accounts.length !== SUPPORTED_CHAIN_IDS.length
+    value.accounts.length !== 1
   ) {
-    throw new Error("Burrito native wallet returned invalid accounts")
+    throw new Error("Burrito Wallet Extension returned invalid accounts")
   }
-
-  const accountValues = value.accounts
-  const accounts = SUPPORTED_CHAIN_IDS.map((chainId) => {
-    const matches = accountValues.filter(
-      (candidate) => isRecord(candidate) && candidate.chainId === chainId
-    )
-    if (matches.length !== 1) {
-      throw new Error("Burrito native wallet returned duplicate chain accounts")
-    }
-    return parseNativeAccount(matches[0], chainId)
-  })
-
-  return accounts
+  return parseExtensionAccount(value.accounts[0], chainId)
 }
 
-export const connectBurritoNativeWallet = async (
+export const connectBurritoExtensionWallet = async (
   chainId: string
 ): Promise<WalletAccount> => {
   if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
-    throw new Error("Burrito native wallet does not support this chain")
+    throw new Error("Burrito Wallet Extension does not support this chain")
   }
-  invalidateBurritoNativeSession()
-  const version = sessionVersion
-  const bridge = getBridge()
-  const capabilities = await bridge.request("bridge.getCapabilities", {})
-  requireCurrentSession(version)
-  validateCapabilities(capabilities)
-  const status = await bridge.request("wallet.getStatus", {})
-  requireCurrentSession(version)
-  validateWalletStatus(status)
-  const response = await bridge.request("wallet.open", {})
-  requireCurrentSession(version)
-  connectedAccounts = parseNativeAccounts(response)
-  const account = requireActiveAccount(chainId)
+  const supportedChainId = chainId as SupportedChainId
+  const provider = getProvider()
+  observeSessionChanges()
+  invalidateBurritoExtensionSession()
+  const connectingVersion = sessionVersion
+  validateCapabilities(
+    await provider.request("wallet.getCapabilities", {}),
+    supportedChainId
+  )
+  if (connectingVersion !== sessionVersion) {
+    throw new Error("Burrito Wallet Extension connection changed; reconnect")
+  }
+  const account = parseExtensionAccounts(
+    await provider.request("wallet.connect", { chainIds: [supportedChainId] }),
+    supportedChainId
+  )
+  if (connectingVersion !== sessionVersion) {
+    account.pubkey.fill(0)
+    throw new Error("Burrito Wallet Extension connection changed; reconnect")
+  }
+  connectedAccount = account
   return { address: account.address, name: "Burrito Wallet" }
 }
 
-export const disconnectBurritoNativeWallet = async () => {
-  invalidateBurritoNativeSession()
+export const disconnectBurritoExtensionWallet = async () => {
+  invalidateBurritoExtensionSession()
+  await getProvider().request("wallet.disconnect", {})
 }
 
 const requireActiveAccount = (chainId: string) => {
-  const account = connectedAccounts?.find((candidate) => candidate.chainId === chainId)
-  if (!account) {
-    throw new Error("Reconnect Burrito Wallet before signing")
+  if (connectedAccount?.chainId !== chainId) {
+    throw new Error("Reconnect Burrito Wallet Extension before signing")
   }
-  return account
+  return connectedAccount
 }
 
 const validateSignedTransaction = (
   value: unknown,
-  account: NativeWalletAccount,
+  account: ExtensionWalletAccount,
   signDoc: SignDoc
 ) => {
   if (
@@ -266,7 +263,7 @@ const validateSignedTransaction = (
     typeof value.txHash !== "string" ||
     !HASH.test(value.txHash)
   ) {
-    throw new Error("Burrito native signature response is invalid")
+    throw new Error("Burrito Wallet Extension signature response is invalid")
   }
 
   let txBytes: Uint8Array
@@ -277,7 +274,7 @@ const validateSignedTransaction = (
     txRaw = TxRaw.decode(txBytes)
     authInfo = AuthInfo.decode(signDoc.authInfoBytes)
   } catch {
-    throw new Error("Burrito native signed transaction is invalid")
+    throw new Error("Burrito Wallet Extension signed transaction is invalid")
   }
   if (
     toBase64(txBytes) !== value.txRawBytes ||
@@ -290,19 +287,19 @@ const validateSignedTransaction = (
     authInfo.signerInfos.length !== 1 ||
     authInfo.signerInfos[0].sequence.toString() !== value.sequence
   ) {
-    throw new Error("Burrito native signature does not match the request")
+    throw new Error("Burrito Wallet Extension signature does not match the request")
   }
   return txRaw.signatures[0]
 }
 
-export const getBurritoNativeOfflineSigner = (
+export const getBurritoExtensionOfflineSigner = (
   chainId: string
 ): OfflineDirectSigner => {
   if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
-    throw new Error("Burrito native wallet does not support this chain")
+    throw new Error("Burrito Wallet Extension does not support this chain")
   }
-  const version = sessionVersion
   const account = requireActiveAccount(chainId)
+  const signerVersion = sessionVersion
   const accountData: AccountData = {
     address: account.address,
     algo: account.algo,
@@ -311,23 +308,26 @@ export const getBurritoNativeOfflineSigner = (
 
   return {
     getAccounts: async () => {
-      requireCurrentSession(version)
+      if (signerVersion !== sessionVersion) {
+        throw new Error("Burrito Wallet Extension signing context changed")
+      }
+      requireActiveAccount(chainId)
       return [{ ...accountData, pubkey: accountData.pubkey.slice() }]
     },
     signDirect: async (
       signerAddress: string,
       signDoc: SignDoc
     ): Promise<DirectSignResponse> => {
-      requireCurrentSession(version)
       const current = requireActiveAccount(chainId)
       if (
+        signerVersion !== sessionVersion ||
         signerAddress !== current.address ||
         signDoc.chainId !== chainId ||
         signDoc.accountNumber < 0n
       ) {
-        throw new Error("Burrito native signing context changed")
+        throw new Error("Burrito Wallet Extension signing context changed")
       }
-      const response = await getBridge().request("wallet.signDirect", {
+      const response = await getProvider().request("wallet.signDirect", {
         version: 1,
         chainId,
         account: current.address,
@@ -335,7 +335,9 @@ export const getBurritoNativeOfflineSigner = (
         bodyBytes: toBase64(signDoc.bodyBytes),
         authInfoBytes: toBase64(signDoc.authInfoBytes)
       })
-      requireCurrentSession(version)
+      if (signerVersion !== sessionVersion) {
+        throw new Error("Burrito Wallet Extension signing context changed")
+      }
       const signature = validateSignedTransaction(response, current, signDoc)
       return {
         signed: signDoc,
