@@ -1,5 +1,54 @@
 # Production Refactor Notes
 
+## Populated governance contrast and installed-runtime pairing — 2026-09-30
+
+The documentation-only follow-up `cead7fe` did not stay green: Frontend run
+`36767576636` passed install/lint/unit/audit/build/budgets but failed mobile dark
+Governance. A real Voting proposal arrived before Axe and exposed 4.2:1 text
+contrast instead of the required 4.5:1. The earlier passing empty/timing-dependent
+scan did not prove populated status labels were accessible. This was a real
+palette defect, not grounds to retry CI unchanged or weaken the contrast rule.
+
+An offline production baseline with all four states reproduced 10/16 failures:
+all four light-theme labels and dark Voting at both viewport widths. The new
+permanent tests also failed 8/8 before the fix. Governance list/detail status
+pills now use the existing shared info/warning/success/danger foreground and
+soft-background tokens. Typography, brand, chain data and transaction logic are
+unchanged. The generic Governance quality gate waits for a fixture proposal;
+the additional tests require each visible label and a measurable Axe result on
+both chains, both themes and list/details at desktop/mobile sizes: 64 checks
+inside 8 tests. No empty-state pass or contrast exclusion is used.
+
+Final local checks: full dev suite 141 pass / 3 intentional platform skips;
+selected production wallet/quality/status suite 88/88; lint, 265 unit tests,
+TypeScript build, production build, existing bundle limits and production audit
+pass. Audit remains 12 low, zero elevated in production, not full-tree clearance.
+All browser runs are isolated offline API fixtures, not governance execution or
+live-data acceptance. Zero uncaught page errors; full dev console samples retain
+8,987 messages and drop 3,693 at the existing cap, production retains 5,972 and
+drops 2,940. These are not complete error-free online-service logs.
+
+Before the palette change, exact runtime `4e894ff` / docs head `cead7fe` also
+passed 205/205 actual installed-extension pairing assertions with unchanged
+extension `007bfa8` / ZIP `d9fc83e7...26c22d`. A separate 105/105 focused run
+held its exact production lazy chunk, queued and cancelled an unstarted mobile
+handoff through UI, opened a real extension review, then released unchanged
+code. Original dialog/focus and pending network lock survived 122 rendered
+frames / 1005 ms; real Cancel left no grant after reload. This proves that
+observed account-access boundary, not completed WalletConnect pairing or signing.
+Both new unfunded QA wallets were locked normally, contexts closed and exact
+profile Chrome process counts were zero. Profiles are retained, not deleted.
+
+Persistent evidence collection:
+`C:/Users/fengz/.codex/artifacts/burrito-wallet/installed-runtime-pairing-20260930-4e9256842eaa44dcb6879751753b05c6/`.
+It retains the failed CI log, initial probe's detached-node failure, corrected
+baseline, candidate tests/screens and source/output pins. The initial probe
+used rapid tab clicks; the contrast reproduction navigates directly to each
+status URL instead, without claiming the initial probe passed. Current-candidate
+pairing and CI must retain their own subsequent evidence; earlier results are
+not silently rebound to a different build. No real funds/signatures/broadcast,
+native-device/certificate changes, main merge, deployment or store upload.
+
 ## Persistent wallet owner and CI regression repairs — 2026-09-30
 
 The application now has one persistent WalletProvider. Lazy Cosmos Kit code

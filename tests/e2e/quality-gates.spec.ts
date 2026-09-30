@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright"
 import { expect, test, type Locator, type Page } from "@playwright/test"
+import { installGovernanceFixtures } from "./fixtures/governance"
 
 const routes = [
   ["/", "Dashboard"],
@@ -94,8 +95,12 @@ for (const theme of themes) {
       const pageErrors: string[] = []
       page.on("pageerror", (error) => pageErrors.push(error.message))
 
+      if (path === "/gov") await installGovernanceFixtures(page)
       await page.goto(path)
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible()
+      if (path === "/gov") {
+        await expect(page.locator('a[href="/proposal/99001"]')).toBeVisible()
+      }
       await setTheme(page, theme)
 
       const overflow = await page.evaluate(
