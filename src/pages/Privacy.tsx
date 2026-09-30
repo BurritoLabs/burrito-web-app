@@ -22,11 +22,18 @@ const Privacy = () => (
           recovery phrases in device-protected storage; the Chrome extension
           keeps them in password-encrypted local vaults. Recovery phrases and
           derived signing keys are processed locally for wallet operations,
-          including creation, import, account derivation, and signing. The
-          extension also processes the phrase locally when you choose to reveal
-          it after password verification. These secrets are not sent to the Burrito web app, Burrito Labs,
-          or a backend service. Encrypted storage does not mean these values
+          including creation, import, account derivation, and signing. These
+          secrets are not sent to the Burrito web app, Burrito Labs, or a backend
+          service. Encrypted storage does not mean these values
           remain encrypted while the wallet is using or displaying them.
+        </p>
+        <p>
+          When you choose to back up a saved mobile wallet, the native app
+          retrieves the phrase locally after device-owner authentication. You
+          select one word at a time to display; screen readers can read the word
+          you select. The phrase is not passed to the embedded web app. The
+          Chrome extension also processes the phrase locally when you choose
+          to reveal it after password verification.
         </p>
         <p>
           You are responsible for keeping your recovery phrase safe. Burrito
@@ -208,6 +215,13 @@ const Privacy = () => (
           session and clears recovery text from the wallet interface; it is not
           a guarantee that every copy has been physically erased from
           browser-managed memory or storage.
+        </p>
+        <p>
+          Finishing mobile backup review or moving the app to the background
+          clears the displayed recovery word. Opening backup review again
+          requires device-owner authentication. Hiding the words does not
+          delete the saved wallet or guarantee that every copy has been
+          physically erased from device-managed memory.
         </p>
         <p>
           Mobile secure-storage retention depends on the operating system.

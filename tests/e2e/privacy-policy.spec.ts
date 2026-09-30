@@ -45,6 +45,11 @@ test("privacy distinguishes local custody from lookup and deletion boundaries", 
   await custody.scrollIntoViewIfNeeded()
   await expect(custody).toContainText("password-encrypted local vaults")
   await expect(custody).toContainText("using or displaying them")
+  await expect(custody).toContainText("retrieves the phrase locally after device-owner authentication")
+  await expect(custody).toContainText("select one word at a time to display")
+  await expect(custody).toContainText("screen readers can read the word you select")
+  await expect(custody).toContainText("The phrase is not passed to the embedded web app")
+  await expect(custody).toContainText("reveal it after password verification")
 
   const services = policy.locator("section").filter({
     has: page.getByRole("heading", { name: "Blockchain and service providers", exact: true })
@@ -62,6 +67,10 @@ test("privacy distinguishes local custody from lookup and deletion boundaries", 
   await retention.scrollIntoViewIfNeeded()
   await expect(retention).toContainText("Other stored wallets and the shared theme preference remain")
   await expect(retention).toContainText("it is not a guarantee that every copy has been physically erased")
+  await expect(retention).toContainText("moving the app to the background clears the displayed recovery word")
+  await expect(retention).toContainText("Opening backup review again requires device-owner authentication")
+  await expect(retention).toContainText("Hiding the words does not delete the saved wallet")
+  await expect(retention).toContainText("physically erased from device-managed memory")
   await expect(retention).toContainText("Uninstalling the app alone is not a guarantee")
   await expect(retention).toContainText("This does not clear the embedded web app's separate website storage or cache")
   await expect(retention).toContainText("Local wallet removal cannot delete public blockchain records or establish deletion")
