@@ -17,6 +17,7 @@ import { getBurritoNativeConnector, invalidateBurritoNativeSession } from "./bur
 import {
   BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
   getBurritoExtensionConnector,
+  getBurritoExtensionConnectionErrorMessage,
   invalidateBurritoExtensionSession
 } from "./burritoExtensionWallet"
 import {
@@ -244,6 +245,7 @@ export const WalletProvider = ({
   const manualDisconnectRef = useRef(isWalletManualDisconnectStored())
   const connectionAttemptRef = useRef(0)
   const pendingConnectorRef = useRef<WalletConnectorId | undefined>(undefined)
+  const selectedConnectorRef = useRef<WalletConnectorId | undefined>(undefined)
   const [connectorRefreshNonce, setConnectorRefreshNonce] = useState(0)
   const [storedAutoConnectId, setStoredAutoConnectId] = useState<
     WalletConnectorId | undefined
@@ -253,6 +255,14 @@ export const WalletProvider = ({
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(
     () => !storedAutoConnectId
   )
+
+  useEffect(() => () => {
+    connectionAttemptRef.current += 1
+    if (selectedConnectorRef.current === "burrito-extension") {
+      invalidateBurritoExtensionSession()
+    }
+    pendingConnectorRef.current = undefined
+  }, [])
 
   const supportsMobileWallets = useMemo(() => isTouchWalletCapableBrowser(), [])
   const currentCosmosWalletName = cosmosChain.walletRepo.current?.walletName
@@ -302,13 +312,21 @@ export const WalletProvider = ({
     [cosmosChain.walletRepo]
   )
 
+  const ownsConnectionAttempt = useCallback((id: WalletConnectorId, attempt: number) => {
+    const selected = pendingConnectorRef.current ?? selectedConnectorRef.current ??
+      getStoredWalletConnectorId()
+    return attempt === connectionAttemptRef.current &&
+      !manualDisconnectRef.current && (!selected || selected === id)
+  }, [])
+
   const syncCosmosWalletAccount = useCallback(
-    (id: keyof typeof COSMOS_CONNECTOR_CONFIGS, wallet: ChainWalletBase) => {
-      if (manualDisconnectRef.current) return
+    (id: keyof typeof COSMOS_CONNECTOR_CONFIGS, wallet: ChainWalletBase, attempt: number) => {
+      if (!ownsConnectionAttempt(id, attempt)) return false
 
       const nextAccount = buildWalletAccount(wallet)
-      if (!nextAccount) return
+      if (!nextAccount) return false
 
+      selectedConnectorRef.current = id
       setAccount((current) =>
         current?.address === nextAccount.address && current?.name === nextAccount.name
           ? current
@@ -319,8 +337,9 @@ export const WalletProvider = ({
       setError(undefined)
       rememberWalletConnectorId(id)
       setStoredAutoConnectId(id)
+      return true
     },
-    []
+    [ownsConnectionAttempt]
   )
 
   const ensureCosmosWalletSession = useCallback(
@@ -329,6 +348,10 @@ export const WalletProvider = ({
       wallet: ChainWalletBase,
       options?: { forceConnect?: boolean }
     ) => {
+      const attempt = connectionAttemptRef.current
+      if (!ownsConnectionAttempt(id, attempt)) {
+        throw new Error("Wallet connection changed. Connect again before continuing.")
+      }
       const isMobileWallet = COSMOS_CONNECTOR_CONFIGS[id].type === "mobile"
       const shouldForceConnect = Boolean(options?.forceConnect && isMobileWallet)
 
@@ -352,9 +375,11 @@ export const WalletProvider = ({
         throw new Error(`${COSMOS_CONNECTOR_CONFIGS[id].label} account unavailable`)
       }
 
-      syncCosmosWalletAccount(id, wallet)
+      if (!syncCosmosWalletAccount(id, wallet, attempt)) {
+        throw new Error("Wallet connection changed. Connect again before continuing.")
+      }
     },
-    [syncCosmosWalletAccount]
+    [ownsConnectionAttempt, syncCosmosWalletAccount]
   )
 
   const runWithCosmosWalletSessionRetry = useCallback(
@@ -382,6 +407,8 @@ export const WalletProvider = ({
       id: keyof typeof COSMOS_CONNECTOR_CONFIGS,
       options?: { allowWalletOpen?: boolean; warmSigner?: boolean }
     ) => {
+      const attempt = connectionAttemptRef.current
+      if (!ownsConnectionAttempt(id, attempt)) return false
       if (COSMOS_CONNECTOR_CONFIGS[id].type !== "mobile" || desktopKeplrAvailable) {
         return false
       }
@@ -414,7 +441,7 @@ export const WalletProvider = ({
           return false
         }
 
-        syncCosmosWalletAccount(id, wallet)
+        if (!syncCosmosWalletAccount(id, wallet, attempt)) return false
 
         if (options?.allowWalletOpen && options?.warmSigner) {
           try {
@@ -433,7 +460,7 @@ export const WalletProvider = ({
                 if (!wallet.address) {
                   return false
                 }
-                syncCosmosWalletAccount(id, wallet)
+                if (!syncCosmosWalletAccount(id, wallet, attempt)) return false
                 await wallet.initOfflineSigner("amino")
               } catch (retryError) {
                 if (isWalletInitializationError(retryError)) {
@@ -454,6 +481,7 @@ export const WalletProvider = ({
       desktopKeplrAvailable,
       ensureCosmosWalletSession,
       getCosmosWallet,
+      ownsConnectionAttempt,
       syncCosmosWalletAccount
     ]
   )
@@ -799,14 +827,22 @@ export const WalletProvider = ({
   )
 
   const connect = useCallback(
-    async (id: WalletConnectorId) => {
+    async (id: WalletConnectorId, requestApproval = true) => {
+      if (!requestApproval && (manualDisconnectRef.current || isWalletManualDisconnectStored() ||
+        (selectedConnectorRef.current && selectedConnectorRef.current !== id))) return
+      if (pendingConnectorRef.current) return
       const attempt = ++connectionAttemptRef.current
+      if (id !== "burrito-extension" && selectedConnectorRef.current === "burrito-extension") {
+        invalidateBurritoExtensionSession()
+      }
       if (
         id === "burrito-native" ||
         pendingConnectorRef.current === "burrito-native" ||
         connectorIdRef.current === "burrito-native"
       ) invalidateBurritoNativeSession()
       pendingConnectorRef.current = id
+      selectedConnectorRef.current = id
+      if (id === "burrito-extension") setConnectorId(id)
       manualDisconnectRef.current = false
       setStatus("connecting")
       setAccount(undefined)
@@ -817,7 +853,7 @@ export const WalletProvider = ({
             ? await connectWalletConnector(id)
             : isCosmosConnectorId(id)
               ? await connectCosmosConnector(id)
-              : await connectWalletConnector(id)
+              : await connectWalletConnector(id, { requestApproval })
         if (attempt !== connectionAttemptRef.current) return
         setConnectorId(id)
         rememberWalletConnectorId(id)
@@ -834,7 +870,9 @@ export const WalletProvider = ({
       } catch (err) {
         if (attempt !== connectionAttemptRef.current) return
         setStatus("error")
-        setError(formatWalletError(err))
+        setError(id === "burrito-extension"
+          ? getBurritoExtensionConnectionErrorMessage(err)
+          : formatWalletError(err))
       } finally {
         if (attempt === connectionAttemptRef.current) pendingConnectorRef.current = undefined
       }
@@ -868,7 +906,7 @@ export const WalletProvider = ({
     if (!shouldReconnect || !reconnectId) return
 
     const timer = window.setTimeout(() => {
-      void connect(reconnectId)
+      void connect(reconnectId, false)
     }, 0)
     return () => window.clearTimeout(timer)
   }, [chainKey, connect, refreshConnectors, storedAutoConnectId])
@@ -883,6 +921,7 @@ export const WalletProvider = ({
       const storedConnectorId = getStoredWalletConnectorId()
       const activeConnectorId = connectorIdRef.current
       if (storedConnectorId !== id && activeConnectorId !== id) return
+      if (!ownsConnectionAttempt(id, connectionAttemptRef.current)) return
 
       setStoredAutoConnectId(id)
       setAccount(undefined)
@@ -897,14 +936,13 @@ export const WalletProvider = ({
     const handleBurritoNativeReady = () => refreshConnectors()
     const handleBurritoExtensionReady = () => refreshConnectors()
     const handleBurritoChange = () => {
-      if (
-        connectorIdRef.current !== "burrito-extension" &&
-        pendingConnectorRef.current !== "burrito-extension" &&
-        getStoredWalletConnectorId() !== "burrito-extension"
-      ) return
+      const selected = pendingConnectorRef.current ?? selectedConnectorRef.current ??
+        connectorIdRef.current ?? getStoredWalletConnectorId()
+      if (selected !== "burrito-extension") return
       connectionAttemptRef.current += 1
       pendingConnectorRef.current = undefined
       invalidateBurritoExtensionSession()
+      selectedConnectorRef.current = undefined
       manualDisconnectRef.current = true
       rememberWalletManualDisconnect()
       forgetStoredWalletSession()
@@ -941,7 +979,7 @@ export const WalletProvider = ({
         handleGalaxyChange
       )
     }
-  }, [refreshConnectors])
+  }, [ownsConnectionAttempt, refreshConnectors])
 
   const disconnect = useCallback(async () => {
     const disconnectId = pendingConnectorRef.current ?? connectorIdRef.current ?? getStoredWalletConnectorId()
@@ -949,6 +987,7 @@ export const WalletProvider = ({
     pendingConnectorRef.current = undefined
     if (disconnectId === "burrito-extension") invalidateBurritoExtensionSession()
     if (disconnectId === "burrito-native") invalidateBurritoNativeSession()
+    selectedConnectorRef.current = undefined
     manualDisconnectRef.current = true
     rememberWalletManualDisconnect()
     forgetStoredWalletSession()
@@ -1144,6 +1183,7 @@ export const WalletProvider = ({
 
       const storedConnectorId = getStoredWalletConnectorId()
       if (!storedConnectorId) return
+      if (!ownsConnectionAttempt(storedConnectorId, connectionAttemptRef.current)) return
 
       if (
         isCosmosConnectorId(storedConnectorId) &&
@@ -1182,7 +1222,7 @@ export const WalletProvider = ({
       window.removeEventListener("pageshow", handleFocus)
       document.removeEventListener("visibilitychange", handleFocus)
     }
-  }, [hydrateMobileWalletSession, refreshConnectors])
+  }, [hydrateMobileWalletSession, ownsConnectionAttempt, refreshConnectors])
 
   useEffect(() => {
     registerWalletAdapterRuntime({
@@ -1244,6 +1284,8 @@ export const WalletProvider = ({
     if (!activeCosmosConnectorId || !cosmosChain.isWalletConnected || !cosmosChain.address) {
       return
     }
+    const attempt = connectionAttemptRef.current
+    if (!ownsConnectionAttempt(activeCosmosConnectorId, attempt)) return
     if (manualDisconnectRef.current || isWalletManualDisconnectStored()) {
       forgetStoredWalletSession()
       return
@@ -1256,6 +1298,8 @@ export const WalletProvider = ({
       name: cosmosChain.username || cosmosChain.wallet?.prettyName
     }
     const timer = window.setTimeout(() => {
+      if (!ownsConnectionAttempt(activeCosmosConnectorId, attempt)) return
+      selectedConnectorRef.current = activeCosmosConnectorId
       setAccount((current) =>
         current?.address === nextAccount.address && current?.name === nextAccount.name
           ? current
@@ -1281,7 +1325,8 @@ export const WalletProvider = ({
     cosmosChain.isWalletConnected,
     cosmosChain.username,
     cosmosChain.wallet?.prettyName,
-    desktopKeplrAvailable
+    desktopKeplrAvailable,
+    ownsConnectionAttempt
   ])
 
   useEffect(() => {
@@ -1329,8 +1374,11 @@ export const WalletProvider = ({
       return
     }
 
-    explicitConnectAttemptedRef.current = true
-    void connect(connectOnMountId)
+    const timer = window.setTimeout(() => {
+      explicitConnectAttemptedRef.current = true
+      void connect(connectOnMountId)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [connect, connectOnMountId, connectors])
 
   useEffect(() => {
@@ -1362,7 +1410,7 @@ export const WalletProvider = ({
     if (!autoConnectAvailable) return
     let cancelled = false
     const timer = window.setTimeout(() => {
-      void connect(effectiveAutoConnectId).finally(() => {
+      void connect(effectiveAutoConnectId, false).finally(() => {
         if (!cancelled) {
           setAutoConnectAttempted(true)
         }

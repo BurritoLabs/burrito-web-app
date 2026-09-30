@@ -31,6 +31,7 @@ import { getBurritoNativeConnector, invalidateBurritoNativeSession } from "./bur
 import {
   BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
   getBurritoExtensionConnector,
+  getBurritoExtensionConnectionErrorMessage,
   invalidateBurritoExtensionSession
 } from "./burritoExtensionWallet"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
@@ -139,10 +140,19 @@ const WalletFallbackProvider = ({
   const previousChainKeyRef = useRef(chainKey)
   const connectionAttemptRef = useRef(0)
   const pendingConnectorRef = useRef<WalletConnectorId | undefined>(undefined)
+  const selectedConnectorRef = useRef<WalletConnectorId | undefined>(undefined)
   const connectors = useMemo(() => {
     void connectorRefreshNonce
     return getFallbackConnectors()
   }, [connectorRefreshNonce])
+
+  useEffect(() => () => {
+    connectionAttemptRef.current += 1
+    if (selectedConnectorRef.current === "burrito-extension") {
+      invalidateBurritoExtensionSession()
+    }
+    pendingConnectorRef.current = undefined
+  }, [])
 
   useEffect(() => {
     const refreshNativeConnector = () => {
@@ -157,19 +167,26 @@ const WalletFallbackProvider = ({
   }, [])
 
   const reconnectConnector = useCallback(
-    async (id: WalletConnectorId) => {
+    async (id: WalletConnectorId, requestApproval = true) => {
+      if (!requestApproval && (isWalletManualDisconnectStored() ||
+        (selectedConnectorRef.current && selectedConnectorRef.current !== id))) return
+      // Repeated clicks must not invalidate an approval already in progress.
+      if (pendingConnectorRef.current) return
       const attempt = ++connectionAttemptRef.current
+      if (id !== "burrito-extension" && selectedConnectorRef.current === "burrito-extension") {
+        invalidateBurritoExtensionSession()
+      }
       if (
         id === "burrito-native" ||
         pendingConnectorRef.current === "burrito-native" ||
         getStoredWalletConnectorId() === "burrito-native"
       ) invalidateBurritoNativeSession()
       pendingConnectorRef.current = id
+      selectedConnectorRef.current = id
       setStatus("connecting")
       setConnectorId(id)
       setError(undefined)
       setAccount(undefined)
-      rememberWalletConnectorId(id)
 
       if (id === "keplr-mobile") {
         onRuntimeRequested?.(id)
@@ -179,13 +196,16 @@ const WalletFallbackProvider = ({
       try {
         const { connectWalletConnector } = await import("./walletAdapters")
         if (attempt !== connectionAttemptRef.current) return
-        const nextAccount = await connectWalletConnector(id)
+        const nextAccount = await connectWalletConnector(id, { requestApproval })
         if (attempt !== connectionAttemptRef.current) return
         setAccount(nextAccount)
         setStatus("connected")
+        rememberWalletConnectorId(id)
       } catch (connectError) {
         if (attempt !== connectionAttemptRef.current) return
-        setError(getErrorMessage(connectError))
+        setError(id === "burrito-extension"
+          ? getBurritoExtensionConnectionErrorMessage(connectError)
+          : getErrorMessage(connectError))
         setStatus("error")
       } finally {
         if (attempt === connectionAttemptRef.current) pendingConnectorRef.current = undefined
@@ -210,12 +230,16 @@ const WalletFallbackProvider = ({
     pendingConnectorRef.current = undefined
     if (reconnectId === "burrito-extension") invalidateBurritoExtensionSession()
     if (reconnectId === "burrito-native") invalidateBurritoNativeSession()
+    setAccount(undefined)
+    setError(undefined)
+    setStatus("disconnected")
     setTxState({ status: "idle" })
     if (isWalletManualDisconnectStored()) return
 
     if (!reconnectId || reconnectId === "keplr-mobile") return
 
-    void reconnectConnector(reconnectId)
+    // A chain change restores an existing grant; it never opens a new approval.
+    void reconnectConnector(reconnectId, false)
   }, [chainKey, connectorId, reconnectConnector])
 
   const disconnect = useCallback(async () => {
@@ -225,6 +249,7 @@ const WalletFallbackProvider = ({
     if (disconnectId === "burrito-extension") invalidateBurritoExtensionSession()
     if (disconnectId === "burrito-native") invalidateBurritoNativeSession()
     setStatus("disconnected")
+    selectedConnectorRef.current = undefined
     setConnectorId(undefined)
     setAccount(undefined)
     setError(undefined)
@@ -271,12 +296,13 @@ const WalletFallbackProvider = ({
     }
 
     const timer = window.setTimeout(() => {
-      void connect(autoConnectId)
+      void reconnectConnector(autoConnectId, false)
     }, 700)
     return () => window.clearTimeout(timer)
-  }, [autoConnectId, connect, connectors, status])
+  }, [autoConnectId, reconnectConnector, connectors, status])
 
   useEffect(() => {
+    const reconnectTimers = new Set<number>()
     const reconnectStoredDesktopWallet = (id: WalletConnectorId) => {
       if (isWalletManualDisconnectStored()) {
         forgetStoredWalletSession()
@@ -284,25 +310,32 @@ const WalletFallbackProvider = ({
       }
       const stored = getStoredWalletConnectorId()
       if (stored !== id && connectorId !== id) return
+      const selected = pendingConnectorRef.current ?? selectedConnectorRef.current
+      if (selected && selected !== id) return
       const connector = connectors.find((item) => item.id === id)
       if (!connector?.available) return
 
-      window.setTimeout(() => {
+      const attempt = connectionAttemptRef.current
+      const timer = window.setTimeout(() => {
+        reconnectTimers.delete(timer)
+        if (attempt !== connectionAttemptRef.current) return
+        const current = pendingConnectorRef.current ?? selectedConnectorRef.current
+        if (current && current !== id) return
         void reconnectConnector(id)
       }, 100)
+      reconnectTimers.add(timer)
     }
 
     const handleKeplrChange = () => reconnectStoredDesktopWallet("keplr")
     const handleGalaxyChange = () => reconnectStoredDesktopWallet("galaxy")
     const handleBurritoChange = () => {
-      if (
-        connectorId !== "burrito-extension" &&
-        pendingConnectorRef.current !== "burrito-extension" &&
-        getStoredWalletConnectorId() !== "burrito-extension"
-      ) return
+      const selected = pendingConnectorRef.current ?? selectedConnectorRef.current ??
+        connectorId ?? getStoredWalletConnectorId()
+      if (selected !== "burrito-extension") return
       connectionAttemptRef.current += 1
       pendingConnectorRef.current = undefined
       invalidateBurritoExtensionSession()
+      selectedConnectorRef.current = undefined
       rememberWalletManualDisconnect()
       forgetStoredWalletSession()
       setAccount(undefined)
@@ -318,6 +351,7 @@ const WalletFallbackProvider = ({
     window.addEventListener("galaxy_station_network_change", handleGalaxyChange)
 
     return () => {
+      reconnectTimers.forEach((timer) => window.clearTimeout(timer))
       window.removeEventListener(BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT, handleBurritoChange)
       window.removeEventListener("keplr_keystorechange", handleKeplrChange)
       window.removeEventListener(

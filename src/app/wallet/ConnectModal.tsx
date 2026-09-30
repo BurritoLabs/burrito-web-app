@@ -147,7 +147,13 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
           ))}
         </div>
 
-        {error ? <div className={styles.error}>{error}</div> : null}
+        {isConnecting && connectorId === "burrito-extension" ? (
+          <div className={styles.connectionHint} role="status">
+            Continue in Burrito Wallet. Finish or cancel the request there before
+            switching networks. Closing this panel does not cancel the request.
+          </div>
+        ) : null}
+        {error ? <div className={styles.error} role="alert">{error}</div> : null}
       </div>
     </div>,
     document.body

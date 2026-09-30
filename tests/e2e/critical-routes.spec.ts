@@ -292,11 +292,20 @@ test("iOS native bridge exposes and connects Burrito Wallet", async ({ page }) =
 })
 
 test("Chrome extension provider connects, follows the active chain, invalidates, and disconnects", async ({
-  page
+  page,
+  baseURL
 }) => {
+  const appOrigin = new URL(baseURL!).origin
+  await page.route(/^https?:\/\//, (route) => {
+    const url = new URL(route.request().url())
+    return url.origin !== appOrigin || /^\/(coingecko|keybase|burrito-api)(\/|$)/.test(url.pathname)
+      ? route.abort("internetdisconnected")
+      : route.continue()
+  })
   await selectStoredChain(page, "lunc")
   await page.addInitScript(() => {
     const calls: Array<{ method: string; chainIds?: string[] }> = []
+    const grants = new Set<string>()
     Object.defineProperty(window, "__burritoExtensionCalls", {
       value: calls
     })
@@ -329,10 +338,16 @@ test("Chrome extension provider connects, follows the active chain, invalidates,
               transactionSigning: true
             }
           }
-          if (method === "wallet.connect") {
+          if (method === "wallet.connect" || method === "wallet.getAccounts") {
             const chainId = chainIds?.[0]
             if (chainId !== "columbus-5" && chainId !== "phoenix-1") {
               throw new Error("Unexpected chain")
+            }
+            if (method === "wallet.connect") grants.add(chainId)
+            if (!grants.has(chainId)) {
+              throw Object.assign(new Error("Network not authorized"), {
+                code: "UNAUTHORIZED"
+              })
             }
             return {
               source: "burrito",
@@ -349,6 +364,7 @@ test("Chrome extension provider connects, follows the active chain, invalidates,
             }
           }
           if (method === "wallet.disconnect") {
+            grants.clear()
             return { disconnected: true }
           }
           throw new Error(`Unexpected extension method: ${method}`)
@@ -416,11 +432,16 @@ test("Chrome extension provider connects, follows the active chain, invalidates,
         { method: "wallet.getCapabilities" },
         { method: "wallet.connect", chainIds: ["columbus-5"] },
         { method: "wallet.getCapabilities" },
-        { method: "wallet.connect", chainIds: ["phoenix-1"] }
+        { method: "wallet.getAccounts", chainIds: ["phoenix-1"] }
       ],
       connector: "burrito-extension",
       manuallyDisconnected: null
     })
+  // Switching to an unapproved chain reads existing grants without opening an
+  // approval. A second explicit Connect is required to authorize that chain.
+  await expect(
+    page.getByRole("button", { name: "Connect", exact: true }).first()
+  ).toBeVisible()
 
   await page.evaluate(() => {
     window.dispatchEvent(new Event("burrito:wallet-accounts-changed-v1"))
@@ -445,7 +466,7 @@ test("Chrome extension provider connects, follows the active chain, invalidates,
   ).toEqual({
     connector: null,
     manuallyDisconnected: "true",
-    connectionCount: 2
+    connectionCount: 1
   })
 
   // An extension account change must not silently reconnect or reopen approval.

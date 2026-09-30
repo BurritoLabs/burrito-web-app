@@ -12,9 +12,11 @@ import {
   BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT,
   connectBurritoExtensionWallet,
   disconnectBurritoExtensionWallet,
+  getBurritoExtensionConnectionErrorMessage,
   getBurritoExtensionConnector,
   getBurritoExtensionOfflineSigner,
-  isBurritoExtensionWalletAvailable
+  isBurritoExtensionWalletAvailable,
+  restoreBurritoExtensionWallet
 } from "../src/app/wallet/burritoExtensionWallet"
 import { getWalletConnectors } from "../src/app/wallet/walletAdapters"
 
@@ -58,7 +60,7 @@ const installProvider = ({
           messageSigning: true
         }
       }
-      if (method === "wallet.connect") {
+      if (method === "wallet.connect" || method === "wallet.getAccounts") {
         const chainId = String((params.chainIds as string[])[0])
         return {
           source: "burrito",
@@ -105,12 +107,52 @@ const installProvider = ({
   return provider
 }
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
+}
+
 afterEach(async () => {
   await disconnectBurritoExtensionWallet().catch(() => undefined)
   vi.unstubAllGlobals()
 })
 
 describe("Burrito Wallet Extension provider", () => {
+  for (const method of ["wallet.connect", "wallet.getAccounts"] as const) {
+    it(`does not commit ${method} after invalidation at the final async boundary`, async () => {
+      const provider = installProvider()
+      const original = provider.request.getMockImplementation()!
+      provider.request.mockImplementation(async (nextMethod, params) => {
+        const response = await original(nextMethod, params)
+        if (nextMethod === method && response && "accounts" in response) {
+          const account = response.accounts[0]
+          const publicKey = account.publicKey
+          Object.defineProperty(account, "publicKey", {
+            get: () => {
+              // Run after the inner reader's synchronous validation but before
+              // its caller commits the resolved account in the next microtask.
+              queueMicrotask(() => window.dispatchEvent(
+                new Event(BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT)
+              ))
+              return publicKey
+            }
+          })
+        }
+        return response
+      })
+      const read = method === "wallet.connect"
+        ? connectBurritoExtensionWallet
+        : restoreBurritoExtensionWallet
+      await expect(read("columbus-5")).rejects.toThrow("connection changed")
+      expect(() => getBurritoExtensionOfflineSigner("columbus-5")).toThrow("Reconnect")
+    })
+  }
+
   it("accepts the original capability response without optional message signing", async () => {
     const provider = installProvider()
     const original = provider.request.getMockImplementation()!
@@ -136,6 +178,182 @@ describe("Burrito Wallet Extension provider", () => {
         : result
     })
     await expect(connectBurritoExtensionWallet("columbus-5")).rejects.toThrow("protocol is incompatible")
+  })
+
+  it("restores an existing grant without opening an implicit connection approval", async () => {
+    const provider = installProvider()
+
+    await expect(
+      restoreBurritoExtensionWallet("phoenix-1")
+    ).resolves.toEqual({ address, name: "Burrito Wallet" })
+    expect(provider.request.mock.calls).toEqual([
+      ["wallet.getCapabilities", {}],
+      ["wallet.getAccounts", { chainIds: ["phoenix-1"] }]
+    ])
+    expect(
+      provider.request.mock.calls.some(([method]) => method === "wallet.connect")
+    ).toBe(false)
+    expect(
+      provider.request.mock.calls.some(([method]) => method === "wallet.disconnect")
+    ).toBe(false)
+  })
+
+  it("applies the same exact-chain account validation to passive restore", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    provider.request.mockImplementation(async (method, params) => {
+      if (method !== "wallet.getAccounts") return original(method, params)
+      return {
+        source: "burrito",
+        accounts: [{
+          source: "burrito",
+          chainId: "columbus-5",
+          address,
+          algorithm: "secp256k1",
+          publicKey: toBase64(publicKey)
+        }]
+      }
+    })
+
+    await expect(
+      restoreBurritoExtensionWallet("phoenix-1")
+    ).rejects.toThrow("account is invalid")
+  })
+
+  it("discards a passive restore result returned after session invalidation", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    const held = deferred<unknown>()
+    let response: unknown
+    provider.request.mockImplementation((method, params) => {
+      if (method !== "wallet.getAccounts") return original(method, params)
+      response = original(method, params)
+      return held.promise
+    })
+
+    const restoring = restoreBurritoExtensionWallet("columbus-5")
+    await vi.waitFor(() => expect(response).toBeDefined())
+    window.dispatchEvent(new Event(BURRITO_EXTENSION_ACCOUNTS_CHANGED_EVENT))
+    held.resolve(await response)
+    await expect(restoring).rejects.toThrow("connection changed")
+    expect(() => getBurritoExtensionOfflineSigner("columbus-5")).toThrow(
+      "Reconnect"
+    )
+  })
+
+  it("keeps one explicit connection pending while allowing passive restore", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    const held = deferred<unknown>()
+    let response: unknown
+    let connectCalls = 0
+    provider.request.mockImplementation((method, params) => {
+      if (method !== "wallet.connect" || connectCalls++ > 0) {
+        return original(method, params)
+      }
+      response = original(method, params)
+      return held.promise
+    })
+
+    const first = connectBurritoExtensionWallet("columbus-5")
+    await vi.waitFor(() => expect(response).toBeDefined())
+    const busy = await connectBurritoExtensionWallet("phoenix-1").catch(
+      (error: unknown) => error
+    )
+    expect(busy).toMatchObject({ code: "BUSY" })
+    await expect(
+      restoreBurritoExtensionWallet("columbus-5")
+    ).resolves.toEqual({ address, name: "Burrito Wallet" })
+    held.resolve(await response)
+    await expect(first).resolves.toEqual({ address, name: "Burrito Wallet" })
+    await expect(
+      connectBurritoExtensionWallet("phoenix-1")
+    ).resolves.toEqual({ address, name: "Burrito Wallet" })
+    expect(
+      provider.request.mock.calls.filter(([method]) => method === "wallet.connect")
+    ).toHaveLength(2)
+  })
+
+  it("does not let a late passive restore overwrite an explicit connection", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    const held = deferred<unknown>()
+    let passiveResponse: unknown
+    provider.request.mockImplementation((method, params) => {
+      if (method !== "wallet.getAccounts") return original(method, params)
+      passiveResponse = original(method, params)
+      return held.promise
+    })
+
+    const connecting = connectBurritoExtensionWallet("columbus-5")
+    const restoring = restoreBurritoExtensionWallet("phoenix-1")
+    await vi.waitFor(() => expect(passiveResponse).toBeDefined())
+    await expect(connecting).resolves.toEqual({
+      address,
+      name: "Burrito Wallet"
+    })
+    held.resolve(await passiveResponse)
+    await expect(restoring).rejects.toThrow("connection changed")
+    await expect(
+      getBurritoExtensionOfflineSigner("columbus-5").getAccounts()
+    ).resolves.toHaveLength(1)
+    expect(() => getBurritoExtensionOfflineSigner("phoenix-1")).toThrow(
+      "Reconnect"
+    )
+  })
+
+  it("preserves provider rejection codes and releases the explicit guard", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    const rejection = Object.assign(new Error("The user cancelled approval"), {
+      code: "USER_REJECTED"
+    })
+    let rejected = false
+    provider.request.mockImplementation((method, params) => {
+      if (method === "wallet.connect" && !rejected) {
+        rejected = true
+        return Promise.reject(rejection)
+      }
+      return original(method, params)
+    })
+
+    await expect(
+      connectBurritoExtensionWallet("columbus-5")
+    ).rejects.toBe(rejection)
+    expect((rejection as Error & { code: string }).code).toBe("USER_REJECTED")
+    await expect(
+      connectBurritoExtensionWallet("columbus-5")
+    ).resolves.toEqual({ address, name: "Burrito Wallet" })
+  })
+
+  it("preserves passive provider rejection codes", async () => {
+    const provider = installProvider()
+    const original = provider.request.getMockImplementation()!
+    const rejection = Object.assign(new Error("Unlock the extension"), {
+      code: "WALLET_LOCKED"
+    })
+    provider.request.mockImplementation((method, params) =>
+      method === "wallet.getAccounts"
+        ? Promise.reject(rejection)
+        : original(method, params)
+    )
+
+    await expect(
+      restoreBurritoExtensionWallet("columbus-5")
+    ).rejects.toBe(rejection)
+  })
+
+  it("maps typed connection failures to actionable messages", () => {
+    expect(getBurritoExtensionConnectionErrorMessage({ code: "USER_REJECTED" }))
+      .toContain("Choose Connect")
+    expect(getBurritoExtensionConnectionErrorMessage({ code: "WALLET_LOCKED" }))
+      .toContain("Unlock Burrito Wallet")
+    expect(getBurritoExtensionConnectionErrorMessage({ code: "UNAUTHORIZED" }))
+      .toContain("approve access")
+    expect(getBurritoExtensionConnectionErrorMessage({ code: "BUSY" }))
+      .toContain("Finish or cancel")
+    expect(getBurritoExtensionConnectionErrorMessage(new Error("Provider failed")))
+      .toBe("Provider failed")
   })
 
   it("invalidates cached signers when the extension locks or changes accounts", async () => {
@@ -189,9 +407,16 @@ describe("Burrito Wallet Extension provider", () => {
     const rejected = expect(pending).rejects.toThrow("connection changed")
     await vi.waitFor(() => expect(release).toBeTypeOf("function"))
     await disconnectBurritoExtensionWallet()
+    await expect(
+      connectBurritoExtensionWallet("phoenix-1")
+    ).rejects.toMatchObject({ code: "BUSY" })
     release(await response)
     await rejected
     expect(() => getBurritoExtensionOfflineSigner("columbus-5")).toThrow("Reconnect")
+    provider.request.mockImplementation(original)
+    await expect(
+      connectBurritoExtensionWallet("columbus-5")
+    ).resolves.toEqual({ address, name: "Burrito Wallet" })
   })
 
   it("is available only when the versioned provider is injected", () => {

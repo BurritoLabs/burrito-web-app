@@ -13,7 +13,8 @@ import {
   connectBurritoExtensionWallet,
   disconnectBurritoExtensionWallet,
   getBurritoExtensionConnector,
-  getBurritoExtensionOfflineSigner
+  getBurritoExtensionOfflineSigner,
+  restoreBurritoExtensionWallet
 } from "./burritoExtensionWallet"
 import {
   connectGalaxyWallet,
@@ -363,12 +364,18 @@ export const isWalletConnectorAvailable = (id: WalletConnectorId) =>
 
 export { getWalletConnectorBadge, getWalletConnectorLabel }
 
-export const connectWalletConnector = async (id: WalletConnectorId) => {
+export const connectWalletConnector = async (
+  id: WalletConnectorId,
+  options: { requestApproval?: boolean } = {}
+) => {
   if (id === "burrito-native") {
     return connectBurritoNativeWallet(getActiveChain().chain.chainId)
   }
   if (id === "burrito-extension") {
-    return connectBurritoExtensionWallet(getActiveChain().chain.chainId)
+    const connect = options.requestApproval === false
+      ? restoreBurritoExtensionWallet
+      : connectBurritoExtensionWallet
+    return connect(getActiveChain().chain.chainId)
   }
   const runtimeAccount = await walletAdapterRuntime?.connect?.(id)
   if (runtimeAccount) {

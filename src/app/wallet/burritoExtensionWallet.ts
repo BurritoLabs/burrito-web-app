@@ -40,6 +40,8 @@ declare global {
 let connectedAccount: ExtensionWalletAccount | undefined
 let sessionVersion = 0
 let sessionEventTarget: Window | undefined
+let explicitConnectionPending = false
+let explicitConnectionCommitVersion = 0
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -88,6 +90,16 @@ const getProvider = () => {
   }
   return provider
 }
+
+const requireSupportedChainId = (chainId: string): SupportedChainId => {
+  if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
+    throw new Error("Burrito Wallet Extension does not support this chain")
+  }
+  return chainId as SupportedChainId
+}
+
+const createConnectionError = (code: "BUSY", message: string) =>
+  Object.assign(new Error(message), { code })
 
 export const isBurritoExtensionWalletAvailable = () => {
   try {
@@ -199,34 +211,103 @@ const parseExtensionAccounts = (
   return parseExtensionAccount(value.accounts[0], chainId)
 }
 
-export const connectBurritoExtensionWallet = async (
-  chainId: string
-): Promise<WalletAccount> => {
-  if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
-    throw new Error("Burrito Wallet Extension does not support this chain")
-  }
-  const supportedChainId = chainId as SupportedChainId
-  const provider = getProvider()
-  observeSessionChanges()
-  invalidateBurritoExtensionSession()
-  const connectingVersion = sessionVersion
+const readExtensionAccount = async (
+  provider: ExtensionProvider,
+  chainId: SupportedChainId,
+  accountMethod: "wallet.connect" | "wallet.getAccounts",
+  expectedSessionVersion: number
+) => {
   validateCapabilities(
     await provider.request("wallet.getCapabilities", {}),
-    supportedChainId
+    chainId
   )
-  if (connectingVersion !== sessionVersion) {
+  if (expectedSessionVersion !== sessionVersion) {
     throw new Error("Burrito Wallet Extension connection changed; reconnect")
   }
   const account = parseExtensionAccounts(
-    await provider.request("wallet.connect", { chainIds: [supportedChainId] }),
-    supportedChainId
+    await provider.request(accountMethod, { chainIds: [chainId] }),
+    chainId
   )
-  if (connectingVersion !== sessionVersion) {
+  if (expectedSessionVersion !== sessionVersion) {
+    account.pubkey.fill(0)
+    throw new Error("Burrito Wallet Extension connection changed; reconnect")
+  }
+  return account
+}
+
+export const connectBurritoExtensionWallet = async (
+  chainId: string
+): Promise<WalletAccount> => {
+  if (explicitConnectionPending) {
+    throw createConnectionError(
+      "BUSY",
+      "A Burrito Wallet connection request is already in progress"
+    )
+  }
+  explicitConnectionPending = true
+  try {
+    const supportedChainId = requireSupportedChainId(chainId)
+    const provider = getProvider()
+    observeSessionChanges()
+    invalidateBurritoExtensionSession()
+    const expectedSessionVersion = sessionVersion
+    const account = await readExtensionAccount(
+      provider,
+      supportedChainId,
+      "wallet.connect",
+      expectedSessionVersion
+    )
+    if (expectedSessionVersion !== sessionVersion) {
+      account.pubkey.fill(0)
+      throw new Error("Burrito Wallet Extension connection changed; reconnect")
+    }
+    connectedAccount = account
+    explicitConnectionCommitVersion += 1
+    return { address: account.address, name: "Burrito Wallet" }
+  } finally {
+    explicitConnectionPending = false
+  }
+}
+
+export const restoreBurritoExtensionWallet = async (
+  chainId: string
+): Promise<WalletAccount> => {
+  const supportedChainId = requireSupportedChainId(chainId)
+  const provider = getProvider()
+  observeSessionChanges()
+  const expectedSessionVersion = sessionVersion
+  const expectedCommitVersion = explicitConnectionCommitVersion
+  const account = await readExtensionAccount(
+    provider,
+    supportedChainId,
+    "wallet.getAccounts",
+    expectedSessionVersion
+  )
+  if (expectedSessionVersion !== sessionVersion || expectedCommitVersion !== explicitConnectionCommitVersion) {
     account.pubkey.fill(0)
     throw new Error("Burrito Wallet Extension connection changed; reconnect")
   }
   connectedAccount = account
   return { address: account.address, name: "Burrito Wallet" }
+}
+
+export const getBurritoExtensionConnectionErrorMessage = (error: unknown) => {
+  const code = isRecord(error) ? error.code : undefined
+  if (code === "USER_REJECTED") {
+    return "Connection cancelled. Choose Connect when you are ready to approve this site."
+  }
+  if (code === "WALLET_LOCKED") {
+    return "Unlock Burrito Wallet, then choose Connect again."
+  }
+  if (code === "UNAUTHORIZED") {
+    return "This site is not authorized for that network. Choose Connect and approve access in Burrito Wallet."
+  }
+  if (code === "BUSY") {
+    return "A Burrito Wallet connection request is already open. Finish or cancel it before trying again."
+  }
+  return error instanceof Error
+    ? error.message
+    : "Burrito Wallet could not connect. Try again from the wallet menu."
 }
 
 export const disconnectBurritoExtensionWallet = async () => {
