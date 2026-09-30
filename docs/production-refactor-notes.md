@@ -52,8 +52,31 @@ environment resolves this without changing the repository's audit policy.
 
 Raw logs, screenshots, source/output hashes and harnesses are in the external
 `burrito-runtime-lifecycle-9068d5046f3143faa4c66edde1ce59cb` evidence collection.
-The existing public-repository Frontend workflow must verify the committed
-candidate; private runner labels/budgets and deployment workflows are unchanged.
+Runtime candidate `4e894ffcc70f3cd1ed3d6824ccb352a5bcb685b9` passed the existing
+public-repository [Frontend run 36766611890](https://github.com/BurritoLabs/burrito-web-app/actions/runs/36766611890)
+at 2026-09-30 19:40 UTC: fresh npm ci, lint, 265 unit tests, production audit,
+build, unchanged bundle budgets and 133 browser cases (3 intentional skips).
+The npm ci informational full-tree audit still reports 17 low, 5 moderate and
+5 high findings, including development dependencies. The production-only gate
+reports 12 low and no elevated findings; this is not an all-dependency clearance.
+Private runner labels/budgets and deployment workflows are unchanged.
+
+A separate final production visual probe passed desktop 1440x900 and mobile
+390x844 in both themes, including page identity, nonblank content, absence of an
+error overlay, dialog bounds, initial focus, Escape and trigger-focus return.
+It used no injected provider and records zero page errors/unexpected console
+entries, plus 16 expected blocked-network errors. Full-suite console sampling
+limits above still apply and are not superseded by this four-surface probe.
+
+Persistent local evidence is `C:/Users/fengz/.codex/artifacts/burrito-wallet/runtime-lifecycle-20260930/evidence.zip`:
+556 entries, 17,774,223 bytes, SHA256
+`d4ca849e7ea3501d2ff7cba9fc60e349810addaa54e884d86d504a09f8fc8a0f`.
+Every archived file was read back and matched to its source SHA256; the package
+includes failed attempts, final runs, CI status/log and exact source/output pins.
+412 non-documentation files match the runtime commit after Git line-ending and
+disposable test-import normalization. The 156 built outputs use a local QA
+release label and are not a deployed build. This follow-up note changes no runtime.
+
 Genuine WalletConnect pairing/return/restoration, exact installed-extension
 pairing of this new build, native iOS/Android acceptance and original release
 gates remain open. No actual signature/broadcast, real funds, device/certificate
