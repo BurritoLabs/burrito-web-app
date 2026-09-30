@@ -302,6 +302,175 @@ const expectPending = async (page: Page, chainId: ChainId) => {
   )
 }
 
+// Delay the real lazy module, not the wallet/controller implementation. This
+// reproduces a user opening Connect while WalletConnect code is still loading.
+const holdWalletRuntime = async (page: Page) => {
+  let release!: (failure: boolean) => void
+  let requested!: () => void
+  const requestedPromise = new Promise<void>((resolve) => { requested = resolve })
+  const releasePromise = new Promise<boolean>((resolve) => { release = resolve })
+  await page.route(/\/src\/app\/wallet\/WalletRuntimeProvider\.tsx(?:\?|$)/, async (route) => {
+    requested()
+    if (await releasePromise) {
+      await route.abort("failed")
+    } else {
+      await route.continue()
+    }
+  })
+  return {
+    requested: requestedPromise,
+    async release(failure = false) {
+      release(failure)
+      const loaded = await page.evaluate(async () => {
+        try {
+          const runtimeModule = "/src/app/wallet/WalletRuntimeProvider.tsx"
+          await import(/* @vite-ignore */ runtimeModule)
+          return true
+        } catch {
+          return false
+        }
+      })
+      expect(loaded).toBe(!failure)
+      // Let React's scheduled commit and passive effects cross a browser paint;
+      // merely receiving the module response does not prove that they ran.
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      }))
+    }
+  }
+}
+
+test("delayed runtime keeps the open Connect dialog and keyboard focus", async ({ page }) => {
+  test.setTimeout(60000)
+  const runtime = await holdWalletRuntime(page)
+  await installProvider(page, { runtime: true, compatibility: "alias" })
+  await openApp(page)
+  await runtime.requested
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const dialog = page.getByRole("dialog", { name: "Connect wallet", exact: true })
+  await expect(dialog).toBeFocused()
+  const originalDialog = await dialog.elementHandle()
+  await runtime.release()
+  await expect(dialog).toBeVisible()
+  expect(await originalDialog!.evaluate((element) => element.isConnected)).toBe(true)
+  await expect(dialog).toBeFocused()
+  expect(await accountCalls(page)).toEqual([])
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+})
+
+for (const outcome of ["approve", "cancel", "load-failure"] as const) {
+  test(`delayed runtime preserves one pending approval through ${outcome}`, async ({ page }, testInfo) => {
+    test.setTimeout(60000)
+    const runtime = await holdWalletRuntime(page)
+    await installProvider(page, { runtime: true, compatibility: "alias" })
+    await openApp(page)
+    await runtime.requested
+    await beginConnection(page)
+    await expectPending(page, "columbus-5")
+    const dialog = page.getByRole("dialog", { name: "Connect wallet", exact: true })
+    const originalDialog = await dialog.elementHandle()
+    await runtime.release(outcome === "load-failure")
+    await expect(dialog).toBeVisible()
+    expect(await originalDialog!.evaluate((element) => element.isConnected)).toBe(true)
+    await expectPending(page, "columbus-5")
+    expect((await snapshot(page)).approvals).toBe(1)
+    expect((await snapshot(page)).maxPending).toBe(1)
+    if (outcome === "approve") {
+      await testInfo.attach("pending-after-runtime-load", {
+        body: await page.screenshot({ animations: "disabled" }), contentType: "image/png"
+      })
+    }
+    if (outcome === "cancel") {
+      await reject(page, "USER_REJECTED")
+      await expect(page.getByRole("alert")).toContainText("Connection cancelled")
+      await expect(extensionButton(page)).toBeEnabled()
+      expect(await rememberedConnector(page)).not.toBe("burrito-extension")
+    } else {
+      await approve(page)
+      await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+      await expect.poll(() => rememberedConnector(page)).toBe("burrito-extension")
+    }
+    await expect(page.getByRole("button", { name: "Switch network", exact: true })).toBeEnabled()
+    expect((await snapshot(page)).pendingChainIds).toBeNull()
+    expect((await snapshot(page)).approvals).toBe(1)
+  })
+}
+
+test("account invalidation during delayed runtime ignores the original approval", async ({ page }) => {
+  test.setTimeout(60000)
+  const runtime = await holdWalletRuntime(page)
+  await installProvider(page, { runtime: true, compatibility: "alias" })
+  await openApp(page)
+  await runtime.requested
+  await beginConnection(page)
+  await expectPending(page, "columbus-5")
+  // Unlike revoke(), this event deliberately leaves the synthetic external
+  // approval unresolved so its obsolete success can arrive after invalidation.
+  await page.evaluate(() => window.dispatchEvent(new Event("burrito:wallet-accounts-changed-v1")))
+  await expect(extensionButton(page)).toBeEnabled()
+  expect(await rememberedConnector(page)).toBeNull()
+  await runtime.release()
+  await approve(page)
+  await expect(page.getByText("Connected", { exact: true })).toHaveCount(0)
+  await expect.poll(() => rememberedConnector(page)).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem("burritoWalletManuallyDisconnected"))).toBe("true")
+  expect((await snapshot(page)).approvals).toBe(1)
+  await expect(page.getByRole("button", { name: "Switch network", exact: true })).toBeEnabled()
+})
+
+test("a mobile runtime load failure releases the UI without breaking extension Connect", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "Keplr Mobile is intentionally unavailable without touch support")
+  test.setTimeout(60000)
+  const runtime = await holdWalletRuntime(page)
+  await installProvider(page, { compatibility: "alias" })
+  await openApp(page)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const mobile = page.getByRole("button").filter({ hasText: /^Keplr Mobile/ })
+  await expect(mobile).toBeEnabled()
+  await mobile.click()
+  await runtime.requested
+  await expect(extensionButton(page)).toBeDisabled()
+  await runtime.release(true)
+  await expect(page.getByRole("alert")).toContainText(/load|wallet/i)
+  await expect(page.getByRole("button", { name: "Switch network", exact: true })).toBeEnabled()
+  expect(await rememberedConnector(page)).toBeNull()
+  await beginConnection(page)
+  await expectPending(page, "columbus-5")
+  await approve(page)
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect.poll(() => rememberedConnector(page)).toBe("burrito-extension")
+  expect((await snapshot(page)).approvals).toBe(1)
+})
+
+test("switching chains cancels an unstarted mobile runtime handoff", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "Keplr Mobile is intentionally unavailable without touch support")
+  test.setTimeout(60000)
+  const runtime = await holdWalletRuntime(page)
+  await installProvider(page, { compatibility: "alias" })
+  await openApp(page)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  await page.getByRole("button").filter({ hasText: /^Keplr Mobile/ }).click()
+  await runtime.requested
+  await expect(extensionButton(page)).toBeDisabled()
+  // Unlike a pending extension grant, loading mobile code can be cancelled by
+  // a network change. It must not open the old chain's handoff afterward.
+  await switchChain(page, "luna")
+  await runtime.release()
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  await expect(extensionButton(page)).toBeEnabled()
+  // Negative observation covers the normal 90 ms mobile handoff plus hydration
+  // effects. No WalletConnect session, real pairing or signing is provided.
+  await page.waitForTimeout(1000)
+  expect(await rememberedConnector(page)).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem("cosmos-kit@2:core//current-wallet"))).toBeNull()
+  expect(await accountCalls(page)).toEqual([])
+  await beginConnection(page)
+  await expectPending(page, "phoenix-1")
+  await approve(page)
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+})
+
 test("explicit Connect owns one pending request, blocks network changes, and remembers only success", async ({ page }) => {
   await installProvider(page)
   await openApp(page)

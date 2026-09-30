@@ -1,5 +1,64 @@
 # Production Refactor Notes
 
+## Persistent wallet owner and CI regression repairs — 2026-09-30
+
+The application now has one persistent WalletProvider. Lazy Cosmos Kit code
+publishes a memoized, chain-tagged snapshot through a headless sibling instead
+of replacing the application tree. Delayed loading preserves the same Connect
+dialog/focus and pending Burrito approval. Failure only resets mobile-owned
+work, and a chain change cancels an unstarted mobile handoff. SDK hook automatic
+connection is disabled; explicit connection and read-only hydration stay with
+the controller. Desktop-only transaction feedback retains its previous
+explicit-dismiss behavior. No CSS, brand asset, chain/fee or API contract changed.
+
+Source baseline is `9cb9a1783f6f10c680caa5ccd9d87cd012c72298`, which already
+upgraded the Axios lock to 1.20.0. Its GitHub run `36761711734` passed dependency
+audit/build but failed four dialog-surface checks and one lazy-runtime wallet
+test. The dialog checks measured Connect's unpainted header instead of its
+painted card. They now measure each component's actual surface without dropping
+color or viewport assertions; contrast checks await finite theme transitions.
+
+Final local validation uses an independent source/dependency copy, scrubbed
+environment, empty env directories and the normal in-copy Vite cache:
+
+- Lint, both TypeScript projects, 265 unit tests/42 files, wallet specs, market
+  asset identities, production build and unchanged bundle budgets pass.
+- Fresh production dependency audit: 12 reviewed low, 0 moderate/high/critical.
+- Controlled-provider wallet cases: 54 pass, 2 desktop-only skips. The final
+  complete offline dev suite: 133 pass, 3 intentional desktop skips / 136.
+- Production assets: 88/88 wallet and light/dark quality cases pass. Tests
+  requiring a Vite source-module interception are excluded from this production
+  run and covered in the dev suite, not counted as production passes.
+- Initial JS 440.0 KiB / 145.5 KiB gzip (150 KiB gzip budget); lazy wallet
+  closure 1021.4 KiB gzip (1025 KiB budget). Existing annotation, vm-browserify
+  eval and large-chunk build warnings remain.
+- Windows Playwright, 1440x900 and 390x844; Browser plugin unavailable. Local
+  static JSON/assets and explicit fixtures allowed; other HTTP/WebSockets
+  blocked. Zero uncaught page errors. Recorded console samples contain offline
+  asset/preload failures, intentionally aborted module failures, blocked Vite
+  HMR and an SDK deprecation warning; samples cap at 250 messages/test. This is
+  not online-service health, installed-extension or native-wallet acceptance.
+
+Failures are retained: pre-fix delayed-load tests reproduce 3/4 failures. The
+first candidate run has 50 pass/3 fail/1 skip because two new fixture oracles
+incorrectly approved an already-rejected synthetic request and expected the
+extension-only network lock for mobile. They were corrected, with an additional
+mobile chain-cancellation case. Initial broader offline runs have 129 pass/
+4 fail/3 skip and production 84 pass/4 fail: the harness blocked local market
+JSON and contrast sampling raced theme transitions. Final passes above use
+the corrected harness and unchanged contrast threshold. A first direct-node
+audit invocation failed on Windows npm.cmd launching; the normal npm CLI
+environment resolves this without changing the repository's audit policy.
+
+Raw logs, screenshots, source/output hashes and harnesses are in the external
+`burrito-runtime-lifecycle-9068d5046f3143faa4c66edde1ce59cb` evidence collection.
+The existing public-repository Frontend workflow must verify the committed
+candidate; private runner labels/budgets and deployment workflows are unchanged.
+Genuine WalletConnect pairing/return/restoration, exact installed-extension
+pairing of this new build, native iOS/Android acceptance and original release
+gates remain open. No actual signature/broadcast, real funds, device/certificate
+changes, production deployment, main merge or store submission occurred.
+
 ## Independent Keplr identity and mobile handoff isolation — 2026-09-30
 
 Runtime `ed6fa7bc38d7a8df029dff05aa8aaee8b990e81a` includes `4d5bda3`'s

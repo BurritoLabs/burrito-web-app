@@ -15,6 +15,11 @@ The normal frontend CI verifies the following before deployment:
 The mobile wallet runtime remains outside the initial bundle. Opening the
 connect flow preloads it only when Keplr Mobile is available, reducing the wait
 after the user chooses that connector without taxing ordinary page loads.
+One persistent controller owns the application wallet state. The lazy SDK is
+a headless, chain-tagged bridge: loading it must not remount routes, dismiss an
+open connection dialog, orphan an approval, or clear a desktop session on failure.
+Queued mobile work is cancelled by a chain change or disconnect before it can
+start a handoff. SDK readiness is not evidence of completed native pairing.
 
 ## Extension connection contract
 
@@ -43,6 +48,13 @@ not sign or broadcast transactions during the connection-only check.
 Keep its evidence outside this repository. Neither the controlled-provider
 tests nor a connection-only browser run replace native-wallet acceptance,
 transaction review tests, full product-route regression, or release CI.
+
+Dialog checks must measure the actual painted surface (the Connect dialog
+itself versus the token picker's inner card), while retaining all background,
+foreground and viewport assertions. Theme accessibility checks wait for actual
+finite CSS transitions and fonts before measuring contrast, not an arbitrary
+delay. Offline acceptance must still allow versioned local static JSON/assets;
+blocked live services and intentionally failed imports are recorded separately.
 
 Production clients report FCP, LCP, CLS, INP, and TTFB to the Burrito API. The
 report contains no wallet address or query string and is aggregated for a

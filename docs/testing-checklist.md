@@ -4,6 +4,13 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Wallet
 
+- Delay the mobile SDK while Connect is open, including during a pending Burrito
+  approval. The same dialog/focus, pending state and network lock must survive
+  successful loading; approval/cancellation must settle once. SDK failure must
+  leave the desktop flow usable. Invalidation must reject obsolete responses.
+- Cancel an unstarted mobile handoff by switching chains while its SDK loads;
+  loading completion must not open the old chain's connection afterward.
+  Verify actual WalletConnect pairing/return separately from these fixtures.
 - Connect dialog must have an accessible name, receive initial focus, contain
   forward/reverse Tab, close on Escape and restore the trigger. Repeat while an
   extension request is pending: closing the panel must not approve/cancel it or
