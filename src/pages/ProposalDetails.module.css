@@ -847,19 +847,19 @@
 }
 
 .voteYes {
-  color: #52c41a;
+  color: var(--bui-color-success);
 }
 
 .voteNo {
-  color: #ff7aa2;
+  color: var(--bui-color-danger);
 }
 
 .voteVeto {
-  color: #ff4d4f;
+  color: var(--bui-color-danger);
 }
 
 .voteAbstain {
-  color: #f6c343;
+  color: var(--bui-color-warning);
 }
 
 .voteCardYes {

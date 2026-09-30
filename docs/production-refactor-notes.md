@@ -1,5 +1,46 @@
 # Production Refactor Notes
 
+## Proposal tally text and full detail-page gates — 2026-09-30
+
+Following `8e28bb6`, the status pills passed, but that did not cover the four
+vote-percentage values. A populated, offline baseline measured light-theme
+Yes/No/Veto/Abstain at 2.15/2.33/3.11/1.56:1 against a required 4.5:1.
+The final baseline matrix reproduced 16 light-theme failures; 16 dark-theme
+cases passed. The four text classes now use the existing shared success,
+danger and warning tokens. Chart segments, borders, typography, brand,
+wallet logic and transaction execution are unchanged.
+
+`governance-details.spec.ts` adds 32 cases: both chains, both themes, all four
+proposal states, desktop 1440x900 and touch/mobile 390x844. Tests enter from
+the real Governance list, require a loaded tally and four visible percentage
+nodes, expand/collapse the description, check overflow/page errors, and run
+whole-page Axe with the existing decorative `aria-hidden` exclusion. Each
+of the four changed values must also appear in the scoped contrast passes;
+empty violations/incomplete arrays alone are insufficient. Whole-page manual
+review items are retained as attachments, not declared passing or suppressed.
+This is not a complete WCAG certification: fixture validators, individual votes
+and deposit lists remain empty, and no wallet is connected or transaction sent.
+
+Local full dev suite: 173 pass / 3 intentional platform skips. Production
+governance suite: 40/40; lint, 265 unit tests, TypeScript,
+production build and bundle budgets pass. Production dependency audit remains
+12 low and zero moderate/high/critical, not a full-tree dependency clearance.
+The isolated dependencies are copied from the previously verified lock-matched
+installation; final-head CI must provide its own fresh-install result.
+The 32 new production cases record 2,560 console messages with no truncation:
+expected blocked-network failures and preload warnings, no uncaught page errors.
+The wider 40-case suite records 4,560 messages and drops 422 at the existing
+per-test cap; it is not evidence of complete error-free online service logs.
+
+Evidence: `C:/Users/fengz/.codex/artifacts/burrito-wallet/proposal-details-20260930/`.
+The initial cold-dev-server invalid-hook failure and early test-authoring
+failures (ambiguous Deposit link and overbroad manual-review assertion) are
+retained alongside the corrected baseline and final production evidence.
+The previously sealed pairing evidence was not modified; this CSS-only runtime
+change does not claim a new installed-extension/native/signing acceptance run.
+Full-suite and subsequent exact-head CI results are retained in this collection
+rather than creating a documentation-only follow-up that retriggers CI.
+
 ## Populated governance contrast and installed-runtime pairing — 2026-09-30
 
 The documentation-only follow-up `cead7fe` did not stay green: Frontend run
