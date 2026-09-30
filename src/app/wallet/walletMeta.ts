@@ -13,6 +13,7 @@ const COSMOS_KIT_STORAGE_KEYS = [
 
 export const KNOWN_CONNECTOR_IDS: WalletConnectorId[] = [
   "burrito-native",
+  "burrito-extension",
   "keplr",
   "keplr-mobile",
   "galaxy"
@@ -31,6 +32,12 @@ export const CONNECTOR_META: Record<WalletConnectorId, WalletAdapterMeta> = {
     label: "Burrito Wallet",
     badge: "B",
     type: "mobile"
+  },
+  "burrito-extension": {
+    id: "burrito-extension",
+    label: "Burrito Wallet",
+    badge: "B",
+    type: "extension"
   },
   keplr: {
     id: "keplr",
