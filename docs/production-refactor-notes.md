@@ -1,5 +1,66 @@
 # Production Refactor Notes
 
+## Independent Keplr identity and mobile handoff isolation — 2026-09-30
+
+Runtime `ed6fa7bc38d7a8df029dff05aa8aaee8b990e81a` includes `4d5bda3`'s
+shared provider identity check across WalletBoot, WalletProvider and adapters.
+Burrito's named/versioned Keplr compatibility object is no longer advertised or
+used as a separate Keplr installation. A desktop connector cannot use a cached
+runtime to bypass that check or borrow Burrito's global signer helpers.
+Independent Keplr interfaces and their legacy helpers remain supported.
+Keplr Mobile no longer falls back to a desktop account/signer when its runtime
+is absent; a legitimate pending mobile handoff still returns without an account.
+No extension API, CSS, brand asset, dependency or audit baseline changed.
+
+Regression evidence distinguishes fixtures from actual installed extensions:
+
+- Initial alias tests: 6 failures / 8 cases; mobile-fallback follow-up: 2 failures
+  / 13 cases. Console result summaries are retained, not claimed as raw logs.
+  Final identity tests: 13/13; full Vitest suite: 265/265 across 42 files.
+- Existing desktop/narrow-screen wallet suites: 42/42 on an isolated Vite dev
+  server. Includes the actual lazy controller with a synthetic Burrito alias,
+  stale Keplr restore, independent-provider coexistence and mobile handoff
+  boundaries. Provider state/decisions here are fixtures, not real Keplr QA.
+- Actual unchanged `007bfa8` Burrito extension plus final local Web production
+  assets: 205/205 assertions (including provenance, not 205 distinct features).
+  Covers Classic/Terra grants, cancellation, refresh, lock, explicit reconnect,
+  revocation, address/QR UI and wallet A/B switching. Separate real-extension
+  dialog probe: 27/27, including alias disabled, Burrito enabled, compatibility
+  API still present and keyboard focus at both viewport widths.
+- Final production build, both TypeScript checks, modified-file ESLint and
+  existing bundle budgets pass. Wallet runtime closure is 1024.0 KiB gzip
+  against 1025 KiB; initial JS 426.7 KiB / 141.8 KiB gzip. Existing annotation,
+  vm-browserify eval and large-chunk warnings remain.
+
+Browser plugin unavailable: existing Playwright 1.62.1 / Windows Chromium
+151.0.7922.34; 1440x900 and 390x844. Real-extension tests serve local static
+assets at the isolated browser's app origin and block other HTTP/WebSockets.
+The final pairing records 0 page errors, 0 unexpected console errors and 0
+external responses; 191 reads/20 writes blocked, 151 expected network errors,
+59 warnings (20 preload, 39 unclassified). This is not live-data validation.
+No actual signature, broadcast, secrets captured or funded wallet; final QA
+wallets locked/disconnected, four persistent profiles retained and no matching
+Chrome processes after closure. The approval screenshot is a 1440x900 viewport,
+not physical popup geometry. No native-mobile or new optical-ink claim.
+
+Evidence: `artifacts/web-provider-identity-20260930/`. Final pairing report
+`final/run-UtMkxo/acceptance.json` SHA-256
+`b323d2ac54ef8e29b879f61f5a206f7807ec20f5c0f47b2426b8478928b1e452`;
+dialog report `final/focus-u4axjS/acceptance.json` SHA-256
+`6c1cd6567c7c9d5c5b9410df01faa9c7094420daa90ec0e194279176da651ff4`.
+Complete ZIP has 362 individually hash-verified entries, SHA-256
+`85e56394663423ff2031d6d1490fbfc4b75f44ea77c275b7f95596437d223f89`.
+Source/output pins cover 316 Web files/156 outputs and the unchanged complete
+extension ZIP. Repository dist and unrelated untracked entries remain intact.
+
+Remaining: genuine Keplr/Burrito extension injection-order coexistence, actual
+WalletConnect mobile pairing/signing, deployed consumers and original release
+gates. CI run 36757104617 for the preceding `b3749cc` passed install/lint/unit
+tests but failed production dependency audit on newly reported Axios advisories;
+its build/E2E were skipped, not passed. Lock remains Axios 1.19.0. Address the
+upstream patched version and compatibility in a separate dependency change;
+do not widen audit allowances or inherit an old green CI result.
+
 ## Current-extension pairing and connection-dialog keyboard fix — 2026-09-30
 
 Runtime `c152eaa1ff1d35e86650d239ce7ebca99458b888` gives ConnectModal an

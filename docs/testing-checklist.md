@@ -11,6 +11,9 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - With only Burrito installed, do not present its compatibility alias as a
   separate Keplr installation. With genuine Keplr also installed, verify provider
   identity remains distinct through connect/restore/events/signing boundaries.
+- Keplr Mobile must retain a pending mobile handoff without borrowing a desktop
+  account. A missing mobile runtime/signer must not fall back to desktop Keplr;
+  verify both the missing and legitimate-ready runtime cases.
 - After adding/switching wallets A and B in the extension, require explicit Web
   reconnection, clear prior grants and verify the complete new public identity.
 
