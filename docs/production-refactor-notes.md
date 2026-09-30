@@ -1,5 +1,89 @@
 # Production Refactor Notes
 
+## Current-extension pairing and connection-dialog keyboard fix — 2026-09-30
+
+Runtime `c152eaa1ff1d35e86650d239ce7ebca99458b888` gives ConnectModal an
+accessible name, focuses its dialog when opened, contains forward/reverse Tab,
+closes with Escape and restores the triggering control. The keyboard listener
+exists only while open; a stable callback ref avoids resubscribing/refocusing
+when wallet state changes. No CSS, shared brand, provider/storage/signing logic
+or dependencies changed. Escape closes the Web UI, not a pending wallet request.
+
+The pre-fix production build reproduced all six keyboard/semantic failures at
+both desktop and narrow viewports (6/18 checks passed). The unchanged probe
+passes 18/18 after the fix; a separate real-extension probe passes 21/21,
+including multiple enabled controls. Permanent keyboard tests pass on both
+configured desktop and mobile projects. The full unit suite remains 252/252
+across 41 files; modified-file ESLint, both TypeScript projects and existing
+bundle budgets pass. Initial JS is 426.5 KiB / 141.8 KiB gzip; the existing
+wallet runtime's static closure is 1023.9 KiB gzip, close to its 1025 KiB budget.
+Existing Rollup annotation, vm-browserify eval and large-chunk warnings remain.
+
+Two isolated real-extension runs, before and after this UI fix, each pass
+197/197 assertions (including provenance checks, not 197 distinct features).
+The authoritative post-fix run pairs this Web runtime with extension runtime
+`007bfa80c51c5666d94edd604adf3624067b6d3e`, complete ZIP SHA-256
+`d9fc83e73a83f8807abdf2df71c4edb83538bb161957be62abdbe6683526c22d`.
+
+- Uses the actual production-mode local `/privacy` application and real
+  extension, not injected provider/vault/worker state. Only local static assets
+  are fulfilled at the isolated browser's `https://app.burrito.money` origin;
+  all other HTTP/WebSockets are blocked. This is not the deployed WebApp.
+- Covers cancellation, closing a pending panel with network switching still
+  disabled, Classic-only permission, rejected Terra upgrade preserving Classic,
+  both-chain permission, passive restoration, lock/unlock requiring explicit
+  reconnect, extension revocation and Web disconnect across refresh.
+- At 390x844, verifies the connected identity and separate address/QR close
+  controls. Adding wallet B invalidates Web wallet A; switching back to A
+  invalidates B, clears grants and requires new explicit access. Full public
+  identities match; screenshots are masked and reports retain only digests.
+- Wallets are fresh and unfunded, phrases counted only, passwords in memory;
+  no signature, broadcast or real funds. Both pairing runs end locked and
+  disconnected. All five dedicated persistent profiles are retained and have
+  zero matching Chrome processes after normal closure.
+- Existing Playwright 1.62.1 / Windows Chromium 151.0.7922.34, Browser plugin
+  unavailable; 1440x900 and 390x844. Identity, meaningful content, no framework
+  overlay and the interactions above pass. Post-fix actual pairing has zero
+  uncaught/unexpected console errors or external responses, 191 blocked reads,
+  20 blocked writes, 151 expected network-error messages and 60 warnings
+  (20 unused-preload, 40 unclassified). This is not error-free online-data QA.
+- Pre/post hashes match 315 Web sources, 156 outputs, 109 extension sources,
+  40 extension outputs and the complete ZIP. Builds used existing dependencies,
+  scrubbed environment and empty env directories; repository `dist` and the
+  four unrelated untracked entries were preserved. No fresh install/audit,
+  Linux CI, physical toolbar, mobile-native, QR payload decoding or optical-ink
+  certification is implied. The approval screenshot uses a 1440x900 viewport.
+
+The expanded controlled-provider suite has **26 passing production-preview
+cases**, including Escape while approval remains pending. Two existing tests
+explicitly await `/src/app/wallet/WalletRuntimeProvider.tsx`, so running them
+against production assets caused two harness-environment timeouts. Original
+logs and error contexts remain. Both subsequently pass against an isolated
+Vite development server with their original oracles/timeouts. This is 26 + 2
+environment-appropriate passes, not an erased failure or one all-green run.
+
+Evidence collection `artifacts/web-current-pairing-20260930/`:
+
+- Post-fix `fix/run-09HiPS/acceptance.json`: SHA-256
+  `64ea6ebf95095a7188569f800a856359df6400376939dbc968ba9e31ee8d64a9`.
+- Real-extension focus `focus-CnTIZ3/acceptance.json`: SHA-256
+  `9396ab1772718f570a6679af246eb0044935c787137dbe7671e56dccc77013c5`.
+- Complete evidence ZIP (368 entries individually hash-verified), including
+  both builds, baseline failures, helpers and images: SHA-256
+  `85202c815f03f332ba69b4cc27fd84e89623222694b3c0b7dc6ee316f05420fe`.
+
+**Next confirmed issue:** with only Burrito installed, the Web selector also
+enables a row labelled Keplr. The extension intentionally supplies its named
+compatibility provider as `window.keplr` only when that global is absent, while
+Web's two desktop-provider checks accept any truthy `window.keplr`. The fresh
+real-extension focus screenshots expose this misleading identity. Distinguish
+that alias from an independently installed Keplr without removing compatibility
+from the extension; verify genuine Keplr coexistence and both Web controllers.
+The explicit Burrito-flow passes above do not close this separate identity gate.
+
+Publication, live balances/transactions, complete screen-reader/contrast tests,
+other wallets/devices, current CI and original release gates remain separate.
+
 ## Wallet privacy and exact-extension pairing — 2026-09-30
 
 - Runtime source `d16855789e2d48b5527706467dfd2270a5e4f05c` clarifies the

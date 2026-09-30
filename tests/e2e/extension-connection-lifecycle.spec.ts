@@ -301,6 +301,24 @@ test("explicit Connect owns one pending request, blocks network changes, and rem
   expect((await snapshot(page)).maxPending).toBe(1)
 })
 
+test("Escape dismisses only the connection panel while approval stays pending", async ({ page }) => {
+  await installProvider(page)
+  await openApp(page)
+  await beginConnection(page)
+  await expectPending(page, "columbus-5")
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Switch network", exact: true })).toBeDisabled()
+  expect((await snapshot(page)).pendingChainIds).toEqual(["columbus-5"])
+  expect((await snapshot(page)).approvals).toBe(1)
+  expect((await snapshot(page)).grants).toEqual([])
+  await reject(page, "USER_REJECTED", "Connection request cancelled by the user.")
+  await expect(page.getByRole("button", { name: "Switch network", exact: true })).toBeEnabled()
+  expect((await snapshot(page)).pendingChainIds).toBeNull()
+  expect((await snapshot(page)).approvals).toBe(1)
+  expect(await rememberedConnector(page)).toBeNull()
+})
+
 for (const scenario of [
   { label: "Cancel", message: "Connection request cancelled by the user." },
   { label: "synthetic timeout", message: "Request approval timed out." }

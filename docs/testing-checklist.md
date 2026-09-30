@@ -4,6 +4,16 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Wallet
 
+- Connect dialog must have an accessible name, receive initial focus, contain
+  forward/reverse Tab, close on Escape and restore the trigger. Repeat while an
+  extension request is pending: closing the panel must not approve/cancel it or
+  enable network switching before the wallet request settles.
+- With only Burrito installed, do not present its compatibility alias as a
+  separate Keplr installation. With genuine Keplr also installed, verify provider
+  identity remains distinct through connect/restore/events/signing boundaries.
+- After adding/switching wallets A and B in the extension, require explicit Web
+  reconnection, clear prior grants and verify the complete new public identity.
+
 - Connect **Burrito Wallet Extension** using its explicit connector with the
   exact release-candidate ZIP; do not count its Keplr compatibility alias as
   Burrito integration acceptance. Record deployed Web asset/build identifiers.
