@@ -16,6 +16,7 @@ test("privacy policy explains connected sites and off-device processing", async 
   await expect(extension).toContainText("its own connection approval")
   await expect(extension).toContainText("off-chain messages")
   await expect(extension).toContainText("revoke")
+  await expect(extension).toContainText("extension-page local storage")
 
   const diagnostics = policy.locator("section").filter({
     has: page.getByRole("heading", { name: "Performance and error reporting", exact: true })
@@ -31,4 +32,38 @@ test("privacy policy explains connected sites and off-device processing", async 
   await contact.scrollIntoViewIfNeeded()
   await expect(contact).toBeVisible()
   await expect(contact).toHaveAttribute("href", "mailto:hello@burritolabs.ca")
+})
+
+test("privacy distinguishes local custody from lookup and deletion boundaries", async ({ page }) => {
+  await page.goto("/privacy")
+  const policy = page.locator("main article")
+  await expect(policy.locator("time")).toHaveAttribute("datetime", "2026-09-30")
+
+  const custody = policy.locator("section").filter({
+    has: page.getByRole("heading", { name: "Non-custodial wallet", exact: true })
+  })
+  await custody.scrollIntoViewIfNeeded()
+  await expect(custody).toContainText("password-encrypted local vaults")
+  await expect(custody).toContainText("using or displaying them")
+
+  const services = policy.locator("section").filter({
+    has: page.getByRole("heading", { name: "Blockchain and service providers", exact: true })
+  })
+  await services.scrollIntoViewIfNeeded()
+  await expect(services).toContainText("identifiers of the assets being priced")
+  await expect(services).toContainText("does not require connecting")
+  await expect(services).toContainText("before signing approval")
+  await expect(services).toContainText("Explorer navigation is separate")
+  await expect(services).toContainText("their own browser cookies")
+
+  const retention = policy.locator("section").filter({
+    has: page.getByRole("heading", { name: "Retention and your choices", exact: true })
+  })
+  await retention.scrollIntoViewIfNeeded()
+  await expect(retention).toContainText("Other stored wallets and the shared theme preference remain")
+  await expect(retention).toContainText("physically erased")
+  await expect(retention).toContainText("Uninstalling the app alone is not a guarantee")
+  await expect(retention).toContainText("separate website storage or cache")
+  await expect(retention).toContainText("retained by their operators")
+  await expect(page.locator("vite-error-overlay")).toHaveCount(0)
 })

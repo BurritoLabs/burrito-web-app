@@ -470,6 +470,27 @@ test("an old Burrito revocation event does not cancel a newly pending Keplr conn
   expect((await snapshot(page)).grants).toEqual([])
 })
 
+test("wallet address and QR views expose distinct accessible close controls", async ({ page }) => {
+  await installProvider(page, { remembered: true, grants: ["columbus-5"] })
+  await openApp(page)
+  await expect(connectedButton(page)).toBeVisible()
+  await connectedButton(page).click()
+  await page.getByRole("button", { name: "View wallet addresses", exact: true }).click()
+  const closeAddresses = page.getByRole("button", { name: "Close wallet addresses", exact: true })
+  await expect(closeAddresses).toBeVisible()
+  await page.getByRole("button", { name: "Show QR code", exact: true }).click()
+  await expect(page.getByRole("img", { name: "Wallet address QR code", exact: true })).toBeVisible()
+  const closeQr = page.getByRole("button", { name: "Close QR code", exact: true })
+  await expect(closeQr).toBeVisible()
+  await closeQr.click()
+  await expect(closeQr).toHaveCount(0)
+  await expect(closeAddresses).toBeVisible()
+  await closeAddresses.click()
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(connectedButton(page)).toBeVisible()
+  expect((await snapshot(page)).approvals).toBe(0)
+})
+
 test("real lazy runtime controller also gates pending extension requests and restores chains read-only", async ({ page }) => {
   test.setTimeout(60000)
   await installProvider(page, { runtime: true })

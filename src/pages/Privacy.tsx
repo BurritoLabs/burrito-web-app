@@ -6,7 +6,7 @@ const Privacy = () => (
     <article className={styles.policy}>
       <header className={styles.intro}>
         <p className={styles.updated}>
-          Last updated: <time dateTime="2026-09-29">September 29, 2026</time>
+          Last updated: <time dateTime="2026-09-30">September 30, 2026</time>
         </p>
         <p>
           Burrito is a non-custodial wallet and blockchain interface provided by
@@ -18,12 +18,15 @@ const Privacy = () => (
       <section>
         <h2>Non-custodial wallet</h2>
         <p>
-          Burrito does not take custody of your assets. A recovery phrase or
-          private key created or imported in the mobile app or Chrome extension
-          is encrypted and stored locally using device- or browser-protected
-          storage. It is used locally to derive accounts and sign transactions
-          and is not sent to the Burrito web app, Burrito Labs, or a backend
-          service.
+          Burrito does not take custody of your assets. The mobile wallet keeps
+          recovery phrases in device-protected storage; the Chrome extension
+          keeps them in password-encrypted local vaults. Recovery phrases and
+          derived signing keys are processed locally for wallet operations,
+          including creation, import, account derivation, and signing. The
+          extension also processes the phrase locally when you choose to reveal
+          it after password verification. These secrets are not sent to the Burrito web app, Burrito Labs,
+          or a backend service. Encrypted storage does not mean these values
+          remain encrypted while the wallet is using or displaying them.
         </p>
         <p>
           You are responsible for keeping your recovery phrase safe. Burrito
@@ -47,8 +50,10 @@ const Privacy = () => (
           site does not approve future signing requests.
         </p>
         <p>
-          Chrome storage retains the encrypted wallet vault, account profiles,
-          saved recipients, approved-site status, and preferences. Alarms help
+          The extension stores encrypted wallet vaults, account profiles,
+          saved recipients, approved-site status, and wallet preferences in
+          Chrome extension storage. Its shared theme preference is stored
+          separately in extension-page local storage. Alarms help
           lock the wallet and expire unanswered approvals. The extension does
           not read unrelated websites, browsing history, cookies, device
           contacts, or advertising identifiers.
@@ -156,6 +161,26 @@ const Privacy = () => (
           activity stays on your device.
         </p>
         <p>
+          The extension&apos;s Terra Classic asset-price queries send the
+          identifiers of the assets being priced, selected from queried or
+          tracked wallet assets, to Burrito&apos;s API. These queries omit the
+          wallet address and balance amounts but can still reveal which assets
+          are being looked up. Loading wallet data and prices does not require
+          connecting the extension to a website. Transaction simulation also
+          sends prepared transaction details to the selected node before
+          signing approval; it does not broadcast a signed transaction.
+        </p>
+        <p>
+          Opening a Burrito Finder link sends the public account address or
+          transaction hash in that link, its network path, and ordinary browser
+          request information to Finder and its hosting providers. A transaction
+          can identify the addresses that participated in it. Explorer navigation
+          is separate from granting a website access to the extension. Finder
+          and other websites you open may also receive their own browser cookies;
+          the extension&apos;s restriction on reading cookies does not govern
+          those websites&apos; processing.
+        </p>
+        <p>
           Public blockchains are permanent and transparent. A wallet address and
           its transactions can remain publicly available even after you stop
           using Burrito.
@@ -175,11 +200,25 @@ const Privacy = () => (
           the app does not automatically upload that complete copied report.
         </p>
         <p>
-          Local wallet material remains on your device or browser profile until
-          you delete the wallet, clear the app or extension data, or uninstall
-          Burrito, subject to the platform&apos;s secure-storage behavior. These
-          actions cannot remove information already recorded on a public
-          blockchain or data retained independently by a third-party provider.
+          Removing a wallet from the extension deletes its encrypted record and
+          wallet-specific recipients and asset preferences, and clears site
+          connections. Other stored wallets and the shared theme preference
+          remain. Clearing extension data or uninstalling the extension has a
+          broader scope than removing one wallet. Locking ends the unlocked
+          session and clears recovery text from the wallet interface; it is not
+          a guarantee that every copy has been physically erased from
+          browser-managed memory or storage.
+        </p>
+        <p>
+          Mobile secure-storage retention depends on the operating system.
+          Uninstalling the app alone is not a guarantee that every protected
+          record is deleted. Use the mobile app&apos;s authenticated Remove
+          wallet action to remove its protected wallet secret. This does not
+          clear the embedded web app&apos;s separate website storage or cache.
+          Local wallet removal cannot delete public
+          blockchain records or establish deletion of any API, node, or Finder
+          request records retained by their operators. Those services manage
+          their own retention and deletion practices.
         </p>
         <p>
           Revoking a connected site prevents future extension access through
