@@ -1,9 +1,27 @@
 import { expect, test, type Page } from "@playwright/test"
 
+test.beforeEach(async ({ page, baseURL }) => {
+  if (!baseURL || new URL(baseURL).hostname !== "127.0.0.1") {
+    throw new Error("Wallet race tests require the local app")
+  }
+  const origin = new URL(baseURL).origin
+  await page.route(/^https?:\/\//, async (route) => {
+    const url = new URL(route.request().url())
+    if (url.origin !== origin || /^\/(coingecko|keybase|burrito-api)(\/|$)/.test(url.pathname)) {
+      await route.abort("internetdisconnected")
+    } else if (url.pathname.startsWith("/__registry-test/")) {
+      await route.fulfill({ contentType: "application/json", body: '{"cw20":[],"ibc":[]}' })
+    } else {
+      await route.continue()
+    }
+  })
+  await page.routeWebSocket(/.*/, (socket) => socket.close())
+})
+
 const installPendingExtension = async (page: Page, holdDisconnect = false) => {
   await page.addInitScript((holdDisconnect) => {
     window.localStorage.setItem("burrito:web-app:chain", "lunc")
-    const controls = { connects: 0, disconnects: 0, release: () => {}, releaseDisconnect: () => {} }
+    const controls = { connects: 0, disconnects: 0, release: () => {}, reject: () => {}, releaseDisconnect: () => {} }
     Object.assign(window, { __walletRace: controls })
     Object.defineProperty(window, "BurritoWallet", { value: {
       version: 1,
@@ -23,7 +41,11 @@ const installPendingExtension = async (page: Page, holdDisconnect = false) => {
         }
         if (method !== "wallet.connect") throw new Error("Unexpected request")
         controls.connects += 1
-        if (controls.connects === 1) await new Promise<void>((resolve) => { controls.release = resolve })
+        // Every synthetic approval waits for an explicit test decision, including retries.
+        await new Promise<void>((resolve, reject) => {
+          controls.release = resolve
+          controls.reject = () => reject(Object.assign(new Error("Synthetic approval cancelled"), { code: "USER_REJECTED" }))
+        })
         return { source: "burrito", accounts: [{
           source: "burrito",
           chainId: (params.chainIds as string[])[0],
@@ -48,19 +70,59 @@ const pendingCalls = (page: Page) => page.evaluate(() => (
   window as Window & { __walletRace: { connects: number } }
 ).__walletRace.connects)
 
-test("cancelled extension approval cannot replace a newer connected session with an error", async ({ page }) => {
+test("an invalidated extension rejection cannot replace a newer Keplr session with an error", async ({ page }) => {
   await installPendingExtension(page)
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "keplr", { value: {
+      enable: async () => {},
+      getKey: async () => ({
+        name: "Public Keplr Race",
+        bech32Address: "terra1amdttz2937a3dytmxmkany53pp6ma6dy4vsllv"
+      })
+    } })
+  })
   await page.goto("/")
   await connectExtension(page)
   await expect.poll(() => pendingCalls(page)).toBe(1)
   await page.evaluate(() => window.dispatchEvent(new Event("burrito:wallet-accounts-changed-v1")))
   await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
   await page.getByRole("button", { name: "Close" }).click()
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  await page.getByRole("button").filter({ hasText: /^KeplrExtension$/ }).click()
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect(page.getByRole("dialog").getByText("Public Keplr Race", { exact: true })).toBeVisible()
+  await page.evaluate(() => (window as Window & { __walletRace: { reject: () => void } }).__walletRace.reject())
+  await expect(page.getByRole("alert")).toHaveCount(0)
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect.poll(() => pendingCalls(page)).toBe(1)
+  await expect.poll(() => page.evaluate(() => ({
+    connector: localStorage.getItem("burritoWalletConnector"),
+    manual: localStorage.getItem("burritoWalletManuallyDisconnected")
+  }))).toEqual({ connector: "keplr", manual: null })
+})
+
+test("an invalidated extension request remains BUSY until its original approval settles", async ({ page }) => {
+  await installPendingExtension(page)
+  await page.goto("/")
   await connectExtension(page)
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect.poll(() => pendingCalls(page)).toBe(1)
+  await page.evaluate(() => window.dispatchEvent(new Event("burrito:wallet-accounts-changed-v1")))
+  await expect(extensionButton(page)).toBeEnabled()
+  await extensionButton(page).click()
+  await expect(page.getByRole("alert")).toContainText("connection request is already open")
+  await expect.poll(() => pendingCalls(page)).toBe(1)
+  await expect(page.getByText("Connected", { exact: true })).toHaveCount(0)
+
+  await page.evaluate(() => (window as Window & { __walletRace: { reject: () => void } }).__walletRace.reject())
+  // An obsolete rejection must not replace the newer BUSY feedback or restore a session.
+  await expect(page.getByRole("alert")).toContainText("connection request is already open")
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("burritoWalletConnector"))).toBeNull()
+  await extensionButton(page).click()
+  await expect.poll(() => pendingCalls(page)).toBe(2)
+  await expect(page.getByText("Connected", { exact: true })).toHaveCount(0)
   await page.evaluate(() => (window as Window & { __walletRace: { release: () => void } }).__walletRace.release())
-  await expect(page.getByText("connection changed", { exact: false })).toHaveCount(0)
   await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect(page.getByRole("alert")).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => ({
     connector: localStorage.getItem("burritoWalletConnector"),
     manual: localStorage.getItem("burritoWalletManuallyDisconnected")
@@ -111,6 +173,8 @@ test("a slow disconnect completes without removing a newer wallet connection", a
   const close = page.getByRole("button", { name: "Close" })
   if (await close.isVisible()) await close.click()
   await connectExtension(page)
+  await expect.poll(() => pendingCalls(page)).toBe(2)
+  await page.evaluate(() => (window as Window & { __walletRace: { release: () => void } }).__walletRace.release())
   await expect(page.getByText("Connected", { exact: true })).toBeVisible()
   await page.evaluate(() => (window as Window & { __walletRace: { releaseDisconnect: () => void } }).__walletRace.releaseDisconnect())
   await expect(page.getByText("Connected", { exact: true })).toBeVisible()
