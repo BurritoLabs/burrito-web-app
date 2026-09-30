@@ -32,6 +32,25 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Verify extension lock, wallet change and site revocation invalidate the Web
   account; disconnect must remain disconnected after refresh on both chains.
 - Connect Keplr extension on desktop.
+- With an empty genuine Keplr installation, the connection alert must direct
+  users to create/import inside Keplr, without borrowing Burrito's account or
+  remembering a failed connection. Retry controls must recover; the fixture
+  must count a second enable call, not merely recheck stale text. Explicitly
+  selecting Burrito afterward must still work. Keep cancellation and other
+  provider errors distinct from the exact empty-keyring message.
+- With genuine Keplr as the active owner, separately exercise normal UI lock,
+  unlock and Connected Websites revocation. Record the Web account display,
+  focus return, page reload, and any new unlock/permission windows. Do not replace
+  these with a synthetic `keplr_keystorechange` event: Keplr 0.13.52 does not send
+  that event for these actions, and its public account reads may prompt.
+- Keep the Keplr lifecycle gate open until the explicit-versus-automatic recovery
+  policy is decided and verified. The September 30 exact-runtime reproduction
+  found stale displayed accounts and automatic restore prompts; successful
+  connection, dual-wallet isolation, and Burrito lifecycle tests do not fix it.
+- Verify manual Web Disconnect remains disconnected after refresh, separately
+  from actual Keplr permission removal. After re-granting in another window,
+  reload the Keplr popup before clearing permissions and again before asserting
+  the empty list; retain any earlier stale-list observations as inconclusive.
 - Connect Galaxy Station on desktop.
 - Connect Keplr mobile from mobile browser.
 - Disconnect and reconnect without refreshing.

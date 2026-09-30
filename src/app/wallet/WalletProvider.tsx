@@ -32,6 +32,7 @@ import type { ClassicStargateClient } from "./walletAdapters"
 import type { WalletRuntimeChain, WalletRuntimeSnapshot } from "./walletRuntimeBridge"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import { hasDesktopKeplrProvider } from "./keplrProviderIdentity"
+import { getKeplrConnectionErrorMessage } from "./keplrConnectionErrors"
 import {
   forgetStoredWalletSession,
   getStoredWalletConnectorId,
@@ -928,7 +929,9 @@ export const WalletProvider = ({
         setStatus("error")
         setError(id === "burrito-extension"
           ? getBurritoExtensionConnectionErrorMessage(err)
-          : formatWalletError(err))
+          : id === "keplr"
+            ? getKeplrConnectionErrorMessage(err)
+            : formatWalletError(err))
       } finally {
         if (attempt === connectionAttemptRef.current) pendingConnectorRef.current = undefined
       }

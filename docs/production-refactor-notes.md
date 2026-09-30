@@ -1,5 +1,96 @@
 # Production Refactor Notes
 
+## Empty Keplr connection guidance — 2026-09-30
+
+The desktop Keplr connector now maps the exact official 0.13.52 empty-keyring
+error to an instruction to create or import inside the Keplr extension, then
+connect again. Other messages, cancellation, non-Error fallback, Burrito's
+mapping, adapters, session ownership, storage and restoration policy are unchanged.
+The unresolved active-owner lifecycle gate below remains open.
+
+Local lint, 277 unit tests in 43 files, wallet-spec verification, TypeScript,
+production build and bundle budgets pass. The initial selected browser run
+passed 56 cases with two intentional desktop skips. Four final targeted cases
+also pass: empty Keplr retries count actual fixture enable calls, no automatic
+Burrito account request occurs, explicitly choosing Burrito clears the error and
+connects, and Keplr cancellation retains its original message. These are
+controlled-provider tests, not installed-wallet approval evidence.
+
+Separately, the actual official empty Keplr and empty Burrito extension were
+loaded in a new retained test profile. The local production artifact at the
+intercepted exact Web origin passed 47 checks at 1440x900/light and 390x844/dark:
+actionable alert, usable retry controls, no borrowed account or Burrito review,
+no remembered failed session, viewport containment, close/focus and disconnected
+reload. Screenshots were visually inspected. No wallet creation, import, approval,
+signature, funded account or live API request was used. This narrow desktop
+viewport does not establish mobile-browser extension support.
+
+An earlier attempt timed out during fresh-extension discovery before Connect;
+it is retained as failed setup, not a product pass. The final discovery recorded
+Burrito compatibility first, then independent Keplr after a normal reload. The
+run does not claim automatic first-document discovery. There were no uncaught
+page errors or external HTTP responses; 49 blocked-resource messages and one
+blocked Keplr telemetry error were expected under browser-level offline/routes/
+DNS restrictions, not a verified OS firewall. Existing production-build warnings
+about large chunks, vm-browserify eval and a stripped annotation remain.
+
+Evidence: `C:/Users/fengz/.codex/artifacts/burrito-wallet/keplr-empty-copy-20260930/`,
+final `actual-4lDDzt/acceptance.json`, build `build-kPn9gG/candidate-build.json`.
+The build pins 412 source files and 156 outputs and uses the unchanged local
+dependencies, not a fresh install. No tracked distribution files, publication,
+store, native signing or simulator data changed. iMac still has 7.2 GiB free;
+new dedicated simulator permission is recorded but old-cache deletion is not.
+
+## Genuine Keplr active-owner lifecycle findings — 2026-09-30
+
+Documentation-only checkpoint; no product behavior, dependencies, typography,
+brand, signing, or deployment changed. The tested Web runtime remains `258c6ce`,
+Burrito extension runtime `007bfa8`, and official Keplr 0.13.52 (CRX SHA256
+`452668db29ec1276c785b2114d781460dbd6a758857f4c24a4ce9184252212bf`).
+
+Prior normal-UI dual-account acceptance passed 62 named checks in each of two
+complete fresh-profile replays. That established the listed account-access,
+identity isolation, refresh/disconnect and chain-race scenarios, not all Keplr
+lock or permission semantics. The follow-up used fresh unfunded accounts,
+actual wallet pages and local production artifacts routed at the exact Web
+origin, with external HTTP/WebSockets blocked. It reproduced stale Web account
+display after Keplr lock or site revocation, followed by automatic unlock or
+permission prompts on reload. No signature, broadcast, live balance, or real
+funds operation was used to reach these observations.
+
+`requestApproval: false` currently does not make the Keplr adapter passive.
+Fixed-package source also shows that `getKey` / `getKeysSettled` first ensure
+interactive unlock and access; they cannot replace `enable` as silent probes.
+Normal lock/unlock/site revocation do not emit the supported account-change
+event. Do not equate a cached displayed address with currently confirmed access,
+or claim the observed prompts automatically approve access. The interaction
+policy choice is unresolved and recorded in the quality gates; no quieter but
+functionally reduced recovery flow has been substituted without that decision.
+
+Evidence is outside the repository under
+`C:/Users/fengz/.codex/artifacts/burrito-wallet/keplr-active-owner-20260930/`.
+It retains the interactive probe's setup/locator/cleanup failures, the complete
+narrow replay, and subsequent verification. The narrow replay's reproduction
+checks being true are not a release pass: its four lifecycle expectations are
+explicitly false. Early cleanup read an already-open permission list after a
+second window re-granted access; that is UI evidence only, not proof of an empty
+persistent permission store. Final cleanup requires popup reload before clearing
+and another reload to verify. Retained QA profiles are not included in evidence
+archives and must not be reused or deleted without authorization.
+
+Final desktop `run-KBRAbm` completed 55 reproduction/helper assertions, observed
+the re-granted QA site after reload, explicitly cleared it, and verified the
+empty list after another reload. Both wallets were normally locked and the
+browser closed. Its status remains `findings-confirmed`, not passed: all four
+desired lifecycle expectations are false. Earlier `run-O9d3tw` and `run-F2liPO`
+did restore the account before cleanup failed on an incorrect assumption that
+reload returns Keplr to Home; their stale failure-stage labels must not be read
+as evidence of failed account restoration or a desktop/narrow discrepancy.
+
+No full-suite, native, CI, live-service, or store gate is promoted by this note.
+The earlier dual-account evidence remains separately sealed at
+`C:/Users/fengz/.codex/artifacts/burrito-wallet/keplr-accounts-20260930/`.
+
 ## Proposal tally text and full detail-page gates — 2026-09-30
 
 Following `8e28bb6`, the status pills passed, but that did not cover the four

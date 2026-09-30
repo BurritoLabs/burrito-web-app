@@ -49,6 +49,36 @@ Keep its evidence outside this repository. Neither the controlled-provider
 tests nor a connection-only browser run replace native-wallet acceptance,
 transaction review tests, full product-route regression, or release CI.
 
+### Genuine Keplr lifecycle: unresolved gate
+
+The contract above is a requirement, not proof that every connector implements
+it. On September 30, 2026, the exact Web runtime `258c6ce` paired with official
+Keplr 0.13.52 and Burrito extension runtime `007bfa8` reproduced two gaps:
+
+- Locking Keplr or revoking the site's permission in Connected Websites leaves
+  the previously displayed Web account in place, including after Web focus.
+- Reloading the Web page then opens an unsolicited Keplr unlock or account-access
+  permission window. It still requires user approval; this is not a silent grant
+  and is not evidence that locked or unauthorized signing can succeed.
+
+Keplr's public `getKey` and `getKeysSettled` also perform interactive unlock and
+permission checks in this version. Merely omitting `enable` does not make them
+passive. Its account-change event is not a lock/unlock or permission-revocation
+notification. Do not use internal extension messages, EVM account permissions,
+or fabricated provider state to bypass or claim to test this Terra boundary.
+See Keplr's [connection API](https://docs.keplr.app/api/guide/enable-connection)
+and [account-change event](https://docs.keplr.app/api/guide/custom-event);
+the fixed runtime package was also inspected for the specific behavior.
+
+The product choice between explicit Keplr reconnection and automatic restoration
+with possible prompts remains open. Do not silently remove restoration, change
+the contract, or mark this gate passed. Burrito's genuine coexistence checks and
+controlled-provider tests do not close this Keplr-specific gap. Treat Web local
+Disconnect and clearing Keplr's own site permissions as separate operations.
+After re-granting in a second Keplr window, reload the original popup before
+reading/clearing Connected Websites, then reload again to verify the empty list;
+an already-open empty list alone is insufficient evidence of persistent cleanup.
+
 Dialog checks must measure the actual painted surface (the Connect dialog
 itself versus the token picker's inner card), while retaining all background,
 foreground and viewport assertions. Theme accessibility checks wait for actual

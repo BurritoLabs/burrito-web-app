@@ -776,3 +776,60 @@ test("independent Keplr stays selectable alongside the named Burrito compatibili
   expect((await snapshot(page)).unexpectedMethods).toEqual([])
   expect(await accountCalls(page)).toEqual([])
 })
+
+test("empty Keplr guidance stays inside its selected connector and allows a retry", async ({ page }) => {
+  await installProvider(page, { compatibility: "named-only" })
+  await page.addInitScript(() => {
+    let enables = 0
+    Object.defineProperty(window, "__emptyKeplrEnables", { get: () => enables })
+    Object.defineProperty(window, "keplr", { value: {
+      enable: async () => {
+        enables += 1
+        throw new Error("Users need to create their accounts first")
+      }
+    } })
+  })
+  await openApp(page)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const dialog = page.getByRole("dialog")
+  const keplr = dialog.getByRole("button").filter({ hasText: /^KeplrExtension/ })
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await keplr.click()
+    await expect.poll(() => page.evaluate(() =>
+      (window as typeof window & { __emptyKeplrEnables: number }).__emptyKeplrEnables
+    )).toBe(attempt + 1)
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "No account found in Keplr. Open the Keplr extension to create or import a wallet, then connect again."
+    )
+    await expect(keplr).toBeEnabled()
+    await expect(extensionButton(page)).toBeEnabled()
+    await expect(page.getByText("Connected", { exact: true })).toHaveCount(0)
+    expect(await rememberedConnector(page)).toBeNull()
+    expect(await accountCalls(page)).toEqual([])
+    expect((await snapshot(page)).unexpectedMethods).toEqual([])
+  }
+  await extensionButton(page).click()
+  await expectPending(page, "columbus-5")
+  await expect(dialog.getByRole("alert")).toHaveCount(0)
+  await approve(page)
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible()
+  await expect.poll(() => rememberedConnector(page)).toBe("burrito-extension")
+  expect((await accountCalls(page)).filter(({ method }) => method === "wallet.connect")).toHaveLength(1)
+  await dialog.getByRole("button", { name: "Close", exact: true }).click()
+  await expect(page.getByRole("button", { name: "Burrito Wallet", exact: true })).toBeVisible()
+})
+
+test("Keplr cancellation keeps its original provider message", async ({ page }) => {
+  await installProvider(page, { compatibility: "named-only" })
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "keplr", { value: {
+      enable: async () => { throw new Error("Request rejected") }
+    } })
+  })
+  await openApp(page)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  await page.getByRole("button").filter({ hasText: /^KeplrExtension/ }).click()
+  await expect(page.getByRole("alert")).toHaveText("Request rejected")
+  expect(await accountCalls(page)).toEqual([])
+  expect(await rememberedConnector(page)).toBeNull()
+})
