@@ -36,6 +36,7 @@ import {
   registerWalletAdapterRuntime
 } from "./walletAdapters"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
+import { hasDesktopKeplrProvider } from "./keplrProviderIdentity"
 import {
   forgetStoredWalletSession,
   getStoredWalletConnectorId,
@@ -121,9 +122,6 @@ const connectMobileWallet = async (wallet: ChainWalletBase) => {
     return attemptConnect(true)
   }
 }
-
-const hasDesktopKeplrProvider = () =>
-  typeof window !== "undefined" && Boolean((window as Window & { keplr?: unknown }).keplr)
 
 const formatWalletError = (error: unknown) =>
   error instanceof Error ? error.message : "Wallet connection failed"
@@ -291,6 +289,7 @@ export const WalletProvider = ({
       id: keyof typeof COSMOS_CONNECTOR_CONFIGS,
       options?: { preferConnected?: boolean }
     ) => {
+      if (id === "keplr" && !hasDesktopKeplrProvider()) return undefined
       const config = COSMOS_CONNECTOR_CONFIGS[id]
       const wallet =
         cosmosChain.walletRepo.getWallet(config.walletName) ??
@@ -313,6 +312,7 @@ export const WalletProvider = ({
   )
 
   const ownsConnectionAttempt = useCallback((id: WalletConnectorId, attempt: number) => {
+    if (id === "keplr" && !hasDesktopKeplrProvider()) return false
     const selected = pendingConnectorRef.current ?? selectedConnectorRef.current ??
       getStoredWalletConnectorId()
     return attempt === connectionAttemptRef.current &&
@@ -489,12 +489,12 @@ export const WalletProvider = ({
   const getCosmosConnector = useCallback(
     (id: keyof typeof COSMOS_CONNECTOR_CONFIGS): WalletConnector => {
       const config = COSMOS_CONNECTOR_CONFIGS[id]
-      if (id === "keplr" && desktopKeplrAvailable) {
+      if (id === "keplr") {
         return {
           id,
           label: config.label,
           type: config.type,
-          available: true
+          available: desktopKeplrAvailable
         }
       }
       const wallet = getCosmosWallet(id)
@@ -849,7 +849,7 @@ export const WalletProvider = ({
       setError(undefined)
       try {
         const nextAccount =
-          id === "keplr" && desktopKeplrAvailable
+          id === "keplr"
             ? await connectWalletConnector(id)
             : isCosmosConnectorId(id)
               ? await connectCosmosConnector(id)
@@ -877,7 +877,7 @@ export const WalletProvider = ({
         if (attempt === connectionAttemptRef.current) pendingConnectorRef.current = undefined
       }
     },
-    [connectCosmosConnector, desktopKeplrAvailable]
+    [connectCosmosConnector]
   )
 
   useEffect(() => {

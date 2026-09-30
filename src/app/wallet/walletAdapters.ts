@@ -3,6 +3,7 @@ import type { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
 import { getActiveAppChainKey } from "../activeChain"
 import { getKeplrChainConfig } from "../chain"
 import { CHAIN_RUNTIME_CONFIG } from "../config/chainConfig"
+import { getIndependentKeplrProvider, hasDesktopKeplrProvider } from "./keplrProviderIdentity"
 import {
   connectBurritoNativeWallet,
   disconnectBurritoNativeWallet,
@@ -141,6 +142,7 @@ type InjectedWallet = {
 
 type WalletWindow = Window & {
   keplr?: InjectedWallet
+  BurritoKeplr?: InjectedWallet
   getOfflineSigner?: (chainId: string) => OfflineSigner
   getOfflineSignerAuto?: (chainId: string) => Promise<OfflineSigner>
 }
@@ -241,14 +243,22 @@ const getWalletWindow = () => {
 
 const getRequiredKeplrProvider = () => {
   const walletWindow = getWalletWindow()
-  if (!walletWindow?.keplr) {
+  const provider = getIndependentKeplrProvider(walletWindow)
+  if (!walletWindow || !provider) {
     throw new Error("Keplr not installed")
   }
   return {
-    provider: walletWindow.keplr,
+    provider,
     walletWindow
   }
 }
+
+const isBurritoSignerHelper = (helper: unknown, walletWindow: WalletWindow) =>
+  Boolean(helper && walletWindow.BurritoKeplr && (
+    helper === walletWindow.BurritoKeplr.getOfflineSigner ||
+    helper === walletWindow.BurritoKeplr.getOfflineSignerAuto ||
+    helper === walletWindow.BurritoKeplr.getOfflineSignerOnlyAmino
+  ))
 
 const getActiveChain = () => CHAIN_RUNTIME_CONFIG[getActiveAppChainKey()]
 
@@ -276,10 +286,10 @@ const getOfflineSignerFromKeplr = async (
   if (provider.getOfflineSigner) {
     return provider.getOfflineSigner(chainId)
   }
-  if (walletWindow.getOfflineSignerAuto) {
+  if (walletWindow.getOfflineSignerAuto && !isBurritoSignerHelper(walletWindow.getOfflineSignerAuto, walletWindow)) {
     return await walletWindow.getOfflineSignerAuto(chainId)
   }
-  if (walletWindow.getOfflineSigner) {
+  if (walletWindow.getOfflineSigner && !isBurritoSignerHelper(walletWindow.getOfflineSigner, walletWindow)) {
     return walletWindow.getOfflineSigner(chainId)
   }
   return undefined
@@ -296,13 +306,11 @@ const getAminoOfflineSignerFromKeplr = async (
   if (provider.getOfflineSignerAmino) {
     return provider.getOfflineSignerAmino(chainId)
   }
-  if (walletWindow.getOfflineSigner) {
+  if (walletWindow.getOfflineSigner && !isBurritoSignerHelper(walletWindow.getOfflineSigner, walletWindow)) {
     return walletWindow.getOfflineSigner(chainId)
   }
   return undefined
 }
-
-const hasDesktopKeplr = () => Boolean(getWalletWindow()?.keplr)
 
 const getDirectDesktopKeplrSigner = async () => {
   const { provider, walletWindow } = getRequiredKeplrProvider()
@@ -340,16 +348,16 @@ const connectInjectedKeplr = async (): Promise<WalletAccount> => {
 }
 
 export const getWalletConnectors = (): WalletConnector[] => {
-  const walletWindow = getWalletWindow()
   const keplrRuntimeConnector = walletAdapterRuntime?.getConnector?.("keplr")
   const galaxyRuntimeConnector = walletAdapterRuntime?.getConnector?.("galaxy")
 
   return [
     getBurritoNativeConnector(),
     getBurritoExtensionConnector(),
-    keplrRuntimeConnector ?? {
+    {
       ...getWalletConnectorMeta("keplr"),
-      available: Boolean(walletWindow?.keplr)
+      ...keplrRuntimeConnector,
+      available: hasDesktopKeplrProvider()
     },
     {
       ...getWalletConnectorMeta("keplr-mobile"),
@@ -377,6 +385,7 @@ export const connectWalletConnector = async (
       : connectBurritoExtensionWallet
     return connect(getActiveChain().chain.chainId)
   }
+  if (id === "keplr") return connectInjectedKeplr()
   const runtimeAccount = await walletAdapterRuntime?.connect?.(id)
   if (runtimeAccount) {
     return runtimeAccount
@@ -412,7 +421,7 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
   if (id === "burrito-extension") {
     return getBurritoExtensionOfflineSigner(getActiveChain().chain.chainId)
   }
-  if (id === "keplr" && hasDesktopKeplr()) {
+  if (id === "keplr") {
     const signer = await getDirectDesktopKeplrSigner()
     if (!signer) {
       throw new Error("Keplr signer not available")
@@ -441,7 +450,7 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
 export const getAminoOfflineSignerForConnector = async (
   id: WalletConnectorId
 ) => {
-  if (id === "keplr" && hasDesktopKeplr()) {
+  if (id === "keplr") {
     return getDirectDesktopKeplrAminoSigner()
   }
 
@@ -515,7 +524,7 @@ export const connectClassicStargateClientForConnector = async (
   feeDenom?: string
 ) : Promise<ClassicStargateClient> => {
   const { connectStargateClient } = await import("./signingClient")
-  if (id === "keplr" && hasDesktopKeplr()) {
+  if (id === "keplr") {
     const signer = await getDirectDesktopKeplrSigner()
     if (!signer) {
       throw new Error("Keplr signer not available")

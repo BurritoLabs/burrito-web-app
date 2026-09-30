@@ -38,6 +38,7 @@ import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
 import { loadWalletRuntimeProvider } from "./walletRuntimeLoader"
 import { useAppChain } from "../appChainContext"
+import { hasDesktopKeplrProvider } from "./keplrProviderIdentity"
 
 const WalletRuntimeProvider = lazy(loadWalletRuntimeProvider)
 
@@ -54,7 +55,7 @@ const getWalletWindow = () =>
 
 const getFallbackConnectors = (): WalletConnector[] => {
   const walletWindow = getWalletWindow()
-  const desktopKeplr = Boolean(walletWindow?.keplr)
+  const desktopKeplr = hasDesktopKeplrProvider()
   const desktopGalaxy =
     Boolean(walletWindow?.galaxyStation) &&
     !(walletWindow?.galaxyStation instanceof HTMLElement)
@@ -81,15 +82,14 @@ const getFallbackConnectors = (): WalletConnector[] => {
 const getInitialStoredConnector = () => {
   if (isWalletManualDisconnectStored()) return undefined
   const stored = getStoredWalletConnectorId()
-  if (stored === "keplr-mobile" && getWalletWindow()?.keplr) {
+  if (stored === "keplr-mobile" && hasDesktopKeplrProvider()) {
     return "keplr"
   }
   return stored === "keplr-mobile" ? undefined : stored
 }
 
 const shouldLoadWalletRuntime = () => {
-  const walletWindow = getWalletWindow()
-  if (walletWindow?.keplr) {
+  if (hasDesktopKeplrProvider()) {
     return false
   }
 

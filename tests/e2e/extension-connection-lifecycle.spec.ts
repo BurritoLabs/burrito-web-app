@@ -35,6 +35,8 @@ type ProviderOptions = {
   locked?: boolean
   remembered?: boolean
   runtime?: boolean
+  compatibility?: "alias" | "named-only"
+  rememberedKeplr?: boolean
 }
 
 const PROVIDER_STORAGE_KEY = "burrito:e2e:extension-lifecycle:public-state"
@@ -100,6 +102,8 @@ const installProvider = async (page: Page, options: ProviderOptions = {}) => {
         // Existing supported boot path. There are no saved WalletConnect
         // pairings/sessions and no mobile-wallet connection is requested.
         localStorage.setItem("burritoWalletConnector", "keplr-mobile")
+      } else if (options.rememberedKeplr) {
+        localStorage.setItem("burritoWalletConnector", "keplr")
       } else if (options.remembered) {
         localStorage.setItem("burritoWalletConnector", "burrito-extension")
       } else {
@@ -151,6 +155,23 @@ const installProvider = async (page: Page, options: ProviderOptions = {}) => {
       }
     }
     Object.defineProperty(window, "__extensionLifecycle", { value: controls })
+    if (options.compatibility) {
+      const unexpectedAliasCall = async () => {
+        state.unexpectedMethods.push("burrito-compat-used-as-keplr")
+        persist()
+        throw new Error("Burrito compatibility alias must not be used by a Keplr connector")
+      }
+      const alias = Object.freeze({
+        version: "burrito-compat-v1",
+        enable: unexpectedAliasCall,
+        getKey: unexpectedAliasCall,
+        getOfflineSignerAuto: unexpectedAliasCall
+      })
+      Object.defineProperty(window, "BurritoKeplr", { value: alias })
+      if (options.compatibility === "alias") {
+        Object.defineProperty(window, "keplr", { value: alias })
+      }
+    }
     Object.defineProperty(window, "BurritoWallet", {
       configurable: false, writable: false,
       value: {
@@ -511,7 +532,7 @@ test("wallet address and QR views expose distinct accessible close controls", as
 
 test("real lazy runtime controller also gates pending extension requests and restores chains read-only", async ({ page }) => {
   test.setTimeout(60000)
-  await installProvider(page, { runtime: true })
+  await installProvider(page, { runtime: true, compatibility: "alias" })
   const runtimeLoaded = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/src/app/wallet/WalletRuntimeProvider.tsx" && response.ok()
   )
@@ -524,6 +545,7 @@ test("real lazy runtime controller also gates pending extension requests and res
   })
   expect(await rememberedConnector(page)).toBe("keplr-mobile")
   await beginConnection(page)
+  await expect(page.getByRole("button").filter({ hasText: /^KeplrExtension/ })).toBeDisabled()
   await expectPending(page, "columbus-5")
   expect(await rememberedConnector(page)).not.toBe("burrito-extension")
   await approve(page)
@@ -537,4 +559,51 @@ test("real lazy runtime controller also gates pending extension requests and res
   await expect(connectedButton(page)).toBeVisible()
   expect((await accountCalls(page)).at(-1)).toEqual({ method: "wallet.getAccounts", chainIds: ["columbus-5"] })
   expect((await snapshot(page)).approvals).toBe(1)
+})
+
+test("Burrito compatibility is not a second Keplr installation in the initial controller", async ({ page, isMobile }) => {
+  await installProvider(page, { compatibility: "alias" })
+  await openApp(page)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const keplr = page.getByRole("button").filter({ hasText: /^KeplrExtension/ })
+  await expect(keplr).toBeDisabled()
+  await expect(extensionButton(page)).toBeEnabled()
+  if (isMobile) await expect(page.getByRole("button").filter({ hasText: /^Keplr Mobile/ })).toBeEnabled()
+  await beginConnection(page)
+  await expectPending(page, "columbus-5")
+  await approve(page)
+  await expect.poll(() => rememberedConnector(page)).toBe("burrito-extension")
+  await page.keyboard.press("Escape")
+  await page.reload()
+  await expect(connectedButton(page)).toBeVisible()
+  expect((await snapshot(page)).approvals).toBe(1)
+  expect((await snapshot(page)).unexpectedMethods).toEqual([])
+})
+
+test("a remembered Keplr session never restores through Burrito compatibility", async ({ page }) => {
+  await installProvider(page, { compatibility: "alias", rememberedKeplr: true })
+  await openApp(page)
+  // Cover the existing 700 ms restore timer and the 100 ms keystore event timer.
+  await page.evaluate(() => window.dispatchEvent(new Event("keplr_keystorechange")))
+  await page.waitForTimeout(900)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  await expect(page.getByRole("button").filter({ hasText: /^KeplrExtension/ })).toBeDisabled()
+  await expect(page.getByText("Connected", { exact: true })).toHaveCount(0)
+  expect(await accountCalls(page)).toEqual([])
+  expect((await snapshot(page)).unexpectedMethods).toEqual([])
+})
+
+test("independent Keplr stays selectable alongside the named Burrito compatibility provider", async ({ page }) => {
+  await installProvider(page, { compatibility: "named-only" })
+  await installKeplr(page)
+  await openApp(page)
+  await page.getByRole("button", { name: "Connect", exact: true }).first().click()
+  const keplr = page.getByRole("button").filter({ hasText: /^KeplrExtension/ })
+  await expect(keplr).toBeEnabled()
+  await expect(extensionButton(page)).toBeEnabled()
+  await keplr.click()
+  await expect(page.getByRole("button", { name: "Public Keplr QA", exact: true })).toBeVisible()
+  expect(await rememberedConnector(page)).toBe("keplr")
+  expect((await snapshot(page)).unexpectedMethods).toEqual([])
+  expect(await accountCalls(page)).toEqual([])
 })
