@@ -6,7 +6,7 @@ const Privacy = () => (
     <article className={styles.policy}>
       <header className={styles.intro}>
         <p className={styles.updated}>
-          Last updated: <time dateTime="2026-08-11">August 11, 2026</time>
+          Last updated: <time dateTime="2026-09-29">September 29, 2026</time>
         </p>
         <p>
           Burrito is a non-custodial wallet and blockchain interface provided by
@@ -34,17 +34,24 @@ const Privacy = () => (
       <section>
         <h2>Chrome extension</h2>
         <p>
-          The Burrito Wallet Chrome extension runs only on the Burrito web app
-          at app.burrito.money. It uses Chrome storage to retain an encrypted
-          wallet vault, approved-site status, and local preferences. It uses
-          alarms to lock the wallet and expire unanswered transaction approvals.
+          The Burrito Wallet Chrome extension connects to app.burrito.money,
+          dex.burrito.money, ai.burrito.money, and studio.burrito.money. Each
+          site requires its own connection approval before receiving your
+          selected public address or requesting a signature. You can revoke
+          these connections in the extension.
         </p>
         <p>
-          The extension receives public account requests and transaction details
-          from the Burrito web app only after you approve site access. Every
-          transaction is shown in a separate review window and is signed only
-          after you approve it. The extension does not read unrelated websites,
-          browsing history, cookies, contacts, or advertising identifiers.
+          Transactions and off-chain messages are shown in a dedicated review
+          window and are signed only after your explicit approval. An approved
+          signature is returned to the site that requested it. Connecting a
+          site does not approve future signing requests.
+        </p>
+        <p>
+          Chrome storage retains the encrypted wallet vault, account profiles,
+          saved recipients, approved-site status, and preferences. Alarms help
+          lock the wallet and expire unanswered approvals. The extension does
+          not read unrelated websites, browsing history, cookies, device
+          contacts, or advertising identifiers.
         </p>
         <p>
           Information received through Chrome APIs is used only to provide and
@@ -64,12 +71,15 @@ const Privacy = () => (
             blockchains.
           </li>
           <li>
-            Transaction details you prepare, review, sign, or broadcast. Signing
-            occurs locally after native review and device approval.
+            Transaction details and off-chain messages you prepare, review,
+            sign, or broadcast. The mobile wallet signs locally after native
+            review and device authentication; the extension uses its own
+            approval window. Connected external wallets apply their own signing
+            and authentication controls.
           </li>
           <li>
-            App preferences and public account metadata stored locally on your
-            device.
+            App preferences, public account metadata, and recipients you choose
+            to save locally on your device or browser profile.
           </li>
           <li>
             Technical request information, such as an IP address, user agent,
@@ -78,6 +88,26 @@ const Privacy = () => (
             connects to them.
           </li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Performance and error reporting</h2>
+        <p>
+          The web app, including when opened inside the mobile app, sends
+          performance measurements to Burrito&apos;s configured diagnostics
+          service. These reports include the measurement and its rating, page
+          path, selected blockchain network, navigation type, and app release.
+          Reporting does not require a connected wallet.
+        </p>
+        <p>
+          When configured, runtime-error reporting also sends error details,
+          stack information, page location, selected network, and browser
+          information. The app filters recognized wallet addresses, transaction
+          hashes, and long encoded values from error text before sending it.
+          These reports help diagnose reliability and performance issues;
+          omitting a wallet-address field does not make all request information
+          anonymous.
+        </p>
       </section>
 
       <section>
@@ -105,6 +135,14 @@ const Privacy = () => (
           providers may process network metadata under their own privacy terms.
         </p>
         <p>
+          Looking up an account sends its public address to the relevant
+          blockchain data service. Broadcasting sends the signed transaction
+          to a blockchain node. Registry and price requests retrieve token and
+          market information from Burrito&apos;s APIs and other configured
+          services. Keeping keys on your device does not mean that all wallet
+          activity stays on your device.
+        </p>
+        <p>
           Public blockchains are permanent and transparent. A wallet address and
           its transactions can remain publicly available even after you stop
           using Burrito.
@@ -120,16 +158,23 @@ const Privacy = () => (
           actions cannot remove information already recorded on a public
           blockchain or data retained independently by a third-party provider.
         </p>
+        <p>
+          Revoking a connected site prevents future extension access through
+          that connection; it does not delete information the site previously
+          received. Contact us below with questions about information processed
+          by Burrito&apos;s services.
+        </p>
       </section>
 
       <section>
         <h2>Security</h2>
         <p>
-          Burrito uses device-protected storage, explicit transaction review,
-          device-owner approval, restricted web-to-native communication, and
-          encrypted network connections. No system can guarantee absolute
-          security, especially on a rooted, jailbroken, or otherwise compromised
-          device.
+          The native mobile wallet uses device-protected storage, device-owner
+          authentication, and restricted web-to-native communication. The
+          extension uses a password-encrypted vault and site-specific
+          permissions. Both require explicit signing approval and use encrypted
+          network connections. No system can guarantee absolute security,
+          especially on a rooted, jailbroken, or otherwise compromised device.
         </p>
       </section>
 
