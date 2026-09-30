@@ -1,6 +1,6 @@
 import { encodeSecp256k1Pubkey, pubkeyToAddress } from "@cosmjs/amino"
 import { sha256 } from "@cosmjs/crypto"
-import { toBase64, toHex } from "@cosmjs/encoding"
+import { fromBase64, toBase64, toHex } from "@cosmjs/encoding"
 import {
   AuthInfo,
   TxBody,
@@ -29,6 +29,46 @@ const signatureBytes = Uint8Array.from(
   { length: 64 },
   (_, index) => index + 1
 )
+// These fixed bytes exercise the response contract, not cryptographic signing.
+const otherAddress = pubkeyToAddress(
+  encodeSecp256k1Pubkey(Uint8Array.from([3, ...publicKey.slice(1)])),
+  "terra"
+)
+
+type MockSigningResponse = {
+  txRawBytes: string
+  txHash: string
+  chainId: unknown
+  account: unknown
+  sequence: string
+}
+
+type ProviderOptions = {
+  mutateBody?: boolean
+  mutateHash?: boolean
+  sequence?: string
+  transactionSigning?: boolean
+  mutateResponse?: (response: MockSigningResponse) => MockSigningResponse
+}
+
+const withTransactionBytes = (
+  response: MockSigningResponse,
+  bytes: Uint8Array
+): MockSigningResponse => ({
+  ...response,
+  txRawBytes: toBase64(bytes),
+  // Recompute the hash so a changed payload cannot fail on hash alone.
+  txHash: toHex(sha256(bytes)).toUpperCase()
+})
+
+const withTransaction = (
+  response: MockSigningResponse,
+  change: (transaction: TxRaw) => void
+) => {
+  const transaction = TxRaw.decode(fromBase64(response.txRawBytes))
+  change(transaction)
+  return withTransactionBytes(response, TxRaw.encode(transaction).finish())
+}
 
 const createSignDoc = (chainId = "columbus-5"): SignDoc => ({
   bodyBytes: TxBody.encode(
@@ -45,8 +85,9 @@ const installProvider = ({
   mutateBody = false,
   mutateHash = false,
   sequence = "7",
-  transactionSigning = true
-} = {}) => {
+  transactionSigning = true,
+  mutateResponse
+}: ProviderOptions = {}) => {
   const provider = {
     version: 1,
     request: vi.fn(async (method: string, params: Record<string, unknown> = {}) => {
@@ -90,7 +131,7 @@ const installProvider = ({
             signatures: [signatureBytes]
           })
         ).finish()
-        return {
+        const response: MockSigningResponse = {
           txRawBytes: toBase64(txRawBytes),
           txHash: mutateHash
             ? "A".repeat(64)
@@ -99,6 +140,7 @@ const installProvider = ({
           account: params.account,
           sequence
         }
+        return mutateResponse ? mutateResponse(response) : response
       }
       throw new Error(`Unexpected extension method: ${method}`)
     })
@@ -436,31 +478,199 @@ describe("Burrito Wallet Extension provider", () => {
     })
   })
 
-  it("connects the explicit chain and validates the signed transaction", async () => {
+  it.each(["columbus-5", "phoenix-1"])("connects %s and validates the synthetic transaction response", async (chainId) => {
     const provider = installProvider()
     await expect(
-      connectBurritoExtensionWallet("columbus-5")
+      connectBurritoExtensionWallet(chainId)
     ).resolves.toEqual({ address, name: "Burrito Wallet" })
 
-    const signer = getBurritoExtensionOfflineSigner("columbus-5")
+    const signer = getBurritoExtensionOfflineSigner(chainId)
     await expect(signer.getAccounts()).resolves.toEqual([
       { address, algo: "secp256k1", pubkey: publicKey }
     ])
-    const signDoc = createSignDoc()
+    const signDoc = createSignDoc(chainId)
     const response = await signer.signDirect(address, signDoc)
     expect(response.signed).toBe(signDoc)
     expect(response.signature.signature).toBe(toBase64(signatureBytes))
     expect(provider.request).toHaveBeenCalledWith("wallet.connect", {
-      chainIds: ["columbus-5"]
+      chainIds: [chainId]
     })
     expect(provider.request).toHaveBeenLastCalledWith("wallet.signDirect", {
       version: 1,
-      chainId: "columbus-5",
+      chainId,
       account: address,
       accountNumber: "42",
       bodyBytes: toBase64(signDoc.bodyBytes),
       authInfoBytes: toBase64(signDoc.authInfoBytes)
     })
+  })
+
+  describe.each(["columbus-5", "phoenix-1"])("%s response contract", (chainId) => {
+    const otherChainId = chainId === "columbus-5" ? "phoenix-1" : "columbus-5"
+    const invalidResponse = "Burrito Wallet Extension signature response is invalid"
+    const mismatchedResponse = "Burrito Wallet Extension signature does not match the request"
+    const cases: Array<{
+      label: string
+      mutate: (response: MockSigningResponse) => MockSigningResponse
+      error: string
+    }> = [
+      {
+        label: "the other supported chain",
+        mutate: (response) => ({ ...response, chainId: otherChainId }),
+        error: invalidResponse
+      },
+      {
+        label: "a different account",
+        mutate: (response) => ({ ...response, account: otherAddress }),
+        error: invalidResponse
+      },
+      {
+        label: "a non-canonical sequence",
+        mutate: (response) => ({ ...response, sequence: "07" }),
+        error: invalidResponse
+      },
+      {
+        label: "an unexpected response field",
+        mutate: (response) => ({ ...response, unexpected: true }),
+        error: invalidResponse
+      },
+      {
+        label: "changed authInfo with the same sequence and a matching hash",
+        mutate: (response) => withTransaction(response, (transaction) => {
+          transaction.authInfoBytes = AuthInfo.encode(AuthInfo.fromPartial({
+            signerInfos: [{ sequence: 7n }],
+            fee: { amount: [{ denom: "uluna", amount: "1" }], gasLimit: 1n }
+          })).finish()
+        }),
+        error: mismatchedResponse
+      },
+      {
+        label: "non-canonical base64 pad bits encoding the same bytes",
+        mutate: (response) => {
+          const canonical = response.txRawBytes
+          expect(canonical.endsWith("=")).toBe(true)
+          const padding = canonical.endsWith("==") ? 2 : 1
+          const lastIndex = canonical.length - padding - 1
+          const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+          const changed = canonical.slice(0, lastIndex) +
+            alphabet[alphabet.indexOf(canonical[lastIndex]) | 1] +
+            canonical.slice(lastIndex + 1)
+          expect(changed).not.toBe(canonical)
+          expect(fromBase64(changed)).toEqual(fromBase64(canonical))
+          return { ...response, txRawBytes: changed }
+        },
+        error: mismatchedResponse
+      },
+      {
+        label: "a duplicate protobuf field encoding the same transaction",
+        mutate: (response) => {
+          const bytes = fromBase64(response.txRawBytes)
+          const transaction = TxRaw.decode(bytes)
+          expect(transaction.bodyBytes.length).toBeLessThan(128)
+          const repeated = Uint8Array.from([
+            ...bytes, 0x0a, transaction.bodyBytes.length, ...transaction.bodyBytes
+          ])
+          expect(TxRaw.decode(repeated)).toEqual(transaction)
+          expect(TxRaw.encode(TxRaw.decode(repeated)).finish()).not.toEqual(repeated)
+          return withTransactionBytes(response, repeated)
+        },
+        error: mismatchedResponse
+      },
+      {
+        label: "truncated protobuf bytes with a matching hash",
+        mutate: (response) => withTransactionBytes(response, Uint8Array.of(0x0a, 5, 1)),
+        error: "Burrito Wallet Extension signed transaction is invalid"
+      },
+      {
+        label: "no signature",
+        mutate: (response) => withTransaction(response, (transaction) => {
+          transaction.signatures = []
+        }),
+        error: mismatchedResponse
+      },
+      {
+        label: "two signatures",
+        mutate: (response) => withTransaction(response, (transaction) => {
+          transaction.signatures = [signatureBytes, signatureBytes]
+        }),
+        error: mismatchedResponse
+      },
+      {
+        label: "a 63-byte signature",
+        mutate: (response) => withTransaction(response, (transaction) => {
+          transaction.signatures = [signatureBytes.slice(0, 63)]
+        }),
+        error: mismatchedResponse
+      },
+      {
+        label: "a 65-byte signature",
+        mutate: (response) => withTransaction(response, (transaction) => {
+          transaction.signatures = [Uint8Array.from([...signatureBytes, 65])]
+        }),
+        error: mismatchedResponse
+      }
+    ]
+
+    it.each(cases)("rejects $label, then accepts the unchanged response", async ({ mutate, error }) => {
+      let changeResponse = true
+      const provider = installProvider({
+        mutateResponse: (response) => changeResponse ? mutate(response) : response
+      })
+      await connectBurritoExtensionWallet(chainId)
+      const signer = getBurritoExtensionOfflineSigner(chainId)
+      const signDoc = createSignDoc(chainId)
+
+      await expect(signer.signDirect(address, signDoc)).rejects.toThrow(error)
+      expect(provider.request.mock.calls.filter(([method]) => method === "wallet.signDirect"))
+        .toHaveLength(1)
+
+      // Positive control: a valid response in the same session must still pass.
+      changeResponse = false
+      const response = await signer.signDirect(address, signDoc)
+      expect(response.signed).toBe(signDoc)
+      expect(response.signature.signature).toBe(toBase64(signatureBytes))
+      expect(provider.request.mock.calls.map(([method]) => method)).toEqual([
+        "wallet.getCapabilities", "wallet.connect", "wallet.signDirect", "wallet.signDirect"
+      ])
+    })
+
+    it.each([0, 2])("rejects %i signerInfos even when returned bytes and hash match", async (count) => {
+      const provider = installProvider()
+      await connectBurritoExtensionWallet(chainId)
+      const signer = getBurritoExtensionOfflineSigner(chainId)
+      const signDoc = createSignDoc(chainId)
+      signDoc.authInfoBytes = AuthInfo.encode(AuthInfo.fromPartial({
+        signerInfos: Array.from({ length: count }, () => ({ sequence: 7n }))
+      })).finish()
+
+      await expect(signer.signDirect(address, signDoc)).rejects.toThrow(mismatchedResponse)
+      const valid = createSignDoc(chainId)
+      expect((await signer.signDirect(address, valid)).signed).toBe(valid)
+      expect(provider.request.mock.calls.filter(([method]) => method === "wallet.signDirect"))
+        .toHaveLength(2)
+    })
+
+    it.each(["signer address", "signDoc chain", "negative account number"])(
+      "rejects an invalid %s before requesting a response",
+      async (field) => {
+        const provider = installProvider()
+        await connectBurritoExtensionWallet(chainId)
+        const signer = getBurritoExtensionOfflineSigner(chainId)
+        const signDoc = createSignDoc(field === "signDoc chain" ? otherChainId : chainId)
+        if (field === "negative account number") signDoc.accountNumber = -1n
+
+        await expect(signer.signDirect(
+          field === "signer address" ? otherAddress : address,
+          signDoc
+        )).rejects.toThrow("Burrito Wallet Extension signing context changed")
+        expect(provider.request.mock.calls.some(([method]) => method === "wallet.signDirect"))
+          .toBe(false)
+        const valid = createSignDoc(chainId)
+        expect((await signer.signDirect(address, valid)).signed).toBe(valid)
+        expect(provider.request.mock.calls.filter(([method]) => method === "wallet.signDirect"))
+          .toHaveLength(1)
+      }
+    )
   })
 
   it("rejects a response that changes the reviewed transaction bytes", async () => {

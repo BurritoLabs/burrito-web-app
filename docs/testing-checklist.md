@@ -4,6 +4,13 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Wallet
 
+- Connect **Burrito Wallet Extension** using its explicit connector with the
+  exact release-candidate ZIP; do not count its Keplr compatibility alias as
+  Burrito integration acceptance. Record deployed Web asset/build identifiers.
+- Verify extension connection Cancel grants nothing, a cancelled second-chain
+  request preserves the first grant, and refresh only restores existing access.
+- Verify extension lock, wallet change and site revocation invalidate the Web
+  account; disconnect must remain disconnected after refresh on both chains.
 - Connect Keplr extension on desktop.
 - Connect Galaxy Station on desktop.
 - Connect Keplr mobile from mobile browser.
