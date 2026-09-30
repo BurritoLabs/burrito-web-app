@@ -104,9 +104,22 @@ const Privacy = () => (
           stack information, page location, selected network, and browser
           information. The app filters recognized wallet addresses, transaction
           hashes, and long encoded values from error text before sending it.
-          These reports help diagnose reliability and performance issues;
-          omitting a wallet-address field does not make all request information
-          anonymous.
+        </p>
+        <p>
+          When separately configured, transaction diagnostics report the
+          transaction stage, action label, wallet connector type, selected
+          network, page path, connectivity and page-visibility state, app
+          release, timestamps, and available gas and timing information.
+          Failures include a category and fixed summary instead of the original
+          error text. These reports omit the dedicated wallet-address,
+          transaction-hash, and raw-error fields.
+        </p>
+        <p>
+          Automatic diagnostic requests omit browser credentials. Page paths
+          may contain identifiers and are not replaced with generic route
+          names. These reports help diagnose reliability and performance
+          issues; omitting credentials or a wallet-address field does not make
+          all request information anonymous.
         </p>
       </section>
 
@@ -151,6 +164,16 @@ const Privacy = () => (
 
       <section>
         <h2>Retention and your choices</h2>
+        <p>
+          The web app keeps up to 50 recent transaction diagnostic records in
+          local browser storage. These records can include public wallet
+          addresses, transaction hashes, and original error text. They are
+          replaced as newer records arrive, rather than expiring after a fixed
+          time. Clearing this site&apos;s browser data removes these local
+          records. Choosing Copy diagnostics in the transaction status copies
+          up to eight recent records and browser context to your clipboard;
+          the app does not automatically upload that complete copied report.
+        </p>
         <p>
           Local wallet material remains on your device or browser profile until
           you delete the wallet, clear the app or extension data, or uninstall
