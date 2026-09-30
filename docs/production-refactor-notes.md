@@ -1,5 +1,51 @@
 # Production Refactor Notes
 
+## Native recovery review privacy disclosure — 2026-09-30
+
+Web source `1b488f9c3a058b9b4dcdbf954e6eea346c2dd373` aligns the local
+privacy-policy draft with mobile saved-recovery source `9695e42`. It describes
+device-owner authentication, locally selected individual words, screen-reader
+access to the selected word, no phrase handoff to the embedded website, and
+hiding on Finish/background. Hiding is explicitly distinct from deleting the
+saved wallet or guaranteeing physical erasure of every memory copy. Extension
+password verification remains separately described. This is a factual client
+flow update, not owner approval of provider practices or legal/store answers.
+
+Validation: 277 unit tests / 43 files, TypeScript project build, changed-file
+ESLint, production build and existing bundle budgets pass. The existing privacy
+browser suite passes four desktop/mobile cases with added copy assertions.
+No dependencies, diagnostic transport, wallet logic, branding or CSS changed.
+The four existing untracked workspace entries were left untouched.
+
+Actual local production `/privacy` verification passes 107 checks at 1440x900
+and 390x844, light/dark: URL/title, nonblank policy, no framework overlay,
+theme-button interaction, theme persistence after reload, reachable contact,
+updated custody/retention copy and horizontal containment. Twelve screenshots
+and fresh DOM snapshots are saved; root inspected four representative images.
+The existing scroll-to-top control appears in scrolled mobile captures; the
+new recovery paragraphs are readable. This is not native-device testing.
+
+Chromium 151.0.7922.34 / existing Playwright 1.62.1 were used because Browser
+plugin was absent. All external traffic was blocked: 24 GET attempts and 24
+matching network console errors, zero warnings, zero page errors and zero
+WebSockets. Attempts were to the three existing LCD endpoints and Google Fonts.
+There were no wallet connections, approvals, signatures or external responses.
+Both owned contexts and browser closed normally. Console is not error-free;
+only the expected blocked-network errors are accepted by this bounded check.
+
+Evidence and reproduction helpers remain outside the repository:
+`C:/Users/fengz/.codex/artifacts/burrito-wallet/privacy-native-backup-20260930/`,
+including `build.mjs`, `build-result.json`, `inspect.cjs`, and
+`visual-JGk96j/acceptance.json`. The build is isolated under that directory;
+existing deployment output was not replaced. Bundle results: initial JS
+145.5 KiB gzip, wallet-runtime static imports 1021.4 KiB gzip (budget 1025 KiB).
+Existing dependency PURE/eval and chunk-size build warnings remain.
+
+This draft was not deployed. Published-policy accuracy, actual provider
+retention/access decisions, hardware authentication, spoken accessibility,
+Android runtime and small-phone/iPad acceptance remain open; these local
+rendered checks do not close them. Current-head CI must be assessed separately.
+
 ## Empty Keplr connection guidance — 2026-09-30
 
 The desktop Keplr connector now maps the exact official 0.13.52 empty-keyring
