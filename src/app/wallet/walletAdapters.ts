@@ -386,8 +386,11 @@ export const connectWalletConnector = async (
     return connect(getActiveChain().chain.chainId)
   }
   if (id === "keplr") return connectInjectedKeplr()
-  const runtimeAccount = await walletAdapterRuntime?.connect?.(id)
-  if (runtimeAccount) {
+  const runtimeConnect = walletAdapterRuntime?.connect
+  const runtimeAccount = await runtimeConnect?.(id)
+  // A mobile handoff can intentionally return before an account is available.
+  // Never replace that pending session with the desktop provider's account.
+  if (runtimeAccount || (id === "keplr-mobile" && runtimeConnect)) {
     return runtimeAccount
   }
 
@@ -395,7 +398,7 @@ export const connectWalletConnector = async (
     return connectGalaxyWallet(getActiveChain().chain.chainId)
   }
 
-  return connectInjectedKeplr()
+  throw new Error(`${getWalletConnectorLabel(id)} not available`)
 }
 
 export const disconnectWalletConnector = async (id: WalletConnectorId) => {
@@ -438,13 +441,7 @@ export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
     return getGalaxyOfflineSigner(getActiveChain().chain.chainId)
   }
 
-  const { provider, walletWindow } = getRequiredKeplrProvider()
-  await enableKeplr(provider)
-  const signer = await getOfflineSignerFromKeplr(provider, walletWindow)
-  if (!signer) {
-    throw new Error("Keplr signer not available")
-  }
-  return signer
+  throw new Error(`${getWalletConnectorLabel(id)} signer not available`)
 }
 
 export const getAminoOfflineSignerForConnector = async (

@@ -108,6 +108,46 @@ describe("independent desktop Keplr identity", () => {
     expect(getOfflineSigner).toHaveBeenCalledTimes(2)
   })
 
+  it("does not substitute desktop Keplr when the mobile runtime is missing", async () => {
+    const keplr = makeProvider("Desktop", "0.13.test")
+    vi.stubGlobal("window", { keplr })
+    await expect(connectWalletConnector("keplr-mobile")).rejects.toThrow("Keplr Mobile not available")
+    await expect(getOfflineSignerForConnector("keplr-mobile")).rejects.toThrow("Keplr Mobile signer not available")
+    expect(keplr.enable).not.toHaveBeenCalled()
+    expect(keplr.getKey).not.toHaveBeenCalled()
+    expect(keplr.getOfflineSignerAuto).not.toHaveBeenCalled()
+  })
+
+  it("preserves pending mobile handoff without borrowing a desktop account or signer", async () => {
+    const keplr = makeProvider("Desktop", "0.13.test")
+    vi.stubGlobal("window", { keplr })
+    const connect = vi.fn(async () => undefined)
+    const getOfflineSigner = vi.fn(async () => undefined)
+    registerWalletAdapterRuntime({ connect, getOfflineSigner })
+    await expect(connectWalletConnector("keplr-mobile")).resolves.toBeUndefined()
+    expect(connect).toHaveBeenCalledWith("keplr-mobile")
+    await expect(getOfflineSignerForConnector("keplr-mobile")).rejects.toThrow("Keplr Mobile signer not available")
+    expect(keplr.enable).not.toHaveBeenCalled()
+    expect(keplr.getKey).not.toHaveBeenCalled()
+    expect(keplr.getOfflineSignerAuto).not.toHaveBeenCalled()
+  })
+
+  it("keeps a ready mobile runtime's account and signer", async () => {
+    const keplr = makeProvider("Desktop", "0.13.test")
+    vi.stubGlobal("window", { keplr })
+    const mobileAccount = { address: "mobile-public-test-address" }
+    const mobileSigner = { getAccounts: vi.fn(async () => []) }
+    registerWalletAdapterRuntime({
+      connect: vi.fn(async () => mobileAccount),
+      getOfflineSigner: vi.fn(async () => mobileSigner)
+    })
+    await expect(connectWalletConnector("keplr-mobile")).resolves.toBe(mobileAccount)
+    await expect(getOfflineSignerForConnector("keplr-mobile")).resolves.toBe(mobileSigner)
+    expect(keplr.enable).not.toHaveBeenCalled()
+    expect(keplr.getKey).not.toHaveBeenCalled()
+    expect(keplr.getOfflineSignerAuto).not.toHaveBeenCalled()
+  })
+
   it("never borrows Burrito's global signer helpers for a different Keplr provider", async () => {
     const alias = makeProvider("Burrito", "burrito-compat-v1")
     const aliasSigner = vi.fn(() => signer)
