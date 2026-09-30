@@ -1,5 +1,94 @@
 # Production Refactor Notes
 
+## Wallet privacy and exact-extension pairing — 2026-09-30
+
+- Runtime source `d16855789e2d48b5527706467dfd2270a5e4f05c` clarifies the
+  local privacy draft: encrypted storage versus local secret processing,
+  extension theme storage, asset identifiers in price queries, pre-signature
+  simulation, Finder navigation/cookie boundaries and deletion limits.
+  Mobile removal deletes its protected wallet secret, not WebView storage;
+  uninstalling is not promised to remove every secure-storage record. Saved
+  phrase reveal is described only for the extension, not as a mobile feature.
+- Added accessible names to the address-dialog and QR close buttons. No
+  routes, brand/CSS, wallet storage keys, grants, transaction construction or
+  signing behavior changed. No new dependency or production deployment.
+- Local checks: 252 unit tests / 41 files, app typecheck, modified-file ESLint,
+  and 28 desktop/mobile privacy/provider-fixture browser tests pass. The fixture
+  tests are not installed-extension acceptance; the new negative-wording
+  assertions were also rerun separately on desktop and mobile.
+- Built production-mode assets into a new external evidence directory. The
+  existing repository `dist`, four unrelated untracked entries, extension
+  `.output` and frozen extension ZIP were preserved. Build warnings remain for
+  the existing Rollup annotation, vm-browserify eval and large chunks. This was
+  not a fresh dependency installation or independent security review.
+
+### Actual installed extension + local static Web build
+
+The flow is local `/privacy` -> explicit Burrito Wallet Extension -> Cancel or
+approve the requested network -> reload/switch/lock/revoke/disconnect. Existing
+Playwright 1.62.1/Chromium 151.0.7922.34 was used because Browser plugin is
+unavailable. A fresh owned offline profile loaded the unchanged frozen
+extension `84d11b0`, ZIP SHA-256
+`9c6cc71ccceb3e0f455a7af5cd9c3f8815ec8a5b53c6a3a3dcf85063514f07a4`.
+Normal UI created a new unfunded 24-word wallet; recovery words were counted,
+not read or retained. Password was random and in-memory only.
+
+Within this isolated browser only, `https://app.burrito.money/privacy` and the
+build's static assets were fulfilled from the unmodified local output. All
+other network requests were blocked; no wallet/provider, worker or chain data
+was injected. This is **local consumer pairing, not the deployed WebApp**.
+The local `index.html` SHA-256 is
+`0ddef3e22ab3448b57de80372c4e2036f1f499f80c6270e8516a5bf722bbbbcd`.
+
+The final run passes **211 assertions**, including **84 extension package/hash
+checks** and **25 served-Web-file hash checks**, not 211 distinct features:
+
+- First-connection cancellation grants nothing; closing the Web panel leaves
+  the extension request open and keeps network switching disabled.
+- Classic approval grants only `columbus-5`; refresh restores without a prompt.
+  Switching to ungranted Terra does not open a prompt. Cancelling the explicit
+  Terra request retains Classic; a later approval adds `phoenix-1`.
+- Reviews disclose the requested chain and full matching public identity.
+  Chain IDs are checked independently because both chains can share an address.
+- Lock invalidates the Web account but preserves grants. Reload and unlock do
+  not silently reconnect. Explicit reconnect reuses the existing grant without
+  another review. Extension revocation and Web disconnect clear site access and
+  remain disconnected after reload. No signing or broadcast occurred.
+- Address and QR views show the correct identity and both named close controls
+  operate independently. Privacy page identity, meaningful content, absence of
+  framework overlay and mobile horizontal-overflow checks pass.
+
+Console scope: zero uncaught page errors and zero unexpected console errors;
+90 expected network-failure console messages, 18 warnings, 84 blocked reads,
+14 blocked writes and zero external responses. Warning text was not classified.
+This is not an error-free online-data run. No natural worker-idle, real chain
+data, signature execution, native-mobile or physical-toolbar acceptance is
+implied. Connection checks run at desktop size; privacy screenshots cover
+1440x900 and 390x844. The approval image uses the browser context's 1440x900
+viewport, not a measured native popup size.
+
+Six masked screenshots were visually inspected. Some ordinary title-bearing
+controls are masked along with public account text; those blocks are evidence
+redaction, not UI defects. The mobile services image shows the section heading
+and preceding content, not every newly added paragraph. DOM assertions cover
+the complete wording. All three owned contexts closed and profiles are retained.
+
+The first two runs are retained as **helper failures**, not product failures or
+complete passes: the first used `Unlock wallet` instead of actual `Unlock`;
+the second incorrectly expected another review for an existing grant. Their
+partial 117/120 assertions are not added to the final 211. Original helpers and
+failure reports are preserved beside the corrected helper.
+
+Managed evidence: Web collection `artifacts/privacy-web-20260930/`, final
+`pairing-SvpE0w/acceptance.json`, SHA-256
+`a4124561a452f288c2e361b96226ae277ea495b4544700bcc5cb88ef4bb6f347`.
+The helpers, three attempt reports, six final images, build index and Vite
+manifest are retained. This result does not supersede the separate live-site
+observation: deployed `/assets/index-CtXY4JAH.js` lacked the explicit connector
+and showed the August 6 policy. Production publication and owner confirmation
+of actual recipient practices remain separate gates, as do current-commit CI,
+other DApp consumers, mobile-device/authentication and independent review.
+
 ## Baseline
 
 - `npm run build`: passed before refactor. Vite reported existing dependency/chunk-size warnings only.

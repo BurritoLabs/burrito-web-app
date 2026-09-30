@@ -22,6 +22,20 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open the drawer wallet from at least two routes.
 - Confirm native, CW20, and IBC balances load.
 - Confirm balance values, token logos, and fallback logos display.
+- Open View wallet addresses and its QR view; verify named Close QR code and
+  Close wallet addresses controls close only their own surface and preserve
+  the connected account. Verify both desktop and mobile layouts.
+
+## Privacy publication gate
+
+- Reconcile the local `/privacy` draft with mobile and extension behavior:
+  local secret processing, asset-price queries, simulation before signing,
+  Finder links/cookies, diagnostics and platform-specific deletion boundaries.
+- Confirm actual service-provider data use, access, retention and deletion;
+  source review does not establish these operational facts or legal approval.
+- After separately authorized publication, verify the rendered live policy
+  and explicit Burrito extension connector against exact deployed assets.
+  Local static-build pairing and a passing HTTP response are not live acceptance.
 
 ## Market
 
