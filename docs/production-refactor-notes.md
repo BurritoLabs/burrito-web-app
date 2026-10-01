@@ -1,5 +1,73 @@
 # Production Refactor Notes
 
+## Current validator-candidate extension pairing — 2026-09-30 (Toronto)
+
+The unchanged Web source at `308262efcaf8b126b4db52a20841e99627b94973`
+has a new isolated production-mode build paired with actual Burrito extension
+runtime `8638a120ec648dc45b39332afb32b1d9a5779dc6`, exact ZIP SHA-256
+`74c6a789d1b11bf05543e61b909cd99dcbd8f56316783b98f8b09cfd94a129b6`.
+UTC evidence crosses into October 1. No product source, CSS, brand, dependency,
+deployment environment, personal browser or existing `dist` was changed.
+
+The production build passes the existing bundle budgets: initial JS 145.5 KiB
+gzip and wallet-runtime static load 1021.4 KiB gzip. Its 550 tracked non-doc
+source files and 156 outputs are recorded before actual browser use. This
+build uses an empty envDir and scrubbed inherited environment, existing locked
+dependencies, and the current source release label. It is not a deployed-
+configuration build, fresh dependency installation, native handoff, or renewed
+unit/security audit. Existing PURE-comment, vm-browserify eval and large-chunk
+build warnings remain; the previously passing unit/CI evidence is separate.
+
+Actual local frontend + installed-extension pairing passes **352/352 checks**
+on its first run, including inventory and locator assertions, not 352 distinct
+product features. Only exact `https://app.burrito.money` build-inventory files
+are served locally with their recorded bytes; no provider, worker, account or
+storage state is injected. New unfunded wallets A/B are created through UI,
+recovery words counted only, and passwords stay in memory.
+
+- Cancel Classic grants nothing; explicit Classic approval is scoped to
+  Classic. Cancelling a Terra upgrade preserves that earlier grant, and Terra
+  access requires its own approval. Closing the Web panel leaves the existing
+  extension review pending and the network control disabled.
+- Refresh restores an already-authorized account without another review.
+  Extension lock, site revocation and Web Disconnect clear the Web identity.
+  Unlock alone does not reconnect; the explicit reconnect action is checked.
+- Adding B invalidates A's Web identity. B has no inherited grant and shows its
+  own full address after approval. Switching back to A invalidates B, clears
+  previous access and requires explicit connection; A's original address is
+  restored. Real extension Site connections UI verifies network grants.
+- The actual Connect and wallet-address dialogs pass 1440x900/390x844,
+  light/dark identity, nonblank UI, no framework overlay and containment
+  checks. QR open/close and full-address equality are exercised separately.
+  Thirteen masked screenshots are retained; root inspected seven, including
+  all four representative dialog/theme/viewport combinations. Approval capture
+  uses a wide browser viewport, not native action-popup geometry. Masks are
+  QA redaction, not product UI; this is not mobile-browser extension support.
+
+Windows Chromium 151.0.7922.34 / existing Playwright 1.62.1 were used because
+the Browser plugin is absent. Browser offline/routes/dead-proxy/DNS rules block
+external requests: 219 reads and 20 HTTP write attempts blocked, zero external
+HTTP responses or WebSocket attempts. No signature/broadcast/transfer was
+requested. Console: zero page or unexpected errors, 175 blocked-resource
+errors and 68 warnings (24 unused-preload, 44 unclassified). This is not a
+warning-free console or successful service-health/data test.
+
+Final integrity/cleanup **1020/1020 checks** pass. The test wallet is normally
+locked, the browser is closed, its retained profile has no remaining exact-
+profile Chrome process, and original source/dist/unrelated workspace files
+remain unchanged. Evidence is outside the repository at
+`C:/Users/fengz/.codex/artifacts/burrito-wallet/web-validator-pairing-20260930/`:
+`run-T7rAc3/acceptance.json` SHA-256
+`0caf36b9749389b4839a4130ba0771decc86be72cd09ad66be84de633da1e016`;
+`final-verification.json` SHA-256
+`ae9f7a8148d1a29b69e676d5e44d954e0e6b7cfa9842bf8dfd23dc04b2adb5db`.
+Build/source inventories, execution helpers and screenshot hashes are retained.
+
+This closes this exact candidate's local Burrito/Web account-access pairing
+gap. Genuine Keplr auto-restore/lock/revoke policy below remains unresolved;
+production consumers/configuration, WalletConnect/native pairing, successful
+signing/execution and original release gates are not promoted by this run.
+
 ## Native recovery review privacy disclosure — 2026-09-30
 
 Web source `1b488f9c3a058b9b4dcdbf954e6eea346c2dd373` aligns the local
