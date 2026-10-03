@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright"
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
+import { installGovernanceFixtures } from "./fixtures/governance"
 
 const routes = [
   ["/", "Dashboard"],
@@ -19,19 +20,29 @@ const themes = ["light", "dark"] as const
 
 const setTheme = async (page: Page, theme: (typeof themes)[number]) => {
   const current = await page.locator("html").getAttribute("data-theme")
-  if (current === theme) return
-  await page
-    .getByRole("button", {
-      name: theme === "dark" ? "Switch to dark theme" : "Switch to light theme"
-    })
-    .click()
+  if (current !== theme) {
+    await page
+      .getByRole("button", {
+        name: theme === "dark" ? "Switch to dark theme" : "Switch to light theme"
+      })
+      .click()
+  }
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
+  // Axe must sample the settled theme, not intermediate foreground/background
+  // colors in CSS transitions. Wait for actual finite animations, not a sleep.
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await Promise.allSettled(document.getAnimations()
+      .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+      .map((animation) => animation.finished))
+  })
 }
 
-const expectDialogSurface = async (page: Page) => {
-  const dialog = page.getByRole("dialog")
+const expectDialogSurface = async (dialog: Locator, surface: Locator = dialog) => {
+  await expect(dialog).toHaveCount(1)
   await expect(dialog).toBeVisible()
-  const surface = dialog.locator(":scope > div, :scope > section").first()
+  await expect(surface).toHaveCount(1)
+  await expect(surface).toBeVisible()
   const metrics = await surface.evaluate((element) => {
     const rect = element.getBoundingClientRect()
     const style = window.getComputedStyle(element)
@@ -75,15 +86,21 @@ const overlapArea = (left: HeaderControl, right: HeaderControl) =>
   Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top))
 
 for (const theme of themes) {
-  test(`${theme} theme passes representative visual and accessibility gates`, async ({
-    page
-  }, testInfo) => {
-    const pageErrors: string[] = []
-    page.on("pageerror", (error) => pageErrors.push(error.message))
+  // Each route gets the existing 30-second budget. Eleven navigations plus
+  // eleven Axe scans must not compete for a single page's timeout on CI.
+  for (const [path, heading] of routes) {
+    test(`${theme} ${heading} passes visual and accessibility gates`, async ({
+      page
+    }, testInfo) => {
+      const pageErrors: string[] = []
+      page.on("pageerror", (error) => pageErrors.push(error.message))
 
-    for (const [path, heading] of routes) {
+      if (path === "/gov") await installGovernanceFixtures(page)
       await page.goto(path)
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible()
+      if (path === "/gov") {
+        await expect(page.locator('a[href="/proposal/99001"]')).toBeVisible()
+      }
       await setTheme(page, theme)
 
       const overflow = await page.evaluate(
@@ -126,10 +143,9 @@ for (const theme of themes) {
           }
         )
       }
-    }
-
-    expect(pageErrors).toEqual([])
-  })
+      expect(pageErrors).toEqual([])
+    })
+  }
 
   test(`${theme} theme keeps public dialogs readable and inside the viewport`, async ({
     page
@@ -137,15 +153,22 @@ for (const theme of themes) {
     await page.goto("/")
     await setTheme(page, theme)
     await page.getByRole("button", { name: "Connect", exact: true }).click()
-    await expectDialogSurface(page)
-    await page.getByRole("button", { name: "Close" }).click()
+    const connectDialog = page.getByRole("dialog", { name: "Connect wallet", exact: true })
+    await expectDialogSurface(connectDialog)
+    await connectDialog.getByRole("button", { name: "Close", exact: true }).click()
 
     await page.goto("/swap")
     await setTheme(page, theme)
     await page.locator("main button").filter({ hasText: /LUNC|LUNA/ }).first().click()
-    await expect(page.getByRole("heading", { name: "Select token" })).toBeVisible()
-    await expectDialogSurface(page)
-    await page.getByRole("button", { name: "Close" }).click()
+    const tokenPickerHeading = page.getByRole("heading", { name: "Select token", exact: true })
+    const tokenPickerDialog = page.getByRole("dialog").filter({ has: tokenPickerHeading })
+    // The token picker's dialog role is on its backdrop, unlike Connect's painted card.
+    const tokenPickerSurface = tokenPickerDialog.locator(":scope > div").filter({
+      has: tokenPickerHeading
+    })
+    await expect(tokenPickerHeading).toBeVisible()
+    await expectDialogSurface(tokenPickerDialog, tokenPickerSurface)
+    await tokenPickerDialog.getByRole("button", { name: "Close", exact: true }).click()
   })
 }
 

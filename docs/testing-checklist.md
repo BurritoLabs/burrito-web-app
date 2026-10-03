@@ -4,7 +4,53 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Wallet
 
+- Delay the mobile SDK while Connect is open, including during a pending Burrito
+  approval. The same dialog/focus, pending state and network lock must survive
+  successful loading; approval/cancellation must settle once. SDK failure must
+  leave the desktop flow usable. Invalidation must reject obsolete responses.
+- Cancel an unstarted mobile handoff by switching chains while its SDK loads;
+  loading completion must not open the old chain's connection afterward.
+  Verify actual WalletConnect pairing/return separately from these fixtures.
+- Connect dialog must have an accessible name, receive initial focus, contain
+  forward/reverse Tab, close on Escape and restore the trigger. Repeat while an
+  extension request is pending: closing the panel must not approve/cancel it or
+  enable network switching before the wallet request settles.
+- With only Burrito installed, do not present its compatibility alias as a
+  separate Keplr installation. With genuine Keplr also installed, verify provider
+  identity remains distinct through connect/restore/events/signing boundaries.
+- Keplr Mobile must retain a pending mobile handoff without borrowing a desktop
+  account. A missing mobile runtime/signer must not fall back to desktop Keplr;
+  verify both the missing and legitimate-ready runtime cases.
+- After adding/switching wallets A and B in the extension, require explicit Web
+  reconnection, clear prior grants and verify the complete new public identity.
+
+- Connect **Burrito Wallet Extension** using its explicit connector with the
+  exact release-candidate ZIP; do not count its Keplr compatibility alias as
+  Burrito integration acceptance. Record deployed Web asset/build identifiers.
+- Verify extension connection Cancel grants nothing, a cancelled second-chain
+  request preserves the first grant, and refresh only restores existing access.
+- Verify extension lock, wallet change and site revocation invalidate the Web
+  account; disconnect must remain disconnected after refresh on both chains.
 - Connect Keplr extension on desktop.
+- With an empty genuine Keplr installation, the connection alert must direct
+  users to create/import inside Keplr, without borrowing Burrito's account or
+  remembering a failed connection. Retry controls must recover; the fixture
+  must count a second enable call, not merely recheck stale text. Explicitly
+  selecting Burrito afterward must still work. Keep cancellation and other
+  provider errors distinct from the exact empty-keyring message.
+- With genuine Keplr as the active owner, separately exercise normal UI lock,
+  unlock and Connected Websites revocation. Record the Web account display,
+  focus return, page reload, and any new unlock/permission windows. Do not replace
+  these with a synthetic `keplr_keystorechange` event: Keplr 0.13.52 does not send
+  that event for these actions, and its public account reads may prompt.
+- Keep the Keplr lifecycle gate open until the explicit-versus-automatic recovery
+  policy is decided and verified. The September 30 exact-runtime reproduction
+  found stale displayed accounts and automatic restore prompts; successful
+  connection, dual-wallet isolation, and Burrito lifecycle tests do not fix it.
+- Verify manual Web Disconnect remains disconnected after refresh, separately
+  from actual Keplr permission removal. After re-granting in another window,
+  reload the Keplr popup before clearing permissions and again before asserting
+  the empty list; retain any earlier stale-list observations as inconclusive.
 - Connect Galaxy Station on desktop.
 - Connect Keplr mobile from mobile browser.
 - Disconnect and reconnect without refreshing.
@@ -15,6 +61,20 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open the drawer wallet from at least two routes.
 - Confirm native, CW20, and IBC balances load.
 - Confirm balance values, token logos, and fallback logos display.
+- Open View wallet addresses and its QR view; verify named Close QR code and
+  Close wallet addresses controls close only their own surface and preserve
+  the connected account. Verify both desktop and mobile layouts.
+
+## Privacy publication gate
+
+- Reconcile the local `/privacy` draft with mobile and extension behavior:
+  local secret processing, asset-price queries, simulation before signing,
+  Finder links/cookies, diagnostics and platform-specific deletion boundaries.
+- Confirm actual service-provider data use, access, retention and deletion;
+  source review does not establish these operational facts or legal approval.
+- After separately authorized publication, verify the rendered live policy
+  and explicit Burrito extension connector against exact deployed assets.
+  Local static-build pairing and a passing HTTP response are not live acceptance.
 
 ## Market
 
