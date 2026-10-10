@@ -10,6 +10,12 @@ import {
   getBurritoNativeOfflineSigner
 } from "./burritoNativeWallet"
 import {
+  connectBurritoExtensionWallet,
+  disconnectBurritoExtensionWallet,
+  getBurritoExtensionConnector,
+  getBurritoExtensionOfflineSigner
+} from "./burritoExtensionWallet"
+import {
   connectGalaxyWallet,
   disconnectGalaxyWallet,
   getGalaxyConnector,
@@ -339,6 +345,7 @@ export const getWalletConnectors = (): WalletConnector[] => {
 
   return [
     getBurritoNativeConnector(),
+    getBurritoExtensionConnector(),
     keplrRuntimeConnector ?? {
       ...getWalletConnectorMeta("keplr"),
       available: Boolean(walletWindow?.keplr)
@@ -360,6 +367,9 @@ export const connectWalletConnector = async (id: WalletConnectorId) => {
   if (id === "burrito-native") {
     return connectBurritoNativeWallet(getActiveChain().chain.chainId)
   }
+  if (id === "burrito-extension") {
+    return connectBurritoExtensionWallet(getActiveChain().chain.chainId)
+  }
   const runtimeAccount = await walletAdapterRuntime?.connect?.(id)
   if (runtimeAccount) {
     return runtimeAccount
@@ -377,6 +387,10 @@ export const disconnectWalletConnector = async (id: WalletConnectorId) => {
     await disconnectBurritoNativeWallet()
     return
   }
+  if (id === "burrito-extension") {
+    await disconnectBurritoExtensionWallet()
+    return
+  }
   await walletAdapterRuntime?.disconnect?.(id)
 
   if (id === "galaxy") {
@@ -387,6 +401,9 @@ export const disconnectWalletConnector = async (id: WalletConnectorId) => {
 export const getOfflineSignerForConnector = async (id: WalletConnectorId) => {
   if (id === "burrito-native") {
     return getBurritoNativeOfflineSigner(getActiveChain().chain.chainId)
+  }
+  if (id === "burrito-extension") {
+    return getBurritoExtensionOfflineSigner(getActiveChain().chain.chainId)
   }
   if (id === "keplr" && hasDesktopKeplr()) {
     const signer = await getDirectDesktopKeplrSigner()
