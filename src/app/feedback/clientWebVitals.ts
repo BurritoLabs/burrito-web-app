@@ -61,18 +61,13 @@ export const installClientWebVitals = () => {
     })
 
     try {
-      if (
-        navigator.sendBeacon?.(
-          CLIENT_METRIC_ENDPOINT,
-          new Blob([payload], { type: "application/json" })
-        )
-      ) {
-        return
-      }
+      // Beacon always includes credentials, which this public endpoint does
+      // not accept. Keepalive preserves page-exit delivery without cookies.
       void fetch(CLIENT_METRIC_ENDPOINT, {
         method: "POST",
         body: payload,
         headers: { "content-type": "application/json" },
+        credentials: "omit",
         keepalive: true
       }).catch(() => undefined)
     } catch {

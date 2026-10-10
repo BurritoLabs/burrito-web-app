@@ -39,6 +39,20 @@ export type StoredTxDiagnosticEvent = TxDiagnosticEvent & {
   at: string
 }
 
+const REMOTE_TX_ERROR_SUMMARIES: Record<TxErrorCategory, string> = {
+  wallet_rejected: "Transaction cancelled in wallet.",
+  sequence_mismatch: "Wallet signature is out of sync.",
+  already_submitted: "Transaction was already submitted.",
+  insufficient_funds: "Insufficient balance for the transaction.",
+  slippage: "Transaction exceeded the slippage limit.",
+  gas_too_low: "Transaction gas was insufficient.",
+  network: "Transaction encountered a network error.",
+  unauthorized: "Wallet is not authorized for this action.",
+  invalid_symbol: "Token symbol did not pass validation.",
+  validation: "Transaction did not pass validation.",
+  unknown: "Transaction failed."
+}
+
 const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
   if (!TX_DIAGNOSTICS_ENDPOINT || typeof window === "undefined") return
 
@@ -55,7 +69,10 @@ const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
     label: event.label,
     connectorId: event.connectorId,
     category: event.category,
-    message: event.message?.slice(0, 300),
+    // Keep original error text local: it can contain addresses or URL queries.
+    message: event.phase === "failure"
+      ? REMOTE_TX_ERROR_SUMMARIES[event.category ?? "unknown"]
+      : undefined,
     gasUsed: event.gasUsed,
     gasWanted: event.gasWanted,
     durationMs: event.durationMs,
@@ -63,18 +80,11 @@ const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
   })
 
   try {
-    if (typeof navigator.sendBeacon === "function") {
-      navigator.sendBeacon(
-        TX_DIAGNOSTICS_ENDPOINT,
-        new Blob([payload], { type: "text/plain;charset=UTF-8" })
-      )
-      return
-    }
-
     void fetch(TX_DIAGNOSTICS_ENDPOINT, {
       method: "POST",
       body: payload,
       headers: { "content-type": "text/plain;charset=UTF-8" },
+      credentials: "omit",
       keepalive: true
     }).catch(() => undefined)
   } catch {

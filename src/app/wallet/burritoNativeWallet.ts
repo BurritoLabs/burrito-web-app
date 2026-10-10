@@ -21,6 +21,7 @@ const UNSIGNED_INTEGER = /^(0|[1-9][0-9]*)$/
 type NativeBridge = {
   version: number
   request: (method: string, params?: Record<string, unknown>) => Promise<unknown>
+  cancelPending?: () => void
 }
 
 type NativeWalletAccount = AccountData & {
@@ -36,6 +37,26 @@ declare global {
 }
 
 let connectedAccounts: NativeWalletAccount[] | undefined
+let sessionVersion = 0
+
+export const invalidateBurritoNativeSession = () => {
+  sessionVersion += 1
+  connectedAccounts?.forEach((account) => account.pubkey.fill(0))
+  connectedAccounts = undefined
+  // Newer native hosts also dismiss this document's pending approval. Older
+  // hosts remain compatible: local generation checks still reject late replies.
+  try {
+    if (typeof window !== "undefined") window.BurritoNative?.cancelPending?.()
+  } catch {
+    // A failed native cancellation must never keep the local session alive.
+  }
+}
+
+const requireCurrentSession = (version: number) => {
+  if (version !== sessionVersion) {
+    throw new Error("Reconnect Burrito Wallet before continuing")
+  }
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -195,19 +216,24 @@ export const connectBurritoNativeWallet = async (
   if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
     throw new Error("Burrito native wallet does not support this chain")
   }
+  invalidateBurritoNativeSession()
+  const version = sessionVersion
   const bridge = getBridge()
-  validateCapabilities(await bridge.request("bridge.getCapabilities", {}))
-  validateWalletStatus(await bridge.request("wallet.getStatus", {}))
-  const accounts = parseNativeAccounts(await bridge.request("wallet.open", {}))
-  connectedAccounts?.forEach((account) => account.pubkey.fill(0))
-  connectedAccounts = accounts
+  const capabilities = await bridge.request("bridge.getCapabilities", {})
+  requireCurrentSession(version)
+  validateCapabilities(capabilities)
+  const status = await bridge.request("wallet.getStatus", {})
+  requireCurrentSession(version)
+  validateWalletStatus(status)
+  const response = await bridge.request("wallet.open", {})
+  requireCurrentSession(version)
+  connectedAccounts = parseNativeAccounts(response)
   const account = requireActiveAccount(chainId)
   return { address: account.address, name: "Burrito Wallet" }
 }
 
 export const disconnectBurritoNativeWallet = async () => {
-  connectedAccounts?.forEach((account) => account.pubkey.fill(0))
-  connectedAccounts = undefined
+  invalidateBurritoNativeSession()
 }
 
 const requireActiveAccount = (chainId: string) => {
@@ -275,6 +301,7 @@ export const getBurritoNativeOfflineSigner = (
   if (!SUPPORTED_CHAIN_IDS.includes(chainId as SupportedChainId)) {
     throw new Error("Burrito native wallet does not support this chain")
   }
+  const version = sessionVersion
   const account = requireActiveAccount(chainId)
   const accountData: AccountData = {
     address: account.address,
@@ -283,11 +310,15 @@ export const getBurritoNativeOfflineSigner = (
   }
 
   return {
-    getAccounts: async () => [{ ...accountData, pubkey: accountData.pubkey.slice() }],
+    getAccounts: async () => {
+      requireCurrentSession(version)
+      return [{ ...accountData, pubkey: accountData.pubkey.slice() }]
+    },
     signDirect: async (
       signerAddress: string,
       signDoc: SignDoc
     ): Promise<DirectSignResponse> => {
+      requireCurrentSession(version)
       const current = requireActiveAccount(chainId)
       if (
         signerAddress !== current.address ||
@@ -304,6 +335,7 @@ export const getBurritoNativeOfflineSigner = (
         bodyBytes: toBase64(signDoc.bodyBytes),
         authInfoBytes: toBase64(signDoc.authInfoBytes)
       })
+      requireCurrentSession(version)
       const signature = validateSignedTransaction(response, current, signDoc)
       return {
         signed: signDoc,

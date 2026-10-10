@@ -27,7 +27,7 @@ type TopBarProps = {
 const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { account, txState, connectorId, disconnect } = useWallet()
+  const { account, txState, connectorId, disconnect, status } = useWallet()
   const { chainKey, chain, setChainKey } = useAppChain()
   const [connectOpen, setConnectOpen] = useState(false)
   const [addressesOpen, setAddressesOpen] = useState(false)
@@ -58,6 +58,8 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
     ? walletName ||
       `${account.address.slice(0, 6)}...${account.address.slice(-4)}`
     : "Connect"
+  const connectionApprovalPending =
+    connectorId === "burrito-extension" && status === "connecting"
   const valoperAddress = account?.address
     ? convertBech32Prefix(
         account.address,
@@ -153,6 +155,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   }, [walletMenuOpen])
 
   const selectChain = (next: AppChainKey) => {
+    if (connectionApprovalPending) return
     if (next === chainKey) {
       setChainOpen(false)
       return
@@ -206,6 +209,10 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
             aria-haspopup="menu"
             aria-expanded={chainOpen}
             aria-label="Switch network"
+            disabled={connectionApprovalPending}
+            title={connectionApprovalPending
+              ? "Finish or cancel the Burrito Wallet request before switching networks."
+              : undefined}
             ref={chainButtonRef}
             onClick={() => setChainOpen((open) => !open)}
           >
@@ -259,6 +266,7 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
                           } as React.CSSProperties
                         }
                         role="menuitem"
+                        disabled={connectionApprovalPending}
                         aria-current={active ? "true" : undefined}
                         onClick={() => selectChain(item.key)}
                       >
