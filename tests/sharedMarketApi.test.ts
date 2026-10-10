@@ -1,11 +1,35 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   normalizeSharedCandles,
+  fetchSharedPairCandles,
   requestSharedPairActivation,
   sharedIntervalForBucketMs
 } from "../src/app/data/sharedMarketApi"
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe("shared market candle API", () => {
+  it("requests the newest limited window then orders it chronologically for the chart", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      status: "ok", base: "uluna", quote: "uusd",
+      candles: [
+        { time: 1_700_001_800, open: 2, high: 4, low: 1, close: 3, volume: 8 },
+        { time: 1_700_000_000, open: 1, high: 3, low: 0.5, close: 2, volume: 4 }
+      ]
+    })))
+    vi.stubGlobal("fetch", fetchMock)
+    const candles = await fetchSharedPairCandles({
+      chainId: "columbus-5", pairAddress: "terra1latest-window",
+      leftAssetKey: "uluna", rightAssetKey: "uusd",
+      bucketMs: 30 * 60_000, maxCandles: 48
+    })
+    const query = new URL(fetchMock.mock.calls[0][0]).searchParams
+    expect(query.get("order")).toBe("desc")
+    expect(query.get("limit")).toBe("48")
+    expect(query.get("interval")).toBe("30m")
+    expect(candles.map((candle) => candle.bucketStart)).toEqual([1_700_000_000_000, 1_700_001_800_000])
+    expect(candles[1].close).toBe(3)
+  })
   it("maps chart buckets to the server interval contract", () => {
     expect(sharedIntervalForBucketMs(60_000)).toBe("1m")
     expect(sharedIntervalForBucketMs(30 * 60_000)).toBe("30m")
@@ -33,7 +57,15 @@ describe("shared market candle API", () => {
       },
       leftAssetKey: "uusd",
       rightAssetKey: "uluna"
-    })).toEqual([{ bucketStart: 1_700_000_000_000, open: 0.5, high: 1, low: 0.25, close: 0.4, volumeQuote: 0 }])
+    })).toEqual([{ bucketStart: 1_700_000_000_000, open: 0.5, high: 1, low: 0.25, close: 0.4, volumeQuote: 0, volumeKnown: false }])
+  })
+
+  it("keeps observed prices when volume is missing without claiming zero trading activity", () => {
+    const candles = normalizeSharedCandles({ payload: {
+      base: "uluna", quote: "uusd",
+      candles: [{ time: 1_700_000_000, open: 1, high: 3, low: 0.5, close: 2 }]
+    }, leftAssetKey: "uluna", rightAssetKey: "uusd" })
+    expect(candles[0]).toMatchObject({ close: 2, volumeKnown: false })
   })
 })
 

@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "../PageShell"
+import { MarketAssetIcon as AssetIcon } from "./MarketPairAssetIcon"
 import styles from "../Market.module.css"
 import { CLASSIC_CHAIN } from "../../app/chain"
 import {
   fetchMarketDexPairs,
   fetchMarketPoolLive,
   fetchMarketPools,
+  fetchPackagedMarketSnapshot,
   type MarketPoolSnapshot
 } from "../../app/data/market"
 import {
@@ -21,7 +23,6 @@ import {
   fetchCirculatingSnapshot,
   fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import { useDexEstimatedPrices } from "../../app/data/dexPrices"
 import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
 import { formatNumber, formatPercent, formatUsd, toUnitAmount } from "../../app/utils/format"
 import {
@@ -43,6 +44,7 @@ import {
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
+import { calculatePairPriceChange } from "../../app/market/priceChange"
 import {
   resolveBondingSpotPrice,
   supportsReserveRatioPricing
@@ -238,104 +240,6 @@ const fetchNativeSupplies = async (
   return result
 }
 
-const AssetIcon = ({
-  symbol,
-  candidates,
-  size = 28
-}: {
-  symbol: string
-  candidates: string[]
-  size?: number
-}) => {
-  const candidateKey = `${symbol}:${candidates.join("|")}`
-  return <AssetIconInner key={candidateKey} symbol={symbol} candidates={candidates} size={size} />
-}
-
-const AssetIconInner = ({
-  symbol,
-  candidates,
-  size
-}: {
-  symbol: string
-  candidates: string[]
-  size: number
-}) => {
-  const [index, setIndex] = useState(0)
-  const [loaded, setLoaded] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const src = candidates[index]
-  const systemFallback = candidates.find((candidate) =>
-    candidate.startsWith("/system/")
-  )
-
-  const fallback = systemFallback ? (
-    <img
-      aria-hidden="true"
-      alt=""
-      src={systemFallback}
-      width={size}
-      height={size}
-      decoding="async"
-      style={{
-        inset: 0,
-        position: "absolute",
-        width: "100%",
-        height: "100%",
-        objectFit: "cover"
-      }}
-    />
-  ) : (
-    <span
-      aria-hidden="true"
-      className={styles.assetIconFallback}
-      style={{ inset: 0, position: "absolute", width: "100%", height: "100%" }}
-    />
-  )
-
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        position: "relative",
-        display: "inline-flex",
-        flex: "0 0 auto"
-      }}
-    >
-      {fallback}
-      {!failed && src ? (
-        <img
-          loading="lazy"
-          src={src}
-          alt={symbol}
-          width={size}
-          height={size}
-          decoding="async"
-          referrerPolicy="no-referrer"
-          style={{
-            inset: 0,
-            position: "absolute",
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: loaded ? 1 : 0,
-            transition: "opacity 120ms ease"
-          }}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setLoaded(false)
-            if (index < candidates.length - 1) {
-              setIndex((prev) => prev + 1)
-            } else {
-              setFailed(true)
-            }
-          }}
-        />
-      ) : null}
-    </span>
-  )
-}
-
 const Market = () => {
   const location = useLocation()
   const { chain, chainKey } = useAppChain()
@@ -367,14 +271,21 @@ const Market = () => {
     ? dexFilter
     : "all"
 
+  const { data: packagedSnapshot } = useQuery({
+    queryKey: ["market", chain.chainId, "packaged-snapshot"],
+    queryFn: () => fetchPackagedMarketSnapshot(chain.chainId),
+    staleTime: Number.POSITIVE_INFINITY
+  })
+
   const { data: pairs = [], isLoading: isPairsLoading } = useQuery({
     queryKey: ["market", chain.chainId, "pairs"],
     queryFn: fetchMarketDexPairs,
+    placeholderData: packagedSnapshot?.pairs,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000
   })
 
-  const { data: pools = [], isLoading: isPoolsLoading } = useQuery({
+  const { data: pools = [], isLoading: isPoolsLoading, isPlaceholderData } = useQuery({
     queryKey: [
       "market",
       chain.chainId,
@@ -382,9 +293,10 @@ const Market = () => {
       pairs.map((pair) => pair.pair).join(",")
     ],
     queryFn: () => fetchMarketPools(pairs),
+    placeholderData: packagedSnapshot?.pools,
     enabled: pairs.length > 0,
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 4 * 60 * 1000
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000
   })
 
   const nativeDenoms = useMemo(() => {
@@ -430,38 +342,6 @@ const Market = () => {
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000
   })
-
-  const assetMetas = useMemo(() => {
-    const map = new Map<string, number>()
-    const addAsset = (id: string) => {
-      if (!id) return
-      if (id.startsWith("native:")) {
-        const denom = id.slice(7)
-        const key = normalizeAssetKey(denom)
-        if (!key || map.has(key)) return
-        const decimals = denom.startsWith("ibc/")
-          ? (ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
-            cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
-            6)
-          : (nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6)
-        map.set(key, decimals)
-        return
-      }
-      if (id.startsWith("cw20:")) {
-        const contract = id.slice(5).toLowerCase()
-        const key = normalizeAssetKey(contract)
-        if (!key || map.has(key)) return
-        map.set(key, cw20Whitelist[contract]?.decimals ?? 6)
-      }
-    }
-    pools.forEach((pool) => {
-      addAsset(pool.poolAssets[0]?.id ?? "")
-      addAsset(pool.poolAssets[1]?.id ?? "")
-    })
-    return Array.from(map.entries()).map(([key, decimals]) => ({ key, decimals }))
-  }, [cw20Whitelist, ibcWhitelist, nativeWhitelist, pools])
-
-  const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
 
   const resolveAsset = useCallback(
     (assetId: string): ResolvedAsset => {
@@ -557,15 +437,11 @@ const Market = () => {
     (asset: ResolvedAsset) => {
       if (asset.isLunc) return nativePrice?.usd
       if (asset.isUstc) return prices?.ustc?.usd
-      const graphEntry = poolGraphUsdPrices[asset.key]
-      if (graphEntry !== undefined) return graphEntry.price
-      const estimate = dexEstimatedPrices?.[asset.key]
-      if (!estimate) return undefined
-      const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : nativePrice?.usd
-      if (quoteUsd === undefined) return undefined
-      return estimate.priceInQuote * quoteUsd
+      // The list already has the pool reserves. Do not fetch every pool again
+      // for an estimate; missing prices stay unknown until data is available.
+      return poolGraphUsdPrices[asset.key]?.price
     },
-    [dexEstimatedPrices, nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
+    [nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
   )
 
   const getAssetPriceConfidence = useCallback(
@@ -749,12 +625,7 @@ const Market = () => {
     (card: MarketCard, tf: Timeframe) => {
       const baseChange = getAssetChange(card.priceBase, tf)
       const quoteChange = getAssetChange(card.priceQuote, tf)
-      if (baseChange === undefined && quoteChange === undefined) return undefined
-      if (baseChange !== undefined && quoteChange !== undefined) {
-        return ((1 + baseChange / 100) / (1 + quoteChange / 100) - 1) * 100
-      }
-      if (baseChange !== undefined) return baseChange
-      return quoteChange !== undefined ? -quoteChange : undefined
+      return calculatePairPriceChange(baseChange, quoteChange)
     },
     [getAssetChange]
   )
@@ -955,7 +826,10 @@ const Market = () => {
     [compareMarketCards, filteredCards]
   )
 
-  const visible = filteredAndSorted.slice(0, visibleCount)
+  const visible = useMemo(
+    () => filteredAndSorted.slice(0, visibleCount),
+    [filteredAndSorted, visibleCount]
+  )
   const hasMore = filteredAndSorted.length > visible.length
   const visibleCw20Contracts = useMemo(
     () =>
@@ -1234,8 +1108,8 @@ const Market = () => {
               {isLoading
                 ? "Loading pools..."
                 : effectiveDexFilter === "all"
-                  ? `${filteredAndSorted.length} pools`
-                  : `${filteredAndSorted.length} ${selectedDexFilter.label} pools`}
+                  ? `${filteredAndSorted.length} ${filteredAndSorted.length === 1 ? "pool" : "pools"}`
+                  : `${filteredAndSorted.length} ${selectedDexFilter.label} ${filteredAndSorted.length === 1 ? "pool" : "pools"}`}
             </div>
             <div className={styles.timeframe}>
               {(["1h", "24h", "7d"] as Timeframe[]).map((tf) => (
@@ -1331,6 +1205,11 @@ const Market = () => {
           </div>
         </section>
 
+        {(isPlaceholderData || pools.some((pool) => pool.snapshotSource === "packaged")) && !isLoading ? (
+          <p className={styles.snapshotNotice} role="status">
+            Some pools use a saved snapshot. Live data is not available for these pools. Estimates are not execution quotes.
+          </p>
+        ) : null}
         {isLoading ? (
           <section className={`card ${styles.empty}`}>Loading market data...</section>
         ) : displayVisible.length === 0 ? (
@@ -1384,6 +1263,7 @@ const Market = () => {
                                 symbol={card.left.symbol}
                                 candidates={card.left.iconCandidates}
                                 size={40}
+                                priority={index < 3}
                               />
                             </span>
                             <span className={styles.pairIconSecondary}>
@@ -1391,6 +1271,7 @@ const Market = () => {
                                 symbol={card.right.symbol}
                                 candidates={card.right.iconCandidates}
                                 size={22}
+                                priority={index < 3}
                               />
                             </span>
                           </div>

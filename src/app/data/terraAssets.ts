@@ -1024,18 +1024,26 @@ export const fetchCw20TokenInfos = async (
         const name = info?.name?.trim()
         const parsedDecimals = Number(info?.decimals)
         let icon: string | undefined
-        try {
-          const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
-          const marketingResponse = await fetchWithEndpointFallback(
-            `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
-          )
-          if (marketingResponse.ok) {
-            const marketingPayload =
-              (await marketingResponse.json()) as Cw20MarketingInfoResponse
-            icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
+        const hasUsableFallbackIcon = Boolean(
+          sanitizeAssetIconUrl(fallbackWithFinder[contract]?.icon) ||
+            sanitizeAssetIconUrl(
+              getLocalCw20TokenOverride(contract, scope.chainKey)?.icon
+            )
+        )
+        if (!hasUsableFallbackIcon) {
+          try {
+            const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
+            const marketingResponse = await fetchWithEndpointFallback(
+              `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${marketingQuery}`
+            )
+            if (marketingResponse.ok) {
+              const marketingPayload =
+                (await marketingResponse.json()) as Cw20MarketingInfoResponse
+              icon = extractCw20MarketingLogo(marketingPayload.data?.logo)
+            }
+          } catch {
+            icon = undefined
           }
-        } catch {
-          icon = undefined
         }
         const onChain = {
           symbol: symbol || undefined,

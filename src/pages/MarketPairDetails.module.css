@@ -7,46 +7,57 @@
   font-size: 14px;
 }
 
-.timeframe {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 999px;
-  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 12%, transparent);
-  background: var(--card-bg-muted);
+.detailPage {
+  --market-surface: #111914;
+  --market-line: #2c3830;
+  --market-muted: #a5b3aa;
+  --market-tint: #18221c;
+  padding: 20px 24px 32px;
+  background: var(--market-surface);
 }
 
-.timeButton {
-  border: 0;
-  background: transparent;
-  color: var(--bui-color-text-secondary);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: var(--bold);
-  height: 28px;
-  min-width: 34px;
-  padding: 0 10px;
-  border-radius: 999px;
-  cursor: pointer;
+:global(:root[data-theme="light"]) .detailPage {
+  --market-surface: #fff;
+  --market-line: #e1e7e3;
+  --market-muted: #68766e;
+  --market-tint: #f7f9f8;
 }
 
-.timeButtonActive {
-  color: #0e1a12;
-  background: rgba(var(--active-chain-rgb), 0.95);
+.detailPage > div {
+  max-width: 1440px;
+  gap: 16px;
+}
+
+.detailPage h1 {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.detailPage :global(.card) {
+  background: var(--market-surface);
+  border-color: var(--market-line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.detailPage :is(button, summary):focus-visible,
+.heroMeta:focus-visible {
+  outline: 2px solid var(--bui-color-brand-text);
+  outline-offset: 3px;
 }
 
 .hero {
-  padding: 14px 16px 13px;
   display: grid;
-  gap: 11px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px 24px;
+  padding: 0 0 4px;
 }
 
 .heroTop {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
 }
 
 .heroLeft {
@@ -54,28 +65,30 @@
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .heroHeading {
   min-width: 0;
-  display: grid;
-  gap: 7px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
 }
 
 .pairIcons {
   position: relative;
-  width: 58px;
-  height: 48px;
-  flex: 0 0 58px;
+  width: 42px;
+  height: 36px;
+  flex: 0 0 42px;
 }
 
 .pairIcons img,
 .assetIconFallback {
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--bui-color-text) 20%, transparent);
+  border: 1px solid var(--market-line);
   background: var(--asset-logo-surface);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .pairIconPrimary,
@@ -93,8 +106,8 @@
 }
 
 .pairIconSecondary {
-  right: -4px;
-  bottom: -4px;
+  right: 0;
+  bottom: 0;
   z-index: 2;
 }
 
@@ -112,9 +125,9 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 30px;
-  line-height: 1;
-  font-weight: var(--bold);
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 650;
   letter-spacing: 0;
   color: var(--bui-color-text);
   margin: 0;
@@ -133,36 +146,36 @@
 
 .heroMeta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-  gap: 8px;
-  width: 100%;
+  grid-template-columns: repeat(5, minmax(64px, auto));
+  gap: 0;
+  margin: 0 0 6px;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .heroMetaItem {
   display: grid;
-  gap: 6px;
-  border-radius: 12px;
-  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 9%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bui-color-text) 5%, transparent) 0%, color-mix(in srgb, var(--bui-color-text) 2%, transparent) 100%);
-  padding: 10px 12px;
-  min-height: 56px;
+  gap: 8px;
+  border-left: 1px solid var(--market-line);
+  padding: 0 16px;
   min-width: 0;
 }
 
-.heroMetaItem em {
-  font-style: normal;
-  font-size: 12px;
-  font-weight: var(--semibold);
-  letter-spacing: 0;
-  color: var(--bui-color-text-secondary);
+.heroMetaItem dt {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--market-muted);
 }
 
-.heroMetaItem strong {
-  font-size: 18px;
-  line-height: 1.05;
+.heroMetaItem dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: var(--bui-color-text);
-  min-width: 0;
-  text-align: left;
+  white-space: nowrap;
 }
 
 .heroInfoRow {
@@ -170,8 +183,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 20px;
-  padding-top: 9px;
-  border-top: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  padding-bottom: 4px;
 }
 
 .heroInfoItem {
@@ -210,15 +222,8 @@
   transition: color 0.16s ease;
 }
 
-.poolLink::after {
-  content: "↗";
-  flex: 0 0 auto;
-  font-size: 0.82em;
-  opacity: 0.72;
-}
-
 .poolLink:hover {
-  color: rgba(133, 230, 91, 0.92);
+  color: var(--bui-color-brand-text);
 }
 
 .poolLink:hover .poolValue {
@@ -294,13 +299,9 @@
 }
 
 .dexTag {
-  border-radius: 999px;
-  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 14%, transparent);
-  font-size: 10px;
-  line-height: 1;
-  padding: 4px 8px;
-  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
-  color: var(--bui-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--market-muted);
 }
 
 .dexVersionTag {
@@ -326,67 +327,74 @@
 }
 
 .heroRight {
-  flex: 0 0 auto;
   display: grid;
-  justify-items: end;
-  gap: 8px;
-  text-align: right;
-  padding: 1px 0 1px 18px;
-  min-width: 220px;
-  border-left: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 5px 14px;
+  min-width: 0;
 }
 
 .priceMain {
-  font-size: 30px;
-  line-height: 1;
-  font-weight: var(--bold);
-  letter-spacing: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.6px;
+  font-variant-numeric: tabular-nums;
   color: var(--bui-color-text);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.priceUnit {
+  font-size: 0.6em;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .priceChange {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: var(--bold);
-  border: var(--border-width) solid transparent;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.priceChange span {
+  color: var(--market-muted);
+  font-weight: 400;
 }
 
 .changeUp {
   color: var(--bui-color-success);
-  border-color: color-mix(in srgb, var(--bui-color-success) 28%, transparent);
-  background: var(--bui-color-success-soft);
 }
 
 .changeDown {
   color: var(--bui-color-danger);
-  border-color: color-mix(in srgb, var(--bui-color-danger) 28%, transparent);
-  background: var(--bui-color-danger-soft);
 }
 
 .changeFlat {
   color: var(--bui-color-text-secondary);
-  border-color: color-mix(in srgb, var(--bui-color-text) 10%, transparent);
-  background: color-mix(in srgb, var(--bui-color-text) 5%, transparent);
 }
 
 .priceHint {
+  grid-column: 1 / -1;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--bui-color-text-secondary);
-  max-width: 220px;
+  color: var(--market-muted);
 }
 
 .marketLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  grid-template-columns: minmax(0, 1fr) 320px;
   grid-template-areas:
     "chart swap"
-    "trades swap";
+    "trades swap"
+    "pool pool";
   gap: 16px;
   align-items: start;
 }
@@ -401,13 +409,9 @@
   grid-area: swap;
   min-width: 0;
   position: sticky;
-  top: 12px;
+  top: 16px;
   align-self: start;
   display: flex;
-  max-height: calc(100vh - 24px);
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
 .marketRight::-webkit-scrollbar {
@@ -419,95 +423,11 @@
   flex: 1 1 auto;
 }
 
-.chartSection {
-  grid-area: chart;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
 .sectionTitle {
-  font-size: 13px;
-  font-weight: var(--bold);
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 0;
-  color: var(--bui-color-text-secondary);
-}
-
-.chartHeader {
-  height: 44px;
-  padding: 0 16px;
-  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 10%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.ohlcHeader {
-  min-height: 44px;
-  padding: 8px 16px;
-  border-bottom: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  row-gap: 6px;
-  font-size: 12px;
-  font-weight: var(--bold);
-  color: var(--bui-color-text-secondary);
-}
-
-.ohlcUp {
-  color: var(--bui-color-brand-text);
-}
-
-.ohlcDown {
-  color: var(--bui-color-danger);
-}
-
-.ohlcFlat {
-  color: var(--bui-color-text-secondary);
-}
-
-.chartSymbol {
-  font-size: 11px;
-  font-weight: var(--bold);
-  color: var(--bui-color-text-secondary);
-}
-
-.chartCanvas {
-  position: relative;
-  width: 100%;
-  height: 460px;
-  background: color-mix(in srgb, var(--bui-color-text) 2%, var(--card-bg-muted));
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.chartCanvas::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 92% 12%, rgba(92, 226, 54, 0.12), transparent 28%),
-    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--bui-color-text) 4%, transparent), transparent 22%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.chartCanvas::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-top: 1px solid color-mix(in srgb, var(--bui-color-text) 4%, transparent);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.chartHost {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+  color: var(--bui-color-text);
 }
 
 .chartTooltip {
@@ -608,16 +528,6 @@
   color: var(--bui-color-text);
   font-weight: var(--bold);
   text-align: right;
-}
-
-.chartFallback {
-  height: 220px;
-  display: grid;
-  place-items: center;
-  color: var(--bui-color-text-secondary);
-  font-size: 13px;
-  text-align: center;
-  padding: 0 16px;
 }
 
 .tradesSection {
@@ -747,8 +657,16 @@
   width: 100%;
   min-height: 0;
   display: grid;
-  gap: 10px;
+  gap: 0;
   align-content: start;
+  border: 1px solid var(--market-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.swapEmbed > :global(.card) {
+  border: 0;
+  border-radius: 0;
 }
 
 .tradingUnavailable {
@@ -774,11 +692,10 @@
 .sidePanelTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 4px;
-  border: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
-  border-radius: 10px;
-  background: rgba(8, 16, 13, 0.72);
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--market-line);
+  background: var(--market-surface);
 }
 
 .sidePanelTabsSingle {
@@ -786,9 +703,10 @@
 }
 
 .sidePanelTabs button {
-  min-height: 34px;
+  min-height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--bui-color-text-secondary);
   font-family: var(--font-ui);
@@ -799,8 +717,44 @@
 
 .sidePanelTabs button:hover,
 .sidePanelTabActive {
-  color: #f4fff4 !important;
-  background: rgba(104, 216, 63, 0.16) !important;
+  color: var(--bui-color-text);
+  background: transparent;
+}
+
+.sidePanelTabs .sidePanelTabActive {
+  border-bottom-color: var(--bui-color-brand-text);
+  font-weight: 650;
+}
+
+.poolDetails {
+  grid-area: pool;
+  min-width: 0;
+  border: 1px solid var(--market-line);
+  border-radius: 10px;
+}
+
+.poolDetails summary {
+  min-height: 48px;
+  padding: 14px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.poolDetails summary strong {
+  font-weight: 600;
+  padding-left: 6px;
+}
+
+.poolDetails summary span {
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--market-muted);
+}
+
+.poolDetailsBody {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
 }
 
 .liquidityCard {
@@ -1242,20 +1196,6 @@
   color: var(--bui-color-text);
 }
 
-:global(:root[data-theme="light"]) .timeframe {
-  background: var(--bui-color-surface-sunken);
-}
-
-:global(:root[data-theme="light"]) .sidePanelTabs {
-  border-color: var(--card-border);
-  background: var(--card-bg-muted);
-}
-
-:global(:root[data-theme="light"]) .sidePanelTabs :is(button:hover, .sidePanelTabActive) {
-  color: var(--bui-color-text) !important;
-  background: rgba(var(--active-chain-rgb), 0.14) !important;
-}
-
 :global(:root[data-theme="light"]) :is(.liquidityAssetBox, .liquidityReceiveBox) {
   border-color: var(--card-border);
   background: var(--card-bg-muted);
@@ -1283,7 +1223,32 @@
   font-size: 13px;
 }
 
+@media (max-width: 1250px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .heroMeta {
+    grid-template-columns: repeat(5, minmax(100px, 1fr));
+  }
+
+  .heroMetaItem:first-child {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .marketLayout {
+    grid-template-columns: minmax(0, 1fr) 296px;
+  }
+}
+
 @media (max-width: 991.98px) {
+  .detailPage {
+    padding: 16px 16px 32px;
+  }
+
   .liquidityTopMeta {
     grid-template-columns: 1fr;
   }
@@ -1292,31 +1257,13 @@
     justify-self: start;
   }
 
-  .heroTop {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .heroRight {
-    width: 100%;
-    justify-items: start;
-    text-align: left;
-    padding: 14px 0 0;
-    min-width: 0;
-    border-left: 0;
-    border-top: var(--border-width) solid color-mix(in srgb, var(--bui-color-text) 8%, transparent);
-  }
-
-  .priceHint {
-    max-width: none;
-  }
-
   .marketLayout {
     grid-template-columns: 1fr;
     grid-template-areas:
       "chart"
       "swap"
-      "trades";
+      "trades"
+      "pool";
     align-items: start;
   }
 
@@ -1329,19 +1276,14 @@
 }
 
 @media (max-width: 700px) {
-  .pairIcons {
-    width: 56px;
-    height: 46px;
-    flex-basis: 56px;
-  }
-
   .pairTitle {
     font-size: 22px;
   }
 
   .heroMeta {
-    grid-template-columns: 1fr;
-    gap: 6px;
+    grid-template-columns: repeat(5, max-content);
+    padding-bottom: 8px;
+    margin-bottom: 0;
   }
 
   .heroAddressRow {
@@ -1349,16 +1291,8 @@
   }
 
   .heroMetaItem {
-    min-height: 52px;
-    padding: 9px 11px;
-  }
-
-  .heroMetaItem em {
-    font-size: 10px;
-  }
-
-  .heroMetaItem strong {
-    font-size: 16px;
+    padding: 0 12px;
+    min-width: 76px;
   }
 
   .heroInfoRow {
@@ -1372,10 +1306,6 @@
     gap: 4px;
   }
 
-  .chartCanvas {
-    height: 360px;
-  }
-
   .chartTooltip {
     width: 196px;
   }
@@ -1387,6 +1317,10 @@
 
   .swapEmbed {
     height: auto;
+  }
+
+  .poolDetails summary span {
+    display: none;
   }
 
   .liquidityEstimateRows div {

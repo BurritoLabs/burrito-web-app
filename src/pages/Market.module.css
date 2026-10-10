@@ -4,6 +4,13 @@
   container: market / inline-size;
 }
 
+.snapshotNotice {
+  margin: 0;
+  color: var(--bui-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .toolbar {
   padding: 14px;
   display: grid;
