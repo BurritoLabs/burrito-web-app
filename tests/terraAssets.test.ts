@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   fetchCw20TokenInfos,
   includeTrustedCw20Tokens,
@@ -10,6 +10,8 @@ import {
 } from "../src/app/data/terraAssets"
 import { mapVerifiedRegistryAssets } from "../src/app/data/tokenRegistry"
 import { getAssetProvenanceLabel } from "../src/app/utils/assetProvenance"
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe("Terra asset registry selection", () => {
   const registry = {
@@ -244,6 +246,142 @@ describe("Terra asset registry selection", () => {
       name: "Juris Protocol",
       icon: "/tokens/juris.webp"
     })
+  })
+
+  it("skips marketing_info when a sanitized fallback icon is already available", async () => {
+    const contract = "terra1jkndu9w5attpz09ut02sgey5dd3e8sq5watzm0"
+    const fallbackIcon = "/tokens/registry.svg"
+    const requests: string[] = []
+    const tokenInfoQuery = btoa(JSON.stringify({ token_info: {} }))
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString()
+      requests.push(url)
+      if (url.includes(tokenInfoQuery)) {
+        return new Response(JSON.stringify({
+          data: { name: "Registry Token", symbol: "REG", decimals: 8 }
+        }))
+      }
+      throw new Error(`Unexpected CW20 metadata request: ${url}`)
+    }))
+
+    const tokens = await fetchCw20TokenInfos(
+      [contract],
+      {
+        [contract]: {
+          token: contract,
+          symbol: "REG",
+          name: "Registry Token",
+          decimals: 8,
+          icon: fallbackIcon
+        }
+      },
+      {
+        chainId: "columbus-5",
+        chainKey: "lunc",
+        lcd: "https://terra-classic-lcd.test",
+        name: "Terra Classic"
+      },
+      { skipFinder: true }
+    )
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]).toContain(tokenInfoQuery)
+    expect(requests[0]).not.toContain(btoa(JSON.stringify({ marketing_info: {} })))
+    expect(tokens[contract]).toMatchObject({
+      symbol: "REG",
+      decimals: 8,
+      decimalsVerified: true,
+      icon: fallbackIcon
+    })
+  })
+
+  it("loads a marketing icon when the fallback icon is absent or invalid", async () => {
+    const contract = "terra1zs54uanqzwh2y4a6z9xlzawjyjp3tddd99ad0h58ghr5yh2fdfjq95gmcv"
+    const requests: string[] = []
+    const tokenInfoQuery = btoa(JSON.stringify({ token_info: {} }))
+    const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString()
+      requests.push(url)
+      if (url.includes(tokenInfoQuery)) {
+        return new Response(JSON.stringify({
+          data: { name: "On-chain Token", symbol: "CHAIN", decimals: 6 }
+        }))
+      }
+      if (url.includes(marketingQuery)) {
+        return new Response(JSON.stringify({
+          data: { logo: { url: "/tokens/on-chain.svg" } }
+        }))
+      }
+      throw new Error(`Unexpected CW20 metadata request: ${url}`)
+    }))
+
+    const tokens = await fetchCw20TokenInfos(
+      [contract],
+      {
+        [contract]: {
+          token: contract,
+          symbol: "CHAIN",
+          icon: "javascript:alert(1)"
+        }
+      },
+      {
+        chainId: "columbus-5",
+        chainKey: "lunc",
+        lcd: "https://terra-classic-lcd.test",
+        name: "Terra Classic"
+      },
+      { skipFinder: true }
+    )
+
+    expect(requests).toHaveLength(2)
+    expect(requests.some((url) => url.includes(marketingQuery))).toBe(true)
+    expect(tokens[contract]).toMatchObject({
+      symbol: "CHAIN",
+      decimals: 6,
+      decimalsVerified: true,
+      icon: "/tokens/on-chain.svg"
+    })
+  })
+
+  it("keeps token_info metadata when marketing_info fails", async () => {
+    const contract = "terra1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj"
+    const requests: string[] = []
+    const tokenInfoQuery = btoa(JSON.stringify({ token_info: {} }))
+    const marketingQuery = btoa(JSON.stringify({ marketing_info: {} }))
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString()
+      requests.push(url)
+      if (url.includes(tokenInfoQuery)) {
+        return new Response(JSON.stringify({
+          data: { name: "No Logo Token", symbol: "NOLOGO", decimals: 6 }
+        }))
+      }
+      if (url.includes(marketingQuery)) {
+        return new Response("Unavailable", { status: 503 })
+      }
+      throw new Error(`Unexpected CW20 metadata request: ${url}`)
+    }))
+
+    const tokens = await fetchCw20TokenInfos(
+      [contract],
+      {},
+      {
+        chainId: "columbus-5",
+        chainKey: "lunc",
+        lcd: "https://terra-classic-lcd.test",
+        name: "Terra Classic"
+      },
+      { skipFinder: true }
+    )
+
+    expect(requests).toHaveLength(2)
+    expect(tokens[contract]).toMatchObject({
+      symbol: "NOLOGO",
+      decimals: 6,
+      decimalsVerified: true
+    })
+    expect(tokens[contract].icon).toBeUndefined()
   })
 
   it("includes trusted Terra Classic CW20s in wallet discovery", () => {

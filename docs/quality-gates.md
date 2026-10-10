@@ -23,10 +23,18 @@ start a handoff. SDK readiness is not evidence of completed native pairing.
 
 ## Extension connection contract
 
-Only an explicit Connect action may request extension approval. Page reload,
-focus, and network changes may read existing accounts, but must not silently
-request another grant. A cancelled network upgrade must preserve the older
-network's grant. Locking or revoking access invalidates the Web session.
+For Burrito Wallet Extension, only an explicit Connect action may request
+extension approval. Page reload, focus, and network changes may passively read
+existing access, but must not silently request another grant. A cancelled
+network upgrade must preserve the older network's grant. Locking or revoking
+access invalidates the Web session.
+
+Genuine Keplr follows a distinct, accepted restoration policy: keep automatic
+restoration enabled. Keplr's public account/key reads may open a Keplr-owned
+unlock or account-permission prompt during restoration; the user accepts that
+possible prompt. It is not Burrito's passive restoration behavior and does not
+grant access without the user's approval. A declined prompt must not be
+described as a successful connection or authorization to sign.
 
 One pending request owns the connection state until it settles or is
 invalidated. Repeated clicks must not supersede it; callbacks from an older
@@ -49,17 +57,20 @@ Keep its evidence outside this repository. Neither the controlled-provider
 tests nor a connection-only browser run replace native-wallet acceptance,
 transaction review tests, full product-route regression, or release CI.
 
-### Genuine Keplr lifecycle: unresolved gate
+### Genuine Keplr lifecycle: restoration decision and open acceptance
 
 The contract above is a requirement, not proof that every connector implements
 it. On September 30, 2026, the exact Web runtime `258c6ce` paired with official
-Keplr 0.13.52 and Burrito extension runtime `007bfa8` reproduced two gaps:
+Keplr 0.13.52 and Burrito extension runtime `007bfa8` reproduced stale-account
+behavior and automatic restoration prompts:
 
 - Locking Keplr or revoking the site's permission in Connected Websites leaves
   the previously displayed Web account in place, including after Web focus.
-- Reloading the Web page then opens an unsolicited Keplr unlock or account-access
-  permission window. It still requires user approval; this is not a silent grant
-  and is not evidence that locked or unauthorized signing can succeed.
+- Reloading the Web page can open a Keplr unlock or account-access permission
+  window. This prompt is an accepted consequence of the product decision to
+  keep automatic Keplr restoration enabled. It still requires user approval;
+  it is not a silent grant or evidence that locked or unauthorized signing can
+  succeed.
 
 Keplr's public `getKey` and `getKeysSettled` also perform interactive unlock and
 permission checks in this version. Merely omitting `enable` does not make them
@@ -70,14 +81,19 @@ See Keplr's [connection API](https://docs.keplr.app/api/guide/enable-connection)
 and [account-change event](https://docs.keplr.app/api/guide/custom-event);
 the fixed runtime package was also inspected for the specific behavior.
 
-The product choice between explicit Keplr reconnection and automatic restoration
-with possible prompts remains open. Do not silently remove restoration, change
-the contract, or mark this gate passed. Burrito's genuine coexistence checks and
-controlled-provider tests do not close this Keplr-specific gap. Treat Web local
-Disconnect and clearing Keplr's own site permissions as separate operations.
-After re-granting in a second Keplr window, reload the original popup before
-reading/clearing Connected Websites, then reload again to verify the empty list;
-an already-open empty list alone is insufficient evidence of persistent cleanup.
+The product decision is to keep automatic Keplr restoration enabled and accept
+that restoration may request a user-approved Keplr unlock or account-permission
+prompt. The separate genuine-Keplr lock/revocation stale-account behavior remains
+an open acceptance gate: the prior Web account must not remain presented as
+connected after Keplr locks or site access is revoked. Do not mark that gate
+passed without exact-runtime genuine-Keplr verification. Burrito's genuine
+coexistence checks and controlled-provider tests do not close this Keplr-specific
+gap. Treat Web local Disconnect and clearing Keplr's own site permissions as
+separate operations. After re-granting in a second Keplr window, reload the
+original popup before reading/clearing Connected Websites, then reload again to
+verify the empty list; an already-open empty list alone is insufficient evidence
+of persistent cleanup. Manual Web Disconnect must remain disconnected after
+refresh; it must not be undone by automatic restoration.
 
 Dialog checks must measure the actual painted surface (the Connect dialog
 itself versus the token picker's inner card), while retaining all background,

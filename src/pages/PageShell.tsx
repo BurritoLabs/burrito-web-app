@@ -1,6 +1,9 @@
 import type { PropsWithChildren, ReactNode } from "react"
 import { Link } from "react-router-dom"
+import PriceStatusNotice from "../app/feedback/PriceStatusNotice"
 import styles from "./PageShell.module.css"
+
+const PRICE_STATUS_PAGES = new Set(["Dashboard", "Wallet", "Swap", "Market", "Stake"])
 
 type PageShellProps = PropsWithChildren<{
   title: string
@@ -11,6 +14,7 @@ type PageShellProps = PropsWithChildren<{
   backLabel?: string
   onBack?: () => void
   inlineExtraOnMobile?: boolean
+  className?: string
 }>
 
 const PageShell = ({
@@ -22,11 +26,12 @@ const PageShell = ({
   backLabel = "Back",
   onBack,
   inlineExtraOnMobile = false,
+  className = "",
   children
 }: PageShellProps) => {
   return (
     <section
-      className={`${styles.page} ${small ? styles.small : ""} ${
+      className={`${styles.page} ${className} ${small ? styles.small : ""} ${
         banner ? styles.withBanner : ""
       }`}
       data-page-shell="true"
@@ -63,7 +68,10 @@ const PageShell = ({
           </div>
           {extra ? <div className={styles.extra}>{extra}</div> : null}
         </header>
-        <div className={styles.content}>{children}</div>
+        <div className={styles.content}>
+          {PRICE_STATUS_PAGES.has(title) ? <PriceStatusNotice /> : null}
+          {children}
+        </div>
       </div>
     </section>
   )

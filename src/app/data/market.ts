@@ -29,6 +29,7 @@ import {
 } from "../utils/assetIdentity"
 import { toUnitAmount } from "../utils/format"
 import { fetchSharedPairCandles } from "./sharedMarketApi"
+import { selectObservedCandles } from "../market/observedCandles"
 
 type AssetDexPair = {
   dex?: string
@@ -108,6 +109,8 @@ export type MarketBondingSnapshot = {
 }
 
 export type MarketPoolSnapshot = {
+  snapshotSource?: "packaged" | "shared"
+  snapshotGeneratedAt?: string
   bonding?: MarketBondingSnapshot
   pair: string
   dexId: string
@@ -170,6 +173,7 @@ export type PairCandle = {
   low: number
   close: number
   volumeQuote: number
+  volumeKnown?: boolean
 }
 
 export type PairTrade = {
@@ -199,7 +203,7 @@ type CodeContractsResponse = {
 }
 
 const FACTORY_PAIR_CACHE_TTL = 30 * 60 * 1000
-const LOCAL_INDEX_CACHE_TTL = 5 * 60 * 1000
+const LOCAL_INDEX_CACHE_TTL = 30 * 1000
 let factoryPairDexCache:
   | {
       at: number
@@ -580,56 +584,6 @@ const buildCandlesFromTrades = ({
     .slice(-maxCandles)
 }
 
-const fillCandleGaps = ({
-  candles,
-  bucketMs,
-  lookbackBuckets,
-  maxCandles
-}: {
-  candles: PairCandle[]
-  bucketMs: number
-  lookbackBuckets: number
-  maxCandles: number
-}) => {
-  if (!candles.length || bucketMs <= 0 || lookbackBuckets <= 0) return candles
-
-  const sorted = [...candles].sort((a, b) => a.bucketStart - b.bucketStart)
-  const byBucket = new Map(sorted.map((candle) => [candle.bucketStart, candle]))
-  const nowBucket = Math.floor(Date.now() / bucketMs) * bucketMs
-  const firstBucket = nowBucket - bucketMs * (lookbackBuckets - 1)
-  const filled: PairCandle[] = []
-
-  let previousClose =
-    sorted.find((candle) => candle.bucketStart <= firstBucket)?.close ??
-    sorted[0]?.open ??
-    sorted[0]?.close
-
-  for (
-    let bucketStart = firstBucket;
-    bucketStart <= nowBucket;
-    bucketStart += bucketMs
-  ) {
-    const candle = byBucket.get(bucketStart)
-    if (candle) {
-      filled.push(candle)
-      previousClose = candle.close
-      continue
-    }
-
-    if (!Number.isFinite(previousClose) || previousClose <= 0) continue
-    filled.push({
-      bucketStart,
-      open: previousClose,
-      high: previousClose,
-      low: previousClose,
-      close: previousClose,
-      volumeQuote: 0
-    })
-  }
-
-  return filled.slice(-maxCandles)
-}
-
 const sanitizeSwapTicks = (ticks: SwapTick[]) => {
   const valid = ticks.filter(
     (tick) =>
@@ -891,6 +845,8 @@ type MarketIndexPayload = {
     dexId?: string
     dexLabel?: string
     type?: string
+    snapshotSource?: "packaged" | "shared"
+    snapshotGeneratedAt?: string | null
     volumes?: Partial<Record<"1h" | "24h" | "7d", Record<string, number>>>
     assets?: string[]
     bonding?: MarketBondingSnapshot
@@ -939,7 +895,10 @@ const shouldRefreshLocalPoolSnapshot = (pool: MarketPoolSnapshot) => {
   return bothSidesEmpty && hasMarketVolume(pool.volumes)
 }
 
-const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
+const parseLocalMarketIndex = (
+  payload: MarketIndexPayload,
+  snapshotSource: "packaged" | "shared"
+) => {
   const entries = payload?.pairs ?? []
   const pairs: MarketDexPair[] = []
   const pools = new Map<string, MarketPoolSnapshot>()
@@ -1015,7 +974,17 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
       type,
       assets: [fallbackAssets[0] ?? "", fallbackAssets[1] ?? ""]
     }
+    const snapshotTime = typeof entry.snapshotGeneratedAt === "string"
+      ? Date.parse(entry.snapshotGeneratedAt) : NaN
+    const snapshotAge = Date.now() - snapshotTime
+    const liveSnapshot = snapshotSource === "shared" && entry.snapshotSource === "shared" &&
+      Number.isFinite(snapshotAge) && snapshotAge >= 0 && snapshotAge <= 120_000
     const poolRecord: MarketPoolSnapshot = {
+      // A shared HTTP response can contain a mix of live and packaged rows.
+      // Catalogue publication time is not a pool's on-chain observation time.
+      snapshotSource: liveSnapshot ? "shared" : "packaged",
+      snapshotGeneratedAt: Number.isFinite(snapshotTime) && snapshotAge >= 0
+        ? entry.snapshotGeneratedAt! : undefined,
       pair,
       bonding,
       dexId,
@@ -1033,6 +1002,30 @@ const parseLocalMarketIndex = (payload: MarketIndexPayload) => {
   })
 
   return { pairs, pools }
+}
+
+// Bootstrap the Classic list independently of the live API. Never put this in
+// the live-index cache: it is a labelled display snapshot, not a current quote.
+export const fetchPackagedMarketSnapshot = async (chainId: string) => {
+  if (chainId !== "columbus-5") return null
+  try {
+    const response = await fetch(LOCAL_MARKET_INDEX_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5_000)
+    })
+    if (!response.ok) return null
+    const payload = (await response.json()) as MarketIndexPayload
+    if (payload.chainId && payload.chainId !== chainId) return null
+    const parsed = parseLocalMarketIndex(payload, "packaged")
+    if (!parsed.pairs.length) return null
+    return {
+      pairs: parsed.pairs,
+      pools: Array.from(parsed.pools.values()),
+      generatedAt: payload.generatedAt
+    }
+  } catch {
+    return null
+  }
 }
 
 const fetchLocalMarketIndex = async () => {
@@ -1060,7 +1053,7 @@ const fetchLocalMarketIndex = async () => {
         if (!response.ok) continue
         const payload = (await response.json()) as MarketIndexPayload
         if (payload.chainId && payload.chainId !== chainId) continue
-        const parsed = parseLocalMarketIndex(payload)
+        const parsed = parseLocalMarketIndex(payload, url === fallbackUrl ? "packaged" : "shared")
         if (!parsed.pairs.length) continue
         const next = { at: Date.now(), chainId, ...parsed }
         localMarketIndexCache = next
@@ -1711,19 +1704,23 @@ export const fetchPairCandles = async ({
   // Burrito API is the shared, cached K-line source. Keep the existing direct
   // chain and static paths as resilience fallbacks while pair coverage grows.
   {
-    const sharedCandles = await fetchSharedPairCandles({
-      chainId: getActiveAppChainRuntime().chain.chainId,
-      pairAddress,
-      leftAssetKey,
-      rightAssetKey,
+    const sharedCandles = selectObservedCandles({
+      candles: await fetchSharedPairCandles({
+        chainId: getActiveAppChainRuntime().chain.chainId,
+        pairAddress,
+        leftAssetKey,
+        rightAssetKey,
+        bucketMs,
+        maxCandles
+      }),
       bucketMs,
+      lookbackBuckets,
       maxCandles
     })
-    if (candlesMatchExpectedPrice(sharedCandles, expectedPrice)) {
-      if (sharedCandles.length >= minCandles) {
-        return fillCandleGaps({ candles: sharedCandles, bucketMs, lookbackBuckets, maxCandles })
-      }
-      if (sharedCandles.length) candidates.push(sharedCandles)
+    if (sharedCandles.length && candlesMatchExpectedPrice(sharedCandles, expectedPrice)) {
+      // Sparse trading is valid data, not a reason to crawl chain history until
+      // we can fill a chart. Show the observed bars from our cached API promptly.
+      return sharedCandles
     }
   }
 
@@ -1731,7 +1728,7 @@ export const fetchPairCandles = async ({
   const txCandles = await fetchFromTx(lookbackBuckets)
   const txCandlesValid = candlesMatchExpectedPrice(txCandles, expectedPrice)
   if (txCandlesValid && txCandles.length >= minCandles) {
-    return fillCandleGaps({
+    return selectObservedCandles({
       candles: txCandles,
       bucketMs,
       lookbackBuckets,
@@ -1817,7 +1814,7 @@ export const fetchPairCandles = async ({
 
   const acceptable = rankedCandidates.filter((candidate) => candidate.quality.isAcceptable)
   const selection = acceptable.length ? acceptable : rankedCandidates
-  return fillCandleGaps({
+  return selectObservedCandles({
     candles: selection[0]?.candles ?? [],
     bucketMs,
     lookbackBuckets,

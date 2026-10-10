@@ -1903,7 +1903,7 @@ const SwapPanel = ({
       <div className={styles.swapCardBody}>
             <div className={styles.topMeta}>
               <p className={styles.formHint}>
-                {isPairOnly
+                {embedded ? "Slippage tolerance" : isPairOnly
                   ? "Swap directly through this pool."
                   : `Aggregated on-chain quotes across ${chain.name} DEX routes.`}
               </p>
@@ -1912,6 +1912,7 @@ const SwapPanel = ({
                   <button
                     key={item.label}
                     type="button"
+                    aria-pressed={slippageBps === item.bps}
                     className={`${styles.slippageButton} ${
                       slippageBps === item.bps ? styles.slippageButtonActive : ""
                     }`}
