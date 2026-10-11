@@ -3,6 +3,7 @@ import { canRetryWalletRecovery } from "../src/app/wallet/walletRecoveryRetry"
 
 const state = {
   visible: true,
+  attempted: true,
   pending: false,
   status: "error" as const,
   now: 30_000,
@@ -11,6 +12,10 @@ const state = {
 }
 
 describe("wallet recovery retry gate", () => {
+  it("does not spend the retry window before the initial restore completes", () => {
+    expect(canRetryWalletRecovery({ ...state, attempted: false })).toBe(false)
+  })
+
   it("does not retry while the document is hidden", () => {
     expect(canRetryWalletRecovery({ ...state, visible: false })).toBe(false)
   })

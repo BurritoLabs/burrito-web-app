@@ -919,3 +919,21 @@ other DApp consumers, mobile-device/authentication and independent review.
   No main merge, production deployment, real signature/broadcast or store upload
   is part of this source candidate. Exact compiled UI evidence and CI are recorded
   separately; earlier candidate CI must not be credited to this revision.
+
+### CI follow-up: initial foreground ordering
+
+- The first Linux run of the integrated candidate passed 213 browser checks but
+  failed the two new foreground retry cases (three conditional skips). Its
+  earlier local 215-pass run was not sufficient to close recovery acceptance.
+- Reproduced the missing retry deterministically by dispatching a foreground
+  event immediately after the recovery listener is installed, before the initial
+  restore's zero-delay timer. Before the follow-up patch all four desktop/mobile
+  locked/unauthorized cases fail with only one account read: startup spent the
+  15-second retry window despite not initiating a retry.
+- Recovery now also requires the initial auto-connect attempt to have completed.
+  A ref updated with the other committed wallet state prevents stale event
+  closures without resubscribing listeners. The cooldown duration, strict call
+  counts, original assertion timeout and explicit connection paths are unchanged.
+- The exact deterministic reproductions passed three repetitions (12 cases)
+  after the patch; one helper unit regression covers the not-yet-attempted gate.
+  Full local/remote reruns are recorded separately for the final commit.

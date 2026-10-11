@@ -261,6 +261,7 @@ export const WalletProvider = ({
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(
     () => !storedAutoConnectId
   )
+  const autoConnectAttemptedRef = useRef(autoConnectAttempted)
 
   const cancelRuntimeRequest = useCallback(() => {
     const request = pendingRuntimeRequestRef.current
@@ -334,7 +335,8 @@ export const WalletProvider = ({
     accountAddressRef.current = account?.address
     connectorIdRef.current = connectorId
     walletStatusRef.current = status
-  }, [account?.address, connectorId, status])
+    autoConnectAttemptedRef.current = autoConnectAttempted
+  }, [account?.address, autoConnectAttempted, connectorId, status])
 
   const getCosmosWallet = useCallback(
     (
@@ -1277,6 +1279,7 @@ export const WalletProvider = ({
       const now = Date.now()
       if (!canRetryWalletRecovery({
         visible: document.visibilityState === "visible",
+        attempted: autoConnectAttemptedRef.current,
         pending: Boolean(pendingConnectorRef.current),
         status: walletStatusRef.current,
         now,

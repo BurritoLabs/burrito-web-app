@@ -40,6 +40,7 @@ type ProviderOptions = {
   compatibility?: "alias" | "named-only"
   rememberedKeplr?: boolean
   holdInitialAccountRead?: boolean
+  focusBeforeInitialRestore?: boolean
 }
 
 const PROVIDER_STORAGE_KEY = "burrito:e2e:extension-lifecycle:public-state"
@@ -90,6 +91,17 @@ test.afterEach(async ({ page }) => {
 
 const installProvider = async (page: Page, options: ProviderOptions = {}) => {
   await page.addInitScript(({ options, storageKey }) => {
+    if (options.focusBeforeInitialRestore) {
+      // A foreground event can arrive after listeners mount but before the
+      // zero-delay initial restore. Exercise that ordering deterministically;
+      // it must not spend the later failed-restore recovery window.
+      const add = window.addEventListener.bind(window)
+      window.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject,
+        eventOptions?: boolean | AddEventListenerOptions) => {
+        add(type, listener, eventOptions)
+        if (type === "focus") queueMicrotask(() => window.dispatchEvent(new Event("focus")))
+      }) as typeof window.addEventListener
+    }
     type Chain = "columbus-5" | "phoenix-1"
     type State = Omit<ProviderSnapshot, "pendingChainIds">
     const saved = localStorage.getItem(storageKey)
@@ -627,7 +639,8 @@ for (const scenario of [
   { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
 ]) {
   test(`remembered ${scenario.label} recovery ignores hidden events and retries once when visible`, async ({ page }) => {
-    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked })
+    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked,
+      focusBeforeInitialRestore: true })
     await openApp(page)
     await expect.poll(() => accountCalls(page)).toEqual([
       { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
