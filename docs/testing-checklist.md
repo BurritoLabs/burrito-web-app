@@ -113,6 +113,13 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open a Terraport pair detail page.
 - Open a Garuda pair detail page.
 - Confirm pair logos, balance display, chart, recent trades, swap panel, liquidity panel, and top metrics load.
+- With a failed IBC trace in a mixed batch, retain successful entries and Finder
+  fallback without marking unverified decimals verified. At most eight items run
+  concurrently per batch. Partial results become stale after 15 seconds; this is
+  not an automatic retry timer. Verify recovery on a subsequent refetch.
+- Concurrent CW20 metadata and supply reads for the same chain and endpoint must
+  share parsed token_info data. Both consumers must receive correct values;
+  different chains/endpoints must not share, and settled failures must be retryable.
 - Copy pool, base token, and quote token addresses from a pair detail page.
 - Provide and withdraw liquidity from a small test pair when balances are available.
 - Use the pair detail back button from a launchpad-opened market page.

@@ -18,6 +18,7 @@ import {
   COSMOS_TERRA_ASSETLIST_URL
 } from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import { mapSettledWithConcurrency, withInFlightAssetRequest } from "./assetMetadataRequests"
 import { fetchVerifiedTokenRegistry } from "./tokenRegistry"
 import { writeLocalStorageValue } from "../utils/safeStorage"
 
@@ -754,7 +755,7 @@ const fetchSourceRegistryToken = async (
     .find(Boolean)
 }
 
-const fetchIbcTraceToken = async (
+const fetchIbcTraceTokenUnshared = async (
   hash: string,
   scope = getAssetChainScope()
 ): Promise<IbcToken | undefined> => {
@@ -802,6 +803,44 @@ const fetchIbcTraceToken = async (
   }
   cacheIbcToken(hash, token, chainId)
   return token
+}
+
+const fetchIbcTraceToken = (
+  hash: string,
+  scope = getAssetChainScope()
+): Promise<IbcToken | undefined> => {
+  const normalizedHash = hash.toUpperCase()
+  return withInFlightAssetRequest(
+    scope.chainId,
+    `${scope.lcd}/ibc-trace/${normalizedHash}`,
+    () => fetchIbcTraceTokenUnshared(normalizedHash, scope)
+  )
+}
+
+export const fetchResolvedIbcMetadataBatch = async (
+  hashes: string[],
+  finderTokens: Record<string, IbcToken>,
+  scope = getAssetChainScope()
+) => {
+  const normalizedHashes = Array.from(new Set(hashes.map((hash) => hash.toUpperCase())))
+  const outcomes = await mapSettledWithConcurrency(
+    normalizedHashes,
+    8,
+    (hash) => fetchIbcTraceToken(hash, scope)
+  )
+  const tokens = { ...finderTokens }
+  const failedHashes: string[] = []
+
+  outcomes.forEach((outcome, index) => {
+    const hash = normalizedHashes[index]
+    if (outcome.status === "rejected" || !outcome.value) {
+      failedHashes.push(hash)
+      return
+    }
+    tokens[hash] = outcome.value
+  })
+
+  return { tokens, failedHashes }
 }
 
 const fetchNativeMetadataToken = async (
@@ -1014,11 +1053,17 @@ export const fetchCw20TokenInfos = async (
       const contract = missing[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
-        const response = await fetchWithEndpointFallback(
-          `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const url = `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const payload = await withInFlightAssetRequest(
+          scope.chainId,
+          url,
+          async () => {
+            const response = await fetchWithEndpointFallback(url)
+            if (!response.ok) return undefined
+            return (await response.json()) as Cw20TokenInfoResponse
+          }
         )
-        if (!response.ok) continue
-        const payload = (await response.json()) as Cw20TokenInfoResponse
+        if (!payload) continue
         const info = payload.data
         const symbol = info?.symbol?.trim()
         const name = info?.name?.trim()
@@ -1246,25 +1291,15 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
           return [[hash, token] as [string, IbcToken]]
         })
       const finderTokens = Object.fromEntries(finderEntries)
-      const unresolvedHashes = missingHashes
-
-      const entries = await Promise.all(
-        unresolvedHashes.map(async (hash) => {
-          const token = await fetchIbcTraceToken(hash, scope)
-          return token ? [hash, token] : undefined
-        })
-      )
-      return {
-        ...finderTokens,
-        ...Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][])
-      }
+      return fetchResolvedIbcMetadataBatch(missingHashes, finderTokens, scope)
     },
     enabled: missingHashes.length > 0 && baseQuery.isFetched,
-    staleTime: 24 * 60 * 60 * 1000
+    staleTime: (query) =>
+      query.state.data?.failedHashes.length ? 15_000 : 24 * 60 * 60 * 1000
   })
 
   const resolvedData = useMemo(
-    () => mergeResolvedIbcAssets(base, resolvedQuery.data ?? {}),
+    () => mergeResolvedIbcAssets(base, resolvedQuery.data?.tokens ?? {}),
     [base, resolvedQuery.data]
   )
 

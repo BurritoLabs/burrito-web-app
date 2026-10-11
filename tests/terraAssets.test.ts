@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   fetchCw20TokenInfos,
+  fetchResolvedIbcMetadataBatch,
   includeTrustedCw20Tokens,
   isResolvedIbcMetadata,
   mapCosmosRegistryAssetAliases,
@@ -146,6 +147,91 @@ describe("Terra asset registry selection", () => {
   it("rejects generic Finder IBC placeholders as resolved metadata", () => {
     expect(isResolvedIbcMetadata({ symbol: "IBC", name: "IBC" })).toBe(false)
     expect(isResolvedIbcMetadata({ symbol: "WBTC", name: "Wrapped Bitcoin" })).toBe(true)
+  })
+
+  it("keeps Finder and successful IBC entries when one trace request fails, then retries that hash", async () => {
+    const hashes = Array.from({ length: 9 }, (_, index) => String(index + 1).repeat(64))
+    const failedHash = hashes[0]
+    const finderToken = {
+      denom: `ibc/${failedHash}`,
+      base_denom: "finder-denom",
+      symbol: "FINDER",
+      name: "Finder Token",
+      decimals: 6
+    }
+    const scope = {
+      chainId: "columbus-5-ibc-test",
+      chainKey: "lunc" as const,
+      lcd: "https://terra-classic-lcd.publicnode.com",
+      name: "Terra Classic"
+    }
+    const traceRequests: string[] = []
+    let shouldFail = true
+    let active = 0
+    let maximumActive = 0
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input.toString())
+      if (url.pathname.includes("/ibc/apps/transfer/v1/denom_traces/")) {
+        const hash = url.pathname.split("/").at(-1)!
+        traceRequests.push(`${url.hostname}/${hash}`)
+        active++
+        maximumActive = Math.max(maximumActive, active)
+        await new Promise((resolve) => setTimeout(resolve, 1))
+        active--
+        if (hash === failedHash && shouldFail) throw new Error("fixture LCD failure")
+        return Response.json({ denom_trace: { base_denom: `denom-${hash.slice(0, 8)}` } })
+      }
+      if (url.pathname.includes("/cosmos/bank/v1beta1/denoms_metadata/")) {
+        return Response.json({ metadata: {
+          symbol: "TOK",
+          name: "Verified Token",
+          display: "tok",
+          denom_units: [{ denom: "base", exponent: 0 }, { denom: "tok", exponent: 6 }]
+        } })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+
+    const first = await fetchResolvedIbcMetadataBatch(hashes, { [failedHash]: finderToken }, scope)
+    expect(maximumActive).toBeLessThanOrEqual(8)
+    expect(first.failedHashes).toEqual([failedHash])
+    expect(first.tokens[failedHash]).toEqual(finderToken)
+    expect(first.tokens[hashes[1]]).toMatchObject({ symbol: "TOK", decimals: 6, decimalsVerified: true })
+
+    shouldFail = false
+    const attemptsBeforeRetry = traceRequests.filter((request) => request.endsWith(`/${failedHash}`)).length
+    const retry = await fetchResolvedIbcMetadataBatch([failedHash], {}, scope)
+    expect(retry.failedHashes).toEqual([])
+    expect(retry.tokens[failedHash]).toMatchObject({ symbol: "TOK", decimals: 6, decimalsVerified: true })
+    expect(traceRequests.filter((request) => request.endsWith(`/${failedHash}`)).length).toBeGreaterThan(attemptsBeforeRetry)
+  })
+
+  it("does not share same-URL CW20 metadata reads across different chains", async () => {
+    const contract = "terra1jkndu9w5attpz09ut02sgey5dd3e8sq5watzm0"
+    const tokenInfoQuery = btoa(JSON.stringify({ token_info: {} }))
+    const requests: string[] = []
+    const releaseRequests: Array<() => void> = []
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      requests.push(input.toString())
+      const decimals = requests.length === 1 ? 8 : 6
+      await new Promise<void>((resolve) => releaseRequests.push(resolve))
+      return Response.json({ data: { name: "Chain Token", symbol: "CHAIN", decimals, total_supply: "100000000" } })
+    }))
+    const lcd = "https://terra-classic-lcd.publicnode.com"
+    const fallback = { [contract]: { token: contract, symbol: "CHAIN", icon: "/system/cw20.svg" } }
+    const first = fetchCw20TokenInfos([contract], fallback, {
+      chainId: "same-url-chain-a", chainKey: "lunc", lcd, name: "Chain A"
+    }, { skipFinder: true })
+    const second = fetchCw20TokenInfos([contract], fallback, {
+      chainId: "same-url-chain-b", chainKey: "lunc", lcd, name: "Chain B"
+    }, { skipFinder: true })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(requests.filter((url) => url.includes(tokenInfoQuery))).toHaveLength(2)
+    releaseRequests.forEach((release) => release())
+    const [firstResult, secondResult] = await Promise.all([first, second])
+    expect(firstResult[contract]).toMatchObject({ symbol: "CHAIN", decimals: 8, decimalsVerified: true })
+    expect(secondResult[contract]).toMatchObject({ symbol: "CHAIN", decimals: 6, decimalsVerified: true })
   })
 
   it("preserves the exact chain registry logo during IBC resolution", () => {

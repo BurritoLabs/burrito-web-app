@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Cw20Token } from "./terraAssets"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import { withInFlightAssetRequest } from "./assetMetadataRequests"
 import { writeLocalStorageValue } from "../utils/safeStorage"
 import { isTerraAddress } from "../utils/assetIdentity"
 import { getActiveAppChainRuntime } from "../activeChain"
@@ -510,6 +511,8 @@ export const useCw20Balances = (
 
 type Cw20TokenInfoResponse = {
   data?: {
+    name?: string
+    symbol?: string
     total_supply?: string
     decimals?: number
   }
@@ -611,11 +614,17 @@ export const fetchCw20Supplies = async (
       const contract = missing[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
-        const res = await fetchWithEndpointFallback(
-          `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const url = `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const data = await withInFlightAssetRequest(
+          scope.chainId,
+          url,
+          async () => {
+            const response = await fetchWithEndpointFallback(url)
+            if (!response.ok) return undefined
+            return (await response.json()) as Cw20TokenInfoResponse
+          }
         )
-        if (!res.ok) continue
-        const data = (await res.json()) as Cw20TokenInfoResponse
+        if (!data) continue
         const tokenInfo = data?.data
         const totalSupply = tokenInfo?.total_supply
         if (!totalSupply) continue
