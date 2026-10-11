@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   audit:
-    name: Production dependency audit
+    name: Production and build dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -29,3 +29,6 @@ jobs:
 
       - name: Check tracked audit baseline
         run: npm run check:audit
+
+      - name: Reject elevated findings including build tools
+        run: npm run check:audit:all

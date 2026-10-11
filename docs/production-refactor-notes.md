@@ -1,5 +1,25 @@
 # Production Refactor Notes
 
+## Dependency-only follow-up — 2026-10-11
+
+- Updated only compatible build/test/polyfill lockfile resolutions and pinned
+  Vitest 4.1.11 on top of the isolated Market candidate. No application source,
+  production-dependency lock entry, wallet transaction logic, fees, public
+  routes, brand assets or shared UI version changed.
+- Added an explicit development-inclusive moderate-or-higher audit gate to
+  `verify`, frontend CI and the existing weekly/manual audit workflow. Retained
+  the separate production-only low-risk baseline without new exceptions.
+- Fresh installation and lint, 341 unit tests, TypeScript, wallet-spec and
+  market-asset checks pass. Full graph audit has 17 low/no elevated findings;
+  production scope retains 12 low/no elevated findings. Reviewed source and
+  focused dependency controls are described in `dependency-audit.md`.
+- Build output remains outside tracked `dist`. Actual module provenance catches
+  the browser PBKDF2 entry point, which passed 16 public-vector checks. Bundle
+  budgets remain unchanged: initial JS 146.5 KiB gzip, wallet static load
+  1022.4 KiB gzip. Complete browser/CI outcomes are recorded with the candidate
+  PR; neither dependency audit nor controlled tests establish genuine-wallet
+  lifecycle or real transaction acceptance. No deployment or store upload.
+
 ## Current validator-candidate extension pairing — 2026-09-30 (Toronto)
 
 The unchanged Web source at `308262efcaf8b126b4db52a20841e99627b94973`
