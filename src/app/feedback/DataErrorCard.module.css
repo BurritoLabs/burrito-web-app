@@ -39,10 +39,18 @@
   gap: 10px;
 }
 
+.description,
+.actionStatus {
+  margin: 0;
+  color: var(--bui-color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .button,
 .secondaryButton {
   width: fit-content;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 20px;
   border-radius: 999px;
   font: inherit;
@@ -60,4 +68,14 @@
   border: 1px solid var(--card-border);
   background: transparent;
   color: var(--bui-color-text);
+}
+
+.secondaryButton:disabled {
+  cursor: wait;
+}
+
+.button:focus-visible,
+.secondaryButton:focus-visible {
+  outline: 2px solid var(--bui-color-text);
+  outline-offset: 3px;
 }

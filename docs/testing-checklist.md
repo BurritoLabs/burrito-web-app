@@ -32,6 +32,10 @@ Run this before a production deployment or after touching wallet, market, swap, 
   restores existing access without requesting another grant.
 - Verify extension lock, wallet change and site revocation invalidate the Web
   account; disconnect must remain disconnected after refresh on both chains.
+- Hold a passive read pending and dispatch focus/pageshow/visibility events:
+  no duplicate read or approval may occur. After an unauthorized/locked restore,
+  hidden events must neither read accounts nor spend the recovery cooldown;
+  becoming visible may retry once, without requesting a new grant.
 - Connect Keplr extension on desktop.
 - With an empty genuine Keplr installation, the connection alert must direct
   users to create/import inside Keplr, without borrowing Burrito's account or
@@ -76,6 +80,17 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Privacy publication gate
 
+- In a new browser/WebView, optional diagnostics must be off. Verify opt-in,
+  reload, cross-tab withdrawal and missing/blocked storage. Failed withdrawal
+  must stop reports on the current page, explain the persistence failure and
+  retry the original Off choice, not invert it to On.
+- Verify the production-built performance collector as well as the controlled
+  development error endpoint; intercept reports so nothing reaches live services.
+  Default/off and post-withdrawal must send nothing; opted-in reporting must
+  actually send, rather than passing because the collector never started.
+- Clear only synthetic local diagnostic records after confirmation. Cancel and
+  storage failures must preserve records; consent, wallets and unrelated settings
+  must survive a successful clear. Previously uploaded data is not locally erased.
 - Reconcile the local `/privacy` draft with mobile and extension behavior:
   local secret processing, asset-price queries, simulation before signing,
   Finder links/cookies, diagnostics and platform-specific deletion boundaries.

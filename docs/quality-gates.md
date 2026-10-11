@@ -29,6 +29,11 @@ existing access, but must not silently request another grant. A cancelled
 network upgrade must preserve the older network's grant. Locking or revoking
 access invalidates the Web session.
 
+Hidden focus/pageshow/visibility events must not initiate recovery or consume
+its retry window. Once visible, a failed passive restore may retry once within
+the existing cooldown policy; pending reads must not be duplicated. These gates
+do not disable the distinct, user-approved Keplr restoration policy below.
+
 Genuine Keplr follows a distinct, accepted restoration policy: keep automatic
 restoration enabled. Keplr's public account/key reads may open a Keplr-owned
 unlock or account-permission prompt during restoration; the user accepts that
@@ -102,6 +107,27 @@ finite CSS transitions and fonts before measuring contrast, not an arbitrary
 delay. Offline acceptance must still allow versioned local static JSON/assets;
 blocked live services and intentionally failed imports are recorded separately.
 
-Production clients report FCP, LCP, CLS, INP, and TTFB to the Burrito API. The
-report contains no wallet address or query string and is aggregated for a
-30-day operational view.
+## Optional diagnostics
+
+Production clients collect FCP, LCP, CLS, INP and TTFB only after an explicit
+browser/WebView-local opt-in on `/privacy`. Default, missing, malformed or
+unreadable consent is off. Turning sharing off stops new reports and pending
+performance flushes; open tabs synchronize withdrawal. A failed preference
+write stops sharing on the current page and clearly warns that the previous
+saved choice can still apply after reload.
+
+Runtime and transaction reporting also require consent and a configured
+endpoint. Reports can contain paths, network/browser information and diagnostic
+details; do not describe them as necessarily anonymous. The performance payload
+excludes query strings and wallet addresses. Clearing local transaction
+diagnostics requires confirmation and preserves wallets and unrelated settings.
+It does not delete reports already sent.
+
+The paired API candidate independently stores performance and error diagnostics
+with 30-day table cleanup. This is a source-level retention scope, not proof
+of deployment or a promise about proxy/PM2 logs, backups or external providers.
+Operational retention and the published policy still require release checks.
+
+Diagnostic-copy UI fixtures import normal package entry points through Vite;
+never hardcode transient `node_modules/.vite/deps` cache paths. Keep cold-start,
+copy-failure/retry and obsolete async-result checks alongside the product tests.

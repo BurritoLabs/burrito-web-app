@@ -877,3 +877,45 @@ other DApp consumers, mobile-device/authentication and independent review.
 - API fresh installation, full 20-script test pipeline/config validation and audit pass (zero findings); the original 41 price-contract scenarios remain. A real stalled-body abort is tested with an independent four-second watchdog. Web audit remains 12 low, zero moderate/high/critical; existing peer/deprecation and bundle warnings are not represented as fixed.
 - Compiled Web + actual compiled API route integration uses in-memory SQLite and wholly mocked upstreams. It verifies 503/no-store recovery, original cache timestamps, full catalogue preservation, one allowlisted fixture pool, and real canvas rendering from test candles. Desktop 1440x1000/light and mobile 390x844/dark have no blank page, framework overlay, horizontal overflow or uncaught page exception; search, Retry, theme and chart Reset respond. Shared brand font renders 20px/650/-1px. Deliberately blocked upstream reads generate expected HTTP 503 console messages; the sole net::ERR_FAILED is the deliberately aborted `POST /v1/market/activate`. These are controlled failure tests, not proof of production provider availability or real trading history.
 - Logs, screenshots, builds and candidate fingerprints are under `C:/Users/fengz/.codex/artifacts/burrito-wallet/release-prep-20261009`; final Web artifact is `web-build-final/dist`. Tracked deployment `dist` is unchanged. Remaining gates: immutable candidate commit/CI, current production drift check, independently usable code+dependency rollback and exact API-only switch approval, genuine wallet acceptance, and post-deployment origin/public checks. Nothing was pushed, deployed, signed or uploaded to a store, and no paid service was added.
+
+## Integrated privacy and recovery candidate — 2026-10-11
+
+- Diagnosed Web, API, extension and mobile before selecting changes. The new
+  `codex/web-integrated-readiness-20261011` branch starts at toolchain candidate
+  `f49413042321e6ba93821be05387457a5b99b77b`; it retains the reviewed Market and
+  dependency patches. The original dirty development checkout is unchanged.
+- Integrated 24 previously separate privacy/diagnostics and Launchpad source/test
+  files after a line-ending-normalized comparison. Default-off diagnostics,
+  explicit opt-in, cross-tab withdrawal, storage-failure recovery and confirmed
+  local diagnostic clearing are now in the same candidate as Market. Clearing
+  diagnostic records does not remove wallets, preferences or uploaded reports.
+- Copied transaction/runtime reports explain their contents, report clipboard
+  failure honestly and ignore results belonging to an obsolete transaction or
+  unmounted boundary. Launchpad rejects invalid Bech32 checksums, prefixes and
+  unsupported address lengths without changing transaction amounts or fee policy.
+- Reproduced a real recovery bug: hidden focus/pageshow/visibility events could
+  issue an extra passive account read and consume the retry window. Such events
+  now exit before refreshing connectors; visible retries respect pending state
+  and the existing cooldown. Added deterministic held-read and locked/unauthorized
+  regressions. Keplr's accepted auto-restore policy, explicit approval, manual
+  disconnect, chain ownership and transaction construction remain unchanged.
+- Diagnosed the baseline diagnostic-copy test failure as an import of a missing
+  Vite dependency-cache file. The test-only TSX entry now uses standard imports
+  transformed by Vite, with a regression rejecting hardcoded cache URLs. No test
+  assertions were relaxed. The baseline 206-pass/1-fail/3-skip log is retained.
+- Local verification: 409 unit tests; 215 browser checks passed, three conditional
+  desktop skips (touch-only mobile flows); lint, type/build, wallet specs, 4,084-pair
+  asset validation and unchanged bundle budgets passed. The final diagnostic
+  fixture passed 48 checks across three repetitions and both viewports. Audit:
+  production 12 low, full graph 17 low, zero moderate/high/critical reported.
+  This is not an independent security audit or a zero-vulnerability claim.
+- Initial JavaScript is 148.5 KiB gzip; lazy wallet static load is 1024.4 KiB gzip,
+  close to its unchanged 1025 KiB limit. Production build/QA artifacts remain
+  outside the tracked `dist`, under `project-diagnosis-20261011/web`.
+- Matching API integration must include independent error storage and both-table
+  30-day cleanup, not the dirty stale-price prototype. Table retention does not
+  establish PM2/proxy/backup retention. Production prices/index remain separate
+  deployment gates, as do genuine Keplr lock/revocation and native authentication.
+  No main merge, production deployment, real signature/broadcast or store upload
+  is part of this source candidate. Exact compiled UI evidence and CI are recorded
+  separately; earlier candidate CI must not be credited to this revision.

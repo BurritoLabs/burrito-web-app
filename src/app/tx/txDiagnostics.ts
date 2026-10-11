@@ -1,5 +1,6 @@
 import { getActiveAppChainKey } from "../activeChain"
 import { CHAIN_RUNTIME_CONFIG } from "../config/chainConfig"
+import { getDiagnosticsConsent } from "../feedback/diagnosticsConsent"
 
 const TX_DIAGNOSTICS_STORAGE_KEY = "burrito:tx-diagnostics:v1"
 const MAX_STORED_TX_DIAGNOSTICS = 50
@@ -54,7 +55,7 @@ const REMOTE_TX_ERROR_SUMMARIES: Record<TxErrorCategory, string> = {
 }
 
 const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
-  if (!TX_DIAGNOSTICS_ENDPOINT || typeof window === "undefined") return
+  if (!TX_DIAGNOSTICS_ENDPOINT || typeof window === "undefined" || !getDiagnosticsConsent()) return
 
   const chainKey = getActiveAppChainKey()
   const payload = JSON.stringify({
@@ -80,6 +81,7 @@ const reportRemoteDiagnostic = (event: StoredTxDiagnosticEvent) => {
   })
 
   try {
+    if (!getDiagnosticsConsent()) return
     void fetch(TX_DIAGNOSTICS_ENDPOINT, {
       method: "POST",
       body: payload,
@@ -307,6 +309,18 @@ export const recordTxDiagnostic = (event: TxDiagnosticEvent) => {
   }
 
   reportRemoteDiagnostic(next)
+}
+
+export const clearStoredTxDiagnostics = (): boolean => {
+  if (typeof window === "undefined") return false
+
+  try {
+    const storage = window.localStorage
+    storage.removeItem(TX_DIAGNOSTICS_STORAGE_KEY)
+    return storage.getItem(TX_DIAGNOSTICS_STORAGE_KEY) === null
+  } catch {
+    return false
+  }
 }
 
 export const getStoredTxDiagnostics = () => {

@@ -33,6 +33,7 @@ import type { WalletRuntimeChain, WalletRuntimeSnapshot } from "./walletRuntimeB
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import { hasDesktopKeplrProvider } from "./keplrProviderIdentity"
 import { getKeplrConnectionErrorMessage } from "./keplrConnectionErrors"
+import { canRetryWalletRecovery } from "./walletRecoveryRetry"
 import {
   forgetStoredWalletSession,
   getStoredWalletConnectorId,
@@ -1274,10 +1275,14 @@ export const WalletProvider = ({
       if (walletStatusRef.current === "connected") return
 
       const now = Date.now()
-      if (
-        now - lastAutoConnectRetryAtRef.current <
-        AUTO_RECONNECT_RETRY_COOLDOWN_MS
-      ) {
+      if (!canRetryWalletRecovery({
+        visible: document.visibilityState === "visible",
+        pending: Boolean(pendingConnectorRef.current),
+        status: walletStatusRef.current,
+        now,
+        lastAttemptAt: lastAutoConnectRetryAtRef.current,
+        cooldownMs: AUTO_RECONNECT_RETRY_COOLDOWN_MS
+      })) {
         return
       }
 
@@ -1286,6 +1291,7 @@ export const WalletProvider = ({
       setAutoConnectAttempted(false)
     }
     const handleFocus = () => {
+      if (document.visibilityState !== "visible") return
       refreshConnectors()
       requestStoredReconnect()
     }
