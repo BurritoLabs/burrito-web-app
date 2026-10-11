@@ -638,6 +638,65 @@ for (const scenario of [
   { label: "unauthorized", grants: [] as ChainId[], locked: false },
   { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
 ]) {
+  test(`remembered ${scenario.label} session ignores late initial foreground events`, async ({ page }) => {
+    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked })
+    await openApp(page)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }))
+      window.dispatchEvent(new Event("focus"))
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+    await page.waitForTimeout(100)
+    expect(await accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    expect((await snapshot(page)).approvals).toBe(0)
+  })
+}
+
+for (const scenario of [
+  { label: "unauthorized", grants: [] as ChainId[], locked: false },
+  { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
+]) {
+  for (const resume of ["BFCache", "window focus"] as const) {
+  test(`remembered ${scenario.label} session retries once after ${resume} resume`, async ({ page }) => {
+    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked })
+    await openApp(page)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
+
+    await page.evaluate((resume) => {
+      if (resume === "BFCache") {
+        // BFCache can resume without our listener observing a prior blur.
+        window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }))
+      } else {
+        // Window focus may change while the document remains visible.
+        window.dispatchEvent(new Event("blur"))
+      }
+      window.dispatchEvent(new Event("focus"))
+      document.dispatchEvent(new Event("visibilitychange"))
+    }, resume)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] },
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await page.waitForTimeout(100)
+    expect((await snapshot(page)).approvals).toBe(0)
+  })
+  }
+}
+
+for (const scenario of [
+  { label: "unauthorized", grants: [] as ChainId[], locked: false },
+  { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
+]) {
   test(`remembered ${scenario.label} recovery ignores hidden events and retries once when visible`, async ({ page }) => {
     await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked,
       focusBeforeInitialRestore: true })

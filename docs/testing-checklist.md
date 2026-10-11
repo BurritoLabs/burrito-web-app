@@ -36,6 +36,10 @@ Run this before a production deployment or after touching wallet, market, swap, 
   no duplicate read or approval may occur. After an unauthorized/locked restore,
   hidden events must neither read accounts nor spend the recovery cooldown;
   becoming visible may retry once, without requesting a new grant.
+- After a failed initial restore, late non-persisted pageshow and redundant
+  foreground events must not add an account read. A subsequent hidden/visible,
+  window blur/focus, or persisted BFCache return may retry within the original
+  cooldown. None may request an extension grant.
 - Connect Keplr extension on desktop.
 - With an empty genuine Keplr installation, the connection alert must direct
   users to create/import inside Keplr, without borrowing Burrito's account or

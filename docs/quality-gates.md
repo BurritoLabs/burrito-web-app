@@ -33,6 +33,10 @@ Hidden focus/pageshow/visibility events must not initiate recovery or consume
 its retry window. Once visible, a failed passive restore may retry once within
 the existing cooldown policy; pending reads must not be duplicated. These gates
 do not disable the distinct, user-approved Keplr restoration policy below.
+Late initial pageshow/focus/visibility events are not a resume. Recovery requires
+an observed hidden/blur departure, or a persisted BFCache pageshow; connector
+discovery still refreshes on visible events. Cover both early and late startup
+events, window blur/focus with a visible document, and BFCache without prior blur.
 
 Genuine Keplr follows a distinct, accepted restoration policy: keep automatic
 restoration enabled. Keplr's public account/key reads may open a Keplr-owned

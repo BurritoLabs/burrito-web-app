@@ -1293,16 +1293,28 @@ export const WalletProvider = ({
       setStoredAutoConnectId(storedConnectorId)
       setAutoConnectAttempted(false)
     }
-    const handleFocus = () => {
-      if (document.visibilityState !== "visible") return
+    // A late initial pageshow/focus is not a return from a wallet or another
+    // window. Only an observed departure (or BFCache restore) permits recovery.
+    let wasAway = document.visibilityState !== "visible"
+    const handleBlur = () => { wasAway = true }
+    const handleFocus = (event: Event) => {
+      if (document.visibilityState !== "visible") {
+        wasAway = true
+        return
+      }
+      const resumed = wasAway ||
+        (event.type === "pageshow" && (event as PageTransitionEvent).persisted)
+      wasAway = false
       refreshConnectors()
-      requestStoredReconnect()
+      if (resumed) requestStoredReconnect()
     }
+    window.addEventListener("blur", handleBlur)
     window.addEventListener("focus", handleFocus)
     window.addEventListener("pageshow", handleFocus)
     document.addEventListener("visibilitychange", handleFocus)
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer))
+      window.removeEventListener("blur", handleBlur)
       window.removeEventListener("focus", handleFocus)
       window.removeEventListener("pageshow", handleFocus)
       document.removeEventListener("visibilitychange", handleFocus)
