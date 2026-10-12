@@ -689,6 +689,36 @@
   line-height: 1.55;
 }
 
+.precisionRetry {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--market-line);
+  border-radius: 10px;
+  background: var(--bui-color-surface-raised);
+  color: var(--bui-color-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.precisionRetry:hover:not(:disabled) {
+  background: var(--bui-color-surface-hover);
+  border-color: var(--bui-color-text-secondary);
+}
+
+.precisionRetry:focus-visible {
+  outline: 2px solid var(--bui-color-text);
+  outline-offset: 3px;
+}
+
+.precisionRetry:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .sidePanelTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -17,6 +17,8 @@ import {
 } from "../../app/data/dashboard"
 import { getCw20SupplyUnitsForDecimals, useCw20Supplies } from "../../app/data/cw20"
 import { hasMarketCw20Precision } from "../../app/market/cw20Pricing"
+import { marketHistoryPrecisionKey } from "../../app/market/historyPrecision"
+import { resolveNativeMarketDecimals } from "../../app/data/assetPrecision"
 import {
   type PairCandle,
   fetchPairCandles,
@@ -432,15 +434,22 @@ const MarketPairDetails = () => {
     return Array.from(set)
   }, [poolsForMetadata])
 
-  const { data: nativeWhitelist = {} } = useResolvedNativeWhitelist(nativeDenoms)
-  const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
+  const { data: nativeWhitelist = {}, isFetching: isNativePrecisionFetching, refetch: refetchNativePrecision } = useResolvedNativeWhitelist(nativeDenoms)
+  const { data: ibcWhitelist = {}, isFetching: isIbcPrecisionFetching, refetch: refetchIbcPrecision } = useResolvedIbcWhitelist(ibcDenoms)
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(cw20Contracts)
   const {
     data: detailCw20Supplies = {},
-    isFetching: isPrecisionFetching,
-    refetch: refetchPrecision
+    isFetching: isCw20PrecisionFetching,
+    refetch: refetchCw20Precision
   } = useCw20Supplies(cw20Contracts)
-  const hasPairPrecision = hasMarketCw20Precision(cw20Contracts, detailCw20Supplies)
+  const hasPairPrecision = hasMarketCw20Precision(cw20Contracts, detailCw20Supplies) &&
+    [...nativeDenoms, ...ibcDenoms].every(denom => resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) !== undefined)
+  const isPrecisionFetching = isCw20PrecisionFetching || isNativePrecisionFetching || isIbcPrecisionFetching
+  const refetchPrecision = () => Promise.all([
+    ...(cw20Contracts.length ? [refetchCw20Precision()] : []),
+    ...(nativeDenoms.length ? [refetchNativePrecision()] : []),
+    ...(ibcDenoms.length ? [refetchIbcPrecision()] : [])
+  ])
 
   const { data: prices } = useQuery({
     queryKey: ["prices", chain.chainId],
@@ -469,12 +478,8 @@ const MarketPairDetails = () => {
           const denom = asset.id.slice(7)
           const key = normalizeAssetKey(denom)
           if (!key || map.has(key)) return
-          const decimals = denom.startsWith("ibc/")
-            ? (ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
-              cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
-              6)
-            : (nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6)
-          map.set(key, decimals)
+          const decimals = resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist)
+          if (decimals !== undefined) map.set(key, decimals)
           return
         }
         if (asset.id.startsWith("cw20:")) {
@@ -487,7 +492,7 @@ const MarketPairDetails = () => {
       })
     })
     return Array.from(map.entries()).map(([key, decimals]) => ({ key, decimals }))
-  }, [cw20Whitelist, detailCw20Supplies, ibcWhitelist, nativeWhitelist, poolsForMetadata])
+  }, [detailCw20Supplies, ibcWhitelist, nativeWhitelist, poolsForMetadata])
 
   const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
 
@@ -538,7 +543,7 @@ const MarketPairDetails = () => {
           key: normalizeAssetKey(denom),
           symbol,
           name,
-            decimals: ibc?.decimals ?? ibcHexxagon?.decimals ?? 6,
+            decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) ?? 0,
             iconCandidates: buildIbcIconCandidates({
               ibcIcon: ibc?.icon,
               hexxagonIcon: ibcHexxagon?.icon,
@@ -566,7 +571,7 @@ const MarketPairDetails = () => {
         key: normalizeAssetKey(denom),
         symbol: identity.symbol,
         name: identity.name,
-        decimals: nativeToken?.decimals ?? 6,
+        decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) ?? 0,
         iconCandidates: buildNativeIconCandidates(
           denom,
           identity.symbol,
@@ -602,6 +607,7 @@ const MarketPairDetails = () => {
   const getAssetUsdPrice = (asset: ResolvedAsset) => {
     if (asset.isLunc) return nativePrice?.usd
     if (asset.isUstc) return prices?.ustc?.usd
+    if (asset.id.startsWith("native:") && resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
     // A CW20 can reuse a native ticker; names are not price/asset identities.
     if (asset.id.startsWith("cw20:") && !detailCw20Supplies[asset.id.slice(5).toLowerCase()]) return undefined
     const graphEntry = poolGraphUsdPrices[asset.key]
@@ -818,8 +824,7 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
       tradesLimit
     ],
     queryFn: () =>
@@ -838,8 +843,8 @@ const MarketPairDetails = () => {
     refetchInterval: 90_000
   })
 
-  const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
-  const hasMoreTrades = Boolean(tradesData?.hasMore)
+  const trades = useMemo(() => hasPairPrecision ? tradesData?.trades ?? [] : [], [hasPairPrecision, tradesData?.trades])
+  const hasMoreTrades = hasPairPrecision && Boolean(tradesData?.hasMore)
 
   const { data: traderStatsData } = useQuery({
     queryKey: [
@@ -849,8 +854,7 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals)
     ],
     queryFn: () =>
       fetchPairTrades({
@@ -868,7 +872,7 @@ const MarketPairDetails = () => {
     refetchInterval: 120_000
   })
   const tradersByTimeframe = useMemo(() => {
-    const source = traderStatsData?.trades?.length ? traderStatsData.trades : trades
+    const source = hasPairPrecision && traderStatsData?.trades?.length ? traderStatsData.trades : trades
     const now = Date.now()
 
     return (["1h", "24h", "7d"] as Timeframe[]).reduce(
@@ -884,7 +888,7 @@ const MarketPairDetails = () => {
       },
       {} as Record<Timeframe, number | undefined>
     )
-  }, [traderStatsData?.trades, trades])
+  }, [hasPairPrecision, traderStatsData?.trades, trades])
 
   const {
     data: candlesData = [],
@@ -899,8 +903,7 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
       timeframe
     ],
     queryFn: () =>
@@ -925,6 +928,7 @@ const MarketPairDetails = () => {
 
   const candles = useMemo(
     () => {
+      if (!hasPairPrecision) return []
       const merged = new Map<number, PairCandle>()
 
       ;[...candlesData]
@@ -957,7 +961,7 @@ const MarketPairDetails = () => {
 
       return [...merged.values()].sort((a, b) => a.bucketStart - b.bucketStart)
     },
-    [candlesData]
+    [hasPairPrecision, candlesData]
   )
 
   const activeCandle = useMemo(() => {
@@ -1495,9 +1499,9 @@ const MarketPairDetails = () => {
           <section className={styles.swapEmbed}>
             {!hasPairPrecision ? (
               <div className={`card ${styles.tradingUnavailable}`} role="status">
-                <strong>{isPrecisionFetching ? "Verifying token precision…" : "Token precision unavailable"}</strong>
-                <span>Prices, history and trading require verified token units.</span>
-                <button type="button" disabled={isPrecisionFetching} onClick={() => { void refetchPrecision() }}>
+                <strong>{isPrecisionFetching ? "Checking token precision…" : "Token precision unavailable"}</strong>
+                <span>Prices, history and trading require valid token units.</span>
+                <button className={styles.precisionRetry} type="button" disabled={isPrecisionFetching} onClick={() => { void refetchPrecision() }}>
                   Retry token data
                 </button>
               </div>

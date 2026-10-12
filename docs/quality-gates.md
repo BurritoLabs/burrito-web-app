@@ -231,5 +231,49 @@ identities. Preserve our registry's labels, icons and provenance separately.
 `tests/cw20Pricing.test.ts` checks single/multi-hop unit conversion, zero/invalid
 values, intermediate-precision invariance and both-side readiness. Compiled QA
 must check the actual eight-decimal price and cap (not merely `--`), selected
-pair FDV, and missing-precision recovery. Native/IBC precision provenance and
-upstream candle-unit guarantees still require their own acceptance.
+pair FDV, and missing-precision recovery. Upstream candle-unit guarantees still
+require their own acceptance.
+
+### Native and IBC market precision
+
+Unknown precision stays undefined at metadata/registry boundaries. Bank and
+Cosmos asset-list precision must match an explicit display unit and a zero-unit
+base entry, with a nonnegative integer exponent whose decimal scale is finite
+(0..308 is a JavaScript display limit, not a protocol constraint). Bank metadata
+must match the requested denomination. Preserve the existing owned-registry
+0..30 validation range, including genuine zero; do not manufacture six on failure.
+LUNC/LUNA uluna and uusd retain the application's known six-decimal constants.
+
+Explicit valid registry precision retains priority. Missing precision must not
+overwrite an earlier valid registry entry; registry identity/logo/provenance
+survives additional on-chain resolution. A third-party list outage must not
+discard a successful Burrito registry response. Native resolution consults bank
+metadata when registry precision is unavailable, with at most eight concurrent
+reads and successful-sibling isolation.
+
+For IBC, request metadata for the exact local `ibc/HASH` denomination and verify
+that response base. A source-chain short denomination or an alias does not prove
+the local asset's units. Source aliases and Finder without precision provenance
+can still supply display identity, but cannot supply financial precision. A full
+hash registry's explicit precision remains usable. The market does not request
+extra trace metadata merely to replace an already-known registry precision.
+
+Ignore legacy IBC V4/native V2 caches that can contain guessed values. New V5/V3
+caches and resolved query keys include configured LCD as well as chain. Reject
+malformed, future, expired, mismatched-identity or unknown-precision cache entries;
+missing results remain retryable. Do not delete wallet/settings data. Market
+display prices/supplies and pair history/trading must gate unknown native/IBC
+units. Internal graph normalization is not proof of precision; an unknown
+intermediary can retain an algebraically cancelling normalization basis, but its
+own inferred unit price must not be displayed. Detail retry refreshes the relevant
+native, IBC and CW20 sources and has a keyboard-visible focus/44px touch target.
+Unknown precision uses a distinct history-query key from legitimate zero-decimal
+assets, and cached trades/statistics/candles are hidden until precision is ready.
+`tests/marketHistoryPrecision.test.ts` exercises the actual QueryObserver cache
+transition from known zero to unavailable and back without issuing a read.
+
+`tests/nativeAssetPrecision.test.ts` covers invalid/missing/display mismatch,
+registry retention/outage, legacy and endpoint-isolated caches, exact IBC identity,
+native constants and zero. Compile-page QA must separately check explicit-eight
+IBC list price/cap, missing-precision detail gating and recovery; native/IBC
+production histories and actual chain metadata coverage are not thereby certified.

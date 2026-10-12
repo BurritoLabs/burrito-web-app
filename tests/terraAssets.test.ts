@@ -182,11 +182,14 @@ describe("Terra asset registry selection", () => {
         return Response.json({ denom_trace: { base_denom: `denom-${hash.slice(0, 8)}` } })
       }
       if (url.pathname.includes("/cosmos/bank/v1beta1/denoms_metadata/")) {
+        // Precision now requires metadata for the exact local IBC denomination.
+        const denom = decodeURIComponent(url.pathname.split("/").at(-1)!)
         return Response.json({ metadata: {
+          base: denom,
           symbol: "TOK",
           name: "Verified Token",
           display: "tok",
-          denom_units: [{ denom: "base", exponent: 0 }, { denom: "tok", exponent: 6 }]
+          denom_units: [{ denom, exponent: 0 }, { denom: "tok", exponent: 6 }]
         } })
       }
       throw new Error(`Unexpected request: ${url}`)

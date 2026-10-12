@@ -47,6 +47,7 @@ import { calculatePairPriceChange } from "../../app/market/priceChange"
 import { selectCw20MarketSupplyContracts } from "../../app/market/marketSupplySelection"
 import { hydrateMarketCw20Presentation } from "../../app/market/assetPresentation"
 import { resolveCw20ReservePrice, resolveCw20ReserveValuation } from "../../app/market/cw20Pricing"
+import { resolveNativeMarketDecimals } from "../../app/data/assetPrecision"
 import {
   resolveBondingSpotPrice,
   supportsReserveRatioPricing
@@ -388,11 +389,12 @@ const Market = () => {
     (asset: ResolvedAsset) => {
       if (asset.isLunc) return nativePrice?.usd
       if (asset.isUstc) return prices?.ustc?.usd
+      if (asset.id.startsWith("native:") && resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
       // The list already has the pool reserves. Do not fetch every pool again
       // for an estimate; missing prices stay unknown until data is available.
       return poolGraphUsdPrices[asset.key]?.price
     },
-    [nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
+    [ibcWhitelist, nativeWhitelist, nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
   )
 
   const getAssetPriceConfidence = useCallback(
@@ -673,7 +675,8 @@ const Market = () => {
             .map((card) => card.priceBase)
             .filter(
               (asset) =>
-                asset.id.startsWith("native:") && !asset.isLunc && !asset.isUstc
+                asset.id.startsWith("native:") && !asset.isLunc && !asset.isUstc &&
+                resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) !== undefined
             )
             .map((asset) => ({ denom: asset.id.slice(7), decimals: asset.decimals }))
             .map((entry) => `${entry.denom}:${entry.decimals}`)
@@ -682,7 +685,7 @@ const Market = () => {
         const [denom, decimals] = entry.split(":")
         return { denom, decimals: Number(decimals || "6") }
       }),
-    [supplyCards]
+    [ibcWhitelist, nativeWhitelist, supplyCards]
   )
 
   const { data: nativeSupplies = {} } = useQuery({
@@ -723,6 +726,8 @@ const Market = () => {
       if ((card.priceConfidenceUsd ?? 0) < 1_000) return undefined
       if (card.priceBase.id.startsWith("native:") && card.priceUsd !== undefined) {
         const denom = card.priceBase.id.slice(7)
+        if (resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) === undefined) return undefined
+        if (nativeSupplies[denom]?.decimals !== card.priceBase.decimals) return undefined
         const units = nativeSupplies[denom]?.units
         if (units !== undefined) {
           return guardChainRelativeValuation(units * card.priceUsd, chainMarketCapUsd)
@@ -737,7 +742,7 @@ const Market = () => {
       )
       return guardChainRelativeValuation(value, chainMarketCapUsd)
     },
-    [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
+    [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, ibcWhitelist, nativeWhitelist, nativePrice, nativeSupplies, prices]
   )
 
   const compareMarketCards = useCallback(
@@ -797,6 +802,7 @@ const Market = () => {
   // below the market-cap confidence threshold. Do not verify the whole graph.
   const { data: visibleCw20Supplies = {} } = useCw20Supplies(visibleCw20Contracts)
   const getCardDisplayPriceUsd = (card: MarketCard) => {
+    if (card.priceBase.id.startsWith("native:") && resolveNativeMarketDecimals(card.priceBase.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
     if (!card.priceBase.id.startsWith("cw20:")) return card.priceUsd
     if (!card.priceUsesReserveUnits) return undefined
     const contract = card.priceBase.id.slice(5).toLowerCase()
