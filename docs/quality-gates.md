@@ -203,3 +203,11 @@ the price-base metadata, leave the derived valuation unavailable. This narrow
 guard does not certify the price graph's fallback metadata or quote precision;
 those need separate source-aware pricing acceptance. Keep matching zero supply
 and zero price valid, and do not discard the valid raw supply on a mismatch.
+
+Display-only CW20 hydration must preserve the decimals used to build the card's
+price and reserve amounts. Updating labels/icons must not replace those units
+with newer token metadata without rebuilding the price. Otherwise the supply
+guard can incorrectly match new supply precision against old price units.
+`tests/marketAssetPresentation.test.ts` locks this boundary; compiled acceptance
+must include different static-price and dynamic-token decimals, not just missing
+precision. Pair details currently resolve metadata before calculating prices.

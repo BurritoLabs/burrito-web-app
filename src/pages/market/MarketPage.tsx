@@ -45,6 +45,7 @@ import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
 import { calculatePairPriceChange } from "../../app/market/priceChange"
 import { selectCw20MarketSupplyContracts } from "../../app/market/marketSupplySelection"
+import { hydrateMarketCw20Presentation } from "../../app/market/assetPresentation"
 import {
   resolveBondingSpotPrice,
   supportsReserveRatioPricing
@@ -836,22 +837,7 @@ const Market = () => {
   }, [buildMarketCard, liveVisiblePools, visible])
 
   const hydrateVisibleCw20Asset = useCallback(
-    (asset: ResolvedAsset): ResolvedAsset => {
-      if (!asset.id.startsWith("cw20:")) return asset
-
-      const contract = asset.id.slice(5).toLowerCase()
-      const token = visibleCw20Whitelist[contract]
-      if (!token) return asset
-
-      const symbol = token.symbol || asset.symbol
-      return {
-        ...asset,
-        symbol,
-        name: token.name || symbol,
-        decimals: token.decimals ?? asset.decimals,
-        iconCandidates: buildCw20IconCandidates(token.icon, symbol)
-      }
-    },
+    (asset: ResolvedAsset) => hydrateMarketCw20Presentation(asset, visibleCw20Whitelist),
     [visibleCw20Whitelist]
   )
 
