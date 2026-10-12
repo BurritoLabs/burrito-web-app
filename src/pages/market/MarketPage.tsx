@@ -16,7 +16,7 @@ import {
   useResolvedIbcWhitelist,
   useResolvedCw20Whitelist
 } from "../../app/data/terraAssets"
-import { useCw20Supplies } from "../../app/data/cw20"
+import { getCw20SupplyUnitsForDecimals, useCw20Supplies } from "../../app/data/cw20"
 import { fetchPrices } from "../../app/data/classic"
 import {
   fetchCirculatingSnapshot,
@@ -727,7 +727,8 @@ const Market = () => {
       if (!card.priceBase.id.startsWith("cw20:")) return undefined
       if (card.priceUsd === undefined) return undefined
       const contract = card.priceBase.id.slice(5).toLowerCase()
-      const supply = cw20Supplies[contract]?.units
+      // Do not multiply chain supply by a price normalized with different units.
+      const supply = getCw20SupplyUnitsForDecimals(cw20Supplies[contract], card.priceBase.decimals)
       if (supply === undefined) return undefined
       return guardChainRelativeValuation(supply * card.priceUsd, chainMarketCapUsd)
     },

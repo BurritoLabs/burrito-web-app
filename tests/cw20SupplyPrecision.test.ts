@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { fetchCw20Supplies } from "../src/app/data/cw20"
+import { fetchCw20Supplies, getCw20SupplyUnitsForDecimals } from "../src/app/data/cw20"
 
 const { fetchEndpoint } = vi.hoisted(() => ({ fetchEndpoint: vi.fn() }))
 vi.mock("../src/app/data/endpointFallback", () => ({
@@ -36,6 +36,20 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe("CW20 supply precision and cache provenance", () => {
+  it("does not combine verified supply units with a differently normalized price", () => {
+    const supply = { totalSupply: "1200000000", decimals: 8, units: 12 }
+    expect(getCw20SupplyUnitsForDecimals(supply, 6)).toBeUndefined()
+    expect(getCw20SupplyUnitsForDecimals(supply, 8)).toBe(12)
+    expect(getCw20SupplyUnitsForDecimals(supply, NaN)).toBeUndefined()
+    expect(getCw20SupplyUnitsForDecimals(undefined, 8)).toBeUndefined()
+  })
+
+  it("preserves zero supply and zero price when precision matches", () => {
+    const supply = { totalSupply: "0", decimals: 0, units: 0 }
+    expect(getCw20SupplyUnitsForDecimals(supply, 0)).toBe(0)
+    expect(getCw20SupplyUnitsForDecimals({ ...supply, totalSupply: "12", units: 12 }, 0)! * 0).toBe(0)
+  })
+
   it("does not guess decimals from a registry when token_info omits them", async () => {
     fetchEndpoint.mockImplementationOnce(async () => ({
       ok: true, json: async () => ({ data: { total_supply: "12000000" } })

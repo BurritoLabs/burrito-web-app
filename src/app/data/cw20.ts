@@ -515,6 +515,11 @@ export type Cw20SupplyInfo = {
   units: number
 }
 
+export const getCw20SupplyUnitsForDecimals = (
+  supply: Cw20SupplyInfo | undefined,
+  priceDecimals: number
+) => supply?.decimals === priceDecimals ? supply.units : undefined
+
 const parseCw20Supply = (
   totalSupply: unknown,
   decimals: unknown

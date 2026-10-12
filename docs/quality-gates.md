@@ -196,3 +196,10 @@ precision, Uint128/u8 bounds, legacy cache rejection, raw cache validation,
 expiration and storage/endpoint isolation. Compiled UI acceptance must also use
 explicit healthy on-chain fixture decimals and a missing-decimals case; an
 unchanged card-order hash when all CW20 responses fail is not value validation.
+
+Market Cap and pair-detail FDV must not combine CW20 supply units with a price
+normalized using different base-asset decimals. If supply decimals disagree with
+the price-base metadata, leave the derived valuation unavailable. This narrow
+guard does not certify the price graph's fallback metadata or quote precision;
+those need separate source-aware pricing acceptance. Keep matching zero supply
+and zero price valid, and do not discard the valid raw supply on a mismatch.

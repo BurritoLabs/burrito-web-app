@@ -15,7 +15,7 @@ import {
   fetchCirculatingSnapshot,
   fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import { useCw20Supplies } from "../../app/data/cw20"
+import { getCw20SupplyUnitsForDecimals, useCw20Supplies } from "../../app/data/cw20"
 import {
   type PairCandle,
   fetchPairCandles,
@@ -803,7 +803,7 @@ const MarketPairDetails = () => {
     if (!detail?.priceBase.id.startsWith("cw20:")) return undefined
     if (detail.priceUsd === undefined) return undefined
     const contract = detail.priceBase.id.slice("cw20:".length).toLowerCase()
-    const units = detailCw20Supplies[contract]?.units
+    const units = getCw20SupplyUnitsForDecimals(detailCw20Supplies[contract], detail.priceBase.decimals)
     return units !== undefined ? units * detail.priceUsd : undefined
   }, [detail, detailCw20Supplies])
   const detailMarketCapUsd = detail?.marketCapUsd
