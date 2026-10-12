@@ -127,7 +127,8 @@
 
 .sortWrap {
   position: relative;
-  z-index: 4;
+  /* The sort menu overlaps the wrapped DEX row, whose More control is at 5. */
+  z-index: 6;
 }
 
 .sortButton {

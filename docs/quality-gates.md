@@ -156,3 +156,8 @@ siblings. Preserve the six-worker limit and case-sensitive supply denoms.
 these boundaries without live endpoints. Production-build desktop/mobile Market
 checks must additionally exercise search, sorting, DEX filters and pagination.
 Controlled request counts are not measurements of production latency.
+
+On narrow layouts the sort menu overlaps the wrapped DEX filter row. Its
+stacking layer must remain above the DEX More control; test actual hit targets
+and normal clicks in both themes, not visibility alone or forced clicks.
+Keep the fixed application header and global content layers unchanged.
