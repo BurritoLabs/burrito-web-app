@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import type { Cw20Token } from "./terraAssets"
 import { fetchWithEndpointFallback } from "./endpointFallback"
 import { withInFlightAssetRequest } from "./assetMetadataRequests"
-import { writeLocalStorageValue } from "../utils/safeStorage"
+import { readLocalStorageValue, writeLocalStorageValue } from "../utils/safeStorage"
 import { isTerraAddress } from "../utils/assetIdentity"
 import { getActiveAppChainRuntime } from "../activeChain"
 
@@ -509,43 +509,43 @@ export const useCw20Balances = (
   })
 }
 
-type Cw20TokenInfoResponse = {
-  data?: {
-    name?: string
-    symbol?: string
-    total_supply?: string
-    decimals?: number
-  }
-}
-
 export type Cw20SupplyInfo = {
   totalSupply: string
   decimals: number
   units: number
 }
 
-const toUnits = (amount: string, decimals: number) => {
-  const parsed = Number(amount)
-  if (!Number.isFinite(parsed)) return 0
-  return parsed / 10 ** Math.max(0, decimals)
+const parseCw20Supply = (
+  totalSupply: unknown,
+  decimals: unknown
+): Cw20SupplyInfo | undefined => {
+  // CW20 TokenInfoResponse supplies Uint128 + u8. Do not infer precision from
+  // registry metadata or turn a malformed upstream value into a real zero.
+  if (
+    typeof totalSupply !== "string" || !/^[0-9]{1,39}$/.test(totalSupply) ||
+    BigInt(totalSupply) > 340282366920938463463374607431768211455n ||
+    typeof decimals !== "number" || !Number.isInteger(decimals) ||
+    decimals < 0 || decimals > 255
+  ) return undefined
+  return { totalSupply, decimals, units: Number(totalSupply) / 10 ** decimals }
 }
 
-const buildCw20SupplyCacheKey = (contract: string, chainId: string) =>
-  `cw20supply-token:v1:${chainId}:${contract}`
+const buildCw20SupplyCacheKey = (contract: string, scope: Cw20ChainScope) =>
+  `cw20supply-token:v2:${scope.chainId}:${scope.lcd}:${contract}`
 
-const loadCw20SupplyCache = (contract: string, chainId: string) => {
-  if (typeof window === "undefined") return undefined
+const loadCw20SupplyCache = (contract: string, scope: Cw20ChainScope) => {
   try {
-    const raw = window.localStorage.getItem(
-      buildCw20SupplyCacheKey(contract, chainId)
-    )
+    const raw = readLocalStorageValue(buildCw20SupplyCacheKey(contract, scope))
     if (!raw) return undefined
-    const cached = JSON.parse(raw) as { ts?: number; data?: Cw20SupplyInfo }
-    if (!cached.ts || Date.now() - cached.ts > SUPPLY_CACHE_TTL) return undefined
-    if (!cached.data?.totalSupply || !Number.isFinite(cached.data.decimals)) {
-      return undefined
-    }
-    return cached.data
+    const cached = JSON.parse(raw) as {
+      ts?: unknown; data?: { totalSupply?: unknown; decimals?: unknown }
+    } | null
+    const now = Date.now()
+    if (!cached || typeof cached.ts !== "number" || !Number.isFinite(cached.ts) ||
+      cached.ts < 0 || cached.ts > now || now - cached.ts >= SUPPLY_CACHE_TTL) return undefined
+    // Recompute approximate display units from validated raw fields; never trust
+    // a stored converted number. v1/batch caches can contain guessed decimals.
+    return parseCw20Supply(cached.data?.totalSupply, cached.data?.decimals)
   } catch {
     return undefined
   }
@@ -554,13 +554,13 @@ const loadCw20SupplyCache = (contract: string, chainId: string) => {
 const saveCw20SupplyCache = (
   contract: string,
   data: Cw20SupplyInfo,
-  chainId: string
+  scope: Cw20ChainScope
 ) => {
   if (typeof window === "undefined") return
   try {
     writeLocalStorageValue(
-      buildCw20SupplyCacheKey(contract, chainId),
-      JSON.stringify({ ts: Date.now(), data })
+      buildCw20SupplyCacheKey(contract, scope),
+      JSON.stringify({ ts: Date.now(), data: { totalSupply: data.totalSupply, decimals: data.decimals } })
     )
   } catch {
     // Ignore storage failures in private browsing or low-storage mobile contexts.
@@ -569,7 +569,7 @@ const saveCw20SupplyCache = (
 
 export const fetchCw20Supplies = async (
   contracts: string[],
-  whitelist: Record<string, Cw20Token>,
+  _whitelist: Record<string, Cw20Token>,
   scope = getCw20ChainScope()
 ) => {
   const unique = Array.from(
@@ -581,24 +581,10 @@ export const fetchCw20Supplies = async (
   )
   if (!unique.length) return {}
 
-  const cacheKey = `cw20supply:${scope.chainId}:${unique.join(",")}`
-  const cached = loadCache(cacheKey, SUPPLY_CACHE_TTL) as Record<string, string> | undefined
   const results: Record<string, Cw20SupplyInfo> = {}
   unique.forEach((contract) => {
-    const individual = loadCw20SupplyCache(contract, scope.chainId)
-    if (individual) {
-      results[contract] = individual
-      return
-    }
-    const payload = cached?.[contract]
-    if (!payload) return
-    try {
-      const parsed = JSON.parse(payload) as Cw20SupplyInfo
-      results[contract] = parsed
-      saveCw20SupplyCache(contract, parsed, scope.chainId)
-    } catch {
-      // Ignore invalid legacy cache entries.
-    }
+    const individual = loadCw20SupplyCache(contract, scope)
+    if (individual) results[contract] = individual
   })
 
   const missing = unique.filter((contract) => !results[contract])
@@ -621,21 +607,16 @@ export const fetchCw20Supplies = async (
           async () => {
             const response = await fetchWithEndpointFallback(url)
             if (!response.ok) return undefined
-            return (await response.json()) as Cw20TokenInfoResponse
+            return (await response.json()) as {
+              data?: { total_supply?: unknown; decimals?: unknown }
+            } | null
           }
         )
-        if (!data) continue
         const tokenInfo = data?.data
-        const totalSupply = tokenInfo?.total_supply
-        if (!totalSupply) continue
-        const decimals = tokenInfo?.decimals ?? whitelist[contract]?.decimals ?? 6
-        const supply = {
-          totalSupply,
-          decimals,
-          units: toUnits(totalSupply, decimals)
-        }
+        const supply = parseCw20Supply(tokenInfo?.total_supply, tokenInfo?.decimals)
+        if (!supply) continue
         results[contract] = supply
-        saveCw20SupplyCache(contract, supply, scope.chainId)
+        saveCw20SupplyCache(contract, supply, scope)
       } catch {
         // Ignore per-contract failure.
       }
@@ -644,17 +625,6 @@ export const fetchCw20Supplies = async (
 
   await Promise.all(workers)
 
-  if (Object.keys(results).length) {
-    const serializable = Object.fromEntries(
-      Object.entries(results).map(([contract, info]) => [contract, JSON.stringify(info)])
-    )
-    if (typeof window !== "undefined") {
-      writeLocalStorageValue(
-        cacheKey,
-        JSON.stringify({ ts: Date.now(), data: serializable })
-      )
-    }
-  }
   return results
 }
 
@@ -668,7 +638,7 @@ export const useCw20Supplies = (
   ).sort()
 
   return useQuery({
-    queryKey: ["cw20-supplies", scope.chainId, normalized.join(",")],
+    queryKey: ["cw20-supplies", scope.chainId, scope.lcd, normalized.join(",")],
     queryFn: () => fetchCw20Supplies(normalized, whitelist ?? {}, scope),
     enabled: normalized.length > 0,
     staleTime: SUPPLY_CACHE_TTL

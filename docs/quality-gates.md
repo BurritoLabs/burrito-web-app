@@ -173,3 +173,26 @@ For Market Cap sorting, selection starts from the full filtered card set, before
 pagination. `tests/marketSupplySelection.test.ts` checks both global sort
 directions and an eligible highest-value card beyond the first two pages. Do
 not reduce global sorting to visible cards to meet a request-count target.
+
+CW20 supply valuation requires explicit on-chain precision. Validate the
+`token_info` response's unsigned decimal-string Uint128 supply and integer u8
+decimals; never replace missing precision with registry/default-six values or
+replace malformed supplies with zero. The generic CW20 response type is u8;
+cw20-base's stricter instantiate limit is not a universal interface constraint.
+See the [CW20 response definition](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw20/src/query.rs).
+Converted units remain approximate display numbers, not transaction amounts.
+
+Only the version-2 per-contract supply cache is trusted for this path. Its key
+and query identity include chain ID and configured LCD. Save raw supply and
+explicit decimals, validate them again and recompute display units on read.
+Expire at 15 minutes without refreshing timestamps on reads. Old version-1 and
+aggregate entries may contain inferred precision and must not be migrated;
+unrelated settings/wallet storage are not removed. Storage failures must not
+prevent live reads. Keep four-worker concurrency, same-endpoint pending request
+sharing, successful siblings and retryability of failed/invalid items.
+
+`tests/cw20SupplyPrecision.test.ts` covers malformed responses, zero, non-six
+precision, Uint128/u8 bounds, legacy cache rejection, raw cache validation,
+expiration and storage/endpoint isolation. Compiled UI acceptance must also use
+explicit healthy on-chain fixture decimals and a missing-decimals case; an
+unchanged card-order hash when all CW20 responses fail is not value validation.
