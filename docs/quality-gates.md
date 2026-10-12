@@ -198,11 +198,13 @@ explicit healthy on-chain fixture decimals and a missing-decimals case; an
 unchanged card-order hash when all CW20 responses fail is not value validation.
 
 Market Cap and pair-detail FDV must not combine CW20 supply units with a price
-normalized using different base-asset decimals. If supply decimals disagree with
-the price-base metadata, leave the derived valuation unavailable. This narrow
-guard does not certify the price graph's fallback metadata or quote precision;
-those need separate source-aware pricing acceptance. Keep matching zero supply
-and zero price valid, and do not discard the valid raw supply on a mismatch.
+normalized using different base-asset decimals. For a reserve-graph-derived list
+price only, convert from the graph's fixed normalization basis to strict supply
+precision before display or valuation. This is a unit conversion, not a second
+price feed; intermediate-token precision cancels along the reserve path and
+USD liquidity/confidence remains invariant. Never rescale an external bonding
+spot price or a native anchor. Missing precision, invalid numbers and numerical
+overflow/underflow remain unavailable; genuine zero values remain valid.
 
 Display-only CW20 hydration must preserve the decimals used to build the card's
 price and reserve amounts. Updating labels/icons must not replace those units
@@ -211,3 +213,23 @@ guard can incorrectly match new supply precision against old price units.
 `tests/marketAssetPresentation.test.ts` locks this boundary; compiled acceptance
 must include different static-price and dynamic-token decimals, not just missing
 precision. Pair details currently resolve metadata before calculating prices.
+
+The list's card values retain their internal pricing basis: labels/icons never
+rewrite it. Only `getCardDisplayPriceUsd` produces the displayed unit price;
+market-cap multiplication uses the same strict-supply conversion. Visible token
+precision reads reuse the existing supply cache and in-flight request sharing,
+not a metadata scan of every graph intermediary. Global market-cap eligibility
+and pre-pagination selection remain unchanged.
+
+Pair details use the selected pair's validated supply precision for reserves,
+graph normalization, DEX estimates and history query keys. Both CW20 sides must
+be ready before price-ratio history, spot simulation or embedded trading starts.
+Missing precision has an explicit retry and must never pass placeholder units
+into trade controls or display fake reserves. Token tickers are not native-price
+identities. Preserve our registry's labels, icons and provenance separately.
+
+`tests/cw20Pricing.test.ts` checks single/multi-hop unit conversion, zero/invalid
+values, intermediate-precision invariance and both-side readiness. Compiled QA
+must check the actual eight-decimal price and cap (not merely `--`), selected
+pair FDV, and missing-precision recovery. Native/IBC precision provenance and
+upstream candle-unit guarantees still require their own acceptance.

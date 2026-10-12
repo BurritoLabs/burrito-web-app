@@ -16,7 +16,7 @@ import {
   useResolvedIbcWhitelist,
   useResolvedCw20Whitelist
 } from "../../app/data/terraAssets"
-import { getCw20SupplyUnitsForDecimals, useCw20Supplies } from "../../app/data/cw20"
+import { useCw20Supplies } from "../../app/data/cw20"
 import { fetchPrices } from "../../app/data/classic"
 import {
   fetchCirculatingSnapshot,
@@ -46,6 +46,7 @@ import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
 import { calculatePairPriceChange } from "../../app/market/priceChange"
 import { selectCw20MarketSupplyContracts } from "../../app/market/marketSupplySelection"
 import { hydrateMarketCw20Presentation } from "../../app/market/assetPresentation"
+import { resolveCw20ReservePrice, resolveCw20ReserveValuation } from "../../app/market/cw20Pricing"
 import {
   resolveBondingSpotPrice,
   supportsReserveRatioPricing
@@ -91,6 +92,7 @@ type MarketCard = {
   priceValue?: number
   priceLabel?: string
   priceUsd?: number
+  priceUsesReserveUnits: boolean
   marketCapUsd?: number
   liquidityUsd?: number
   priceConfidenceUsd?: number
@@ -534,6 +536,7 @@ const Market = () => {
             ? `1 ${priceBase.symbol} ≈ ${formatNumber(priceValue, priceValue < 1 ? 6 : 4)} ${priceQuote.symbol}`
             : undefined,
         priceUsd,
+        priceUsesReserveUnits: leftUsd !== undefined && !priceBase.isLunc && !priceBase.isUstc,
         marketCapUsd,
         liquidityUsd,
         priceConfidenceUsd
@@ -728,10 +731,11 @@ const Market = () => {
       if (!card.priceBase.id.startsWith("cw20:")) return undefined
       if (card.priceUsd === undefined) return undefined
       const contract = card.priceBase.id.slice(5).toLowerCase()
-      // Do not multiply chain supply by a price normalized with different units.
-      const supply = getCw20SupplyUnitsForDecimals(cw20Supplies[contract], card.priceBase.decimals)
-      if (supply === undefined) return undefined
-      return guardChainRelativeValuation(supply * card.priceUsd, chainMarketCapUsd)
+      if (!card.priceUsesReserveUnits) return undefined
+      const value = resolveCw20ReserveValuation(
+        card.priceUsd, card.priceBase.decimals, cw20Supplies[contract]
+      )
+      return guardChainRelativeValuation(value, chainMarketCapUsd)
     },
     [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
   )
@@ -789,6 +793,18 @@ const Market = () => {
   )
   const { data: visibleCw20Whitelist = {} } =
     useResolvedCw20Whitelist(visibleCw20Contracts)
+  // Reuse strict token_info/supply reads for displayed prices, including pools
+  // below the market-cap confidence threshold. Do not verify the whole graph.
+  const { data: visibleCw20Supplies = {} } = useCw20Supplies(visibleCw20Contracts)
+  const getCardDisplayPriceUsd = (card: MarketCard) => {
+    if (!card.priceBase.id.startsWith("cw20:")) return card.priceUsd
+    if (!card.priceUsesReserveUnits) return undefined
+    const contract = card.priceBase.id.slice(5).toLowerCase()
+    return resolveCw20ReservePrice(
+      card.priceUsd, card.priceBase.decimals,
+      visibleCw20Supplies[contract] ?? cw20Supplies[contract]
+    )
+  }
   const liveRefreshCards = visible.slice(0, LIVE_POOL_REFRESH_LIMIT)
   const liveRefreshKey = liveRefreshCards
     .map((card) => `${card.dexId}:${card.pairAddress}`)
@@ -1150,6 +1166,7 @@ const Market = () => {
               {displayVisible.map((card, index) => {
                 const pairChange = getPairChange(card, timeframe)
                 const marketCapUsd = getCardMarketCapUsd(card)
+                const displayPriceUsd = getCardDisplayPriceUsd(card)
                 const secondaryMetric =
                   sortMetric === "volume"
                     ? {
@@ -1238,7 +1255,7 @@ const Market = () => {
                         </div>
 
                         <div className={styles.rightMetrics}>
-                          <div className={styles.price}>{card.priceUsd !== undefined ? formatUsdSmart(card.priceUsd) : "--"}</div>
+                          <div className={styles.price}>{displayPriceUsd !== undefined ? formatUsdSmart(displayPriceUsd) : "--"}</div>
                           <div
                             className={`${styles.change} ${
                               pairChange === undefined
