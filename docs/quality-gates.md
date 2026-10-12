@@ -161,3 +161,15 @@ On narrow layouts the sort menu overlaps the wrapped DEX filter row. Its
 stacking layer must remain above the DEX More control; test actual hit targets
 and normal clicks in both themes, not visibility alone or forced clicks.
 Keep the fixed application header and global content layers unchanged.
+
+CW20 supply selection must match the existing Market Cap valuation branches.
+Skip reads only when the card uses a native special case, already has a market
+cap (including zero), falls below the existing price-confidence threshold, or
+has no price. Zero price and the exact threshold remain eligible. This is not
+a new price-validity or precision rule. Any eligible card for a shared contract
+must retain that contract even if another card for it needs no supply.
+
+For Market Cap sorting, selection starts from the full filtered card set, before
+pagination. `tests/marketSupplySelection.test.ts` checks both global sort
+directions and an eligible highest-value card beyond the first two pages. Do
+not reduce global sorting to visible cards to meet a request-count target.

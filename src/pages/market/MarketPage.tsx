@@ -44,6 +44,7 @@ import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
 import { calculatePairPriceChange } from "../../app/market/priceChange"
+import { selectCw20MarketSupplyContracts } from "../../app/market/marketSupplySelection"
 import {
   resolveBondingSpotPrice,
   supportsReserveRatioPricing
@@ -651,15 +652,7 @@ const Market = () => {
   ])
 
   const cw20SupplyContracts = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          supplyCards
-            .map((card) => card.priceBase.id)
-            .filter((id) => id.startsWith("cw20:"))
-            .map((id) => id.slice(5).toLowerCase())
-        )
-      ),
+    () => selectCw20MarketSupplyContracts(supplyCards),
     [supplyCards]
   )
 
