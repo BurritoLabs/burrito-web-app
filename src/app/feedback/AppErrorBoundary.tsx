@@ -16,7 +16,7 @@ type AppErrorBoundaryProps = {
 
 type AppErrorBoundaryState = {
   error: Error | null
-  diagnosticsCopied: boolean
+  diagnosticsCopyState: "idle" | "copying" | "copied" | "failed"
 }
 
 const APP_RECOVERY_STORAGE_KEY = "burrito.appRecoveryAt"
@@ -104,17 +104,30 @@ class AppErrorBoundary extends Component<
   AppErrorBoundaryState
 > {
   private recoveryTimer: number | undefined
+  private mounted = false
+  private copyAttempt = 0
+  private copyPending = false
 
   state: AppErrorBoundaryState = {
     error: null,
-    diagnosticsCopied: false
+    diagnosticsCopyState: "idle"
   }
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
-    return { error, diagnosticsCopied: false }
+    return { error, diagnosticsCopyState: "idle" }
+  }
+
+  componentDidMount() {
+    this.mounted = true
+  }
+
+  private invalidateCopy() {
+    this.copyAttempt += 1
+    this.copyPending = false
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.invalidateCopy()
     reportRuntimeError({
       kind: "react",
       error,
@@ -136,12 +149,16 @@ class AppErrorBoundary extends Component<
   }
 
   componentWillUnmount() {
+    this.mounted = false
+    this.invalidateCopy()
     if (this.recoveryTimer !== undefined) {
       window.clearTimeout(this.recoveryTimer)
     }
   }
 
   handleReload = () => {
+    this.invalidateCopy()
+    this.setState({ diagnosticsCopyState: "idle" })
     if (this.recoveryTimer !== undefined) {
       window.clearTimeout(this.recoveryTimer)
       this.recoveryTimer = undefined
@@ -157,25 +174,39 @@ class AppErrorBoundary extends Component<
 
   handleCopyDiagnostics = async () => {
     const error = this.state.error
-    const diagnostics = JSON.stringify(
-      {
-        generatedAt: new Date().toISOString(),
-        path: window.location.pathname,
-        message: sanitizeClientErrorText(
-          error?.message || error?.name || "Unknown runtime error",
-          1_000
-        ),
-        userAgent: window.navigator.userAgent.slice(0, 500)
-      },
-      null,
-      2
-    )
+    if (!this.mounted || !error || this.copyPending) return
+
+    const attempt = ++this.copyAttempt
+    this.copyPending = true
+    this.setState({ diagnosticsCopyState: "copying" })
+    const ownsCopy = () =>
+      this.mounted && this.copyAttempt === attempt && this.state.error === error
 
     try {
+      const diagnostics = JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          path: window.location.pathname,
+          message: sanitizeClientErrorText(error.message || error.name || "Unknown runtime error", 1_000),
+          userAgent: window.navigator.userAgent.slice(0, 500)
+        },
+        null,
+        2
+      )
       await window.navigator.clipboard.writeText(diagnostics)
-      this.setState({ diagnosticsCopied: true })
+      if (ownsCopy()) {
+        this.setState((state) =>
+          ownsCopy() && state.error === error ? { diagnosticsCopyState: "copied" } : null
+        )
+      }
     } catch {
-      this.setState({ diagnosticsCopied: false })
+      if (ownsCopy()) {
+        this.setState((state) =>
+          ownsCopy() && state.error === error ? { diagnosticsCopyState: "failed" } : null
+        )
+      }
+    } finally {
+      if (ownsCopy()) this.copyPending = false
     }
   }
 
@@ -190,11 +221,24 @@ class AppErrorBoundary extends Component<
           }
           onAction={this.handleReload}
           secondaryActionLabel={
-            this.state.diagnosticsCopied
+            this.state.diagnosticsCopyState === "copying"
+              ? "Copying diagnostics…"
+              : this.state.diagnosticsCopyState === "copied"
               ? "Diagnostics copied"
               : "Copy diagnostics"
           }
+          secondaryActionPending={this.state.diagnosticsCopyState === "copying"}
+          secondaryActionStatus={
+            this.state.diagnosticsCopyState === "failed"
+              ? "Could not copy diagnostics. Clipboard access may be unavailable. Please try again."
+              : this.state.diagnosticsCopyState === "copied"
+              ? "Diagnostics copied."
+              : this.state.diagnosticsCopyState === "copying"
+              ? "Copying diagnostics…"
+              : undefined
+          }
           onSecondaryAction={() => void this.handleCopyDiagnostics()}
+          secondaryActionDescription="Copies the page path, browser information, timestamp and filtered error message. Review it before sharing. Copying does not upload the report."
         />
       )
     }

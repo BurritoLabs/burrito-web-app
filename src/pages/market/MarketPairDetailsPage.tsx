@@ -15,7 +15,10 @@ import {
   fetchCirculatingSnapshot,
   fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import { useCw20Supplies } from "../../app/data/cw20"
+import { getCw20SupplyUnitsForDecimals, useCw20Supplies } from "../../app/data/cw20"
+import { hasMarketCw20Precision } from "../../app/market/cw20Pricing"
+import { marketHistoryPrecisionKey } from "../../app/market/historyPrecision"
+import { resolveNativeMarketDecimals } from "../../app/data/assetPrecision"
 import {
   type PairCandle,
   fetchPairCandles,
@@ -431,9 +434,22 @@ const MarketPairDetails = () => {
     return Array.from(set)
   }, [poolsForMetadata])
 
-  const { data: nativeWhitelist = {} } = useResolvedNativeWhitelist(nativeDenoms)
-  const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
+  const { data: nativeWhitelist = {}, isFetching: isNativePrecisionFetching, refetch: refetchNativePrecision } = useResolvedNativeWhitelist(nativeDenoms)
+  const { data: ibcWhitelist = {}, isFetching: isIbcPrecisionFetching, refetch: refetchIbcPrecision } = useResolvedIbcWhitelist(ibcDenoms)
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(cw20Contracts)
+  const {
+    data: detailCw20Supplies = {},
+    isFetching: isCw20PrecisionFetching,
+    refetch: refetchCw20Precision
+  } = useCw20Supplies(cw20Contracts)
+  const hasPairPrecision = hasMarketCw20Precision(cw20Contracts, detailCw20Supplies) &&
+    [...nativeDenoms, ...ibcDenoms].every(denom => resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) !== undefined)
+  const isPrecisionFetching = isCw20PrecisionFetching || isNativePrecisionFetching || isIbcPrecisionFetching
+  const refetchPrecision = () => Promise.all([
+    ...(cw20Contracts.length ? [refetchCw20Precision()] : []),
+    ...(nativeDenoms.length ? [refetchNativePrecision()] : []),
+    ...(ibcDenoms.length ? [refetchIbcPrecision()] : [])
+  ])
 
   const { data: prices } = useQuery({
     queryKey: ["prices", chain.chainId],
@@ -462,24 +478,21 @@ const MarketPairDetails = () => {
           const denom = asset.id.slice(7)
           const key = normalizeAssetKey(denom)
           if (!key || map.has(key)) return
-          const decimals = denom.startsWith("ibc/")
-            ? (ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
-              cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
-              6)
-            : (nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6)
-          map.set(key, decimals)
+          const decimals = resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist)
+          if (decimals !== undefined) map.set(key, decimals)
           return
         }
         if (asset.id.startsWith("cw20:")) {
           const contract = asset.id.slice(5).toLowerCase()
           const key = normalizeAssetKey(contract)
           if (!key || map.has(key)) return
-          map.set(key, cw20Whitelist[contract]?.decimals ?? 6)
+          const decimals = detailCw20Supplies[contract]?.decimals
+          if (decimals !== undefined) map.set(key, decimals)
         }
       })
     })
     return Array.from(map.entries()).map(([key, decimals]) => ({ key, decimals }))
-  }, [cw20Whitelist, ibcWhitelist, nativeWhitelist, poolsForMetadata])
+  }, [detailCw20Supplies, ibcWhitelist, nativeWhitelist, poolsForMetadata])
 
   const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
 
@@ -501,7 +514,8 @@ const MarketPairDetails = () => {
             return nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6
           }
           if (assetId.startsWith("cw20:")) {
-            return cw20Whitelist[assetId.slice("cw20:".length).toLowerCase()]?.decimals ?? 6
+            const contract = assetId.slice("cw20:".length).toLowerCase()
+            return detailCw20Supplies[contract]?.decimals ?? cw20Whitelist[contract]?.decimals ?? 6
           }
           return 6
         },
@@ -511,7 +525,7 @@ const MarketPairDetails = () => {
           return undefined
         }
       }),
-    [cw20Whitelist, ibcWhitelist, nativePrice?.usd, nativeWhitelist, pools, prices?.ustc?.usd]
+    [cw20Whitelist, detailCw20Supplies, ibcWhitelist, nativePrice?.usd, nativeWhitelist, pools, prices?.ustc?.usd]
   )
 
   const resolveAsset = (assetId: string): ResolvedAsset => {
@@ -529,7 +543,7 @@ const MarketPairDetails = () => {
           key: normalizeAssetKey(denom),
           symbol,
           name,
-            decimals: ibc?.decimals ?? ibcHexxagon?.decimals ?? 6,
+            decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) ?? 0,
             iconCandidates: buildIbcIconCandidates({
               ibcIcon: ibc?.icon,
               hexxagonIcon: ibcHexxagon?.icon,
@@ -557,7 +571,7 @@ const MarketPairDetails = () => {
         key: normalizeAssetKey(denom),
         symbol: identity.symbol,
         name: identity.name,
-        decimals: nativeToken?.decimals ?? 6,
+        decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) ?? 0,
         iconCandidates: buildNativeIconCandidates(
           denom,
           identity.symbol,
@@ -576,7 +590,9 @@ const MarketPairDetails = () => {
       key: normalizeAssetKey(contract),
       symbol,
       name: token?.name || symbol,
-      decimals: token?.decimals ?? 6,
+      // Zero is an internal placeholder only; prices/history/trading remain
+      // gated until strict token_info precision is available for both sides.
+      decimals: detailCw20Supplies[contract]?.decimals ?? 0,
       iconCandidates: buildCw20IconCandidates(token?.icon, token?.symbol),
       isLunc: false,
       isUstc: false,
@@ -591,9 +607,9 @@ const MarketPairDetails = () => {
   const getAssetUsdPrice = (asset: ResolvedAsset) => {
     if (asset.isLunc) return nativePrice?.usd
     if (asset.isUstc) return prices?.ustc?.usd
-    const upperSymbol = asset.symbol.trim().toUpperCase()
-    if (upperSymbol === "LUNC" || upperSymbol === "LUNA") return nativePrice?.usd
-    if (upperSymbol === "USTC") return prices?.ustc?.usd
+    if (asset.id.startsWith("native:") && resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
+    // A CW20 can reuse a native ticker; names are not price/asset identities.
+    if (asset.id.startsWith("cw20:") && !detailCw20Supplies[asset.id.slice(5).toLowerCase()]) return undefined
     const graphEntry = poolGraphUsdPrices[asset.key]
     if (graphEntry !== undefined) return graphEntry.price
     const estimate = dexEstimatedPrices?.[asset.key]
@@ -634,13 +650,13 @@ const MarketPairDetails = () => {
 
     const priceBase = left
     const priceQuote = right
-    const priceValue = rightAmount / leftAmount
+    const priceValue = hasPairPrecision ? rightAmount / leftAmount : undefined
     const priceQuoteUsd = getAssetUsdPrice(priceQuote)
     const leftUsd = getAssetUsdPrice(left)
     const rightUsd = getAssetUsdPrice(right)
     const priceUsd =
       leftUsd ??
-      (priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined)
+      (priceQuoteUsd !== undefined && priceValue !== undefined ? priceValue * priceQuoteUsd : undefined)
     const bondingLiquidityUsd =
       displayPool.bonding?.liquidityAssetId && displayPool.bonding?.liquidityAmount
         ? (() => {
@@ -727,7 +743,7 @@ const MarketPairDetails = () => {
       priceValue,
       priceQuoteUsd,
       priceUsd,
-      liquidityUsd,
+      liquidityUsd: hasPairPrecision ? liquidityUsd : undefined,
       marketCapUsd,
       volumesUsd: {
         "1h": getVolumeUsd("1h"),
@@ -743,7 +759,7 @@ const MarketPairDetails = () => {
   })()
 
   const usesSimulatedSpotPrice = Boolean(
-    detail && !supportsReserveRatioPricing(detail.pool.type)
+    detail && hasPairPrecision && !supportsReserveRatioPricing(detail.pool.type)
   )
   const { data: simulatedSpotPrice } = useQuery({
     queryKey: [
@@ -788,22 +804,11 @@ const MarketPairDetails = () => {
     }
   }, [isBondingCurve, sidePanelMode])
 
-  const detailBaseCw20Contracts = useMemo(
-    () =>
-      detail?.priceBase.id.startsWith("cw20:")
-        ? [detail.priceBase.id.slice("cw20:".length).toLowerCase()]
-        : [],
-    [detail?.priceBase.id]
-  )
-  const { data: detailCw20Supplies = {} } = useCw20Supplies(
-    detailBaseCw20Contracts,
-    cw20Whitelist
-  )
   const detailFdvUsd = useMemo(() => {
     if (!detail?.priceBase.id.startsWith("cw20:")) return undefined
     if (detail.priceUsd === undefined) return undefined
     const contract = detail.priceBase.id.slice("cw20:".length).toLowerCase()
-    const units = detailCw20Supplies[contract]?.units
+    const units = getCw20SupplyUnitsForDecimals(detailCw20Supplies[contract], detail.priceBase.decimals)
     return units !== undefined ? units * detail.priceUsd : undefined
   }, [detail, detailCw20Supplies])
   const detailMarketCapUsd = detail?.marketCapUsd
@@ -819,8 +824,7 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
       tradesLimit
     ],
     queryFn: () =>
@@ -834,13 +838,13 @@ const MarketPairDetails = () => {
         limit: tradesLimit,
         maxPages: DETAIL_TRADES_MAX_PAGES
       }),
-    enabled: Boolean(detail?.pool.pair),
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision),
     staleTime: 45_000,
     refetchInterval: 90_000
   })
 
-  const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
-  const hasMoreTrades = Boolean(tradesData?.hasMore)
+  const trades = useMemo(() => hasPairPrecision ? tradesData?.trades ?? [] : [], [hasPairPrecision, tradesData?.trades])
+  const hasMoreTrades = hasPairPrecision && Boolean(tradesData?.hasMore)
 
   const { data: traderStatsData } = useQuery({
     queryKey: [
@@ -850,8 +854,7 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals)
     ],
     queryFn: () =>
       fetchPairTrades({
@@ -864,12 +867,12 @@ const MarketPairDetails = () => {
         limit: DETAIL_TRADER_STATS_LIMIT,
         maxPages: DETAIL_TRADES_MAX_PAGES
       }),
-    enabled: Boolean(detail?.pool.pair),
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision),
     staleTime: 60_000,
     refetchInterval: 120_000
   })
   const tradersByTimeframe = useMemo(() => {
-    const source = traderStatsData?.trades?.length ? traderStatsData.trades : trades
+    const source = hasPairPrecision && traderStatsData?.trades?.length ? traderStatsData.trades : trades
     const now = Date.now()
 
     return (["1h", "24h", "7d"] as Timeframe[]).reduce(
@@ -885,7 +888,7 @@ const MarketPairDetails = () => {
       },
       {} as Record<Timeframe, number | undefined>
     )
-  }, [traderStatsData?.trades, trades])
+  }, [hasPairPrecision, traderStatsData?.trades, trades])
 
   const {
     data: candlesData = [],
@@ -900,8 +903,7 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
       timeframe
     ],
     queryFn: () =>
@@ -919,13 +921,14 @@ const MarketPairDetails = () => {
         minCandles: MIN_CANDLES_FOR_CHART[timeframe],
         includeLocalFallback: true
       }),
-    enabled: Boolean(detail?.pool.pair && detailPriceValue),
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision && detailPriceValue),
     staleTime: 60_000,
     refetchInterval: 120_000
   })
 
   const candles = useMemo(
     () => {
+      if (!hasPairPrecision) return []
       const merged = new Map<number, PairCandle>()
 
       ;[...candlesData]
@@ -958,7 +961,7 @@ const MarketPairDetails = () => {
 
       return [...merged.values()].sort((a, b) => a.bucketStart - b.bucketStart)
     },
-    [candlesData]
+    [hasPairPrecision, candlesData]
   )
 
   const activeCandle = useMemo(() => {
@@ -1494,7 +1497,15 @@ const MarketPairDetails = () => {
 
         <aside className={styles.marketRight}>
           <section className={styles.swapEmbed}>
-            {!chain.features.swap ? (
+            {!hasPairPrecision ? (
+              <div className={`card ${styles.tradingUnavailable}`} role="status">
+                <strong>{isPrecisionFetching ? "Checking token precision…" : "Token precision unavailable"}</strong>
+                <span>Prices, history and trading require valid token units.</span>
+                <button className={styles.precisionRetry} type="button" disabled={isPrecisionFetching} onClick={() => { void refetchPrecision() }}>
+                  Retry token data
+                </button>
+              </div>
+            ) : !chain.features.swap ? (
               <div className={`card ${styles.tradingUnavailable}`}>
                 <strong>Trading is not available on {chain.name} yet</strong>
                 <span>Pool data, price history, and recent transactions remain live.</span>
@@ -1632,7 +1643,9 @@ const MarketPairDetails = () => {
               <span className={styles.heroInfoItem}>
                 <em>Reserves</em>
                 <strong className={styles.reserveValue}>
-                  {formatNumber(detail.leftAmount, 2)} {detail.left.symbol} · {formatNumber(detail.rightAmount, 2)} {detail.right.symbol}
+                  {hasPairPrecision
+                    ? `${formatNumber(detail.leftAmount, 2)} ${detail.left.symbol} · ${formatNumber(detail.rightAmount, 2)} ${detail.right.symbol}`
+                    : "Unavailable until token precision is verified"}
                 </strong>
               </span>
               <a className={styles.poolLink} href={getAddressExplorerUrl(chainKey, detail.pool.pair)} target="_blank" rel="noreferrer">

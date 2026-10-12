@@ -1,4 +1,6 @@
 import PageShell from "./PageShell"
+import DiagnosticsPreferences from "../app/feedback/DiagnosticsPreferences"
+import LocalDiagnosticsPreferences from "../app/feedback/LocalDiagnosticsPreferences"
 import styles from "./Privacy.module.css"
 
 const Privacy = () => (
@@ -6,7 +8,7 @@ const Privacy = () => (
     <article className={styles.policy}>
       <header className={styles.intro}>
         <p className={styles.updated}>
-          Last updated: <time dateTime="2026-09-30">September 30, 2026</time>
+          Last updated: <time dateTime="2026-10-01">October 1, 2026</time>
         </p>
         <p>
           Burrito is a non-custodial wallet and blockchain interface provided by
@@ -14,6 +16,9 @@ const Privacy = () => (
           Chrome extension, and web app process information.
         </p>
       </header>
+
+      <DiagnosticsPreferences />
+      <LocalDiagnosticsPreferences />
 
       <section>
         <h2>Non-custodial wallet</h2>
@@ -105,20 +110,24 @@ const Privacy = () => (
       <section>
         <h2>Performance and error reporting</h2>
         <p>
-          The web app, including when opened inside the mobile app, sends
-          performance measurements to Burrito&apos;s configured diagnostics
-          service. These reports include the measurement and its rating, page
+          Optional diagnostic reporting is off by default. The web app,
+          including when opened inside the mobile app, sends performance
+          measurements to Burrito&apos;s configured diagnostics service only
+          after you turn on Share optional diagnostics above. These reports
+          include the measurement and its rating, page
           path, selected blockchain network, navigation type, and app release.
           Reporting does not require a connected wallet.
         </p>
         <p>
-          When configured, runtime-error reporting also sends error details,
+          With your permission and when configured, runtime-error reporting
+          also sends error details,
           stack information, page location, selected network, and browser
           information. The app filters recognized wallet addresses, transaction
           hashes, and long encoded values from error text before sending it.
         </p>
         <p>
-          When separately configured, transaction diagnostics report the
+          With the same permission and when separately configured,
+          transaction diagnostics report the
           transaction stage, action label, wallet connector type, selected
           network, page path, connectivity and page-visibility state, app
           release, timestamps, and available gas and timing information.
@@ -132,6 +141,22 @@ const Privacy = () => (
           names. These reports help diagnose reliability and performance
           issues; omitting credentials or a wallet-address field does not make
           all request information anonymous.
+        </p>
+        <p>
+          This choice applies to this site in this browser or embedded web
+          view, not to other devices, browsers, or Burrito websites. Turning
+          sharing off stops new automatic reports and discards pending
+          performance samples; it does not recall requests already sent or
+          delete records held by a service. Reports from before you gave
+          permission are not queued for later upload.
+        </p>
+        <p>
+          This control does not disable the network requests needed to load
+          the app, retrieve blockchain and market data, or process a
+          transaction you approve. It does not control separate hosting,
+          platform, or service-provider logging. The local transaction
+          history and the Copy diagnostics action described below are
+          separate from automatic reporting.
         </p>
       </section>
 
@@ -198,11 +223,13 @@ const Privacy = () => (
         <h2>Retention and your choices</h2>
         <p>
           The web app keeps up to 50 recent transaction diagnostic records in
-          local browser storage. These records can include public wallet
+          local browser storage, even when optional sharing is off. These
+          records can include public wallet
           addresses, transaction hashes, and original error text. They are
           replaced as newer records arrive, rather than expiring after a fixed
-          time. Clearing this site&apos;s browser data removes these local
-          records. Choosing Copy diagnostics in the transaction status copies
+          time. Use Clear local diagnostics above to remove only these
+          records; clearing this site&apos;s browser data also removes them.
+          Choosing Copy diagnostics in the transaction status copies
           up to eight recent records and browser context to your clipboard;
           the app does not automatically upload that complete copied report.
         </p>

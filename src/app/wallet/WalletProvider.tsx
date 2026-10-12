@@ -33,6 +33,7 @@ import type { WalletRuntimeChain, WalletRuntimeSnapshot } from "./walletRuntimeB
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import { hasDesktopKeplrProvider } from "./keplrProviderIdentity"
 import { getKeplrConnectionErrorMessage } from "./keplrConnectionErrors"
+import { canRetryWalletRecovery } from "./walletRecoveryRetry"
 import {
   forgetStoredWalletSession,
   getStoredWalletConnectorId,
@@ -260,6 +261,7 @@ export const WalletProvider = ({
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(
     () => !storedAutoConnectId
   )
+  const autoConnectAttemptedRef = useRef(autoConnectAttempted)
 
   const cancelRuntimeRequest = useCallback(() => {
     const request = pendingRuntimeRequestRef.current
@@ -333,7 +335,8 @@ export const WalletProvider = ({
     accountAddressRef.current = account?.address
     connectorIdRef.current = connectorId
     walletStatusRef.current = status
-  }, [account?.address, connectorId, status])
+    autoConnectAttemptedRef.current = autoConnectAttempted
+  }, [account?.address, autoConnectAttempted, connectorId, status])
 
   const getCosmosWallet = useCallback(
     (
@@ -1274,10 +1277,15 @@ export const WalletProvider = ({
       if (walletStatusRef.current === "connected") return
 
       const now = Date.now()
-      if (
-        now - lastAutoConnectRetryAtRef.current <
-        AUTO_RECONNECT_RETRY_COOLDOWN_MS
-      ) {
+      if (!canRetryWalletRecovery({
+        visible: document.visibilityState === "visible",
+        attempted: autoConnectAttemptedRef.current,
+        pending: Boolean(pendingConnectorRef.current),
+        status: walletStatusRef.current,
+        now,
+        lastAttemptAt: lastAutoConnectRetryAtRef.current,
+        cooldownMs: AUTO_RECONNECT_RETRY_COOLDOWN_MS
+      })) {
         return
       }
 
@@ -1285,15 +1293,28 @@ export const WalletProvider = ({
       setStoredAutoConnectId(storedConnectorId)
       setAutoConnectAttempted(false)
     }
-    const handleFocus = () => {
+    // A late initial pageshow/focus is not a return from a wallet or another
+    // window. Only an observed departure (or BFCache restore) permits recovery.
+    let wasAway = document.visibilityState !== "visible"
+    const handleBlur = () => { wasAway = true }
+    const handleFocus = (event: Event) => {
+      if (document.visibilityState !== "visible") {
+        wasAway = true
+        return
+      }
+      const resumed = wasAway ||
+        (event.type === "pageshow" && (event as PageTransitionEvent).persisted)
+      wasAway = false
       refreshConnectors()
-      requestStoredReconnect()
+      if (resumed) requestStoredReconnect()
     }
+    window.addEventListener("blur", handleBlur)
     window.addEventListener("focus", handleFocus)
     window.addEventListener("pageshow", handleFocus)
     document.addEventListener("visibilitychange", handleFocus)
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer))
+      window.removeEventListener("blur", handleBlur)
       window.removeEventListener("focus", handleFocus)
       window.removeEventListener("pageshow", handleFocus)
       document.removeEventListener("visibilitychange", handleFocus)

@@ -18,8 +18,10 @@ import {
   COSMOS_TERRA_ASSETLIST_URL
 } from "../config/externalServices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import { mapSettledWithConcurrency, withInFlightAssetRequest } from "./assetMetadataRequests"
 import { fetchVerifiedTokenRegistry } from "./tokenRegistry"
 import { writeLocalStorageValue } from "../utils/safeStorage"
+import { readAssetDecimals, readDenomMetadataDecimals } from "./assetPrecision"
 
 export type AssetProvenance = {
   verificationStatus?: string
@@ -173,10 +175,10 @@ const EMPTY_COSMOS_REGISTRY_ASSETS: CosmosRegistryAssets = {
   native: {}
 }
 
-const IBC_CACHE_KEY = "burritoIbcTraceCacheV4"
+const IBC_CACHE_KEY = "burritoIbcTraceCacheV5"
 const IBC_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 const IBC_UNRESOLVED_CACHE_TTL = 5 * 60 * 1000
-const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV2"
+const NATIVE_TOKEN_CACHE_KEY = "burritoNativeTokenCacheV3"
 const NATIVE_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000
 const CW20_TOKEN_INFO_CACHE_KEY = "burritoCw20TokenInfoCacheV3"
 const CW20_TOKEN_INFO_CACHE_TTL = 24 * 60 * 60 * 1000
@@ -313,6 +315,7 @@ const getCachedIbcToken = (hash: string, chainId: string) => {
   if (!cached) return undefined
   if (
     !cached.token ||
+    cached.token.denom !== `ibc/${hash}` ||
     typeof cached.token.symbol !== "string" ||
     typeof cached.ts !== "number"
   ) {
@@ -324,7 +327,8 @@ const getCachedIbcToken = (hash: string, chainId: string) => {
   const cacheTtl = cached.token.symbol.toUpperCase() === "IBC"
     ? IBC_UNRESOLVED_CACHE_TTL
     : IBC_CACHE_TTL
-  if (Date.now() - cached.ts > cacheTtl) {
+  const age = Date.now() - cached.ts
+  if (!Number.isFinite(age) || age < 0 || age >= cacheTtl || readAssetDecimals(cached.token.decimals) === undefined) {
     const next = { ...cache }
     delete next[key]
     writeIbcCache(next)
@@ -347,7 +351,9 @@ const getCachedNativeToken = (denom: string, chainId: string) => {
   const key = buildChainScopedAssetCacheKey(chainId, denom)
   const cached = cache[key]
   if (!cached) return undefined
-  if (Date.now() - cached.ts > NATIVE_TOKEN_CACHE_TTL) {
+  const age = Date.now() - cached.ts
+  if (typeof cached.ts !== "number" || !Number.isFinite(age) || age < 0 || age >= NATIVE_TOKEN_CACHE_TTL ||
+    cached.token?.denom !== denom || readAssetDecimals(cached.token?.decimals) === undefined) {
     const next = { ...cache }
     delete next[key]
     writeNativeTokenCache(next)
@@ -583,30 +589,7 @@ const CLASSIC_NATIVE_DEFAULTS: Record<string, NativeToken> = {
   }
 }
 
-const getDecimalsFromMetadata = (metadata?: BankMetadataResponse["metadata"]) => {
-  if (!metadata?.denom_units?.length) return undefined
-  const display = metadata.display
-  const displayUnit = metadata.denom_units.find((unit) => unit.denom === display)
-  if (displayUnit && Number.isFinite(displayUnit.exponent)) {
-    return Number(displayUnit.exponent)
-  }
-  const nonZero = metadata.denom_units.find(
-    (unit) => Number.isFinite(unit.exponent) && Number(unit.exponent) > 0
-  )
-  if (nonZero && Number.isFinite(nonZero.exponent)) {
-    return Number(nonZero.exponent)
-  }
-  return undefined
-}
-
-const getRegistryAssetDecimals = (asset: CosmosRegistryAsset) => {
-  const displayUnit = asset.denom_units?.find((unit) => unit.denom === asset.display)
-  if (Number.isFinite(displayUnit?.exponent)) return Number(displayUnit?.exponent)
-  const exponents = (asset.denom_units ?? [])
-    .map((unit) => Number(unit.exponent))
-    .filter((exponent) => Number.isFinite(exponent) && exponent >= 0)
-  return exponents.length ? Math.max(...exponents) : 6
-}
+const getRegistryAssetDecimals = (asset: CosmosRegistryAsset) => readDenomMetadataDecimals(asset)
 
 export const mapCosmosRegistryAssets = (
   payload: CosmosRegistryAssetList
@@ -754,12 +737,13 @@ const fetchSourceRegistryToken = async (
     .find(Boolean)
 }
 
-const fetchIbcTraceToken = async (
+const fetchIbcTraceTokenUnshared = async (
   hash: string,
   scope = getAssetChainScope()
 ): Promise<IbcToken | undefined> => {
   const { chainId, chainKey, lcd } = scope
-  const cached = getCachedIbcToken(hash, chainId)
+  const cacheScope = `${chainId}:${lcd}`
+  const cached = getCachedIbcToken(hash, cacheScope)
   if (cached?.decimalsVerified) return cached
 
   const traceRes = await fetchWithEndpointFallback(
@@ -774,7 +758,7 @@ const fetchIbcTraceToken = async (
   let metadata: BankMetadataResponse["metadata"] | undefined
   try {
     const metadataRes = await fetchWithEndpointFallback(
-      `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(baseDenom)}`
+      `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(`ibc/${hash}`)}`
     )
     if (metadataRes.ok) {
       const payload = (await metadataRes.json()) as BankMetadataResponse
@@ -796,15 +780,55 @@ const fetchIbcTraceToken = async (
       (looksLikeHttpUrl(metadata?.uri)
         ? sanitizeAssetIconUrl(metadata?.uri) ?? "/system/ibc.svg"
         : "/system/ibc.svg"),
-    decimals: getDecimalsFromMetadata(metadata) ?? sourceToken?.decimals ?? 6,
-    decimalsVerified: getDecimalsFromMetadata(metadata) !== undefined,
+    // A short origin denomination/alias is not proof of this local IBC asset's units.
+    decimals: readDenomMetadataDecimals(metadata, `ibc/${hash}`),
+    decimalsVerified: readDenomMetadataDecimals(metadata, `ibc/${hash}`) !== undefined,
     path: tracePayload?.denom_trace?.path
   }
-  cacheIbcToken(hash, token, chainId)
+  cacheIbcToken(hash, token, cacheScope)
   return token
 }
 
-const fetchNativeMetadataToken = async (
+const fetchIbcTraceToken = (
+  hash: string,
+  scope = getAssetChainScope()
+): Promise<IbcToken | undefined> => {
+  const normalizedHash = hash.toUpperCase()
+  return withInFlightAssetRequest(
+    scope.chainId,
+    `${scope.lcd}/ibc-trace/${normalizedHash}`,
+    () => fetchIbcTraceTokenUnshared(normalizedHash, scope)
+  )
+}
+
+export const fetchResolvedIbcMetadataBatch = async (
+  hashes: string[],
+  finderTokens: Record<string, IbcToken>,
+  scope = getAssetChainScope()
+) => {
+  const normalizedHashes = Array.from(new Set(hashes.map((hash) => hash.toUpperCase())))
+  const outcomes = await mapSettledWithConcurrency(
+    normalizedHashes,
+    8,
+    (hash) => fetchIbcTraceToken(hash, scope)
+  )
+  const tokens = { ...finderTokens }
+  const failedHashes: string[] = []
+
+  outcomes.forEach((outcome, index) => {
+    const hash = normalizedHashes[index]
+    if (outcome.status === "rejected" || !outcome.value) {
+      failedHashes.push(hash)
+      return
+    }
+    tokens[hash] = outcome.value
+    if (readAssetDecimals(outcome.value.decimals) === undefined) failedHashes.push(hash)
+  })
+
+  return { tokens, failedHashes }
+}
+
+export const fetchNativeMetadataToken = async (
   denom: string,
   scope = getAssetChainScope()
 ): Promise<NativeToken | undefined> => {
@@ -826,35 +850,42 @@ const fetchNativeMetadataToken = async (
       : CLASSIC_NATIVE_DEFAULTS[normalized]
   if (predefined) return predefined
 
-  const cached = getCachedNativeToken(normalized, chainId)
+  const cacheScope = `${chainId}:${lcd}`
+  const cached = getCachedNativeToken(normalized, cacheScope)
   if (cached) return cached
 
   const registryToken = (await fetchCosmosRegistryAssets(chainKey)).native[
     normalized
   ]
-  if (registryToken) {
-    cacheNativeToken(normalized, registryToken, chainId)
+  if (readAssetDecimals(registryToken?.decimals) !== undefined) {
+    cacheNativeToken(normalized, registryToken, cacheScope)
     return registryToken
   }
 
-  const response = await fetchWithEndpointFallback(
-    `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
-  )
-  if (!response.ok) return undefined
-  const payload = (await response.json()) as BankMetadataResponse
+  const metadataUrl = `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
+  const payload = await withInFlightAssetRequest(
+    chainId,
+    metadataUrl,
+    async () => {
+      const response = await fetchWithEndpointFallback(metadataUrl)
+      if (!response.ok) return undefined
+      return (await response.json()) as BankMetadataResponse
+    }
+  ).catch(error => { if (registryToken) return undefined; throw error })
+  if (payload === undefined) return registryToken
   const metadata = payload?.metadata
-  if (!metadata) return undefined
+  if (!metadata || metadata.base !== normalized) return registryToken
 
   const symbol = resolveDisplaySymbol(metadata.symbol, normalized)
   const name = resolveDisplayName(metadata.name, symbol)
   const token: NativeToken = {
     denom: normalized,
-    symbol,
-    name,
-    decimals: getDecimalsFromMetadata(metadata) ?? 6,
-    icon: undefined
+    symbol: registryToken?.symbol ?? symbol,
+    name: registryToken?.name ?? name,
+    decimals: readDenomMetadataDecimals(metadata, normalized),
+    icon: registryToken?.icon
   }
-  cacheNativeToken(normalized, token, chainId)
+  cacheNativeToken(normalized, token, cacheScope)
   return token
 }
 
@@ -1014,11 +1045,17 @@ export const fetchCw20TokenInfos = async (
       const contract = missing[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
-        const response = await fetchWithEndpointFallback(
-          `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const url = `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const payload = await withInFlightAssetRequest(
+          scope.chainId,
+          url,
+          async () => {
+            const response = await fetchWithEndpointFallback(url)
+            if (!response.ok) return undefined
+            return (await response.json()) as Cw20TokenInfoResponse
+          }
         )
-        if (!response.ok) continue
-        const payload = (await response.json()) as Cw20TokenInfoResponse
+        if (!payload) continue
         const info = payload.data
         const symbol = info?.symbol?.trim()
         const name = info?.name?.trim()
@@ -1171,20 +1208,31 @@ export const useResolvedCw20Whitelist = (contracts?: string[]) => {
   }
 }
 
+export const mergeIbcRegistryAssets = (...sources: Record<string, IbcToken>[]) => {
+  const merged: Record<string, IbcToken> = {}
+  sources.forEach(source => Object.entries(source).forEach(([hash, token]) => {
+    merged[hash] = { ...merged[hash], ...token,
+      decimals: readAssetDecimals(token.decimals) ?? merged[hash]?.decimals,
+      decimalsVerified: false }
+  }))
+  return merged
+}
+
+export const fetchIbcWhitelist = async (scope = getAssetChainScope()) => {
+  // An unavailable third-party list must not discard our own registry response.
+  const [data, verified, supplemental] = await Promise.all([
+    fetchAsset<Record<string, Record<string, IbcToken>>>("ibc/tokens.json").catch(() => ({})),
+    fetchVerifiedTokenRegistry(scope.chainKey),
+    fetchCosmosRegistryAssets(scope.chainKey)
+  ])
+  return mergeIbcRegistryAssets(pickChainAssets(data, scope.name, scope.chainId) ?? {}, supplemental.ibc, verified.ibc)
+}
+
 export const useIbcWhitelist = () => {
   const scope = getAssetChainScope()
   return useQuery({
     queryKey: ["terra-assets", "ibc", scope.chainId],
-    queryFn: async () => {
-      const [data, verified] = await Promise.all([
-        fetchAsset<Record<string, Record<string, IbcToken>>>("ibc/tokens.json"),
-        fetchVerifiedTokenRegistry(scope.chainKey)
-      ])
-      const tokens =
-        pickChainAssets(data, scope.name, scope.chainId) ?? {}
-      const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).ibc
-      return { ...tokens, ...supplemental, ...verified.ibc }
-    },
+    queryFn: () => fetchIbcWhitelist(scope),
     staleTime: 60 * 60 * 1000
   })
 }
@@ -1205,7 +1253,7 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
   }, [denoms])
 
   const missingHashes = useMemo(
-    () => hashes.filter((hash) => !base[hash] || !base[hash].decimalsVerified),
+    () => hashes.filter((hash) => readAssetDecimals(base[hash]?.decimals) === undefined),
     [base, hashes]
   )
 
@@ -1214,6 +1262,7 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
       "terra-assets",
       "ibc-resolved",
       scope.chainId,
+      scope.lcd,
       missingHashes.join(",")
     ],
     queryFn: async () => {
@@ -1240,31 +1289,22 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
             symbol,
             name: resolveDisplayName(metadata.name, symbol),
             icon: sanitizeAssetIconUrl(metadata.icon) ?? "/system/ibc.svg",
-            decimals: Number.isInteger(metadata.decimals) ? metadata.decimals : 6,
+            // Finder's current response does not attest the precision source.
+            decimals: undefined,
             path: metadata.path
           }
           return [[hash, token] as [string, IbcToken]]
         })
       const finderTokens = Object.fromEntries(finderEntries)
-      const unresolvedHashes = missingHashes
-
-      const entries = await Promise.all(
-        unresolvedHashes.map(async (hash) => {
-          const token = await fetchIbcTraceToken(hash, scope)
-          return token ? [hash, token] : undefined
-        })
-      )
-      return {
-        ...finderTokens,
-        ...Object.fromEntries(entries.filter(Boolean) as [string, IbcToken][])
-      }
+      return fetchResolvedIbcMetadataBatch(missingHashes, finderTokens, scope)
     },
     enabled: missingHashes.length > 0 && baseQuery.isFetched,
-    staleTime: 24 * 60 * 60 * 1000
+    staleTime: (query) =>
+      query.state.data?.failedHashes.length ? 15_000 : 24 * 60 * 60 * 1000
   })
 
   const resolvedData = useMemo(
-    () => mergeResolvedIbcAssets(base, resolvedQuery.data ?? {}),
+    () => mergeResolvedIbcAssets(base, resolvedQuery.data?.tokens ?? {}),
     [base, resolvedQuery.data]
   )
 
@@ -1273,7 +1313,8 @@ export const useResolvedIbcWhitelist = (denoms?: string[]) => {
     data: resolvedData,
     isFetching: baseQuery.isFetching || resolvedQuery.isFetching,
     isError: baseQuery.isError || resolvedQuery.isError,
-    error: (baseQuery.error ?? resolvedQuery.error) as Error | null
+    error: (baseQuery.error ?? resolvedQuery.error) as Error | null,
+    refetch: async () => { await baseQuery.refetch(); return resolvedQuery.refetch() }
   }
 }
 
@@ -1295,6 +1336,11 @@ export const mergeResolvedIbcAssets = (
     merged[hash] = {
       ...registryToken,
       ...token,
+      symbol: registryToken?.symbol && registryToken.symbol !== "IBC" ? registryToken.symbol : token.symbol,
+      name: registryToken?.name && registryToken.name !== "IBC" ? registryToken.name : token.name,
+      decimals: token.decimalsVerified && readAssetDecimals(token.decimals) !== undefined
+        ? token.decimals : readAssetDecimals(registryToken?.decimals),
+      decimalsVerified: Boolean(token.decimalsVerified && readAssetDecimals(token.decimals) !== undefined),
       icon
     }
   })
@@ -1324,19 +1370,18 @@ export const useResolvedNativeWhitelist = (denoms?: string[]) => {
       "terra-assets",
       "native-resolved",
       scope.chainId,
+      scope.lcd,
       normalized.join(",")
     ],
     queryFn: async () => {
-      const entries = await Promise.all(
-        normalized.map(async (denom) => {
-          const token = await fetchNativeMetadataToken(denom, scope)
-          return token ? [denom, token] : undefined
-        })
-      )
-      return Object.fromEntries(entries.filter(Boolean) as [string, NativeToken][])
+      const outcomes = await mapSettledWithConcurrency(normalized, 8, denom => fetchNativeMetadataToken(denom, scope))
+      return Object.fromEntries(outcomes.flatMap((outcome, index) =>
+        outcome.status === "fulfilled" && outcome.value ? [[normalized[index], outcome.value]] : []
+      )) as Record<string, NativeToken>
     },
     enabled: normalized.length > 0,
-    staleTime: 24 * 60 * 60 * 1000
+    staleTime: query => normalized.some(denom => readAssetDecimals(query.state.data?.[denom]?.decimals) === undefined)
+      ? 15_000 : 24 * 60 * 60 * 1000
   })
 }
 

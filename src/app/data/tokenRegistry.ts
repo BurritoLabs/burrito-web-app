@@ -47,7 +47,7 @@ const registryPromises = new Map<
 const validDecimals = (value: number | null) =>
   Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 30
     ? Number(value)
-    : 6
+    : undefined
 
 export const mapVerifiedRegistryAssets = (
   assets: VerifiedRegistryAsset[]

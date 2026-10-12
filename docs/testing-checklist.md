@@ -32,6 +32,14 @@ Run this before a production deployment or after touching wallet, market, swap, 
   restores existing access without requesting another grant.
 - Verify extension lock, wallet change and site revocation invalidate the Web
   account; disconnect must remain disconnected after refresh on both chains.
+- Hold a passive read pending and dispatch focus/pageshow/visibility events:
+  no duplicate read or approval may occur. After an unauthorized/locked restore,
+  hidden events must neither read accounts nor spend the recovery cooldown;
+  becoming visible may retry once, without requesting a new grant.
+- After a failed initial restore, late non-persisted pageshow and redundant
+  foreground events must not add an account read. A subsequent hidden/visible,
+  window blur/focus, or persisted BFCache return may retry within the original
+  cooldown. None may request an extension grant.
 - Connect Keplr extension on desktop.
 - With an empty genuine Keplr installation, the connection alert must direct
   users to create/import inside Keplr, without borrowing Burrito's account or
@@ -76,6 +84,17 @@ Run this before a production deployment or after touching wallet, market, swap, 
 
 ## Privacy publication gate
 
+- In a new browser/WebView, optional diagnostics must be off. Verify opt-in,
+  reload, cross-tab withdrawal and missing/blocked storage. Failed withdrawal
+  must stop reports on the current page, explain the persistence failure and
+  retry the original Off choice, not invert it to On.
+- Verify the production-built performance collector as well as the controlled
+  development error endpoint; intercept reports so nothing reaches live services.
+  Default/off and post-withdrawal must send nothing; opted-in reporting must
+  actually send, rather than passing because the collector never started.
+- Clear only synthetic local diagnostic records after confirmation. Cancel and
+  storage failures must preserve records; consent, wallets and unrelated settings
+  must survive a successful clear. Previously uploaded data is not locally erased.
 - Reconcile the local `/privacy` draft with mobile and extension behavior:
   local secret processing, asset-price queries, simulation before signing,
   Finder links/cookies, diagnostics and platform-specific deletion boundaries.
@@ -98,6 +117,13 @@ Run this before a production deployment or after touching wallet, market, swap, 
 - Open a Terraport pair detail page.
 - Open a Garuda pair detail page.
 - Confirm pair logos, balance display, chart, recent trades, swap panel, liquidity panel, and top metrics load.
+- With a failed IBC trace in a mixed batch, retain successful entries and Finder
+  fallback without marking unverified decimals verified. At most eight items run
+  concurrently per batch. Partial results become stale after 15 seconds; this is
+  not an automatic retry timer. Verify recovery on a subsequent refetch.
+- Concurrent CW20 metadata and supply reads for the same chain and endpoint must
+  share parsed token_info data. Both consumers must receive correct values;
+  different chains/endpoints must not share, and settled failures must be retryable.
 - Copy pool, base token, and quote token addresses from a pair detail page.
 - Provide and withdraw liquidity from a small test pair when balances are available.
 - Use the pair detail back button from a launchpad-opened market page.
