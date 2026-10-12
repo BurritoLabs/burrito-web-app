@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query"
 import PageShell from "../PageShell"
 import { MarketAssetIcon as AssetIcon } from "./MarketPairAssetIcon"
 import styles from "../Market.module.css"
-import { CLASSIC_CHAIN } from "../../app/chain"
 import {
   fetchMarketDexPairs,
   fetchMarketPoolLive,
@@ -23,7 +22,7 @@ import {
   fetchCirculatingSnapshot,
   fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
+import { fetchNativeSupplies } from "../../app/data/nativeSupplies"
 import { formatNumber, formatPercent, formatUsd, toUnitAmount } from "../../app/utils/format"
 import {
   buildClassicNativeIconCandidates,
@@ -58,13 +57,6 @@ import { useAppChain } from "../../app/appChainContext"
 type SortMetric = "change" | "volume" | "liquidity" | "marketCap"
 type SortDirection = "desc" | "asc"
 type Timeframe = "1h" | "24h" | "7d"
-type NativeSupplyInfo = {
-  denom: string
-  amount: string
-  units: number
-  decimals: number
-}
-
 type ResolvedAsset = {
   id: string
   key: string
@@ -193,51 +185,6 @@ const formatUsdSmart = (value?: number) => {
   }
 
   return `${sign}$${intPart}.${keptFraction}`
-}
-
-const fetchNativeSupplies = async (
-  entries: Array<{ denom: string; decimals: number }>
-) => {
-  const unique = Array.from(
-    new Set(entries.map((entry) => entry.denom).filter(Boolean))
-  )
-  if (!unique.length) return {}
-
-  const decimalsMap = new Map(entries.map((entry) => [entry.denom, entry.decimals]))
-  const result: Record<string, NativeSupplyInfo> = {}
-  const limit = 6
-  let index = 0
-
-  const workers = Array.from({ length: Math.min(limit, unique.length) }, async () => {
-    while (index < unique.length) {
-      const current = index
-      index += 1
-      const denom = unique[current]
-      const decimals = decimalsMap.get(denom) ?? 6
-      try {
-        const url = new URL(`${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/supply/by_denom`)
-        url.searchParams.set("denom", denom)
-        const response = await fetchWithEndpointFallback(url.toString())
-        if (!response.ok) continue
-        const data = (await response.json()) as {
-          amount?: { amount?: string }
-        }
-        const amount = data?.amount?.amount ?? "0"
-        const parsed = Number(amount)
-        result[denom] = {
-          denom,
-          amount,
-          units: Number.isFinite(parsed) ? parsed / 10 ** Math.max(0, decimals) : 0,
-          decimals
-        }
-      } catch {
-        // Ignore denom-level failures.
-      }
-    }
-  })
-
-  await Promise.all(workers)
-  return result
 }
 
 const Market = () => {
@@ -745,9 +692,10 @@ const Market = () => {
     queryKey: [
       "native-supplies",
       chain.chainId,
+      chain.runtime.chain.lcd,
       nativeSupplyDenoms.map((entry) => `${entry.denom}:${entry.decimals}`).join("|")
     ],
-    queryFn: () => fetchNativeSupplies(nativeSupplyDenoms),
+    queryFn: () => fetchNativeSupplies(nativeSupplyDenoms, chain.runtime.chain),
     enabled: nativeSupplyDenoms.length > 0,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000

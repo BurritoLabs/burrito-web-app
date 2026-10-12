@@ -135,3 +135,24 @@ Operational retention and the published policy still require release checks.
 Diagnostic-copy UI fixtures import normal package entry points through Vite;
 never hardcode transient `node_modules/.vite/deps` cache paths. Keep cold-start,
 copy-failure/retry and obsolete async-result checks alongside the product tests.
+
+## Market asset request isolation
+
+Native supply workers capture the query's chain ID and LCD before starting.
+A network switch during a batch must not send later workers to the new chain
+under the old query key. Cache and in-flight identity include both the chain
+ID and full request URL. Native metadata shares only overlapping JSON reads;
+failures remain retryable and existing metadata/precision validation is retained.
+
+Supply caching stores raw public amounts, not converted display units. Each
+consumer applies its current decimals; changing the visible asset set must not
+repeat fresh successful reads. The raw cache expires after ten minutes and is
+bounded to 256 entries; the surrounding query retains its existing refresh
+schedule. It is not a live-supply guarantee. Invalid or failed responses stay
+unavailable instead of becoming a synthetic zero, and do not discard successful
+siblings. Preserve the six-worker limit and case-sensitive supply denoms.
+
+`tests/nativeSupplies.test.ts` and `tests/nativeMetadataRequests.test.ts` cover
+these boundaries without live endpoints. Production-build desktop/mobile Market
+checks must additionally exercise search, sorting, DEX filters and pagination.
+Controlled request counts are not measurements of production latency.

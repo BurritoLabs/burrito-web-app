@@ -843,7 +843,7 @@ export const fetchResolvedIbcMetadataBatch = async (
   return { tokens, failedHashes }
 }
 
-const fetchNativeMetadataToken = async (
+export const fetchNativeMetadataToken = async (
   denom: string,
   scope = getAssetChainScope()
 ): Promise<NativeToken | undefined> => {
@@ -876,11 +876,17 @@ const fetchNativeMetadataToken = async (
     return registryToken
   }
 
-  const response = await fetchWithEndpointFallback(
-    `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
+  const metadataUrl = `${lcd}/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(normalized)}`
+  const payload = await withInFlightAssetRequest(
+    chainId,
+    metadataUrl,
+    async () => {
+      const response = await fetchWithEndpointFallback(metadataUrl)
+      if (!response.ok) return undefined
+      return (await response.json()) as BankMetadataResponse
+    }
   )
-  if (!response.ok) return undefined
-  const payload = (await response.json()) as BankMetadataResponse
+  if (payload === undefined) return undefined
   const metadata = payload?.metadata
   if (!metadata) return undefined
 
