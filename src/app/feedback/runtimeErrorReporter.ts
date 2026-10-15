@@ -102,18 +102,12 @@ export const reportRuntimeError = ({
   })
 
   try {
-    if (typeof window.navigator.sendBeacon === "function") {
-      const accepted = window.navigator.sendBeacon(
-        CLIENT_ERROR_ENDPOINT,
-        new Blob([payload], { type: "application/json" })
-      )
-      if (accepted) return
-    }
-
+    // This public endpoint does not accept credentialed Beacon requests.
     void fetch(CLIENT_ERROR_ENDPOINT, {
       method: "POST",
       body: payload,
       headers: { "content-type": "application/json" },
+      credentials: "omit",
       keepalive: true
     }).catch(() => undefined)
   } catch {

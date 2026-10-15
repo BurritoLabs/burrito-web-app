@@ -155,8 +155,9 @@ IBC, and CW20 assets. LUNC, USTC, LUNA, and launchpad creation fees are split 5%
 to burn, 5% to the community pool, 5% to the Classic oracle pool or Terra
 network rewards, and 85% to the dedicated collector. Other swap assets are sent
 in full to the collector because CW20 assets cannot be represented as Cosmos
-community-pool coins. Confirmed supported collector receipts are settled to the
-configured treasury by the Burrito AI allocator.
+community-pool coins. Confirmed supported collector receipts are recorded by
+the Burrito AI backend and retained in the company collector. They are not
+automatically swept to a node or treasury wallet.
 
 ## Performance Behavior
 
