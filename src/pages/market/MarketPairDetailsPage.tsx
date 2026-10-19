@@ -816,7 +816,47 @@ const MarketPairDetails = () => {
   const tradesLimit =
     detail?.pool.pair && tradePager.pair === detail.pool.pair ? tradePager.limit : 25
 
-  const { data: tradesData, isLoading: isTradesLoading } = useQuery({
+  const {
+    data: candlesData = [],
+    isLoading: isCandlesLoading,
+    isError: isCandlesError,
+    refetch: refetchCandles
+  } = useQuery({
+    queryKey: [
+      "market",
+      chain.chainId,
+      "pair-candles",
+      detail?.pool.pair,
+      detail?.left.key,
+      detail?.right.key,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
+      timeframe
+    ],
+    queryFn: ({ signal }) =>
+      fetchPairCandles({
+        pairAddress: detail!.pool.pair,
+        leftAssetKey: detail!.left.key,
+        rightAssetKey: detail!.right.key,
+        leftDecimals: detail!.left.decimals,
+        rightDecimals: detail!.right.decimals,
+        expectedPrice: detailPriceValue,
+        bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
+        lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        maxPages: DETAIL_CANDLE_TX_MAX_PAGES[timeframe],
+        minCandles: MIN_CANDLES_FOR_CHART[timeframe],
+        includeLocalFallback: true,
+        signal
+      }),
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision && detailPriceValue),
+    // Each attempt already has endpoint fallback and a total deadline. Do not
+    // hide a failure behind another full scan before showing the Retry action.
+    retry: false,
+    staleTime: 60_000,
+    refetchInterval: 120_000
+  })
+
+  const { data: tradesData, isLoading: isTradesLoading, isError: isTradesError, refetch: refetchTrades } = useQuery({
     queryKey: [
       "market",
       chain.chainId,
@@ -827,7 +867,7 @@ const MarketPairDetails = () => {
       ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
       tradesLimit
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchPairTrades({
         pairAddress: detail!.pool.pair,
         leftAssetKey: detail!.left.key,
@@ -836,9 +876,11 @@ const MarketPairDetails = () => {
         rightDecimals: detail!.right.decimals,
         offset: 0,
         limit: tradesLimit,
-        maxPages: DETAIL_TRADES_MAX_PAGES
+        maxPages: DETAIL_TRADES_MAX_PAGES,
+        signal
       }),
     enabled: Boolean(detail?.pool.pair && hasPairPrecision),
+    retry: false,
     staleTime: 45_000,
     refetchInterval: 90_000
   })
@@ -856,7 +898,7 @@ const MarketPairDetails = () => {
       detail?.right.key,
       ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals)
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchPairTrades({
         pairAddress: detail!.pool.pair,
         leftAssetKey: detail!.left.key,
@@ -865,9 +907,13 @@ const MarketPairDetails = () => {
         rightDecimals: detail!.right.decimals,
         offset: 0,
         limit: DETAIL_TRADER_STATS_LIMIT,
-        maxPages: DETAIL_TRADES_MAX_PAGES
+        maxPages: DETAIL_TRADES_MAX_PAGES,
+        signal
       }),
-    enabled: Boolean(detail?.pool.pair && hasPairPrecision),
+    // The larger analytics scan is not required to draw the chart or show the
+    // first trades. Let those critical requests finish before it competes.
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision && !isCandlesLoading && !isTradesLoading),
+    retry: false,
     staleTime: 60_000,
     refetchInterval: 120_000
   })
@@ -889,42 +935,6 @@ const MarketPairDetails = () => {
       {} as Record<Timeframe, number | undefined>
     )
   }, [hasPairPrecision, traderStatsData?.trades, trades])
-
-  const {
-    data: candlesData = [],
-    isLoading: isCandlesLoading,
-    isError: isCandlesError,
-    refetch: refetchCandles
-  } = useQuery({
-    queryKey: [
-      "market",
-      chain.chainId,
-      "pair-candles",
-      detail?.pool.pair,
-      detail?.left.key,
-      detail?.right.key,
-      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
-      timeframe
-    ],
-    queryFn: () =>
-      fetchPairCandles({
-        pairAddress: detail!.pool.pair,
-        leftAssetKey: detail!.left.key,
-        rightAssetKey: detail!.right.key,
-        leftDecimals: detail!.left.decimals,
-        rightDecimals: detail!.right.decimals,
-        expectedPrice: detailPriceValue,
-        bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
-        lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
-        maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
-        maxPages: DETAIL_CANDLE_TX_MAX_PAGES[timeframe],
-        minCandles: MIN_CANDLES_FOR_CHART[timeframe],
-        includeLocalFallback: true
-      }),
-    enabled: Boolean(detail?.pool.pair && hasPairPrecision && detailPriceValue),
-    staleTime: 60_000,
-    refetchInterval: 120_000
-  })
 
   const candles = useMemo(
     () => {
@@ -1623,6 +1633,8 @@ const MarketPairDetails = () => {
           baseSymbol={detail.left.symbol}
           hasMoreTrades={hasMoreTrades}
           isTradesLoading={isTradesLoading}
+          isTradesError={isTradesError}
+          onRetryTrades={() => { void refetchTrades() }}
           onLoadMore={() =>
             setTradePager((prev) => ({
               pair: detail.pool.pair,
