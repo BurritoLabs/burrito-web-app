@@ -3,6 +3,7 @@ import type { TxErrorCategory } from "../src/app/tx/txDiagnostics"
 
 const endpoint = "https://diagnostics.example.test/transactions"
 const storageKey = "burrito:tx-diagnostics:v1"
+const consentKey = "burrito:diagnostics-consent:v1"
 const address = `terra1${"q".repeat(38)}`
 const txHash = "A".repeat(64)
 const originalMessage = `Failed for ${address} ${txHash} ${"x".repeat(220)} https://example.test/request?token=private-test-value#private-fragment`
@@ -15,7 +16,7 @@ describe("transaction diagnostic transport", () => {
   beforeEach(() => {
     vi.resetModules()
     vi.stubEnv("VITE_TX_DIAGNOSTICS_ENDPOINT", endpoint)
-    values = new Map<string, string>()
+    values = new Map<string, string>([[consentKey, "granted"]])
     fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     beacon = vi.fn().mockReturnValue(true)
     vi.stubGlobal("fetch", fetchMock)
@@ -113,7 +114,7 @@ describe("transaction diagnostic transport", () => {
   })
 
   it("retains the latest 50 full local records and copies eight without sending the copied report", async () => {
-    vi.stubEnv("VITE_TX_DIAGNOSTICS_ENDPOINT", "")
+    values.delete(consentKey)
     const { recordTxDiagnostic, getStoredTxDiagnostics, buildTxDiagnosticsReport } = await import("../src/app/tx/txDiagnostics")
     for (let index = 0; index < 55; index++) {
       recordTxDiagnostic({
@@ -130,6 +131,47 @@ describe("transaction diagnostic transport", () => {
     expect(copied.context).toMatchObject({ path: "/commission", userAgent: "Transaction diagnostics QA" })
     expect(fetchMock).not.toHaveBeenCalled()
     expect(beacon).not.toHaveBeenCalled()
+  })
+
+  it("defaults remote diagnostics off and only sends new events after an explicit grant", async () => {
+    values.delete(consentKey)
+    const { recordTxDiagnostic, getStoredTxDiagnostics, buildTxDiagnosticsReport } = await import("../src/app/tx/txDiagnostics")
+    const { setDiagnosticsConsent } = await import("../src/app/feedback/diagnosticsConsent")
+    recordTxDiagnostic({ phase: "start", label: "Old local event" })
+    recordTxDiagnostic({ phase: "failure", label: "Old local failure", message: originalMessage })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(getStoredTxDiagnostics()).toHaveLength(2)
+    expect(setDiagnosticsConsent(true)).toBe(true)
+    buildTxDiagnosticsReport()
+    expect(fetchMock).not.toHaveBeenCalled()
+    recordTxDiagnostic({ phase: "success", label: "New event" })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ phase: "success", label: "New event" })
+    expect(getStoredTxDiagnostics()).toHaveLength(3)
+  })
+
+  it("rechecks consent for each remote event while preserving local history and copy after revocation", async () => {
+    const { recordTxDiagnostic, getStoredTxDiagnostics, buildTxDiagnosticsReport } = await import("../src/app/tx/txDiagnostics")
+    recordTxDiagnostic({ phase: "start", label: "Consented event" })
+    values.set(consentKey, "denied")
+    recordTxDiagnostic({ phase: "failure", message: originalMessage, accountAddress: address })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(getStoredTxDiagnostics()[0]).toMatchObject({ phase: "failure", message: originalMessage, accountAddress: address })
+    expect(JSON.parse(buildTxDiagnosticsReport()).events).toHaveLength(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps local diagnostics when reading consent fails and does not reuse a stale stored grant", async () => {
+    const { recordTxDiagnostic, getStoredTxDiagnostics } = await import("../src/app/tx/txDiagnostics")
+    const read = vi.spyOn(window.localStorage, "getItem").mockImplementation((key) => {
+      if (key === consentKey) throw new Error("Consent storage unavailable")
+      return values.get(key) ?? null
+    })
+    recordTxDiagnostic({ phase: "failure", message: originalMessage })
+    read.mockRestore()
+    recordTxDiagnostic({ phase: "success", label: "Still local" })
+    expect(getStoredTxDiagnostics()).toHaveLength(2)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it.each(["synchronous", "asynchronous"])("keeps the local record after %s transport failure", async (mode) => {

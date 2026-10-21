@@ -1,3 +1,5 @@
+import { throwIfRequestAborted, withRequestDeadline } from "./requestDeadline"
+
 const BINODES_BASE = "https://api.binodes.com"
 const BINODES_REQUEST_TIMEOUT_MS = 3_500
 
@@ -182,32 +184,12 @@ const buildBinodesUrl = (path: string, params?: Record<string, string>) => {
   return url.toString()
 }
 
-const fetchBinodes = async (url: string) => {
-  const controller =
-    typeof AbortController === "undefined" ? undefined : new AbortController()
-  const timeoutId = controller
-    ? globalThis.setTimeout(() => controller.abort(), BINODES_REQUEST_TIMEOUT_MS)
-    : undefined
-
-  try {
-    return await fetch(url, { signal: controller?.signal })
-  } finally {
-    if (timeoutId !== undefined) {
-      globalThis.clearTimeout(timeoutId)
-    }
-  }
-}
-
 const fetchBinodesList = async <T>(
   path: string,
-  params: Record<string, string> = {}
-) => {
-  const response = await fetchBinodes(
-    buildBinodesUrl(path, {
-      limit: "1",
-      ...params
-    })
-  )
+  params: Record<string, string> = {},
+  signal?: AbortSignal
+) => withRequestDeadline(async (requestSignal) => {
+  const response = await fetch(buildBinodesUrl(path, { limit: "1", ...params }), { signal: requestSignal })
   if (!response.ok) {
     throw new Error(`BiNodes request failed: ${response.status}`)
   }
@@ -216,7 +198,7 @@ const fetchBinodesList = async <T>(
     throw new Error(payload.message || "BiNodes request failed")
   }
   return payload.data ?? []
-}
+}, { signal, timeoutMs: BINODES_REQUEST_TIMEOUT_MS })
 
 const latestDate = (items: Array<{ dt?: string }>) =>
   items
@@ -532,10 +514,12 @@ const settleList = async <T>(
 
 export const fetchBinodesDexTxDetails = async ({
   pairAddress,
-  limit = 25
+  limit = 25,
+  signal
 }: {
   pairAddress: string
   limit?: number
+  signal?: AbortSignal
 }) => {
   const safeLimit = Math.max(1, Math.min(Math.ceil(limit), 500))
   const pageSize = Math.min(safeLimit, 100)
@@ -543,6 +527,7 @@ export const fetchBinodesDexTxDetails = async ({
   const items: BinodesDexTxDetail[] = []
 
   for (let page = 1; page <= pages; page += 1) {
+    throwIfRequestAborted(signal)
     const remaining = safeLimit - items.length
     if (remaining <= 0) break
 
@@ -551,7 +536,7 @@ export const fetchBinodesDexTxDetails = async ({
       limit: String(Math.min(pageSize, remaining)),
       page_size: String(Math.min(pageSize, remaining)),
       page: String(page)
-    })
+    }, signal)
 
     items.push(...pageItems)
     if (pageItems.length < pageSize) break

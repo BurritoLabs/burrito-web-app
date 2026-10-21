@@ -1,6 +1,7 @@
 import { getActiveAppChainKey } from "../activeChain"
 import { CHAIN_RUNTIME_CONFIG } from "../config/chainConfig"
 import { BURRITO_REGISTRY_API_URL } from "../config/externalServices"
+import { getDiagnosticsConsent, subscribeDiagnosticsConsent } from "./diagnosticsConsent"
 
 export type RuntimeErrorKind = "error" | "unhandledrejection" | "react" | "fetch"
 
@@ -21,6 +22,18 @@ const DUPLICATE_WINDOW_MS = 30_000
 const recentFingerprints = new Map<string, number>()
 let reportWindowStartedAt = 0
 let reportsInWindow = 0
+
+const clearReportState = () => {
+  recentFingerprints.clear()
+  reportWindowStartedAt = 0
+  reportsInWindow = 0
+}
+
+const hasConsent = () => {
+  if (getDiagnosticsConsent()) return true
+  clearReportState()
+  return false
+}
 
 export const sanitizeClientErrorText = (value: string, maxLength: number) =>
   value
@@ -77,7 +90,7 @@ export const reportRuntimeError = ({
   error,
   componentStack
 }: RuntimeErrorReport) => {
-  if (!CLIENT_ERROR_ENDPOINT || typeof window === "undefined") return
+  if (!CLIENT_ERROR_ENDPOINT || typeof window === "undefined" || !hasConsent()) return
 
   const normalized = normalizeError(error)
   const message = sanitizeClientErrorText(normalized.message, 1_000)
@@ -102,6 +115,7 @@ export const reportRuntimeError = ({
   })
 
   try {
+    if (!hasConsent()) return
     // This public endpoint does not accept credentialed Beacon requests.
     void fetch(CLIENT_ERROR_ENDPOINT, {
       method: "POST",
@@ -117,6 +131,7 @@ export const reportRuntimeError = ({
 
 export const installRuntimeErrorReporting = () => {
   if (typeof window === "undefined") return () => undefined
+  let listening = false
 
   const handleError = (event: ErrorEvent) => {
     reportRuntimeError({
@@ -131,10 +146,25 @@ export const installRuntimeErrorReporting = () => {
     })
   }
 
-  window.addEventListener("error", handleError)
-  window.addEventListener("unhandledrejection", handleUnhandledRejection)
-  return () => {
+  const stop = () => {
     window.removeEventListener("error", handleError)
     window.removeEventListener("unhandledrejection", handleUnhandledRejection)
+    listening = false
+    clearReportState()
+  }
+  const syncConsent = () => {
+    if (!hasConsent()) {
+      stop()
+    } else if (!listening) {
+      window.addEventListener("error", handleError)
+      window.addEventListener("unhandledrejection", handleUnhandledRejection)
+      listening = true
+    }
+  }
+  const unsubscribe = subscribeDiagnosticsConsent(syncConsent)
+  syncConsent()
+  return () => {
+    unsubscribe()
+    stop()
   }
 }

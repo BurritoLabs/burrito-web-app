@@ -17,6 +17,8 @@ type ProviderSnapshot = {
 }
 type ProviderControls = {
   snapshot: () => ProviderSnapshot
+  accountReadPending: () => boolean
+  releaseAccountRead: () => void
   approve: () => void
   approveNext: () => void
   reject: (code: ConnectionErrorCode, message?: string) => void
@@ -37,6 +39,8 @@ type ProviderOptions = {
   runtime?: boolean
   compatibility?: "alias" | "named-only"
   rememberedKeplr?: boolean
+  holdInitialAccountRead?: boolean
+  focusBeforeInitialRestore?: boolean
 }
 
 const PROVIDER_STORAGE_KEY = "burrito:e2e:extension-lifecycle:public-state"
@@ -87,6 +91,17 @@ test.afterEach(async ({ page }) => {
 
 const installProvider = async (page: Page, options: ProviderOptions = {}) => {
   await page.addInitScript(({ options, storageKey }) => {
+    if (options.focusBeforeInitialRestore) {
+      // A foreground event can arrive after listeners mount but before the
+      // zero-delay initial restore. Exercise that ordering deterministically;
+      // it must not spend the later failed-restore recovery window.
+      const add = window.addEventListener.bind(window)
+      window.addEventListener = ((type: string, listener: EventListenerOrEventListenerObject,
+        eventOptions?: boolean | AddEventListenerOptions) => {
+        add(type, listener, eventOptions)
+        if (type === "focus") queueMicrotask(() => window.dispatchEvent(new Event("focus")))
+      }) as typeof window.addEventListener
+    }
     type Chain = "columbus-5" | "phoenix-1"
     type State = Omit<ProviderSnapshot, "pendingChainIds">
     const saved = localStorage.getItem(storageKey)
@@ -129,9 +144,18 @@ const installProvider = async (page: Page, options: ProviderOptions = {}) => {
       resolve: (value: ReturnType<typeof accounts>) => void
       reject: (error: Error) => void
     } | undefined
+    let holdNextAccountRead = options.holdInitialAccountRead ?? false
+    let releaseAccountRead: (() => void) | undefined
     let approveNext = false
     const controls: ProviderControls = {
       snapshot: () => ({ ...state, pendingChainIds: pending?.chainIds ?? null }),
+      accountReadPending: () => Boolean(releaseAccountRead),
+      releaseAccountRead: () => {
+        if (!releaseAccountRead) throw new Error("No synthetic account read is pending")
+        const release = releaseAccountRead
+        releaseAccountRead = undefined
+        release()
+      },
       approveNext: () => { approveNext = true },
       approve: () => {
         if (!pending) throw new Error("No synthetic approval is pending")
@@ -202,6 +226,10 @@ const installProvider = async (page: Page, options: ProviderOptions = {}) => {
           if (state.locked) throw providerError("WALLET_LOCKED")
           const authorized = chainIds.every((id) => state.grants.includes(id))
           if (method === "wallet.getAccounts") {
+            if (holdNextAccountRead) {
+              holdNextAccountRead = false
+              await new Promise<void>((resolve) => { releaseAccountRead = resolve })
+            }
             if (!authorized) throw providerError("UNAUTHORIZED")
             return accounts(chainIds)
           }
@@ -256,6 +284,12 @@ const installKeplr = (page: Page) => page.addInitScript(() => {
 
 const snapshot = (page: Page) => page.evaluate(() =>
   (window as TestWindow).__extensionLifecycle.snapshot()
+)
+const accountReadPending = (page: Page) => page.evaluate(() =>
+  (window as TestWindow).__extensionLifecycle.accountReadPending()
+)
+const releaseAccountRead = (page: Page) => page.evaluate(() =>
+  (window as TestWindow).__extensionLifecycle.releaseAccountRead()
 )
 const accountCalls = async (page: Page) => (await snapshot(page)).calls.filter(
   ({ method }) => method === "wallet.connect" || method === "wallet.getAccounts"
@@ -554,6 +588,35 @@ test("remembered authorized sessions reload with getAccounts and never reopen ap
   expect((await snapshot(page)).pendingChainIds).toBeNull()
 })
 
+test("foreground recovery events do not duplicate a pending read-only restore", async ({ page }) => {
+  await installProvider(page, {
+    remembered: true,
+    grants: ["columbus-5"],
+    holdInitialAccountRead: true
+  })
+  await openApp(page)
+  await expect.poll(() => accountReadPending(page)).toBe(true)
+  expect(await accountCalls(page)).toEqual([
+    { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+  ])
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("pageshow"))
+    window.dispatchEvent(new Event("focus"))
+    document.dispatchEvent(new Event("visibilitychange"))
+  })
+  await page.waitForTimeout(100)
+  expect(await accountCalls(page)).toEqual([
+    { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+  ])
+
+  await releaseAccountRead(page)
+  await expect(connectedButton(page)).toBeVisible()
+  expect(await accountCalls(page)).toEqual([
+    { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+  ])
+})
+
 for (const scenario of [
   { label: "unauthorized", grants: [] as ChainId[], locked: false, hint: "not authorized for that network" },
   { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true, hint: "Unlock Burrito Wallet" }
@@ -568,6 +631,105 @@ for (const scenario of [
     expect((await snapshot(page)).pendingChainIds).toBeNull()
     expect((await snapshot(page)).approvals).toBe(0)
     expect((await snapshot(page)).calls.some(({ method }) => method === "wallet.connect")).toBe(false)
+  })
+}
+
+for (const scenario of [
+  { label: "unauthorized", grants: [] as ChainId[], locked: false },
+  { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
+]) {
+  test(`remembered ${scenario.label} session ignores late initial foreground events`, async ({ page }) => {
+    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked })
+    await openApp(page)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }))
+      window.dispatchEvent(new Event("focus"))
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+    await page.waitForTimeout(100)
+    expect(await accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    expect((await snapshot(page)).approvals).toBe(0)
+  })
+}
+
+for (const scenario of [
+  { label: "unauthorized", grants: [] as ChainId[], locked: false },
+  { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
+]) {
+  for (const resume of ["BFCache", "window focus"] as const) {
+  test(`remembered ${scenario.label} session retries once after ${resume} resume`, async ({ page }) => {
+    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked })
+    await openApp(page)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
+
+    await page.evaluate((resume) => {
+      if (resume === "BFCache") {
+        // BFCache can resume without our listener observing a prior blur.
+        window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }))
+      } else {
+        // Window focus may change while the document remains visible.
+        window.dispatchEvent(new Event("blur"))
+      }
+      window.dispatchEvent(new Event("focus"))
+      document.dispatchEvent(new Event("visibilitychange"))
+    }, resume)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] },
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await page.waitForTimeout(100)
+    expect((await snapshot(page)).approvals).toBe(0)
+  })
+  }
+}
+
+for (const scenario of [
+  { label: "unauthorized", grants: [] as ChainId[], locked: false },
+  { label: "locked", grants: ["columbus-5"] as ChainId[], locked: true }
+]) {
+  test(`remembered ${scenario.label} recovery ignores hidden events and retries once when visible`, async ({ page }) => {
+    await installProvider(page, { remembered: true, grants: scenario.grants, locked: scenario.locked,
+      focusBeforeInitialRestore: true })
+    await openApp(page)
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" })
+      window.dispatchEvent(new Event("focus"))
+      window.dispatchEvent(new Event("pageshow"))
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+    await page.waitForTimeout(100)
+    expect(await accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
+      window.dispatchEvent(new Event("pageshow"))
+      window.dispatchEvent(new Event("focus"))
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+    await expect.poll(() => accountCalls(page)).toEqual([
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] },
+      { method: "wallet.getAccounts", chainIds: ["columbus-5"] }
+    ])
+    await page.waitForTimeout(100)
+    expect((await snapshot(page)).approvals).toBe(0)
+    expect((await snapshot(page)).pendingChainIds).toBeNull()
   })
 }
 

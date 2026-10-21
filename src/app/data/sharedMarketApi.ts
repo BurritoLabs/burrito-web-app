@@ -1,4 +1,5 @@
 import { BURRITO_MARKET_API_URL } from "../config/externalServices"
+import { throwIfRequestAborted, withRequestDeadline } from "./requestDeadline"
 
 type SharedCandle = {
   time?: number
@@ -152,7 +153,8 @@ export const fetchSharedPairCandles = async ({
   leftAssetKey,
   rightAssetKey,
   bucketMs,
-  maxCandles
+  maxCandles,
+  signal
 }: {
   chainId: string
   pairAddress: string
@@ -160,7 +162,9 @@ export const fetchSharedPairCandles = async ({
   rightAssetKey: string
   bucketMs: number
   maxCandles: number
+  signal?: AbortSignal
 }) => {
+  throwIfRequestAborted(signal)
   const interval = sharedIntervalForBucketMs(bucketMs)
   const normalizedChainId = chainId.trim()
   if (!BURRITO_MARKET_API_URL || !normalizedChainId || !interval) return []
@@ -177,12 +181,16 @@ export const fetchSharedPairCandles = async ({
   })
 
   try {
-    const response = await fetch(`${BURRITO_MARKET_API_URL}/v1/market/candles?${params}`, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(8_000)
-    })
-    if (!response.ok) return []
-    const payload = (await response.json()) as SharedCandleResponse
+    const payload = await withRequestDeadline(async (requestSignal) => {
+      const response = await fetch(`${BURRITO_MARKET_API_URL}/v1/market/candles?${params}`, {
+        headers: { Accept: "application/json" },
+        signal: requestSignal
+      })
+      if (!response.ok) return null
+      return await response.json() as SharedCandleResponse
+    }, { signal, timeoutMs: 8_000 })
+    throwIfRequestAborted(signal)
+    if (!payload) return []
     if (payload.status === "unavailable") {
       if (payload.limitations?.includes("candles_not_indexed")) {
         void requestSharedPairActivation(normalizedChainId, pairAddress)
@@ -191,6 +199,7 @@ export const fetchSharedPairCandles = async ({
     }
     return normalizeSharedCandles({ payload, leftAssetKey, rightAssetKey })
   } catch {
+    throwIfRequestAborted(signal)
     return []
   }
 }

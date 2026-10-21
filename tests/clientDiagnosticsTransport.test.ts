@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const metricEndpoint = "https://diagnostics.example.test/metrics"
 const errorEndpoint = "https://diagnostics.example.test/errors"
+const consentKey = "burrito:diagnostics-consent:v1"
 
 describe("credential-free client diagnostics", () => {
   let cleanup: (() => void) | undefined
@@ -11,6 +12,7 @@ describe("credential-free client diagnostics", () => {
   let beacon: ReturnType<typeof vi.fn>
   let disconnect: ReturnType<typeof vi.fn>
   let navigation: { responseStart: number; type: string }[]
+  let values: Map<string, string>
 
   beforeEach(() => {
     vi.resetModules()
@@ -21,11 +23,16 @@ describe("credential-free client diagnostics", () => {
     beacon = vi.fn().mockReturnValue(true)
     disconnect = vi.fn()
     navigation = [{ responseStart: 125.5, type: "navigate" }]
+    values = new Map([[consentKey, "granted"]])
     class Observer {
       observe() {}
       disconnect() { disconnect() }
     }
     windowEvents = Object.assign(new EventTarget(), {
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => { values.set(key, value) }
+      },
       location: {
         hostname: "wallet.example.test",
         origin: "https://wallet.example.test",
@@ -42,6 +49,7 @@ describe("credential-free client diagnostics", () => {
     vi.stubGlobal("navigator", { sendBeacon: beacon })
     vi.stubGlobal("PerformanceObserver", Observer)
     vi.stubGlobal("performance", {
+      now: () => 0,
       getEntriesByType: (type: string) => type === "navigation" ? navigation : []
     })
     vi.stubGlobal("fetch", fetchMock)
@@ -134,6 +142,78 @@ describe("credential-free client diagnostics", () => {
       reportRuntimeError({ kind: "error", error: message })
     }
     expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it("does not normalize, fingerprint or queue errors before consent", async () => {
+    values.delete(consentKey)
+    const { reportRuntimeError } = await import("../src/app/feedback/runtimeErrorReporter")
+    const { setDiagnosticsConsent } = await import("../src/app/feedback/diagnosticsConsent")
+    const toJSON = vi.fn(() => ({ message: "Ordinary synthetic error" }))
+    reportRuntimeError({ kind: "error", error: { toJSON } })
+    for (const message of ["one", "two", "three", "four"]) {
+      reportRuntimeError({ kind: "error", error: message })
+    }
+    expect(toJSON).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(setDiagnosticsConsent(true)).toBe(true)
+    expect(fetchMock).not.toHaveBeenCalled()
+    for (const message of ["one", "two", "three", "four"]) {
+      reportRuntimeError({ kind: "error", error: message })
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it("only installs error listeners while consent is active and clears old fingerprints on withdrawal", async () => {
+    values.delete(consentKey)
+    const { installRuntimeErrorReporting } = await import("../src/app/feedback/runtimeErrorReporter")
+    const { setDiagnosticsConsent } = await import("../src/app/feedback/diagnosticsConsent")
+    const add = vi.spyOn(windowEvents, "addEventListener")
+    const error = () => windowEvents.dispatchEvent(Object.assign(new Event("error"), { error: "same synthetic error" }))
+    cleanup = installRuntimeErrorReporting()
+    expect(add.mock.calls.map(([type]) => type)).toEqual(["storage"])
+    error()
+    expect(fetchMock).not.toHaveBeenCalled()
+    setDiagnosticsConsent(true)
+    error()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    setDiagnosticsConsent(false)
+    error()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    setDiagnosticsConsent(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    error()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("stops error/rejection reporting on cross-tab revocation and does not replay events", async () => {
+    const { installRuntimeErrorReporting } = await import("../src/app/feedback/runtimeErrorReporter")
+    cleanup = installRuntimeErrorReporting()
+    const rejection = () => windowEvents.dispatchEvent(Object.assign(new Event("unhandledrejection"), { reason: "Synthetic rejected operation" }))
+    rejection()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    values.set(consentKey, "denied")
+    windowEvents.dispatchEvent(Object.assign(new Event("storage"), { key: consentKey, storageArea: window.localStorage }))
+    rejection()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    values.set(consentKey, "granted")
+    windowEvents.dispatchEvent(Object.assign(new Event("storage"), { key: consentKey, storageArea: window.localStorage }))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    rejection()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("rechecks error consent on every call, including unavailable storage", async () => {
+    const { reportRuntimeError } = await import("../src/app/feedback/runtimeErrorReporter")
+    reportRuntimeError({ kind: "error", error: "consented error" })
+    values.set(consentKey, "denied")
+    reportRuntimeError({ kind: "error", error: "not consented error" })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    values.set(consentKey, "granted")
+    const read = vi.spyOn(window.localStorage, "getItem").mockImplementationOnce(() => { throw new Error("Storage unavailable") })
+    reportRuntimeError({ kind: "error", error: "storage-blocked error" })
+    read.mockRestore()
+    reportRuntimeError({ kind: "error", error: "still blocked until explicit choice" })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it.each(["synchronous", "asynchronous"])("contains %s transport failures", async (mode) => {

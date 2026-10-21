@@ -170,6 +170,39 @@ for (const theme of themes) {
     await expectDialogSurface(tokenPickerDialog, tokenPickerSurface)
     await tokenPickerDialog.getByRole("button", { name: "Close", exact: true }).click()
   })
+
+  test(`${theme} Market sort options remain clickable above wrapped DEX filters`, async ({ page }, testInfo) => {
+    await page.route("**/*", (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname !== "127.0.0.1" || /^\/(burrito-api|coingecko|keybase|__registry-test)(\/|$)/.test(url.pathname)) {
+        return route.abort("blockedbyclient")
+      }
+      return route.continue()
+    })
+    await page.goto("/market")
+    await expect(page.getByRole("heading", { name: "Market", exact: true })).toBeVisible()
+    await setTheme(page, theme)
+    await page.getByRole("button", { name: "Liquidity", exact: true }).click()
+    const menu = page.getByRole("listbox", { name: "Sort market pools" })
+    await expect(menu).toBeVisible()
+    await testInfo.attach(`${theme}-market-sort-open`, {
+      body: await page.screenshot({ animations: "disabled" }), contentType: "image/png"
+    })
+    const hitTargets = await menu.getByRole("option").evaluateAll((options) => options.map((option) => {
+      const rect = option.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      return { option: option.textContent?.trim(), clickable: hit !== null && option.contains(hit) }
+    }))
+    expect(hitTargets).toHaveLength(4)
+    expect(hitTargets.filter((target) => !target.clickable)).toEqual([])
+    await menu.getByRole("option", { name: "Market Cap", exact: true }).click()
+    await expect(menu).toBeHidden()
+    await expect(page.getByRole("button", { name: "Market Cap", exact: true })).toBeVisible()
+    const more = page.getByRole("button", { name: /^More\s*\d/ })
+    await more.click()
+    await page.getByRole("option", { name: /^White Whale\s*\d/ }).click()
+    await expect(page.getByRole("button", { name: /^White Whale\s*\d/ })).toHaveAttribute("aria-pressed", "true")
+  })
 }
 
 test("market cards keep a loaded local fallback under remote asset logos", async ({

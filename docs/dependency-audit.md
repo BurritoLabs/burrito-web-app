@@ -82,3 +82,37 @@ These use only synthetic inputs, not user secrets, signatures or transactions.
 
 No application-wallet lifecycle issue, genuine-wallet acceptance gate or
 production deployment is closed merely by this dependency remediation.
+
+## Compatible advisory refresh — 2026-10-21 UTC
+
+A fresh audit found two elevated package entries without a preceding lockfile
+change: follow-redirects 1.16.0 and Vite 7.3.6. Update only the locked
+follow-redirects to 1.16.1 and Vite to 7.3.7, including the root Vite minimum.
+Axios 1.20.0 already accepts the redirect patch; Vite's dependency and Node-engine
+ranges are unchanged. No wallet downgrade, forced audit fix, new override or
+audit-baseline exception is introduced.
+
+The redirect advisories concern Node HTTP requests with
+[array-form headers](https://github.com/follow-redirects/follow-redirects/security/advisories/GHSA-q3jh-wrc6-jgq8)
+or [custom sensitive header names](https://github.com/advisories/GHSA-8r9p-f939-6h3c).
+An isolated loopback test with synthetic headers reproduces both defects in
+1.16.0 and verifies their removal in 1.16.1, with same-host authorization and
+ordinary public headers preserved. The first fixture attempt omitted the Host
+header required by Node's raw-header-array form and failed before exercising
+redirects; only the corrected fixture is remediation evidence. The identified
+browser wallet path uses Axios's browser adapter, not this Node transport; this
+does not establish that Burrito's live browser app leaked credentials.
+
+Vite bundles launch-editor internally, so a standalone transitive override would
+not repair its development-server editor route. The
+[patched Vite 7.3.7 release](https://github.com/vitejs/vite/releases/tag/v7.3.7)
+contains launch-editor 2.14.2 for the Windows path/escaping and editor-argument
+advisories. Isolated checks of the actual bundled pure helpers verify percent
+and line-break rejection, normalized paths, CLI-like filename handling and
+ordinary spaced filenames with cursor positions. No editor or shell command is
+executed by those checks; public reachability or an OS exploit is not claimed.
+
+After a lockfile-consistent install, both audit gates again pass: production
+12 low and full graph 17 low, with zero moderate/high/critical. Existing low-risk
+wallet findings remain tracked above. Candidate-only remediation is not a
+statement that main, older builds or production deployments have been updated.
