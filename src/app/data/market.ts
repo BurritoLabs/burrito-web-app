@@ -15,7 +15,7 @@ import {
   type BinodesDexTxDetail
 } from "./binodes"
 import { queryContractSmart } from "./classic"
-import { fetchJsonWithEndpointFallback, fetchWithEndpointFallback } from "./endpointFallback"
+import { fetchWithEndpointFallback } from "./endpointFallback"
 import { throwIfRequestAborted, withRequestDeadline } from "./requestDeadline"
 import { getSwapDexes, type SwapDex } from "./dexFactories"
 import { pickChainAssets } from "./terraAssets"
@@ -1653,10 +1653,8 @@ const fetchPairCandlesWithinBudget = async ({
 
         let data: TxListResponse
         try {
-          const response = await fetchJsonWithEndpointFallback<TxListResponse>(url, {
-            timeoutMs: PAIR_TX_LCD_TIMEOUT_MS,
-            signal
-          })
+          const { fetchMarketTxPage } = await import("./marketTxPage")
+          const response = await fetchMarketTxPage<TxListResponse>(chain.chainId, url, PAIR_TX_LCD_TIMEOUT_MS, signal)
           if (!response.ok || !response.data) break
           data = response.data
           if (!Array.isArray(data.tx_responses)) break
@@ -2055,10 +2053,8 @@ const fetchPairTradesWithinBudget = async ({
 
       let data: TxListResponse
       try {
-        const response = await fetchJsonWithEndpointFallback<TxListResponse>(url, {
-          timeoutMs: PAIR_TX_LCD_TIMEOUT_MS,
-          signal
-        })
+        const { fetchMarketTxPage } = await import("./marketTxPage")
+        const response = await fetchMarketTxPage<TxListResponse>(chain.chainId, url, PAIR_TX_LCD_TIMEOUT_MS, signal)
         if (!response.ok || !response.data) break
         data = response.data
         if (!Array.isArray(data.tx_responses)) break
