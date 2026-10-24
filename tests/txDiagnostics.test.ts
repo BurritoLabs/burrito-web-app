@@ -56,6 +56,51 @@ describe("transaction diagnostics", () => {
     expect(result.userMessage).toContain("Wallet signature is out of sync")
   })
 
+  it.each(["string", "Error"])(
+    "recognizes the native cancellation message received as a %s",
+    (representation) => {
+      const message = "Transaction request rejected."
+      const error = representation === "Error" ? new Error(message) : message
+
+      expect(classifyTxError(error, "Submit failed")).toEqual({
+        category: "wallet_rejected",
+        raw: message,
+        rawMessage: message,
+        userMessage: "Transaction cancelled in wallet."
+      })
+    }
+  )
+
+  it.each([
+    {
+      message: "transaction rejected: insufficient funds",
+      category: "insufficient_funds",
+      userMessage: "Insufficient balance to cover the amount, tax, and network fee."
+    },
+    {
+      message: "transaction rejected: account sequence mismatch, expected 9, got 8",
+      category: "sequence_mismatch",
+      userMessage:
+        "Wallet signature is out of sync. Reconnect the wallet or refresh the page, then submit again."
+    },
+    {
+      message: "transaction rejected by chain",
+      category: "unknown",
+      userMessage: "transaction rejected by chain"
+    }
+  ])(
+    "keeps $category chain rejection separate from wallet cancellation",
+    ({ message, category, userMessage }) => {
+      for (const error of [message, new Error(message)]) {
+        const result = classifyTxError(error, "Submit failed")
+
+        expect(result).toEqual({ category, raw: message, rawMessage: message, userMessage })
+        expect(result.category).not.toBe("wallet_rejected")
+        expect(result.userMessage).not.toBe("Transaction cancelled in wallet.")
+      }
+    }
+  )
+
   it("removes noisy chain prefixes from transaction errors", () => {
     expect(
       cleanTxErrorMessage(

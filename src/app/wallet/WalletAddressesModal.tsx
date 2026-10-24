@@ -74,7 +74,12 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
           <div className={styles.title}>Wallet addresses</div>
-          <button className={styles.closeButton} type="button" onClick={onClose}>
+          <button
+            aria-label="Close wallet addresses"
+            className={styles.closeButton}
+            type="button"
+            onClick={onClose}
+          >
             <span />
             <span />
           </button>
@@ -127,6 +132,7 @@ const WalletAddressesModal = ({ open, onClose }: WalletAddressesModalProps) => {
                   onClick={(event) => event.stopPropagation()}
                 >
                   <button
+                    aria-label="Close QR code"
                     className={styles.qrClose}
                     type="button"
                     onClick={() => setShowQr(false)}
