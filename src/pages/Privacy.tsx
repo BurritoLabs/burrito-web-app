@@ -6,12 +6,12 @@ const Privacy = () => (
     <article className={styles.policy}>
       <header className={styles.intro}>
         <p className={styles.updated}>
-          Last updated: <time dateTime="2026-08-06">August 6, 2026</time>
+          Last updated: <time dateTime="2026-08-11">August 11, 2026</time>
         </p>
         <p>
           Burrito is a non-custodial wallet and blockchain interface provided by
-          Burrito Labs Ltd. This policy explains how the Burrito mobile app and
-          web app process information.
+          Burrito Labs Ltd. This policy explains how the Burrito mobile app,
+          Chrome extension, and web app process information.
         </p>
       </header>
 
@@ -19,14 +19,38 @@ const Privacy = () => (
         <h2>Non-custodial wallet</h2>
         <p>
           Burrito does not take custody of your assets. A recovery phrase or
-          private key created or imported in the mobile app is stored locally
-          using the device&apos;s protected storage and is used on the device to
-          derive accounts and sign transactions. It is not sent to the Burrito
-          web app, Burrito Labs, or a backend service.
+          private key created or imported in the mobile app or Chrome extension
+          is encrypted and stored locally using device- or browser-protected
+          storage. It is used locally to derive accounts and sign transactions
+          and is not sent to the Burrito web app, Burrito Labs, or a backend
+          service.
         </p>
         <p>
           You are responsible for keeping your recovery phrase safe. Burrito
           Labs cannot recover it, reset it, or reverse a blockchain transaction.
+        </p>
+      </section>
+
+      <section>
+        <h2>Chrome extension</h2>
+        <p>
+          The Burrito Wallet Chrome extension runs only on the Burrito web app
+          at app.burrito.money. It uses Chrome storage to retain an encrypted
+          wallet vault, approved-site status, and local preferences. It uses
+          alarms to lock the wallet and expire unanswered transaction approvals.
+        </p>
+        <p>
+          The extension receives public account requests and transaction details
+          from the Burrito web app only after you approve site access. Every
+          transaction is shown in a separate review window and is signed only
+          after you approve it. The extension does not read unrelated websites,
+          browsing history, cookies, contacts, or advertising identifiers.
+        </p>
+        <p>
+          Information received through Chrome APIs is used only to provide and
+          secure the wallet features described here. It is not sold, used for
+          advertising, transferred for credit decisions, or made available for
+          unrelated human review.
         </p>
       </section>
 
@@ -90,12 +114,11 @@ const Privacy = () => (
       <section>
         <h2>Retention and your choices</h2>
         <p>
-          Local wallet material remains on your device until you delete the
-          wallet or app, subject to the operating system&apos;s secure-storage
-          behavior. You can remove the wallet from Burrito, clear app data, or
-          uninstall the app. These actions cannot remove information already
-          recorded on a public blockchain or data retained independently by a
-          third-party provider.
+          Local wallet material remains on your device or browser profile until
+          you delete the wallet, clear the app or extension data, or uninstall
+          Burrito, subject to the platform&apos;s secure-storage behavior. These
+          actions cannot remove information already recorded on a public
+          blockchain or data retained independently by a third-party provider.
         </p>
       </section>
 

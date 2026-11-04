@@ -69,6 +69,7 @@ any extraction or refactor.
 | Wallet session, signer acquisition, retry and account-change handling | `src/app/wallet/WalletProvider.tsx` |
 | Signing client and endpoint fallback | `src/app/wallet/signingClient.ts` |
 | Connector-neutral wallet adapter boundary | `src/app/wallet/walletAdapters.ts` |
+| Burrito Extension provider validation and Direct Sign adapter | `src/app/wallet/burritoExtensionWallet.ts` |
 | Transaction error taxonomy and diagnostics | `src/app/tx/txDiagnostics.ts` |
 | Transaction serialization guard | `src/app/tx/transactionQueue.ts` |
 

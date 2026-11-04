@@ -28,6 +28,7 @@ import {
 } from "./walletMeta"
 import { isTouchWalletCapableBrowser } from "./walletPlatform"
 import { getBurritoNativeConnector } from "./burritoNativeWallet"
+import { getBurritoExtensionConnector } from "./burritoExtensionWallet"
 import { classifyTxError, recordTxDiagnostic } from "../tx/txDiagnostics"
 import { reportRuntimeError } from "../feedback/runtimeErrorReporter"
 import { loadWalletRuntimeProvider } from "./walletRuntimeLoader"
@@ -54,6 +55,7 @@ const getFallbackConnectors = (): WalletConnector[] => {
 
   return [
     getBurritoNativeConnector(),
+    getBurritoExtensionConnector(),
     {
       ...CONNECTOR_META.keplr,
       available: desktopKeplr
@@ -138,8 +140,10 @@ const WalletFallbackProvider = ({
       setConnectorRefreshNonce((current) => current + 1)
     }
     window.addEventListener("burrito:native-ready", refreshNativeConnector)
+    window.addEventListener("burrito:wallet-ready", refreshNativeConnector)
     return () => {
       window.removeEventListener("burrito:native-ready", refreshNativeConnector)
+      window.removeEventListener("burrito:wallet-ready", refreshNativeConnector)
     }
   }, [])
 
