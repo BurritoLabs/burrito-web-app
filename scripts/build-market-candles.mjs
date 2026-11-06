@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import JSON5 from "json5";
+import { buildObservedCandles as buildCandles } from "./lib/observed-candles.mjs";
 
 const LCD = process.env.LCD_URL?.trim() || "https://terra-classic-lcd.publicnode.com";
 const CHAIN_ID = "columbus-5";
@@ -149,61 +150,6 @@ const toAssetMeta = (assetId, cw20Decimals) => {
   const key = normalizeAssetKey(contract);
   const decimals = cw20Decimals.get(key) ?? 6;
   return { key, decimals };
-};
-
-const buildCandles = ({ ticks, bucketMs, lookbackBuckets, now, maxCandles }) => {
-  const lookbackStart = now - bucketMs * lookbackBuckets;
-  const sorted = [...ticks]
-    .filter((tick) => tick.timestamp >= lookbackStart)
-    .sort((a, b) => a.timestamp - b.timestamp);
-
-  if (!sorted.length) return [];
-
-  const buckets = new Map();
-  for (const tick of sorted) {
-    const bucketStart = Math.floor(tick.timestamp / bucketMs) * bucketMs;
-    const existing = buckets.get(bucketStart);
-    if (!existing) {
-      buckets.set(bucketStart, {
-        bucketStart,
-        open: tick.price,
-        high: tick.price,
-        low: tick.price,
-        close: tick.price,
-        volumeQuote: tick.volumeQuote,
-      });
-      continue;
-    }
-    existing.high = Math.max(existing.high, tick.price);
-    existing.low = Math.min(existing.low, tick.price);
-    existing.close = tick.price;
-    existing.volumeQuote += tick.volumeQuote;
-  }
-
-  const firstBucket = Math.floor(lookbackStart / bucketMs) * bucketMs;
-  const lastBucket = Math.floor(now / bucketMs) * bucketMs;
-  const candles = [];
-  let previousClose = sorted[0].price;
-
-  for (let bucketStart = firstBucket; bucketStart <= lastBucket; bucketStart += bucketMs) {
-    const candle = buckets.get(bucketStart);
-    if (candle) {
-      candles.push(candle);
-      previousClose = candle.close;
-      continue;
-    }
-
-    candles.push({
-      bucketStart,
-      open: previousClose,
-      high: previousClose,
-      low: previousClose,
-      close: previousClose,
-      volumeQuote: 0,
-    });
-  }
-
-  return candles.slice(-maxCandles);
 };
 
 const parseTxEvents = (response) => {
@@ -742,6 +688,7 @@ const run = async () => {
       chainId: CHAIN_ID,
       lcd: LCD,
       pair: meta.pair,
+      candleSource: "observed-swaps",
       candles: candlesByTf,
     };
 

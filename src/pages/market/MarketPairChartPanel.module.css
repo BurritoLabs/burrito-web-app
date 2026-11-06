@@ -193,6 +193,13 @@
   outline-offset: 2px;
 }
 
+.lastObservedSwap {
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .chartFooter {
   min-height: 42px;
   padding: 8px 14px;

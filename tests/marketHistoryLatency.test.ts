@@ -146,6 +146,24 @@ describe("bounded market history", () => {
       volumeQuote: 0, volumeKnown: false }])
   })
 
+  it("rejects legacy generated fill but preserves actual zero-volume packaged observations", async () => {
+    vi.mocked(fetchSharedPairCandles).mockResolvedValueOnce([])
+    const testPair = `terra1${"c".repeat(38)}`
+    const bucket = Math.floor(Date.now() / 60_000) * 60_000
+    const bar = (minutes: number, volumeQuote: number, tradeCount?: number) => ({
+      bucketStart: bucket - minutes * 60_000, open: 2, high: 2, low: 2, close: 2, volumeQuote,
+      ...(tradeCount === undefined ? {} : { tradeCount })
+    })
+    vi.stubGlobal("fetch", vi.fn(async (url: string | URL) => new Response(JSON.stringify(
+      String(url).startsWith("/market/candles/") ? { candles: { "1h": { "uluna|uusd": [
+        bar(5, 0), bar(4, 10), bar(3, 0, 1), bar(2, 10, 0), bar(1, 10, -1)
+      ] } } } : { tx_responses: [], data: [] }
+    ))))
+    const candles = await fetchPairCandles({ ...options, pairAddress: testPair, includeLocalFallback: true })
+    expect(candles.map((candle) => candle.bucketStart)).toEqual([bucket - 4 * 60_000, bucket - 3 * 60_000])
+    expect(candles.map((candle) => candle.volumeQuote)).toEqual([10, 0])
+  })
+
   it("stops a cancelled trade request before starting chain fallback", async () => {
     const controller = new AbortController()
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
