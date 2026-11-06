@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
-import type { MouseEventHandler, Time, UTCTimestamp } from "lightweight-charts"
+import type { IChartApi, IPriceLine, ISeriesApi, MouseEventHandler, Time, UTCTimestamp } from "lightweight-charts"
 import PageShell from "../PageShell"
 import SwapPanel from "../components/SwapPanel"
 import MarketPairAssetIcon from "./MarketPairAssetIcon"
@@ -15,7 +15,10 @@ import {
   fetchCirculatingSnapshot,
   fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import { useCw20Supplies } from "../../app/data/cw20"
+import { getCw20SupplyUnitsForDecimals, useCw20Supplies } from "../../app/data/cw20"
+import { hasMarketCw20Precision } from "../../app/market/cw20Pricing"
+import { marketHistoryPrecisionKey } from "../../app/market/historyPrecision"
+import { resolveNativeMarketDecimals } from "../../app/data/assetPrecision"
 import {
   type PairCandle,
   fetchPairCandles,
@@ -35,7 +38,6 @@ import {
   formatNumber,
   formatNumberNoRoundByNonZeroFractionDigits,
   formatPercent,
-  formatUsd,
   truncateHash,
   toUnitAmount
 } from "../../app/utils/format"
@@ -55,8 +57,9 @@ import {
   MIN_CANDLES_FOR_CHART,
   TIMEFRAME_BUCKET_MS,
   TIMEFRAME_LOOKBACK_BUCKETS,
+  chartPriceMinMove,
   formatAxisPrice,
-  formatChartAxisUsd,
+  formatChartAxisPrice,
   formatChartTickTime,
   formatChartTime,
   formatChartUsdPerBase,
@@ -67,6 +70,7 @@ import {
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
+import { calculatePairPriceChange } from "../../app/market/priceChange"
 import { supportsReserveRatioPricing } from "../../app/market/poolPricing"
 import { useAppChain } from "../../app/appChainContext"
 import { getAddressExplorerUrl } from "../../app/explorer"
@@ -125,6 +129,55 @@ type DetailCopyItem = {
 }
 
 type SidePanelMode = "swap" | "add" | "remove"
+
+type ChartRuntime = {
+  chart: IChartApi
+  priceSeries: ISeriesApi<"Candlestick">
+  volumeSeries: ISeriesApi<"Histogram">
+  closeLine: IPriceLine
+  openLine: IPriceLine
+  candleByTimestamp: Map<number, PairCandle>
+}
+
+const updateChartCandles = (
+  runtime: ChartRuntime,
+  candles: PairCandle[],
+  formatter: (value: number) => string
+) => {
+  const candleByTimestamp = new Map<number, PairCandle>()
+  runtime.priceSeries.applyOptions({
+    priceFormat: {
+      type: "custom",
+      minMove: chartPriceMinMove(candles.flatMap((candle) => [candle.open, candle.high, candle.low, candle.close])),
+      formatter
+    }
+  })
+  runtime.priceSeries.setData(candles.map((candle) => {
+    const time = Math.floor(candle.bucketStart / 1000) as UTCTimestamp
+    candleByTimestamp.set(Number(time), candle)
+    return { time, open: candle.open, high: candle.high, low: candle.low, close: candle.close }
+  }))
+  runtime.volumeSeries.setData(candles.filter((candle) => candle.volumeKnown !== false).map((candle) => ({
+    time: Math.floor(candle.bucketStart / 1000) as UTCTimestamp,
+    value: candle.volumeQuote,
+    color: document.documentElement.dataset.theme === "light"
+      ? candle.close >= candle.open ? "rgba(22, 132, 64, 0.3)" : "rgba(196, 52, 67, 0.3)"
+      : candle.close >= candle.open ? "rgba(101, 228, 48, 0.28)" : "rgba(255, 106, 106, 0.28)"
+  })))
+  runtime.candleByTimestamp = candleByTimestamp
+  const last = candles[candles.length - 1]
+  const light = document.documentElement.dataset.theme === "light"
+  const priceColor = last.close >= last.open
+    ? light ? "#168440" : "#6cec3d"
+    : light ? "#c43443" : "#ff6a6a"
+  runtime.closeLine.applyOptions({
+    price: last.close,
+    color: priceColor,
+    axisLabelColor: priceColor,
+    axisLabelTextColor: light ? "#fff" : "#08110d"
+  })
+  runtime.openLine.applyOptions({ price: candles[0].open })
+}
 
 const toPairFallbackAsset = (assetId: string) => {
   if (assetId.startsWith("native:")) return assetId.slice("native:".length)
@@ -209,6 +262,9 @@ const MarketPairDetails = () => {
   const [activeCandleTime, setActiveCandleTime] = useState<number | null>(null)
   const chartHostRef = useRef<HTMLDivElement | null>(null)
   const chartTooltipRef = useRef<HTMLDivElement | null>(null)
+  const chartRuntimeRef = useRef<ChartRuntime | null>(null)
+  const chartDisplayRef = useRef({ baseSymbol: "", quoteSymbol: "", quoteUsd: undefined as number | undefined })
+  const candlesRef = useRef<PairCandle[]>([])
   const isLaunchpadSource = useMemo(() => {
     const state = location.state as MarketDetailLocationState | null
     if (state?.fromLaunchpad) return true
@@ -378,9 +434,22 @@ const MarketPairDetails = () => {
     return Array.from(set)
   }, [poolsForMetadata])
 
-  const { data: nativeWhitelist = {} } = useResolvedNativeWhitelist(nativeDenoms)
-  const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
+  const { data: nativeWhitelist = {}, isFetching: isNativePrecisionFetching, refetch: refetchNativePrecision } = useResolvedNativeWhitelist(nativeDenoms)
+  const { data: ibcWhitelist = {}, isFetching: isIbcPrecisionFetching, refetch: refetchIbcPrecision } = useResolvedIbcWhitelist(ibcDenoms)
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(cw20Contracts)
+  const {
+    data: detailCw20Supplies = {},
+    isFetching: isCw20PrecisionFetching,
+    refetch: refetchCw20Precision
+  } = useCw20Supplies(cw20Contracts)
+  const hasPairPrecision = hasMarketCw20Precision(cw20Contracts, detailCw20Supplies) &&
+    [...nativeDenoms, ...ibcDenoms].every(denom => resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) !== undefined)
+  const isPrecisionFetching = isCw20PrecisionFetching || isNativePrecisionFetching || isIbcPrecisionFetching
+  const refetchPrecision = () => Promise.all([
+    ...(cw20Contracts.length ? [refetchCw20Precision()] : []),
+    ...(nativeDenoms.length ? [refetchNativePrecision()] : []),
+    ...(ibcDenoms.length ? [refetchIbcPrecision()] : [])
+  ])
 
   const { data: prices } = useQuery({
     queryKey: ["prices", chain.chainId],
@@ -409,24 +478,21 @@ const MarketPairDetails = () => {
           const denom = asset.id.slice(7)
           const key = normalizeAssetKey(denom)
           if (!key || map.has(key)) return
-          const decimals = denom.startsWith("ibc/")
-            ? (ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
-              cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
-              6)
-            : (nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6)
-          map.set(key, decimals)
+          const decimals = resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist)
+          if (decimals !== undefined) map.set(key, decimals)
           return
         }
         if (asset.id.startsWith("cw20:")) {
           const contract = asset.id.slice(5).toLowerCase()
           const key = normalizeAssetKey(contract)
           if (!key || map.has(key)) return
-          map.set(key, cw20Whitelist[contract]?.decimals ?? 6)
+          const decimals = detailCw20Supplies[contract]?.decimals
+          if (decimals !== undefined) map.set(key, decimals)
         }
       })
     })
     return Array.from(map.entries()).map(([key, decimals]) => ({ key, decimals }))
-  }, [cw20Whitelist, ibcWhitelist, nativeWhitelist, poolsForMetadata])
+  }, [detailCw20Supplies, ibcWhitelist, nativeWhitelist, poolsForMetadata])
 
   const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
 
@@ -448,7 +514,8 @@ const MarketPairDetails = () => {
             return nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6
           }
           if (assetId.startsWith("cw20:")) {
-            return cw20Whitelist[assetId.slice("cw20:".length).toLowerCase()]?.decimals ?? 6
+            const contract = assetId.slice("cw20:".length).toLowerCase()
+            return detailCw20Supplies[contract]?.decimals ?? cw20Whitelist[contract]?.decimals ?? 6
           }
           return 6
         },
@@ -458,7 +525,7 @@ const MarketPairDetails = () => {
           return undefined
         }
       }),
-    [cw20Whitelist, ibcWhitelist, nativePrice?.usd, nativeWhitelist, pools, prices?.ustc?.usd]
+    [cw20Whitelist, detailCw20Supplies, ibcWhitelist, nativePrice?.usd, nativeWhitelist, pools, prices?.ustc?.usd]
   )
 
   const resolveAsset = (assetId: string): ResolvedAsset => {
@@ -476,7 +543,7 @@ const MarketPairDetails = () => {
           key: normalizeAssetKey(denom),
           symbol,
           name,
-            decimals: ibc?.decimals ?? ibcHexxagon?.decimals ?? 6,
+            decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) ?? 0,
             iconCandidates: buildIbcIconCandidates({
               ibcIcon: ibc?.icon,
               hexxagonIcon: ibcHexxagon?.icon,
@@ -504,7 +571,7 @@ const MarketPairDetails = () => {
         key: normalizeAssetKey(denom),
         symbol: identity.symbol,
         name: identity.name,
-        decimals: nativeToken?.decimals ?? 6,
+        decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) ?? 0,
         iconCandidates: buildNativeIconCandidates(
           denom,
           identity.symbol,
@@ -523,7 +590,9 @@ const MarketPairDetails = () => {
       key: normalizeAssetKey(contract),
       symbol,
       name: token?.name || symbol,
-      decimals: token?.decimals ?? 6,
+      // Zero is an internal placeholder only; prices/history/trading remain
+      // gated until strict token_info precision is available for both sides.
+      decimals: detailCw20Supplies[contract]?.decimals ?? 0,
       iconCandidates: buildCw20IconCandidates(token?.icon, token?.symbol),
       isLunc: false,
       isUstc: false,
@@ -538,9 +607,9 @@ const MarketPairDetails = () => {
   const getAssetUsdPrice = (asset: ResolvedAsset) => {
     if (asset.isLunc) return nativePrice?.usd
     if (asset.isUstc) return prices?.ustc?.usd
-    const upperSymbol = asset.symbol.trim().toUpperCase()
-    if (upperSymbol === "LUNC" || upperSymbol === "LUNA") return nativePrice?.usd
-    if (upperSymbol === "USTC") return prices?.ustc?.usd
+    if (asset.id.startsWith("native:") && resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
+    // A CW20 can reuse a native ticker; names are not price/asset identities.
+    if (asset.id.startsWith("cw20:") && !detailCw20Supplies[asset.id.slice(5).toLowerCase()]) return undefined
     const graphEntry = poolGraphUsdPrices[asset.key]
     if (graphEntry !== undefined) return graphEntry.price
     const estimate = dexEstimatedPrices?.[asset.key]
@@ -581,13 +650,13 @@ const MarketPairDetails = () => {
 
     const priceBase = left
     const priceQuote = right
-    const priceValue = rightAmount / leftAmount
+    const priceValue = hasPairPrecision ? rightAmount / leftAmount : undefined
     const priceQuoteUsd = getAssetUsdPrice(priceQuote)
     const leftUsd = getAssetUsdPrice(left)
     const rightUsd = getAssetUsdPrice(right)
     const priceUsd =
       leftUsd ??
-      (priceQuoteUsd !== undefined ? priceValue * priceQuoteUsd : undefined)
+      (priceQuoteUsd !== undefined && priceValue !== undefined ? priceValue * priceQuoteUsd : undefined)
     const bondingLiquidityUsd =
       displayPool.bonding?.liquidityAssetId && displayPool.bonding?.liquidityAmount
         ? (() => {
@@ -652,12 +721,7 @@ const MarketPairDetails = () => {
     const getPairChange = (tf: Timeframe) => {
       const baseChange = getAssetChange(priceBase, tf)
       const quoteChange = getAssetChange(priceQuote, tf)
-      if (baseChange === undefined && quoteChange === undefined) return undefined
-      if (baseChange !== undefined && quoteChange !== undefined) {
-        return ((1 + baseChange / 100) / (1 + quoteChange / 100) - 1) * 100
-      }
-      if (baseChange !== undefined) return baseChange
-      return quoteChange !== undefined ? -quoteChange : undefined
+      return calculatePairPriceChange(baseChange, quoteChange)
     }
 
     const getVolumeUsd = (tf: Timeframe) => {
@@ -679,7 +743,7 @@ const MarketPairDetails = () => {
       priceValue,
       priceQuoteUsd,
       priceUsd,
-      liquidityUsd,
+      liquidityUsd: hasPairPrecision ? liquidityUsd : undefined,
       marketCapUsd,
       volumesUsd: {
         "1h": getVolumeUsd("1h"),
@@ -695,7 +759,7 @@ const MarketPairDetails = () => {
   })()
 
   const usesSimulatedSpotPrice = Boolean(
-    detail && !supportsReserveRatioPricing(detail.pool.type)
+    detail && hasPairPrecision && !supportsReserveRatioPricing(detail.pool.type)
   )
   const { data: simulatedSpotPrice } = useQuery({
     queryKey: [
@@ -740,22 +804,11 @@ const MarketPairDetails = () => {
     }
   }, [isBondingCurve, sidePanelMode])
 
-  const detailBaseCw20Contracts = useMemo(
-    () =>
-      detail?.priceBase.id.startsWith("cw20:")
-        ? [detail.priceBase.id.slice("cw20:".length).toLowerCase()]
-        : [],
-    [detail?.priceBase.id]
-  )
-  const { data: detailCw20Supplies = {} } = useCw20Supplies(
-    detailBaseCw20Contracts,
-    cw20Whitelist
-  )
   const detailFdvUsd = useMemo(() => {
     if (!detail?.priceBase.id.startsWith("cw20:")) return undefined
     if (detail.priceUsd === undefined) return undefined
     const contract = detail.priceBase.id.slice("cw20:".length).toLowerCase()
-    const units = detailCw20Supplies[contract]?.units
+    const units = getCw20SupplyUnitsForDecimals(detailCw20Supplies[contract], detail.priceBase.decimals)
     return units !== undefined ? units * detail.priceUsd : undefined
   }, [detail, detailCw20Supplies])
   const detailMarketCapUsd = detail?.marketCapUsd
@@ -763,7 +816,47 @@ const MarketPairDetails = () => {
   const tradesLimit =
     detail?.pool.pair && tradePager.pair === detail.pool.pair ? tradePager.limit : 25
 
-  const { data: tradesData, isLoading: isTradesLoading } = useQuery({
+  const {
+    data: candlesData = [],
+    isLoading: isCandlesLoading,
+    isError: isCandlesError,
+    refetch: refetchCandles
+  } = useQuery({
+    queryKey: [
+      "market",
+      chain.chainId,
+      "pair-candles",
+      detail?.pool.pair,
+      detail?.left.key,
+      detail?.right.key,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
+      timeframe
+    ],
+    queryFn: ({ signal }) =>
+      fetchPairCandles({
+        pairAddress: detail!.pool.pair,
+        leftAssetKey: detail!.left.key,
+        rightAssetKey: detail!.right.key,
+        leftDecimals: detail!.left.decimals,
+        rightDecimals: detail!.right.decimals,
+        expectedPrice: detailPriceValue,
+        bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
+        lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
+        maxPages: DETAIL_CANDLE_TX_MAX_PAGES[timeframe],
+        minCandles: MIN_CANDLES_FOR_CHART[timeframe],
+        includeLocalFallback: true,
+        signal
+      }),
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision && detailPriceValue),
+    // Each attempt already has endpoint fallback and a total deadline. Do not
+    // hide a failure behind another full scan before showing the Retry action.
+    retry: false,
+    staleTime: 60_000,
+    refetchInterval: 120_000
+  })
+
+  const { data: tradesData, isLoading: isTradesLoading, isError: isTradesError, refetch: refetchTrades } = useQuery({
     queryKey: [
       "market",
       chain.chainId,
@@ -771,11 +864,10 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals,
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals),
       tradesLimit
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchPairTrades({
         pairAddress: detail!.pool.pair,
         leftAssetKey: detail!.left.key,
@@ -784,15 +876,17 @@ const MarketPairDetails = () => {
         rightDecimals: detail!.right.decimals,
         offset: 0,
         limit: tradesLimit,
-        maxPages: DETAIL_TRADES_MAX_PAGES
+        maxPages: DETAIL_TRADES_MAX_PAGES,
+        signal
       }),
-    enabled: Boolean(detail?.pool.pair),
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision),
+    retry: false,
     staleTime: 45_000,
     refetchInterval: 90_000
   })
 
-  const trades = useMemo(() => tradesData?.trades ?? [], [tradesData?.trades])
-  const hasMoreTrades = Boolean(tradesData?.hasMore)
+  const trades = useMemo(() => hasPairPrecision ? tradesData?.trades ?? [] : [], [hasPairPrecision, tradesData?.trades])
+  const hasMoreTrades = hasPairPrecision && Boolean(tradesData?.hasMore)
 
   const { data: traderStatsData } = useQuery({
     queryKey: [
@@ -802,10 +896,9 @@ const MarketPairDetails = () => {
       detail?.pool.pair,
       detail?.left.key,
       detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals
+      ...marketHistoryPrecisionKey(hasPairPrecision, detail?.left.decimals, detail?.right.decimals)
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchPairTrades({
         pairAddress: detail!.pool.pair,
         leftAssetKey: detail!.left.key,
@@ -814,14 +907,18 @@ const MarketPairDetails = () => {
         rightDecimals: detail!.right.decimals,
         offset: 0,
         limit: DETAIL_TRADER_STATS_LIMIT,
-        maxPages: DETAIL_TRADES_MAX_PAGES
+        maxPages: DETAIL_TRADES_MAX_PAGES,
+        signal
       }),
-    enabled: Boolean(detail?.pool.pair),
+    // The larger analytics scan is not required to draw the chart or show the
+    // first trades. Let those critical requests finish before it competes.
+    enabled: Boolean(detail?.pool.pair && hasPairPrecision && !isCandlesLoading && !isTradesLoading),
+    retry: false,
     staleTime: 60_000,
     refetchInterval: 120_000
   })
   const tradersByTimeframe = useMemo(() => {
-    const source = traderStatsData?.trades?.length ? traderStatsData.trades : trades
+    const source = hasPairPrecision && traderStatsData?.trades?.length ? traderStatsData.trades : trades
     const now = Date.now()
 
     return (["1h", "24h", "7d"] as Timeframe[]).reduce(
@@ -837,42 +934,11 @@ const MarketPairDetails = () => {
       },
       {} as Record<Timeframe, number | undefined>
     )
-  }, [traderStatsData?.trades, trades])
-
-  const { data: candlesData = [], isLoading: isCandlesLoading } = useQuery({
-    queryKey: [
-      "market",
-      chain.chainId,
-      "pair-candles",
-      detail?.pool.pair,
-      detail?.left.key,
-      detail?.right.key,
-      detail?.left.decimals,
-      detail?.right.decimals,
-      timeframe
-    ],
-    queryFn: () =>
-      fetchPairCandles({
-        pairAddress: detail!.pool.pair,
-        leftAssetKey: detail!.left.key,
-        rightAssetKey: detail!.right.key,
-        leftDecimals: detail!.left.decimals,
-        rightDecimals: detail!.right.decimals,
-        expectedPrice: detailPriceValue,
-        bucketMs: TIMEFRAME_BUCKET_MS[timeframe],
-        lookbackBuckets: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
-        maxCandles: TIMEFRAME_LOOKBACK_BUCKETS[timeframe],
-        maxPages: DETAIL_CANDLE_TX_MAX_PAGES[timeframe],
-        minCandles: MIN_CANDLES_FOR_CHART[timeframe],
-        includeLocalFallback: true
-      }),
-    enabled: Boolean(detail?.pool.pair && detailPriceValue),
-    staleTime: 60_000,
-    refetchInterval: 120_000
-  })
+  }, [hasPairPrecision, traderStatsData?.trades, trades])
 
   const candles = useMemo(
     () => {
+      if (!hasPairPrecision) return []
       const merged = new Map<number, PairCandle>()
 
       ;[...candlesData]
@@ -898,13 +964,14 @@ const MarketPairDetails = () => {
             high: Math.max(existing.high, candle.high),
             low: Math.min(existing.low, candle.low),
             close: candle.close,
-            volumeQuote: existing.volumeQuote + candle.volumeQuote
+            volumeQuote: existing.volumeQuote + candle.volumeQuote,
+            volumeKnown: existing.volumeKnown !== false && candle.volumeKnown !== false
           })
         })
 
       return [...merged.values()].sort((a, b) => a.bucketStart - b.bucketStart)
     },
-    [candlesData]
+    [hasPairPrecision, candlesData]
   )
 
   const activeCandle = useMemo(() => {
@@ -914,6 +981,20 @@ const MarketPairDetails = () => {
   const baseSymbol = detail?.left.symbol ?? ""
   const chartQuoteUsd = detailQuoteUsd
   const quoteSymbol = detail?.right.symbol ?? ""
+  chartDisplayRef.current = { baseSymbol, quoteSymbol, quoteUsd: chartQuoteUsd }
+  candlesRef.current = candles
+  const hasCandles = candles.length > 0
+  const chartPairId = detail?.pool.pair ?? ""
+
+  useEffect(() => {
+    const runtime = chartRuntimeRef.current
+    if (!runtime || !candles.length) return
+    updateChartCandles(
+      runtime,
+      candles,
+      formatChartAxisPrice
+    )
+  }, [candles])
 
   const chartStats = useMemo(() => {
     if (!candles.length) return undefined
@@ -931,13 +1012,10 @@ const MarketPairDetails = () => {
   }, [candles])
 
   useEffect(() => {
-    if (!chartHostRef.current || !candles.length) return undefined
+    if (!chartHostRef.current || !hasCandles) return undefined
 
     const host = chartHostRef.current
     const tooltipEl = chartTooltipRef.current
-    const candleByTimestamp = new Map<number, PairCandle>()
-    const firstCandle = candles[0]
-    const lastCandle = candles[candles.length - 1]
     const trendLineColor = "rgba(108, 236, 61, 0.98)"
     const trendLineSoft = "rgba(108, 236, 61, 0.36)"
     let cancelled = false
@@ -957,11 +1035,12 @@ const MarketPairDetails = () => {
 
     const chart = createChart(host, {
       autoSize: true,
-      height: 460,
+      height: 420,
       layout: {
         background: { type: ColorType.Solid, color: "rgba(10, 16, 13, 0.72)" },
         textColor: "rgba(234, 245, 235, 0.64)",
         fontFamily: "Montserrat, sans-serif",
+        fontSize: 11,
         attributionLogo: true
       },
       grid: {
@@ -999,7 +1078,7 @@ const MarketPairDetails = () => {
         }
       },
       localization: {
-        priceFormatter: (value: number) => formatChartAxisUsd(value, chartQuoteUsd)
+        priceFormatter: formatChartAxisPrice
       },
       handleScroll: {
         mouseWheel: true,
@@ -1014,6 +1093,45 @@ const MarketPairDetails = () => {
       }
     })
 
+    const applyTheme = () => {
+      const light = document.documentElement.dataset.theme === "light"
+      chart.applyOptions({
+        layout: {
+          background: {
+            type: ColorType.Solid,
+            color: light ? "#ffffff" : "#111914"
+          },
+          textColor: light ? "#6c7972" : "#a5b3aa"
+        },
+        grid: {
+          vertLines: { color: light ? "rgba(20, 46, 29, 0.06)" : "rgba(255, 255, 255, 0.04)" },
+          horzLines: { color: light ? "rgba(20, 46, 29, 0.09)" : "rgba(255, 255, 255, 0.075)" }
+        },
+        crosshair: {
+          vertLine: { color: light ? "rgba(20, 46, 29, 0.32)" : "rgba(255, 255, 255, 0.28)" },
+          horzLine: { color: light ? "rgba(20, 46, 29, 0.26)" : "rgba(255, 255, 255, 0.22)" }
+        }
+      })
+      const runtime = chartRuntimeRef.current
+      if (runtime?.chart === chart) {
+        const up = light ? "#168440" : "rgba(108, 236, 61, 0.96)"
+        const down = light ? "#c43443" : "rgba(255, 106, 106, 0.96)"
+        runtime.priceSeries.applyOptions({
+          upColor: up, borderUpColor: up, wickUpColor: up,
+          downColor: down, borderDownColor: down, wickDownColor: down
+        })
+        runtime.closeLine.applyOptions({
+          color: light ? "rgba(22, 132, 64, 0.5)" : trendLineSoft,
+          axisLabelColor: up,
+          axisLabelTextColor: light ? "#ffffff" : "#08110d"
+        })
+        updateChartCandles(runtime, candlesRef.current, formatChartAxisPrice)
+      }
+    }
+    applyTheme()
+    const themeObserver = new MutationObserver(applyTheme)
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
+
     const priceSeries = chart.addSeries(CandlestickSeries, {
       upColor: "rgba(108, 236, 61, 0.92)",
       downColor: "rgba(255, 106, 106, 0.92)",
@@ -1026,8 +1144,8 @@ const MarketPairDetails = () => {
       lastValueVisible: false,
       priceFormat: {
         type: "custom",
-        minMove: 0.00000001,
-        formatter: (value: number) => formatChartAxisUsd(value, chartQuoteUsd)
+        minMove: chartPriceMinMove(candlesRef.current.flatMap((candle) => [candle.open, candle.high, candle.low, candle.close])),
+        formatter: formatChartAxisPrice
       }
     })
 
@@ -1047,37 +1165,8 @@ const MarketPairDetails = () => {
       }
     })
 
-    priceSeries.setData(
-      candles.map((candle) => {
-        const time = Math.floor(candle.bucketStart / 1000) as UTCTimestamp
-        const shouldPadFlatCandle = candle.volumeQuote > 0 && candle.high === candle.low
-        const minMove = Math.max(Math.abs(candle.close) * 1e-8, 1e-12)
-        const high = shouldPadFlatCandle ? candle.high + minMove : candle.high
-        const low = shouldPadFlatCandle ? Math.max(candle.low - minMove, 0) : candle.low
-        candleByTimestamp.set(Number(time), candle)
-        return {
-          time,
-          open: candle.open,
-          high,
-          low,
-          close: candle.close
-        }
-      })
-    )
-
-    volumeSeries.setData(
-      candles.map((candle) => ({
-        time: Math.floor(candle.bucketStart / 1000) as UTCTimestamp,
-        value: candle.volumeQuote,
-        color:
-          candle.close >= candle.open
-            ? "rgba(101, 228, 48, 0.28)"
-            : "rgba(255, 106, 106, 0.28)"
-      }))
-    )
-
-    priceSeries.createPriceLine({
-      price: lastCandle.close,
+    const closeLine = priceSeries.createPriceLine({
+      price: candlesRef.current[candlesRef.current.length - 1].close,
       color: trendLineSoft,
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
@@ -1086,14 +1175,25 @@ const MarketPairDetails = () => {
       axisLabelColor: trendLineColor,
       axisLabelTextColor: "#08110d"
     })
-    priceSeries.createPriceLine({
-      price: firstCandle.open,
+    const openLine = priceSeries.createPriceLine({
+      price: candlesRef.current[0].open,
       color: "rgba(234, 245, 235, 0.14)",
       lineWidth: 1,
       lineStyle: LineStyle.Dotted,
       lineVisible: true,
       axisLabelVisible: false
     })
+    const runtime: ChartRuntime = {
+      chart,
+      priceSeries,
+      volumeSeries,
+      closeLine,
+      openLine,
+      candleByTimestamp: new Map()
+    }
+    chartRuntimeRef.current = runtime
+    updateChartCandles(runtime, candlesRef.current, formatChartAxisPrice)
+    applyTheme()
 
     const hideTooltip = () => {
       if (tooltipEl) {
@@ -1127,7 +1227,7 @@ const MarketPairDetails = () => {
         return
       }
 
-      const candle = candleByTimestamp.get(Math.floor(timestampMs / 1000))
+      const candle = runtime.candleByTimestamp.get(Math.floor(timestampMs / 1000))
       if (!candle) {
         hideTooltip()
         return
@@ -1139,12 +1239,13 @@ const MarketPairDetails = () => {
       }
 
       if (!tooltipEl) return
-      const currentPairPrice = `${formatAxisPrice(candle.close)} ${quoteSymbol}`.trim()
-      const currentUsd = formatChartUsdPerBase(candle.close, chartQuoteUsd, baseSymbol)
-      const openPair = `${formatAxisPrice(candle.open)} ${quoteSymbol}`.trim()
-      const highPair = `${formatAxisPrice(candle.high)} ${quoteSymbol}`.trim()
-      const lowPair = `${formatAxisPrice(candle.low)} ${quoteSymbol}`.trim()
-      const closePair = `${formatAxisPrice(candle.close)} ${quoteSymbol}`.trim()
+      const { baseSymbol: currentBaseSymbol, quoteSymbol: currentQuoteSymbol, quoteUsd } = chartDisplayRef.current
+      const currentPairPrice = `${formatAxisPrice(candle.close)} ${currentQuoteSymbol}`.trim()
+      const currentUsd = formatChartUsdPerBase(candle.close, quoteUsd, currentBaseSymbol)
+      const openPair = `${formatAxisPrice(candle.open)} ${currentQuoteSymbol}`.trim()
+      const highPair = `${formatAxisPrice(candle.high)} ${currentQuoteSymbol}`.trim()
+      const lowPair = `${formatAxisPrice(candle.low)} ${currentQuoteSymbol}`.trim()
+      const closePair = `${formatAxisPrice(candle.close)} ${currentQuoteSymbol}`.trim()
       const intrabarChange = candle.open > 0 ? ((candle.close - candle.open) / candle.open) * 100 : undefined
       const changeClass =
         intrabarChange === undefined
@@ -1177,12 +1278,12 @@ const MarketPairDetails = () => {
           <span>Close</span><strong>${closePair}</strong>
         </div>
         <div class="${styles.chartTooltipRow}">
-          <span>Vol</span><strong>${formatNumber(candle.volumeQuote, 2)} ${quoteSymbol}</strong>
+          <span>Vol</span><strong>${candle.volumeKnown === false ? "--" : formatNumber(candle.volumeQuote, 2)} ${currentQuoteSymbol}</strong>
         </div>
       `
 
-      const tooltipWidth = 216
-      const tooltipHeight = 204
+      const tooltipWidth = tooltipEl.offsetWidth || 216
+      const tooltipHeight = tooltipEl.offsetHeight || 204
       const left = Math.min(Math.max(param.point.x + 14, 10), host.clientWidth - tooltipWidth - 10)
       const top = Math.min(Math.max(param.point.y - tooltipHeight - 14, 10), host.clientHeight - tooltipHeight - 10)
 
@@ -1196,8 +1297,24 @@ const MarketPairDetails = () => {
 
     chart.timeScale().fitContent()
 
+    // Adapt the visible history to a changed viewport, but never reset zoom on a data refresh.
+    let chartWidth = host.clientWidth
+    let resizeFrame = 0
+    const resizeObserver = new ResizeObserver(() => {
+      const width = host.clientWidth
+      if (Math.abs(width - chartWidth) < 1) return
+      chartWidth = width
+      cancelAnimationFrame(resizeFrame)
+      resizeFrame = requestAnimationFrame(() => chart.timeScale().fitContent())
+    })
+    resizeObserver.observe(host)
+
     cleanupChart = () => {
       hideTooltip()
+      resizeObserver.disconnect()
+      cancelAnimationFrame(resizeFrame)
+      themeObserver.disconnect()
+      if (chartRuntimeRef.current === runtime) chartRuntimeRef.current = null
       try {
         chart.unsubscribeCrosshairMove(handleCrosshairMove)
       } catch {
@@ -1215,7 +1332,7 @@ const MarketPairDetails = () => {
       cancelled = true
       cleanupChart?.()
     }
-  }, [baseSymbol, candles, chartQuoteUsd, quoteSymbol, timeframe])
+  }, [chartPairId, hasCandles, timeframe])
 
   const loading = isPairsLoading || isPoolsLoading
 
@@ -1242,10 +1359,6 @@ const MarketPairDetails = () => {
   const timeframeVolumeUsd = detail.volumesUsd[timeframe]
   const timeframeTradersCount = tradersByTimeframe[timeframe]
   const chartPairLabel = `${detail.left.symbol}/${detail.right.symbol}`
-  const candleChange =
-    activeCandle && activeCandle.open > 0
-      ? ((activeCandle.close - activeCandle.open) / activeCandle.open) * 100
-      : undefined
   const candleTimeLabel = activeCandle ? formatChartTime(activeCandle.bucketStart, timeframe) : chartPairLabel
   const detailAddressItems = [
     {
@@ -1280,24 +1393,12 @@ const MarketPairDetails = () => {
 
   return (
     <PageShell
-      title={`${detail.left.symbol}/${detail.right.symbol}`}
+      title="Market"
+      className={styles.detailPage}
       onBack={handleBack}
-      extra={
-        <div className={styles.timeframe}>
-          {(["1h", "24h", "7d"] as Timeframe[]).map((tf) => (
-            <button
-              key={tf}
-              type="button"
-              className={`${styles.timeButton} ${timeframe === tf ? styles.timeButtonActive : ""}`}
-              onClick={() => setTimeframe(tf)}
-            >
-              {tf}
-            </button>
-          ))}
-        </div>
-      }
+      backLabel="Back to market"
     >
-      <section className={`card ${styles.hero}`}>
+      <section className={styles.hero} aria-label="Pair overview">
         <div className={styles.heroTop}>
           <div className={styles.heroLeft}>
             <div className={styles.pairIcons}>
@@ -1306,7 +1407,8 @@ const MarketPairDetails = () => {
                   key={detail.left.id}
                   symbol={detail.left.symbol}
                   candidates={detail.left.iconCandidates}
-                  size={48}
+                  priority
+                  size={32}
                 />
               </span>
               <span className={styles.pairIconSecondary}>
@@ -1314,16 +1416,17 @@ const MarketPairDetails = () => {
                   key={detail.right.id}
                   symbol={detail.right.symbol}
                   candidates={detail.right.iconCandidates}
-                  size={30}
+                  priority
+                  size={22}
                 />
               </span>
             </div>
             <div className={styles.heroHeading}>
-              <div className={styles.pairTitle}>
+              <h2 className={styles.pairTitle}>
                 {detail.left.symbol}
                 <span>/</span>
                 {detail.right.symbol}
-              </div>
+              </h2>
               <div className={styles.tags}>
                 <span className={styles.dexTag}>{dexName}</span>
                 {dexVersion ? <span className={styles.dexVersionTag}>{dexVersion}</span> : null}
@@ -1341,7 +1444,10 @@ const MarketPairDetails = () => {
           </div>
           <div className={styles.heroRight}>
             <div className={styles.priceMain}>
-              {detail.priceUsd !== undefined ? formatUsdNoRound(detail.priceUsd) : "--"}
+              {detailPriceValue !== undefined
+                ? formatNumberNoRoundByNonZeroFractionDigits(detailPriceValue, 4)
+                : "--"}
+              <span className={styles.priceUnit}>{detail.priceQuote.symbol}</span>
             </div>
             <div
               className={`${styles.priceChange} ${
@@ -1352,98 +1458,64 @@ const MarketPairDetails = () => {
                     : styles.changeDown
               }`}
             >
-              {timeframe}: {timeframeValue === undefined ? "--" : formatPercent(timeframeValue)}
+              {timeframeValue === undefined ? "--" : formatPercent(timeframeValue)}
+              <span>{timeframe}</span>
             </div>
             <div className={styles.priceHint}>
-              1 {detail.priceBase.symbol} ≈{" "}
-              {detailPriceValue !== undefined
-                ? formatNumberNoRoundByNonZeroFractionDigits(detailPriceValue, 4)
-                : "--"}{" "}
-              {detail.priceQuote.symbol}
+              {detail.priceUsd !== undefined
+                ? `${formatUsdNoRound(detail.priceUsd)} per ${detail.priceBase.symbol}`
+                : "USD price unavailable"}
             </div>
           </div>
         </div>
-        <div className={styles.heroMeta}>
-          <span className={styles.heroMetaItem}>
-            <em>Mkt Cap</em>
-            <strong>{formatUsdCompact(detailMarketCapUsd)}</strong>
-          </span>
-          <span className={styles.heroMetaItem}>
-            <em>FDV</em>
-            <strong>{formatUsdCompact(detailFdvUsd)}</strong>
-          </span>
-          <span className={styles.heroMetaItem}>
-            <em>Liquidity</em>
-            <strong>{detail.liquidityUsd !== undefined ? formatUsd(detail.liquidityUsd) : "--"}</strong>
-          </span>
-          <span className={styles.heroMetaItem}>
-            <em>{timeframe} Vol</em>
-            <strong>{timeframeVolumeUsd !== undefined ? formatUsd(timeframeVolumeUsd) : "--"}</strong>
-          </span>
-          <span className={styles.heroMetaItem}>
-            <em>{timeframe} Traders</em>
-            <strong>{timeframeTradersCount ?? "--"}</strong>
-          </span>
-        </div>
-        <div className={styles.heroInfoRow}>
-          <span className={styles.heroInfoItem}>
-            <em>Reserves</em>
-            <strong className={styles.reserveValue}>
-              {formatNumber(detail.leftAmount, 2)} {detail.left.symbol} · {formatNumber(detail.rightAmount, 2)}{" "}
-              {detail.right.symbol}
-            </strong>
-          </span>
-          <span className={styles.heroInfoItem}>
-            <em>Pool</em>
-            <a
-              className={styles.poolLink}
-              href={getAddressExplorerUrl(chainKey, detail.pool.pair)}
-              target="_blank"
-              rel="noreferrer"
-              title={detail.pool.pair}
-            >
-              <span className={styles.poolValue}>{truncateHash(detail.pool.pair, 10, 8)}</span>
-            </a>
-          </span>
-        </div>
-        <div className={styles.heroAddressRow}>
-          {detailAddressItems.map((item) => (
-            <button
-              key={item.key}
-              className={styles.heroAddressButton}
-              type="button"
-              onClick={() => handleCopyDetailAddress(item.key, item.value)}
-              title={`Copy ${item.copyLabel}: ${item.value}`}
-            >
-              <em>{item.label}</em>
-              <strong>{item.displayValue}</strong>
-              <span>
-                {copiedAddressKey === item.key ? "Copied" : "Copy"}
-              </span>
-            </button>
+        <dl className={styles.heroMeta} aria-label="Market statistics" tabIndex={0}>
+          {[
+            ["Liquidity", detail.liquidityUsd !== undefined ? formatUsdCompact(detail.liquidityUsd) : "--"],
+            [`${timeframe} Volume`, timeframeVolumeUsd !== undefined ? formatUsdCompact(timeframeVolumeUsd) : "--"],
+            [`${timeframe} Traders`, timeframeTradersCount ?? "--"],
+            ["Market cap", formatUsdCompact(detailMarketCapUsd)],
+            ["FDV", formatUsdCompact(detailFdvUsd)]
+          ].map(([label, value]) => (
+            <div className={styles.heroMetaItem} key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
           ))}
-        </div>
+        </dl>
       </section>
 
       <div className={styles.marketLayout}>
         <MarketPairChartPanel
           activeCandle={activeCandle}
-          baseSymbol={detail.left.symbol}
-          candleChange={candleChange}
           candleTimeLabel={candleTimeLabel}
           chartHostRef={chartHostRef}
           chartPairLabel={chartPairLabel}
-          chartQuoteUsd={chartQuoteUsd}
           chartTooltipRef={chartTooltipRef}
           hasCandles={candles.length > 0}
+          isCandlesEnabled={Boolean(detail.pool.pair && detailPriceValue)}
+          isCandlesError={isCandlesError}
           isCandlesLoading={isCandlesLoading}
+          onRetryCandles={() => { void refetchCandles() }}
+          onTimeframeChange={setTimeframe}
+          onResetView={() => {
+            chartRuntimeRef.current?.chart.timeScale().fitContent()
+            chartRuntimeRef.current?.priceSeries.priceScale().applyOptions({ autoScale: true })
+          }}
           quoteSymbol={detail.right.symbol}
           timeframe={timeframe}
         />
 
         <aside className={styles.marketRight}>
           <section className={styles.swapEmbed}>
-            {!chain.features.swap ? (
+            {!hasPairPrecision ? (
+              <div className={`card ${styles.tradingUnavailable}`} role="status">
+                <strong>{isPrecisionFetching ? "Checking token precision…" : "Token precision unavailable"}</strong>
+                <span>Prices, history and trading require valid token units.</span>
+                <button className={styles.precisionRetry} type="button" disabled={isPrecisionFetching} onClick={() => { void refetchPrecision() }}>
+                  Retry token data
+                </button>
+              </div>
+            ) : !chain.features.swap ? (
               <div className={`card ${styles.tradingUnavailable}`}>
                 <strong>Trading is not available on {chain.name} yet</strong>
                 <span>Pool data, price history, and recent transactions remain live.</span>
@@ -1465,6 +1537,7 @@ const MarketPairDetails = () => {
                     sidePanelMode === item ? styles.sidePanelTabActive : ""
                   }
                   type="button"
+                  aria-pressed={sidePanelMode === item}
                   onClick={() => setSidePanelMode(item)}
                 >
                   {item === "swap" ? "Swap" : item === "add" ? "Add" : "Remove"}
@@ -1560,6 +1633,8 @@ const MarketPairDetails = () => {
           baseSymbol={detail.left.symbol}
           hasMoreTrades={hasMoreTrades}
           isTradesLoading={isTradesLoading}
+          isTradesError={isTradesError}
+          onRetryTrades={() => { void refetchTrades() }}
           onLoadMore={() =>
             setTradePager((prev) => ({
               pair: detail.pool.pair,
@@ -1570,6 +1645,40 @@ const MarketPairDetails = () => {
           priceQuoteUsd={detailQuoteUsd}
           trades={trades}
         />
+        <details className={styles.poolDetails}>
+          <summary>
+            <strong>Pool details</strong>
+            <span>Reserves and contract addresses</span>
+          </summary>
+          <div className={styles.poolDetailsBody}>
+            <div className={styles.heroInfoRow}>
+              <span className={styles.heroInfoItem}>
+                <em>Reserves</em>
+                <strong className={styles.reserveValue}>
+                  {hasPairPrecision
+                    ? `${formatNumber(detail.leftAmount, 2)} ${detail.left.symbol} · ${formatNumber(detail.rightAmount, 2)} ${detail.right.symbol}`
+                    : "Unavailable until token precision is verified"}
+                </strong>
+              </span>
+              <a className={styles.poolLink} href={getAddressExplorerUrl(chainKey, detail.pool.pair)} target="_blank" rel="noreferrer">
+                View pool in explorer
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <path d="M14 4h6v6M20 4l-9 9M10 4H4v16h16v-6" />
+                </svg>
+              </a>
+            </div>
+            <div className={styles.heroAddressRow}>
+              {detailAddressItems.map((item) => (
+                <button key={item.key} className={styles.heroAddressButton} type="button"
+                  onClick={() => handleCopyDetailAddress(item.key, item.value)} title={`Copy ${item.copyLabel}: ${item.value}`}>
+                  <em>{item.label}</em>
+                  <strong>{item.displayValue}</strong>
+                  <span>{copiedAddressKey === item.key ? "Copied" : "Copy"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </details>
       </div>
     </PageShell>
   )

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import type { Cw20Token } from "./terraAssets"
 import { fetchWithEndpointFallback } from "./endpointFallback"
-import { writeLocalStorageValue } from "../utils/safeStorage"
+import { withInFlightAssetRequest } from "./assetMetadataRequests"
+import { readLocalStorageValue, writeLocalStorageValue } from "../utils/safeStorage"
 import { isTerraAddress } from "../utils/assetIdentity"
 import { getActiveAppChainRuntime } from "../activeChain"
 
@@ -24,6 +25,10 @@ const BALANCE_FETCH_ATTEMPTS = 2
 const BALANCE_FETCH_RETRY_DELAY_MS = 200
 const BALANCE_FETCH_CONCURRENCY = 8
 
+const isCw20Balance = (value: unknown): value is string =>
+  typeof value === "string" && /^[0-9]{1,39}$/.test(value) &&
+  BigInt(value) <= 340282366920938463463374607431768211455n
+
 type Cw20ChainScope = {
   chainId: string
   lcd: string
@@ -41,11 +46,12 @@ const delay = (ms: number) =>
 
 const loadCachePayload = (key: string, ttl = CACHE_TTL) => {
   if (typeof window === "undefined") return undefined
-  const cached = window.localStorage.getItem(key)
+  const cached = readLocalStorageValue(key)
   if (!cached) return undefined
   try {
     const parsed = JSON.parse(cached) as { ts: number; data: Record<string, string> }
-    if (!parsed?.ts || Date.now() - parsed.ts > ttl) return undefined
+    if (!Number.isFinite(parsed?.ts) || Date.now() - parsed.ts > ttl ||
+      !parsed.data || typeof parsed.data !== "object" || Array.isArray(parsed.data)) return undefined
     return parsed
   } catch {
     return undefined
@@ -96,8 +102,8 @@ const loadSingleBalanceCache = (
     if (!cached) return undefined
     const parsed = JSON.parse(cached) as SingleBalanceCache
     if (
-      typeof parsed.balance !== "string" ||
-      typeof parsed.ts !== "number" ||
+      !isCw20Balance(parsed.balance) ||
+      !Number.isFinite(parsed.ts) ||
       Date.now() - parsed.ts > CACHE_TTL
     ) {
       return undefined
@@ -284,8 +290,10 @@ const fetchCw20BalanceResult = async (
           return { balance: "0", invalid: true }
         }
       } else {
-        const data = (await res.json()) as { data?: { balance?: string } }
-        return { balance: data?.data?.balance ?? "0" }
+        const data = (await res.json()) as { data?: { balance?: unknown } }
+        // CW20 balances are Uint128 strings. A malformed success response is a
+        // failed read, not evidence that the holding has disappeared.
+        if (isCw20Balance(data?.data?.balance)) return { balance: data.data.balance }
       }
 
       if (attempt < BALANCE_FETCH_ATTEMPTS - 1) {
@@ -330,7 +338,7 @@ export const fetchCw20Balances = async (
     scope.chainId
   )
   const invalidKey = `cw20invalid:${scope.chainId}`
-  const cached = loadCache(cacheKey)
+  const cached = getCachedCw20Balances(normalizedAddress, effectiveWhitelist, scope)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
   const invalidContracts: Record<string, boolean> = {}
 
@@ -340,18 +348,10 @@ export const fetchCw20Balances = async (
     })
   }
 
-  const results: Record<string, string> = cached ? { ...cached } : {}
-  loadActiveBalanceContracts(normalizedAddress, scope.chainId).forEach((contract) => {
-    if (!(contract in effectiveWhitelist) || contract in results) return
-    const cachedSingle = loadSingleBalanceCache(
-      normalizedAddress,
-      contract,
-      scope.chainId
-    )
-    if (cachedSingle) {
-      results[contract] = cachedSingle.balance
-    }
-  })
+  const results: Record<string, string> = Object.fromEntries(
+    (cached?.data ?? []).map((token) => [token.address, token.balance])
+  )
+  const freshResults: Record<string, string> = {}
   const entries = Object.entries(effectiveWhitelist).filter(([contract]) => {
     const normalized = contract.toLowerCase()
     if (forceContracts.has(normalized)) return true
@@ -375,19 +375,29 @@ export const fetchCw20Balances = async (
       if (!result) continue
       if (result.invalid && !forceContracts.has(contract)) {
         invalidContracts[contract] = true
+      } else if (!result.invalid) {
+        delete invalidContracts[contract]
       }
       results[contract] = result.balance
+      freshResults[contract] = result.balance
     }
   })
 
   await Promise.all(workers)
 
-  saveCache(cacheKey, results)
+  if (entries.length && !Object.keys(freshResults).length) {
+    throw new Error("Failed to fetch CW20 balances")
+  }
+  // Aggregate snapshots have one timestamp. Only write one when every listed
+  // token was actually read; partial scans must not renew failed old balances.
+  if (Object.keys(freshResults).length === Object.keys(effectiveWhitelist).length) {
+    saveCache(cacheKey, freshResults)
+  }
   saveCache(invalidKey, Object.fromEntries(Object.keys(invalidContracts).map((k) => [k, "1"])))
-  Object.entries(results).forEach(([contract, balance]) => {
+  Object.entries(freshResults).forEach(([contract, balance]) => {
     saveSingleBalanceCache(normalizedAddress, contract, balance, scope.chainId)
   })
-  saveActiveBalanceContracts(normalizedAddress, results, scope.chainId)
+  saveActiveBalanceContracts(normalizedAddress, freshResults, scope.chainId)
 
   return mapCw20BalanceResults(results, effectiveWhitelist)
 }
@@ -408,39 +418,28 @@ export const getCachedCw20Balances = (
   const payload = loadCachePayload(
     buildBalanceCacheKey(normalizedAddress, effectiveWhitelist, scope.chainId)
   )
-  const data: Record<string, string> = payload ? { ...payload.data } : {}
-
-  loadActiveBalanceContracts(normalizedAddress, scope.chainId).forEach((contract) => {
-    if (!(contract in effectiveWhitelist) || contract in data) return
+  const data: Record<string, string> = {}
+  const timestamps: number[] = []
+  Object.keys(effectiveWhitelist).forEach((contract) => {
     const cachedSingle = loadSingleBalanceCache(
       normalizedAddress,
       contract,
       scope.chainId
     )
-    if (cachedSingle) {
+    if (cachedSingle && (!payload || !isCw20Balance(payload.data[contract]) ||
+      cachedSingle.ts >= payload.ts)) {
       data[contract] = cachedSingle.balance
+      timestamps.push(cachedSingle.ts)
+    } else if (payload && isCw20Balance(payload.data[contract])) {
+      data[contract] = payload.data[contract]
+      timestamps.push(payload.ts)
     }
   })
-
-  if (!payload && !Object.keys(data).length) {
-    Object.keys(effectiveWhitelist).forEach((contractRaw) => {
-      const contract = normalizeContract(contractRaw)
-      if (!contract || contract in data) return
-      const cachedSingle = loadSingleBalanceCache(
-        normalizedAddress,
-        contract,
-        scope.chainId
-      )
-      if (cachedSingle) {
-        data[contract] = cachedSingle.balance
-      }
-    })
-  }
 
   if (!Object.keys(data).length) return undefined
   return {
     data: mapCw20BalanceResults(data, effectiveWhitelist),
-    updatedAt: payload?.ts ?? Date.now() - 1
+    updatedAt: Math.min(...timestamps)
   }
 }
 
@@ -501,18 +500,10 @@ export const useCw20Balances = (
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
     initialData: cachedBalances?.data,
     initialDataUpdatedAt: cachedBalances?.updatedAt,
-    placeholderData: (previousData) => previousData,
     staleTime: forceSignature ? 30_000 : 2 * 60_000,
     refetchOnMount: true,
     refetchOnWindowFocus: false
   })
-}
-
-type Cw20TokenInfoResponse = {
-  data?: {
-    total_supply?: string
-    decimals?: number
-  }
 }
 
 export type Cw20SupplyInfo = {
@@ -521,28 +512,42 @@ export type Cw20SupplyInfo = {
   units: number
 }
 
-const toUnits = (amount: string, decimals: number) => {
-  const parsed = Number(amount)
-  if (!Number.isFinite(parsed)) return 0
-  return parsed / 10 ** Math.max(0, decimals)
+export const getCw20SupplyUnitsForDecimals = (
+  supply: Cw20SupplyInfo | undefined,
+  priceDecimals: number
+) => supply?.decimals === priceDecimals ? supply.units : undefined
+
+const parseCw20Supply = (
+  totalSupply: unknown,
+  decimals: unknown
+): Cw20SupplyInfo | undefined => {
+  // CW20 TokenInfoResponse supplies Uint128 + u8. Do not infer precision from
+  // registry metadata or turn a malformed upstream value into a real zero.
+  if (
+    typeof totalSupply !== "string" || !/^[0-9]{1,39}$/.test(totalSupply) ||
+    BigInt(totalSupply) > 340282366920938463463374607431768211455n ||
+    typeof decimals !== "number" || !Number.isInteger(decimals) ||
+    decimals < 0 || decimals > 255
+  ) return undefined
+  return { totalSupply, decimals, units: Number(totalSupply) / 10 ** decimals }
 }
 
-const buildCw20SupplyCacheKey = (contract: string, chainId: string) =>
-  `cw20supply-token:v1:${chainId}:${contract}`
+const buildCw20SupplyCacheKey = (contract: string, scope: Cw20ChainScope) =>
+  `cw20supply-token:v2:${scope.chainId}:${scope.lcd}:${contract}`
 
-const loadCw20SupplyCache = (contract: string, chainId: string) => {
-  if (typeof window === "undefined") return undefined
+const loadCw20SupplyCache = (contract: string, scope: Cw20ChainScope) => {
   try {
-    const raw = window.localStorage.getItem(
-      buildCw20SupplyCacheKey(contract, chainId)
-    )
+    const raw = readLocalStorageValue(buildCw20SupplyCacheKey(contract, scope))
     if (!raw) return undefined
-    const cached = JSON.parse(raw) as { ts?: number; data?: Cw20SupplyInfo }
-    if (!cached.ts || Date.now() - cached.ts > SUPPLY_CACHE_TTL) return undefined
-    if (!cached.data?.totalSupply || !Number.isFinite(cached.data.decimals)) {
-      return undefined
-    }
-    return cached.data
+    const cached = JSON.parse(raw) as {
+      ts?: unknown; data?: { totalSupply?: unknown; decimals?: unknown }
+    } | null
+    const now = Date.now()
+    if (!cached || typeof cached.ts !== "number" || !Number.isFinite(cached.ts) ||
+      cached.ts < 0 || cached.ts > now || now - cached.ts >= SUPPLY_CACHE_TTL) return undefined
+    // Recompute approximate display units from validated raw fields; never trust
+    // a stored converted number. v1/batch caches can contain guessed decimals.
+    return parseCw20Supply(cached.data?.totalSupply, cached.data?.decimals)
   } catch {
     return undefined
   }
@@ -551,13 +556,13 @@ const loadCw20SupplyCache = (contract: string, chainId: string) => {
 const saveCw20SupplyCache = (
   contract: string,
   data: Cw20SupplyInfo,
-  chainId: string
+  scope: Cw20ChainScope
 ) => {
   if (typeof window === "undefined") return
   try {
     writeLocalStorageValue(
-      buildCw20SupplyCacheKey(contract, chainId),
-      JSON.stringify({ ts: Date.now(), data })
+      buildCw20SupplyCacheKey(contract, scope),
+      JSON.stringify({ ts: Date.now(), data: { totalSupply: data.totalSupply, decimals: data.decimals } })
     )
   } catch {
     // Ignore storage failures in private browsing or low-storage mobile contexts.
@@ -566,7 +571,7 @@ const saveCw20SupplyCache = (
 
 export const fetchCw20Supplies = async (
   contracts: string[],
-  whitelist: Record<string, Cw20Token>,
+  _whitelist: Record<string, Cw20Token>,
   scope = getCw20ChainScope()
 ) => {
   const unique = Array.from(
@@ -578,24 +583,10 @@ export const fetchCw20Supplies = async (
   )
   if (!unique.length) return {}
 
-  const cacheKey = `cw20supply:${scope.chainId}:${unique.join(",")}`
-  const cached = loadCache(cacheKey, SUPPLY_CACHE_TTL) as Record<string, string> | undefined
   const results: Record<string, Cw20SupplyInfo> = {}
   unique.forEach((contract) => {
-    const individual = loadCw20SupplyCache(contract, scope.chainId)
-    if (individual) {
-      results[contract] = individual
-      return
-    }
-    const payload = cached?.[contract]
-    if (!payload) return
-    try {
-      const parsed = JSON.parse(payload) as Cw20SupplyInfo
-      results[contract] = parsed
-      saveCw20SupplyCache(contract, parsed, scope.chainId)
-    } catch {
-      // Ignore invalid legacy cache entries.
-    }
+    const individual = loadCw20SupplyCache(contract, scope)
+    if (individual) results[contract] = individual
   })
 
   const missing = unique.filter((contract) => !results[contract])
@@ -611,22 +602,23 @@ export const fetchCw20Supplies = async (
       const contract = missing[current]
       try {
         const query = btoa(JSON.stringify({ token_info: {} }))
-        const res = await fetchWithEndpointFallback(
-          `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const url = `${scope.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${query}`
+        const data = await withInFlightAssetRequest(
+          scope.chainId,
+          url,
+          async () => {
+            const response = await fetchWithEndpointFallback(url)
+            if (!response.ok) return undefined
+            return (await response.json()) as {
+              data?: { total_supply?: unknown; decimals?: unknown }
+            } | null
+          }
         )
-        if (!res.ok) continue
-        const data = (await res.json()) as Cw20TokenInfoResponse
         const tokenInfo = data?.data
-        const totalSupply = tokenInfo?.total_supply
-        if (!totalSupply) continue
-        const decimals = tokenInfo?.decimals ?? whitelist[contract]?.decimals ?? 6
-        const supply = {
-          totalSupply,
-          decimals,
-          units: toUnits(totalSupply, decimals)
-        }
+        const supply = parseCw20Supply(tokenInfo?.total_supply, tokenInfo?.decimals)
+        if (!supply) continue
         results[contract] = supply
-        saveCw20SupplyCache(contract, supply, scope.chainId)
+        saveCw20SupplyCache(contract, supply, scope)
       } catch {
         // Ignore per-contract failure.
       }
@@ -635,17 +627,6 @@ export const fetchCw20Supplies = async (
 
   await Promise.all(workers)
 
-  if (Object.keys(results).length) {
-    const serializable = Object.fromEntries(
-      Object.entries(results).map(([contract, info]) => [contract, JSON.stringify(info)])
-    )
-    if (typeof window !== "undefined") {
-      writeLocalStorageValue(
-        cacheKey,
-        JSON.stringify({ ts: Date.now(), data: serializable })
-      )
-    }
-  }
   return results
 }
 
@@ -659,7 +640,7 @@ export const useCw20Supplies = (
   ).sort()
 
   return useQuery({
-    queryKey: ["cw20-supplies", scope.chainId, normalized.join(",")],
+    queryKey: ["cw20-supplies", scope.chainId, scope.lcd, normalized.join(",")],
     queryFn: () => fetchCw20Supplies(normalized, whitelist ?? {}, scope),
     enabled: normalized.length > 0,
     staleTime: SUPPLY_CACHE_TTL

@@ -14,6 +14,8 @@ type MarketRecentTradesProps = {
   baseSymbol: string
   hasMoreTrades: boolean
   isTradesLoading: boolean
+  isTradesError: boolean
+  onRetryTrades: () => void
   onLoadMore: () => void
   priceQuoteSymbol: string
   priceQuoteUsd: number | undefined
@@ -24,6 +26,8 @@ const MarketRecentTrades = ({
   baseSymbol,
   hasMoreTrades,
   isTradesLoading,
+  isTradesError,
+  onRetryTrades,
   onLoadMore,
   priceQuoteSymbol,
   priceQuoteUsd,
@@ -38,6 +42,13 @@ const MarketRecentTrades = ({
     </header>
     {isTradesLoading ? (
       <div className={styles.tradesFallback}>Loading recent swaps...</div>
+    ) : isTradesError && !trades.length ? (
+      <div className={styles.tradesFallback} role="alert">
+        Could not load recent trades.
+        <button type="button" className="uiButton uiButtonOutline" onClick={onRetryTrades}>
+          Retry trades
+        </button>
+      </div>
     ) : !trades.length ? (
       <div className={styles.tradesFallback}>No recent swaps found for this pair.</div>
     ) : (

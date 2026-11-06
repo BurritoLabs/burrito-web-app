@@ -75,4 +75,17 @@ describe("wallet storage metadata", () => {
     )
     expect(localStorage.getItem("mnemonic")).toBeNull()
   })
+
+  it("persists the Burrito extension connector without storing wallet secrets", () => {
+    const localStorage = createLocalStorage()
+    vi.stubGlobal("window", { localStorage })
+
+    rememberWalletConnectorId("burrito-extension")
+
+    expect(getStoredWalletConnectorId()).toBe("burrito-extension")
+    expect(localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)).toBe(
+      "burrito-extension"
+    )
+    expect(localStorage.getItem("mnemonic")).toBeNull()
+  })
 })

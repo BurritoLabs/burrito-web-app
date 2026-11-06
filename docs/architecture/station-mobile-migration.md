@@ -1,6 +1,6 @@
 # Station Mobile Migration Plan
 
-Last updated: 2026-08-01
+Last updated: 2026-09-30
 
 ## Goal
 
@@ -54,9 +54,18 @@ application.
 
 ## Delivery Phases
 
+The requirements below retain the original migration scope. Implementation,
+scoped acceptance and outstanding release gates are separate: a source-level
+feature or simulator result does not complete every requirement in its phase.
+The evidence checkpoint is Mobile documentation revision `4025f50`, with
+installed iOS runtime `2eeac81`; see the evidence index below. Later work must
+use the Mobile repository's current release matrix rather than infer new
+acceptance from these historical counts.
+
 ### Phase 0 - Provenance and boundaries
 
-Status: completed in the Web repository documentation.
+Status: documentation completed in the Web repository; this is provenance
+preparation, not native runtime or distribution acceptance.
 
 - Pin Station upstream commits.
 - Record license and trademark boundaries.
@@ -65,7 +74,15 @@ Status: completed in the Web repository documentation.
 
 ### Phase 1 - Mobile repository and baseline spike
 
-Status: not started.
+Implemented: the separate `BurritoLabs/burrito-wallet-mobile` repository has a
+modern React Native shell with iOS/Android targets and recorded Station
+reference boundaries; the shell is independently implemented, not a copied
+Station native project.
+
+Accepted: the documented `2eeac81` iOS Release simulator build and installed
+artifact provenance. Earlier Android Debug evidence is recorded separately.
+Pending: current-source Android build/runtime acceptance, final toolchain and
+artifact provenance, and device/distribution gates.
 
 - Create `BurritoLabs/burrito-wallet-mobile` as a separate repository.
 - Preserve Station source history or an equivalent import record.
@@ -82,22 +99,36 @@ host and Apple signing environment are required for iOS build and device proof.
 
 ### Phase 2 - Chain contract fixtures
 
-Status: Windows preparation completed; native import and cross-platform tests
-pending.
+Implemented: the versioned registry and intent/isolation fixtures now also
+exist in the Mobile repository. Its `walletContracts` tests consume those
+fixtures and check explicit chain identities and wallet-scoped keys.
+
+Accepted: scoped JavaScript contract/regression evidence in the Mobile
+release matrix. Pending: equivalent current-source iOS and Android runtime
+evidence; JavaScript fixtures are not platform signing acceptance.
 
 - Snapshot `columbus-5` and `phoenix-1` identities from current Burrito behavior.
 - Add address, denom, fee, memo, message, and readable-preview fixtures.
 - Add negative tests for cross-chain address/session/cache confusion.
 - Do not refactor production Web transaction builders during this phase.
 
-The preparatory registry, schema, and public fixtures live under
-`specs/wallet/` and are checked by `npm run check:wallet-specs`. Completion of
-this phase still requires importing them into the separate mobile repository
-and proving equivalent iOS and Android tests.
+The Web registry, schema, and public fixtures live under `specs/wallet/` and
+are checked by `npm run check:wallet-specs`. The Mobile fixture import and
+consumer are linked in the evidence index. Completing the original phase
+still requires equivalent iOS and Android tests, not merely that import.
 
 ### Phase 3 - Local vault and account lifecycle
 
-Status: not started.
+Implemented: native create/import, backup confirmation, protected storage,
+unlock and confirmed removal, with session invalidation and pre-save cleanup.
+
+Accepted: earlier iOS simulator passes cover disposable protected create and
+12/24-word import, cold/update persistence, Web account return and removal at
+their documented revisions. The later `2eeac81` pass covers pre-save import
+cleanup only; it does not repeat protected-storage acceptance.
+Pending: hardware device-owner authentication, current Android acceptance,
+private accessible word review and the remaining lifecycle requirements below.
+This does not claim native credential-change or recovery-export acceptance.
 
 - Create/import a wallet locally.
 - Verify deterministic addresses against fixed fixtures.
@@ -112,7 +143,13 @@ review.
 
 ### Phase 4 - Read-only wallet
 
-Status: not started.
+Implemented in part: the native bridge supplies chain-specific public accounts
+to the existing shared Web wallet UI. This is not a claim that a separate
+native balances/receive-QR interface is complete.
+
+Accepted: the documented iOS native-to-Web connection and full imported-account
+identity checks. Pending: complete current-device read-only route acceptance,
+including balances, receive QR, freshness and all unavailable/partial states.
 
 - LUNC/LUNA account selection with explicit `chainId`.
 - Native asset balances and receive QR.
@@ -121,7 +158,14 @@ Status: not started.
 
 ### Phase 5 - Send and readable signing
 
-Status: not started.
+Implemented in part: native allowlisted transaction decoding, readable review,
+canonical validation and signing code, alongside the Web transaction builders.
+
+Accepted: scoped fixture and mocked cancellation/stale-callback regressions.
+Pending: actual native transaction-approval acceptance, hardware authentication
+and a separately authorized end-to-end signing/broadcast plan. No successful
+transaction signing or chain execution is established by the iOS evidence
+indexed here; the Phase 3 security-review prerequisite remains unchanged.
 
 - Prepare, simulate, review, sign, broadcast, and confirm a native transfer.
 - Verify the active chain/account immediately before signing.
@@ -132,7 +176,13 @@ Status: not started.
 
 ### Phase 6 - Keplr connection
 
-Status: not started.
+Implemented in part: the shared Web connector and bounded native WalletConnect
+v2 Keplr handoff policy, separate from the Burrito-created account path.
+
+Accepted: source-level navigation-policy coverage only for this summary.
+Pending: actual Keplr pairing and the full restoration, rejection, expiry,
+account/network change and return-to-app sequence on current iOS/Android
+candidates. Native Burrito account-return checks are not Keplr acceptance.
 
 - Add Keplr as an external signer, separate from a Burrito-created account.
 - Implement deep-link, session restoration, rejection, expiry, account change,
@@ -141,7 +191,12 @@ Status: not started.
 
 ### Phase 7 - TestFlight MVP
 
-Status: not started.
+Implemented in part: native wallet flows and draft store/privacy/reviewer
+materials are prepared. Accepted: only the scoped local and simulator evidence
+above. Pending: the complete MVP acceptance list below, final screenshots,
+privacy/provider and owner decisions, real-device proof, release signing and
+explicitly authorized TestFlight submission. No TestFlight acceptance or
+publication approval is claimed.
 
 - Create/import/backup/recover.
 - Keplr external connection.
@@ -151,6 +206,23 @@ Status: not started.
 
 Stake, Governance, Swap, Launchpad, contract tools, Ledger, and acting as a
 WalletConnect wallet for third-party dApps remain outside the first custody MVP.
+
+## Evidence Index — September 30 checkpoint
+
+These links pin Mobile documentation/source revision
+`4025f509983be12387d120042f145eb4255bce10`, not a new native build. Runtime and
+test-only revisions inside each report must not be conflated. The Mobile
+repository's `docs/app-store-release.md` is authoritative for later finalized
+evidence and remaining gates; this Web plan does not declare newer work passed.
+
+| Evidence | Established scope | Not established |
+| --- | --- | --- |
+| [Mobile release matrix](https://github.com/BurritoLabs/burrito-wallet-mobile/blob/4025f509983be12387d120042f145eb4255bce10/docs/app-store-release.md) | Current checkpoint and separate platform, privacy, CI and store gates | Final-source CI, complete native acceptance or distribution approval |
+| [Imported contract fixtures and tests](https://github.com/BurritoLabs/burrito-wallet-mobile/blob/4025f509983be12387d120042f145eb4255bce10/__tests__/walletContracts.test.ts) | Mobile consumes versioned chain/intent/isolation fixtures and rejects malformed or unsupported contracts | Equivalent native iOS/Android signing/runtime acceptance |
+| [Protected-create follow-up](https://github.com/BurritoLabs/burrito-wallet-mobile/blob/4025f509983be12387d120042f145eb4255bce10/docs/ios-protected-runtime-qa-20260930.md) | Earlier `64d2826`/`2796f9a` simulator create/protect, persistence, normal Web account return and Keep/Remove flows | Hardware Face ID/passcode challenge, transaction signing or current-binary repetition |
+| [Protected import and update](https://github.com/BurritoLabs/burrito-wallet-mobile/blob/4025f509983be12387d120042f145eb4255bce10/docs/ios-import-runtime-qa-20260930.md) | 12/24-word import at `2796f9a`, update to `01f01df`, full Web-returned address equality and removal; exact flow revisions are in the report | Hardware authentication, actual transaction approval/signing or Android acceptance |
+| [Pre-save import lifecycle](https://github.com/BurritoLabs/burrito-wallet-mobile/blob/4025f509983be12387d120042f145eb4255bce10/docs/ios-import-lifecycle-qa-20260930.md) | Installed runtime `2eeac81`: 44 native import/review background, foreground and cold-entry checks. Test-only `2cddb77`: selected Jest 326 tests / 29 suites on Windows and iMac, typecheck and zero-warning lint | A new save/protection/authentication action, repeated protected-wallet acceptance, full dependency audit or complete release acceptance |
+| [Android historical runtime](https://github.com/BurritoLabs/burrito-wallet-mobile/blob/4025f509983be12387d120042f145eb4255bce10/docs/android-runtime-qa-20260912.md) | September 12 source-built x86_64 Debug empty-onboarding, text-size and background-clearing checks | Current-source Release runtime, TalkBack, tablet/landscape, hardware authentication or release-binary acceptance |
 
 ## Acceptance Gates
 

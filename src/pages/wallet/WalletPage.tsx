@@ -71,6 +71,7 @@ const Wallet = () => {
   }, [accountAddress, chain.chainId, queryClient])
 
   const handleSendAsset = useCallback((asset: WalletAsset) => {
+    if (asset.decimals === undefined) return
     openWalletPanel({
       view: "send",
       asset: {
@@ -96,6 +97,7 @@ const Wallet = () => {
 
   const handleSwapAsset = useCallback(
     (asset: WalletAsset) => {
+      if (asset.decimals === undefined) return
       navigate(getWalletSwapPath(asset))
     },
     [navigate]

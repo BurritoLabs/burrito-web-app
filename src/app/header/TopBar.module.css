@@ -62,7 +62,7 @@
     color 180ms ease;
 }
 
-.chainTrigger:hover,
+.chainTrigger:hover:not(:disabled),
 .chainTriggerOpen {
   border-color: rgba(var(--chain-rgb), 0.38);
   background: rgba(var(--chain-rgb), 0.08);
@@ -694,4 +694,10 @@
     top: 4px;
     right: 0;
   }
+}
+
+.chainTrigger:disabled,
+.chainOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }

@@ -61,6 +61,9 @@ jobs:
       - name: Production dependency audit
         run: npm run check:audit
 
+      - name: All dependency audit including build tools
+        run: npm run check:audit:all
+
       - name: Build
         run: npm run build
 

@@ -4,7 +4,8 @@ import PageShell from "../PageShell"
 import styles from "../Dashboard.module.css"
 import {
   fetchCurrentDashboardSnapshot,
-  fetchCurrentPhoenixDashboardSnapshot
+  fetchCurrentPhoenixDashboardSnapshot,
+  type DashboardSnapshot
 } from "../../app/data/dashboard"
 import { fetchBinodesDashboardActivity } from "../../app/data/binodes"
 import { fetchPrices } from "../../app/data/classic"
@@ -14,7 +15,7 @@ import {
   type DashboardHistoryPoint
 } from "../../app/data/dashboardHistory"
 import { fetchLunaDashboardMetric } from "../../app/data/dashboardMetrics"
-import { formatNumber, formatPercent } from "../../app/utils/format"
+import { formatPercent } from "../../app/utils/format"
 import {
   dashboardRangeOptions,
   dashboardRanges,
@@ -37,6 +38,15 @@ import {
   MiniTrend
 } from "./DashboardCharts"
 import { useAppChain } from "../../app/appChainContext"
+import {
+  dashboardActivityPoints,
+  dashboardActivityTotal,
+  dashboardBurnAmount,
+  dashboardBurnPoints,
+  dashboardFeeYieldPoints
+} from "../../app/dashboard/activityPresentation"
+
+const EMPTY_SNAPSHOT: DashboardSnapshot = { timestamp: 0 }
 
 const useDeferredHistoryEnabled = () => {
   const [enabled, setEnabled] = useState(() => !getIsMobileDashboard())
@@ -71,20 +81,6 @@ const compactAssetAmount = (value?: number, symbol?: string) => {
     notation: "compact",
     maximumFractionDigits: 2
   }).format(Number(value))}${symbol ? ` ${symbol}` : ""}`
-}
-
-const buildFallbackTrend = (
-  currentPrice: number | undefined,
-  percentageChange: number | undefined,
-  rangeMs: number
-): DashboardHistoryPoint[] => {
-  if (!Number.isFinite(currentPrice) || !Number.isFinite(percentageChange)) return []
-  const divisor = 1 + Number(percentageChange) / 100
-  if (!divisor) return []
-  return [
-    { time: Date.now() - rangeMs, value: Number(currentPrice) / divisor },
-    { time: Date.now(), value: Number(currentPrice) }
-  ]
 }
 
 const marketChange = ({
@@ -202,26 +198,30 @@ const Dashboard = () => {
   const activeRange = dashboardRanges[dashboardRange]
   const historyEnabled = useDeferredHistoryEnabled()
 
-  const { data: currentSnapshot } = useQuery({
+  const snapshotQuery = useQuery({
     queryKey: ["dashboard", chain.chainId, "snapshot", "current"],
     queryFn: isClassic
       ? fetchCurrentDashboardSnapshot
       : fetchCurrentPhoenixDashboardSnapshot,
     staleTime: 60 * 1000,
-    refetchInterval: 90 * 1000
+    refetchInterval: 90 * 1000,
+    retry: false
   })
+  const currentSnapshot = snapshotQuery.data ?? EMPTY_SNAPSHOT
+  const snapshotLoading = snapshotQuery.isPending
 
-  const { data: prices } = useQuery({
+  const pricesQuery = useQuery({
     queryKey: ["prices", chain.chainId],
     queryFn: fetchPrices,
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000
   })
+  const prices = pricesQuery.data
 
   const { data: luncPriceHistory } = useQuery({
     queryKey: ["dashboard", "price-history", "lunc", dashboardRange],
-    queryFn: () =>
-      fetchDashboardPriceHistory("lunc", activeRange.rangeMs, prices?.lunc?.usd),
+    queryFn: ({ signal }) =>
+      fetchDashboardPriceHistory("lunc", activeRange.rangeMs, undefined, signal),
     enabled: isClassic,
     staleTime: activeRange.ttlMs,
     retry: 1
@@ -229,8 +229,8 @@ const Dashboard = () => {
 
   const { data: ustcPriceHistory } = useQuery({
     queryKey: ["dashboard", "price-history", "ustc", dashboardRange],
-    queryFn: () =>
-      fetchDashboardPriceHistory("ustc", activeRange.rangeMs, prices?.ustc?.usd),
+    queryFn: ({ signal }) =>
+      fetchDashboardPriceHistory("ustc", activeRange.rangeMs, undefined, signal),
     enabled: isClassic,
     staleTime: activeRange.ttlMs,
     retry: 1
@@ -238,40 +238,35 @@ const Dashboard = () => {
 
   const { data: lunaPriceHistory } = useQuery({
     queryKey: ["dashboard", "price-history", "luna", dashboardRange],
-    queryFn: () =>
-      fetchDashboardPriceHistory("luna", activeRange.rangeMs, prices?.luna?.usd),
+    queryFn: ({ signal }) =>
+      fetchDashboardPriceHistory("luna", activeRange.rangeMs, undefined, signal),
     enabled: !isClassic,
     staleTime: activeRange.ttlMs,
     retry: 1
   })
 
+  const activityQuery = useQuery({
+    queryKey: [
+      "binodes", "dashboard", chain.chainId, "activity",
+      activeRange.activityFrequency, activeRange.activityBuckets
+    ],
+    queryFn: ({ signal }) => fetchBinodesDashboardActivity(
+      activeRange.activityFrequency, activeRange.activityBuckets, signal
+    ),
+    enabled: isClassic && historyEnabled,
+    staleTime: activeRange.ttlMs,
+    refetchInterval: 10 * 60 * 1000,
+    retry: false
+  })
   const {
     data: activity,
     isLoading: activityLoading,
     isError: activityError
-  } = useQuery({
-    queryKey: [
-      "binodes",
-      "dashboard",
-      chain.chainId,
-      "activity",
-      activeRange.activityFrequency,
-      activeRange.activityBuckets
-    ],
-    queryFn: () =>
-      fetchBinodesDashboardActivity(
-        activeRange.activityFrequency,
-        activeRange.activityBuckets
-      ),
-    enabled: isClassic && historyEnabled,
-    staleTime: activeRange.ttlMs,
-    refetchInterval: 10 * 60 * 1000,
-    retry: 1
-  })
+  } = activityQuery
 
   const { data: lunaStakedHistory, isLoading: lunaStakedLoading } = useQuery({
     queryKey: ["dashboard", "luna", "total_staked", dashboardRange],
-    queryFn: () => fetchLunaDashboardMetric("total_staked", dashboardRange),
+    queryFn: ({ signal }) => fetchLunaDashboardMetric("total_staked", dashboardRange, signal),
     enabled: !isClassic && historyEnabled,
     staleTime: activeRange.ttlMs,
     retry: 1
@@ -279,7 +274,7 @@ const Dashboard = () => {
 
   const { data: lunaUnbondingHistory, isLoading: lunaUnbondingLoading } = useQuery({
     queryKey: ["dashboard", "luna", "unbonding", dashboardRange],
-    queryFn: () => fetchLunaDashboardMetric("unbonding", dashboardRange),
+    queryFn: ({ signal }) => fetchLunaDashboardMetric("unbonding", dashboardRange, signal),
     enabled: !isClassic && historyEnabled,
     staleTime: activeRange.ttlMs,
     retry: 1
@@ -287,7 +282,7 @@ const Dashboard = () => {
 
   const { data: lunaDelegatorHistory, isLoading: lunaDelegatorLoading } = useQuery({
     queryKey: ["dashboard", "luna", "delegators", dashboardRange],
-    queryFn: () => fetchLunaDashboardMetric("delegators", dashboardRange),
+    queryFn: ({ signal }) => fetchLunaDashboardMetric("delegators", dashboardRange, signal),
     enabled: !isClassic && historyEnabled,
     staleTime: activeRange.ttlMs,
     retry: 1
@@ -312,43 +307,31 @@ const Dashboard = () => {
     change7d: prices?.luna?.usd_7d_change
   })
 
-  const luncTrend =
-    luncPriceHistory?.length
-      ? luncPriceHistory
-      : buildFallbackTrend(prices?.lunc?.usd, luncChange, activeRange.rangeMs)
-  const ustcTrend =
-    ustcPriceHistory?.length
-      ? ustcPriceHistory
-      : buildFallbackTrend(prices?.ustc?.usd, ustcChange, activeRange.rangeMs)
-  const lunaTrend =
-    lunaPriceHistory?.length
-      ? lunaPriceHistory
-      : buildFallbackTrend(prices?.luna?.usd, lunaChange, activeRange.rangeMs)
+  const luncTrend = luncPriceHistory ?? []
+  const ustcTrend = ustcPriceHistory ?? []
+  const lunaTrend = lunaPriceHistory ?? []
 
   const metrics = useMemo<MetricItem[]>(() => {
-    if (!currentSnapshot) return []
     if (!isClassic) {
       return [
         {
           key: "staked",
           label: "Total Staked",
-          value: formatValue(currentSnapshot.stakedLunc, 0),
+          value: compactAssetAmount(currentSnapshot.stakedLunc),
+          fullValue: formatValue(currentSnapshot.stakedLunc, 0),
           unit: "LUNA"
         },
         {
           key: "stakingRatio",
           label: "Staking Ratio",
-          value: formatValue(currentSnapshot.stakingRatio * 100, 2),
+          value: formatValue(currentSnapshot.stakingRatio === undefined ? undefined : currentSnapshot.stakingRatio * 100, 2),
           unit: "%"
         },
         {
           key: "validators",
           label: "Active Validators",
-          value: currentSnapshot.activeValidators
-            ? `${formatNumber(currentSnapshot.activeValidators, 0)} / ${formatNumber(
-                currentSnapshot.maxValidators ?? 0,
-                0
-              )}`
+          value: currentSnapshot.activeValidators !== undefined
+            ? `${formatValue(currentSnapshot.activeValidators, 0)} / ${formatValue(currentSnapshot.maxValidators, 0)}`
             : "--"
         },
         {
@@ -363,23 +346,21 @@ const Dashboard = () => {
       {
         key: "staked",
         label: "Total Staked",
-        value: formatValue(currentSnapshot.stakedLunc, 0),
+        value: compactAssetAmount(currentSnapshot.stakedLunc),
+        fullValue: formatValue(currentSnapshot.stakedLunc, 0),
         unit: "LUNC"
       },
       {
         key: "stakingRatio",
         label: "Staking Ratio",
-        value: formatValue(currentSnapshot.stakingRatio * 100, 2),
+        value: formatValue(currentSnapshot.stakingRatio === undefined ? undefined : currentSnapshot.stakingRatio * 100, 2),
         unit: "%"
       },
       {
         key: "validators",
         label: "Active Validators",
-        value: currentSnapshot.activeValidators
-          ? `${formatNumber(currentSnapshot.activeValidators, 0)} / ${formatNumber(
-              currentSnapshot.maxValidators ?? 0,
-              0
-            )}`
+        value: currentSnapshot.activeValidators !== undefined
+          ? `${formatValue(currentSnapshot.activeValidators, 0)} / ${formatValue(currentSnapshot.maxValidators, 0)}`
           : "--"
       },
       {
@@ -395,41 +376,17 @@ const Dashboard = () => {
   )
 
   const activitySeries = activity?.series ?? []
-  const toPoint = (
-    field: "transferAmountUsd" | "activeAddressCount"
-  ): DashboardHistoryPoint[] =>
-    activitySeries.map((point) => ({
-      time: new Date(point.dt).getTime(),
-      value: point[field] ?? 0
-    }))
-  const volumeSeries = toPoint("transferAmountUsd")
-  const walletSeries = toPoint("activeAddressCount")
-  const burnSeries = activitySeries.map((point) => ({
-    time: new Date(point.dt).getTime(),
-    value: point.luncBurnUsd ?? 0,
-    secondaryValue: point.ustcBurnUsd ?? 0
-  }))
-  const volumeTotal = volumeSeries.reduce((sum, point) => sum + point.value, 0)
+  const volumeSeries = dashboardActivityPoints(activitySeries, "transferAmountUsd")
+  const walletSeries = dashboardActivityPoints(activitySeries, "activeAddressCount")
+  const burnSeries = dashboardBurnPoints(activitySeries)
+  const volumeTotal = dashboardActivityTotal(volumeSeries)
   const latestWalletCount = walletSeries.at(-1)?.value
-  const stakedValueUsd =
-    (currentSnapshot?.stakedLunc ?? 0) * (prices?.lunc?.usd ?? 0)
   const annualizationFactor =
     activeRange.activityFrequency === "HOUR" ? 24 * 365 : 365
-  const stakingReturn = activitySeries
-    .map((point) => ({
-      time: new Date(point.dt).getTime(),
-      value: stakedValueUsd
-        ? ((point.feeGasUsd ?? 0) * annualizationFactor * 100) / stakedValueUsd
-        : 0
-    }))
-    .filter((point) => point.value > 0)
+  const stakingReturn = dashboardFeeYieldPoints(activitySeries, currentSnapshot.stakedLunc, prices?.lunc?.usd, annualizationFactor)
   const latestStakingReturn = stakingReturn.at(-1)?.value
-  const luncBurnAmount =
-    (activity?.luncBurns?.fee_burn_amt_actual ?? 0) +
-    (activity?.luncBurns?.voluntary_burn_amt_actual ?? 0)
-  const ustcBurnAmount =
-    (activity?.ustcBurns?.fee_burn_amt_actual ?? 0) +
-    (activity?.ustcBurns?.voluntary_burn_amt_actual ?? 0)
+  const luncBurnAmount = dashboardBurnAmount(activity?.luncBurns)
+  const ustcBurnAmount = dashboardBurnAmount(activity?.ustcBurns)
   const lunaMetricLoading =
     lunaStakedLoading || lunaUnbondingLoading || lunaDelegatorLoading
   const lunaMetricStatus = (status?: string) =>
@@ -458,6 +415,17 @@ const Dashboard = () => {
       }
     >
       <div className={`${styles.page} ${!isClassic ? styles.pageLuna : ""}`}>
+        {snapshotQuery.isError || currentSnapshot.coverage === "partial" ? (
+          <div className={styles.dataNotice} role="status">
+            <span>{snapshotQuery.isError
+              ? snapshotQuery.data ? "Chain data could not refresh. Last loaded metrics are shown." : "Chain metrics are temporarily unavailable. Other sections remain available."
+              : "Some chain metrics are unavailable. Available metrics are shown."}</span>
+            <button type="button" className={styles.retryButton} disabled={snapshotQuery.isFetching}
+              onClick={() => { void snapshotQuery.refetch() }}>
+              {snapshotQuery.isFetching ? "Refreshing..." : "Retry chain data"}
+            </button>
+          </div>
+        ) : null}
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Market</div>
           <div className={`${styles.marketGrid} ${!isClassic ? styles.marketGridSingle : ""}`}>
@@ -499,7 +467,7 @@ const Dashboard = () => {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Supply</div>
           <div className={styles.dualMetrics}>
-            {currentSnapshot ? (
+            {!snapshotLoading ? (
               <>
                 <AssetMetricCard
                   label="Circulating Supply"
@@ -529,7 +497,7 @@ const Dashboard = () => {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Treasury</div>
           <div className={styles.dualMetrics}>
-            {currentSnapshot ? (
+            {!snapshotLoading ? (
               <>
                 <AssetMetricCard
                   label="Community Pool"
@@ -565,7 +533,7 @@ const Dashboard = () => {
         <section className={styles.section}>
           <div className={styles.sectionHeader}>Staking &amp; Chain</div>
           <div className={styles.compactMetrics}>
-            {chainMetrics.length ? (
+            {!snapshotLoading ? (
               chainMetrics.map((item) => <DashboardMetricCard key={item.key} item={item} />)
             ) : (
               <DashboardMetricSkeletons count={4} />
@@ -582,8 +550,16 @@ const Dashboard = () => {
               </div>
               <span className={styles.poweredByLine}>Data by BiNodes</span>
             </div>
-            {activityError ? (
-              <div className={styles.dataNotice}>Network trend data is temporarily unavailable.</div>
+            {activityError || activity?.coverage?.status === "partial" ? (
+              <div className={styles.dataNotice} role="status">
+                <span>{activityError
+                  ? activity ? "Network trends could not refresh. Last loaded data is shown." : "Network trend data is temporarily unavailable. Other dashboard data remains available."
+                  : "Some network trend data is unavailable. Missing values are not counted as zero."}</span>
+                <button type="button" className={styles.retryButton} disabled={activityQuery.isFetching}
+                  onClick={() => { void activityQuery.refetch() }}>
+                  {activityQuery.isFetching ? "Refreshing..." : "Retry network trends"}
+                </button>
+              </div>
             ) : null}
             <div className={styles.trendGrid} aria-busy={activityLoading}>
               <TrendCard title="Transaction Volume" value={formatUsdCompact(volumeTotal)}>
@@ -595,13 +571,13 @@ const Dashboard = () => {
                 />
               </TrendCard>
               <TrendCard
-                title="Staking Return"
+                title="Fee-based Yield"
                 value={
                   Number.isFinite(latestStakingReturn)
                     ? formatPercent(Number(latestStakingReturn))
                     : "--"
                 }
-                meta={stakingReturn.length ? "Estimated annualized" : "Data unavailable"}
+                meta={stakingReturn.length ? "Annualized fee estimate, not staking APR" : "Data unavailable"}
               >
                 <LineChart
                   points={stakingReturn}

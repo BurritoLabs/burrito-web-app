@@ -818,21 +818,21 @@
 }
 
 .statusVoting {
-  color: #3b82f6;
-  border-color: rgba(59, 130, 246, 0.45);
-  background: rgba(59, 130, 246, 0.16);
+  color: var(--bui-color-info);
+  border-color: color-mix(in srgb, var(--bui-color-info) 45%, transparent);
+  background: var(--bui-color-info-soft);
 }
 
 .statusDeposit {
-  color: #f6c343;
-  border-color: rgba(246, 195, 67, 0.45);
-  background: rgba(246, 195, 67, 0.12);
+  color: var(--bui-color-warning);
+  border-color: color-mix(in srgb, var(--bui-color-warning) 45%, transparent);
+  background: var(--bui-color-warning-soft);
 }
 
 .statusPassed {
-  color: var(--bui-color-brand-text);
-  border-color: rgba(82, 196, 26, 0.4);
-  background: rgba(82, 196, 26, 0.12);
+  color: var(--bui-color-success);
+  border-color: color-mix(in srgb, var(--bui-color-success) 40%, transparent);
+  background: var(--bui-color-success-soft);
 }
 
 :global(:root[data-theme="light"]) .validatorVoteBadge {
@@ -841,25 +841,25 @@
 }
 
 .statusRejected {
-  color: #ff7875;
-  border-color: rgba(255, 120, 117, 0.45);
-  background: rgba(255, 120, 117, 0.12);
+  color: var(--bui-color-danger);
+  border-color: color-mix(in srgb, var(--bui-color-danger) 45%, transparent);
+  background: var(--bui-color-danger-soft);
 }
 
 .voteYes {
-  color: #52c41a;
+  color: var(--bui-color-success);
 }
 
 .voteNo {
-  color: #ff7aa2;
+  color: var(--bui-color-danger);
 }
 
 .voteVeto {
-  color: #ff4d4f;
+  color: var(--bui-color-danger);
 }
 
 .voteAbstain {
-  color: #f6c343;
+  color: var(--bui-color-warning);
 }
 
 .voteCardYes {

@@ -22,13 +22,14 @@
 .swapCardEmbedded .swapCardBody {
   height: 100%;
   min-height: 0;
-  padding: 12px;
-  gap: 10px;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: 16px;
+  gap: 14px;
+  grid-template-rows: auto;
 }
 
 .swapCardEmbedded .topMeta {
   gap: 8px;
+  align-items: center;
 }
 
 .swapCardEmbedded .formHint {
@@ -37,14 +38,17 @@
 
 .swapCardEmbedded .slippageControl {
   gap: 4px;
-  padding: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .swapCardEmbedded .slippageButton {
   height: 26px;
-  min-width: 44px;
-  padding: 0 8px;
+  min-width: 36px;
+  padding: 0 6px;
   font-size: 11px;
+  font-weight: 500;
 }
 
 .swapCardEmbedded .swapPanel {
@@ -52,11 +56,12 @@
 }
 
 .swapCardEmbedded .fieldCard {
-  height: 123px;
-  min-height: 123px;
-  padding: 11px 12px;
+  min-height: 110px;
+  padding: 12px;
   gap: 6px;
   grid-template-rows: auto minmax(40px, 1fr) auto;
+  background: var(--market-surface, var(--card-bg));
+  border-color: var(--market-line, var(--card-border));
 }
 
 .swapCardEmbedded .fieldHeader {
@@ -89,10 +94,14 @@
 }
 
 .swapCardEmbedded .assetPickerButton {
-  min-width: 96px;
+  min-width: 0;
   height: 36px;
   font-size: 13px;
-  border-radius: 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .swapCardEmbedded .fieldFooter {
@@ -136,6 +145,9 @@
 .swapCardEmbedded .quotePlaceholder {
   min-height: 40px;
   padding: 10px 12px;
+  background: var(--market-tint, var(--card-bg-muted));
+  border-color: transparent;
+  border-radius: 8px;
 }
 
 .swapCardEmbedded .detailsGrid {
@@ -177,8 +189,11 @@
 }
 
 .swapCardEmbedded .submitButton {
-  height: 40px;
+  min-height: 44px;
   font-size: 13px;
+  border-radius: 8px;
+  background: var(--green);
+  color: #0e1a12;
 }
 
 .topMeta {

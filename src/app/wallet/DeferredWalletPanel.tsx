@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState, type SVGProps } from "react"
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type SVGProps } from "react"
 import styles from "./WalletPanel.module.css"
 import {
   WALLET_PANEL_NAVIGATION_EVENT,
@@ -104,6 +104,18 @@ const DeferredWalletPanel = () => {
   })
   const [warmupRequested, setWarmupRequested] = useState(false)
   const pendingDetailRef = useRef<WalletPanelNavigationDetail | null>(null)
+  const navigationReadyRef = useRef(false)
+
+  const handleNavigationReady = useCallback(() => {
+    navigationReadyRef.current = true
+    const detail = pendingDetailRef.current
+    pendingDetailRef.current = null
+    if (detail) {
+      window.dispatchEvent(new CustomEvent<WalletPanelNavigationDetail>(
+        WALLET_PANEL_NAVIGATION_EVENT, { detail }
+      ))
+    }
+  }, [])
 
   const prepareWalletPanel = () => {
     void loadWalletPanel()
@@ -119,7 +131,7 @@ const DeferredWalletPanel = () => {
       void loadWalletPanel()
       void loadWalletAssetWarmup()
       setWarmupRequested(true)
-      pendingDetailRef.current = detail ?? { view: "wallet" }
+      if (!navigationReadyRef.current) pendingDetailRef.current = detail ?? { view: "wallet" }
       writeLocalStorageValue("burritoWalletOpen", "true")
       setRequested(true)
     }
@@ -134,25 +146,6 @@ const DeferredWalletPanel = () => {
         handleNavigation as EventListener
       )
   }, [])
-
-  useEffect(() => {
-    if (!requested || !pendingDetailRef.current || typeof window === "undefined") {
-      return
-    }
-
-    const detail = pendingDetailRef.current
-    const frame = window.requestAnimationFrame(() => {
-      window.dispatchEvent(
-        new CustomEvent<WalletPanelNavigationDetail>(
-          WALLET_PANEL_NAVIGATION_EVENT,
-          { detail }
-        )
-      )
-      pendingDetailRef.current = null
-    })
-
-    return () => window.cancelAnimationFrame(frame)
-  }, [requested])
 
   const handleOpen = () => {
     prepareWalletPanel()
@@ -184,7 +177,7 @@ const DeferredWalletPanel = () => {
         </Suspense>
       ) : null}
       <Suspense fallback={<WalletPanelLoadingShell />}>
-        <WalletPanel />
+        <WalletPanel onNavigationReady={handleNavigationReady} />
       </Suspense>
     </>
   )

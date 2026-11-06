@@ -4,6 +4,7 @@ import {
   COINPAPRIKA_LUNC_URL,
   COINPAPRIKA_USTC_URL
 } from "../config/externalServices"
+import { withRequestDeadline } from "./requestDeadline"
 
 const HISTORY_TIMEOUT_MS = 8_000
 
@@ -26,22 +27,17 @@ type BinanceKline = [
   ...unknown[]
 ]
 
-const fetchJson = async <T>(url: string): Promise<T> => {
-  const controller = new AbortController()
-  const timeoutId = globalThis.setTimeout(() => controller.abort(), HISTORY_TIMEOUT_MS)
-  try {
+const fetchJson = <T>(url: string, signal?: AbortSignal): Promise<T> =>
+  withRequestDeadline(async requestSignal => {
     const response = await fetch(url, {
       headers: { accept: "application/json" },
-      signal: controller.signal
+      signal: requestSignal
     })
     if (!response.ok) {
       throw new Error(`Dashboard history request failed: ${response.status}`)
     }
-    return response.json() as Promise<T>
-  } finally {
-    globalThis.clearTimeout(timeoutId)
-  }
-}
+    return await response.json() as T
+  }, { signal, timeoutMs: HISTORY_TIMEOUT_MS })
 
 const tickerHistoryUrl = (tickerUrl: string, rangeMs: number) => {
   const start = new Date(Date.now() - rangeMs)
@@ -73,7 +69,8 @@ export const normalizeBinanceHourlyPrices = (
     .sort((a, b) => a.time - b.time)
 
 const fetchDashboardHourlyPriceHistory = async (
-  asset: "luna" | "lunc" | "ustc"
+  asset: "luna" | "lunc" | "ustc",
+  signal?: AbortSignal
 ) => {
   const params = new URLSearchParams({
     symbol: BINANCE_SYMBOLS[asset],
@@ -81,7 +78,7 @@ const fetchDashboardHourlyPriceHistory = async (
     limit: "25"
   })
   const data = await fetchJson<BinanceKline[]>(
-    `${BINANCE_MARKET_API_URL}/api/v3/klines?${params}`
+    `${BINANCE_MARKET_API_URL}/api/v3/klines?${params}`, signal
   )
   return normalizeBinanceHourlyPrices(data)
 }
@@ -89,10 +86,11 @@ const fetchDashboardHourlyPriceHistory = async (
 export const fetchDashboardPriceHistory = async (
   asset: "luna" | "lunc" | "ustc",
   rangeMs: number,
-  currentPrice?: number
+  _currentPrice?: number,
+  signal?: AbortSignal
 ): Promise<DashboardHistoryPoint[]> => {
   if (rangeMs <= 24 * 60 * 60 * 1000) {
-    return fetchDashboardHourlyPriceHistory(asset)
+    return fetchDashboardHourlyPriceHistory(asset, signal)
   }
 
   const tickerUrl =
@@ -102,7 +100,7 @@ export const fetchDashboardPriceHistory = async (
         ? COINPAPRIKA_LUNC_URL
         : COINPAPRIKA_USTC_URL
   const data = await fetchJson<CoinPaprikaHistoricalPoint[]>(
-    tickerHistoryUrl(tickerUrl, rangeMs)
+    tickerHistoryUrl(tickerUrl, rangeMs), signal
   )
   const cutoff = Date.now() - rangeMs
   const points = (data ?? [])
@@ -110,12 +108,9 @@ export const fetchDashboardPriceHistory = async (
       time: point.timestamp ? new Date(point.timestamp).getTime() : 0,
       value: Number(point.price)
     }))
-    .filter((point) => point.time >= cutoff && Number.isFinite(point.value))
+    .filter((point) => point.time >= cutoff && point.time <= Date.now() && Number.isFinite(point.value) && point.value > 0)
     .sort((a, b) => a.time - b.time)
 
-  if (Number.isFinite(currentPrice)) {
-    points.push({ time: Date.now(), value: Number(currentPrice) })
-  }
   return points
 }
 

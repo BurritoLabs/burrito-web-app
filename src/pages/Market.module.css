@@ -4,6 +4,13 @@
   container: market / inline-size;
 }
 
+.snapshotNotice {
+  margin: 0;
+  color: var(--bui-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .toolbar {
   padding: 14px;
   display: grid;
@@ -120,7 +127,8 @@
 
 .sortWrap {
   position: relative;
-  z-index: 4;
+  /* The sort menu overlaps the wrapped DEX row, whose More control is at 5. */
+  z-index: 6;
 }
 
 .sortButton {

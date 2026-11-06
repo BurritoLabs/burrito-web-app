@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import PageShell from "../PageShell"
+import { MarketAssetIcon as AssetIcon } from "./MarketPairAssetIcon"
 import styles from "../Market.module.css"
-import { CLASSIC_CHAIN } from "../../app/chain"
 import {
   fetchMarketDexPairs,
   fetchMarketPoolLive,
   fetchMarketPools,
+  fetchPackagedMarketSnapshot,
   type MarketPoolSnapshot
 } from "../../app/data/market"
 import {
@@ -21,8 +22,7 @@ import {
   fetchCirculatingSnapshot,
   fetchCurrentPhoenixDashboardSnapshot
 } from "../../app/data/dashboard"
-import { useDexEstimatedPrices } from "../../app/data/dexPrices"
-import { fetchWithEndpointFallback } from "../../app/data/endpointFallback"
+import { fetchNativeSupplies } from "../../app/data/nativeSupplies"
 import { formatNumber, formatPercent, formatUsd, toUnitAmount } from "../../app/utils/format"
 import {
   buildClassicNativeIconCandidates,
@@ -43,6 +43,11 @@ import {
 import { calculatePoolLiquidityUsd } from "../../app/market/liquidity"
 import { deriveUsdPriceGraphFromPools } from "../../app/market/priceGraph"
 import { guardChainRelativeValuation } from "../../app/market/valuationGuard"
+import { calculatePairPriceChange } from "../../app/market/priceChange"
+import { selectCw20MarketSupplyContracts } from "../../app/market/marketSupplySelection"
+import { hydrateMarketCw20Presentation } from "../../app/market/assetPresentation"
+import { resolveCw20ReservePrice, resolveCw20ReserveValuation } from "../../app/market/cw20Pricing"
+import { resolveNativeMarketDecimals } from "../../app/data/assetPrecision"
 import {
   resolveBondingSpotPrice,
   supportsReserveRatioPricing
@@ -56,13 +61,6 @@ import { useAppChain } from "../../app/appChainContext"
 type SortMetric = "change" | "volume" | "liquidity" | "marketCap"
 type SortDirection = "desc" | "asc"
 type Timeframe = "1h" | "24h" | "7d"
-type NativeSupplyInfo = {
-  denom: string
-  amount: string
-  units: number
-  decimals: number
-}
-
 type ResolvedAsset = {
   id: string
   key: string
@@ -95,6 +93,7 @@ type MarketCard = {
   priceValue?: number
   priceLabel?: string
   priceUsd?: number
+  priceUsesReserveUnits: boolean
   marketCapUsd?: number
   liquidityUsd?: number
   priceConfidenceUsd?: number
@@ -193,149 +192,6 @@ const formatUsdSmart = (value?: number) => {
   return `${sign}$${intPart}.${keptFraction}`
 }
 
-const fetchNativeSupplies = async (
-  entries: Array<{ denom: string; decimals: number }>
-) => {
-  const unique = Array.from(
-    new Set(entries.map((entry) => entry.denom).filter(Boolean))
-  )
-  if (!unique.length) return {}
-
-  const decimalsMap = new Map(entries.map((entry) => [entry.denom, entry.decimals]))
-  const result: Record<string, NativeSupplyInfo> = {}
-  const limit = 6
-  let index = 0
-
-  const workers = Array.from({ length: Math.min(limit, unique.length) }, async () => {
-    while (index < unique.length) {
-      const current = index
-      index += 1
-      const denom = unique[current]
-      const decimals = decimalsMap.get(denom) ?? 6
-      try {
-        const url = new URL(`${CLASSIC_CHAIN.lcd}/cosmos/bank/v1beta1/supply/by_denom`)
-        url.searchParams.set("denom", denom)
-        const response = await fetchWithEndpointFallback(url.toString())
-        if (!response.ok) continue
-        const data = (await response.json()) as {
-          amount?: { amount?: string }
-        }
-        const amount = data?.amount?.amount ?? "0"
-        const parsed = Number(amount)
-        result[denom] = {
-          denom,
-          amount,
-          units: Number.isFinite(parsed) ? parsed / 10 ** Math.max(0, decimals) : 0,
-          decimals
-        }
-      } catch {
-        // Ignore denom-level failures.
-      }
-    }
-  })
-
-  await Promise.all(workers)
-  return result
-}
-
-const AssetIcon = ({
-  symbol,
-  candidates,
-  size = 28
-}: {
-  symbol: string
-  candidates: string[]
-  size?: number
-}) => {
-  const candidateKey = `${symbol}:${candidates.join("|")}`
-  return <AssetIconInner key={candidateKey} symbol={symbol} candidates={candidates} size={size} />
-}
-
-const AssetIconInner = ({
-  symbol,
-  candidates,
-  size
-}: {
-  symbol: string
-  candidates: string[]
-  size: number
-}) => {
-  const [index, setIndex] = useState(0)
-  const [loaded, setLoaded] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const src = candidates[index]
-  const systemFallback = candidates.find((candidate) =>
-    candidate.startsWith("/system/")
-  )
-
-  const fallback = systemFallback ? (
-    <img
-      aria-hidden="true"
-      alt=""
-      src={systemFallback}
-      width={size}
-      height={size}
-      decoding="async"
-      style={{
-        inset: 0,
-        position: "absolute",
-        width: "100%",
-        height: "100%",
-        objectFit: "cover"
-      }}
-    />
-  ) : (
-    <span
-      aria-hidden="true"
-      className={styles.assetIconFallback}
-      style={{ inset: 0, position: "absolute", width: "100%", height: "100%" }}
-    />
-  )
-
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        position: "relative",
-        display: "inline-flex",
-        flex: "0 0 auto"
-      }}
-    >
-      {fallback}
-      {!failed && src ? (
-        <img
-          loading="lazy"
-          src={src}
-          alt={symbol}
-          width={size}
-          height={size}
-          decoding="async"
-          referrerPolicy="no-referrer"
-          style={{
-            inset: 0,
-            position: "absolute",
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: loaded ? 1 : 0,
-            transition: "opacity 120ms ease"
-          }}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setLoaded(false)
-            if (index < candidates.length - 1) {
-              setIndex((prev) => prev + 1)
-            } else {
-              setFailed(true)
-            }
-          }}
-        />
-      ) : null}
-    </span>
-  )
-}
-
 const Market = () => {
   const location = useLocation()
   const { chain, chainKey } = useAppChain()
@@ -367,14 +223,21 @@ const Market = () => {
     ? dexFilter
     : "all"
 
+  const { data: packagedSnapshot } = useQuery({
+    queryKey: ["market", chain.chainId, "packaged-snapshot"],
+    queryFn: () => fetchPackagedMarketSnapshot(chain.chainId),
+    staleTime: Number.POSITIVE_INFINITY
+  })
+
   const { data: pairs = [], isLoading: isPairsLoading } = useQuery({
     queryKey: ["market", chain.chainId, "pairs"],
     queryFn: fetchMarketDexPairs,
+    placeholderData: packagedSnapshot?.pairs,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000
   })
 
-  const { data: pools = [], isLoading: isPoolsLoading } = useQuery({
+  const { data: pools = [], isLoading: isPoolsLoading, isPlaceholderData } = useQuery({
     queryKey: [
       "market",
       chain.chainId,
@@ -382,9 +245,10 @@ const Market = () => {
       pairs.map((pair) => pair.pair).join(",")
     ],
     queryFn: () => fetchMarketPools(pairs),
+    placeholderData: packagedSnapshot?.pools,
     enabled: pairs.length > 0,
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 4 * 60 * 1000
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000
   })
 
   const nativeDenoms = useMemo(() => {
@@ -430,38 +294,6 @@ const Market = () => {
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000
   })
-
-  const assetMetas = useMemo(() => {
-    const map = new Map<string, number>()
-    const addAsset = (id: string) => {
-      if (!id) return
-      if (id.startsWith("native:")) {
-        const denom = id.slice(7)
-        const key = normalizeAssetKey(denom)
-        if (!key || map.has(key)) return
-        const decimals = denom.startsWith("ibc/")
-          ? (ibcWhitelist[denom.slice(4).toUpperCase()]?.decimals ??
-            cw20Whitelist[`ibc/${denom.slice(4).toLowerCase()}`]?.decimals ??
-            6)
-          : (nativeWhitelist[denom.toLowerCase()]?.decimals ?? 6)
-        map.set(key, decimals)
-        return
-      }
-      if (id.startsWith("cw20:")) {
-        const contract = id.slice(5).toLowerCase()
-        const key = normalizeAssetKey(contract)
-        if (!key || map.has(key)) return
-        map.set(key, cw20Whitelist[contract]?.decimals ?? 6)
-      }
-    }
-    pools.forEach((pool) => {
-      addAsset(pool.poolAssets[0]?.id ?? "")
-      addAsset(pool.poolAssets[1]?.id ?? "")
-    })
-    return Array.from(map.entries()).map(([key, decimals]) => ({ key, decimals }))
-  }, [cw20Whitelist, ibcWhitelist, nativeWhitelist, pools])
-
-  const { data: dexEstimatedPrices } = useDexEstimatedPrices(assetMetas)
 
   const resolveAsset = useCallback(
     (assetId: string): ResolvedAsset => {
@@ -557,15 +389,12 @@ const Market = () => {
     (asset: ResolvedAsset) => {
       if (asset.isLunc) return nativePrice?.usd
       if (asset.isUstc) return prices?.ustc?.usd
-      const graphEntry = poolGraphUsdPrices[asset.key]
-      if (graphEntry !== undefined) return graphEntry.price
-      const estimate = dexEstimatedPrices?.[asset.key]
-      if (!estimate) return undefined
-      const quoteUsd = estimate.quoteDenom === "uusd" ? prices?.ustc?.usd : nativePrice?.usd
-      if (quoteUsd === undefined) return undefined
-      return estimate.priceInQuote * quoteUsd
+      if (asset.id.startsWith("native:") && resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
+      // The list already has the pool reserves. Do not fetch every pool again
+      // for an estimate; missing prices stay unknown until data is available.
+      return poolGraphUsdPrices[asset.key]?.price
     },
-    [dexEstimatedPrices, nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
+    [ibcWhitelist, nativeWhitelist, nativePrice?.usd, poolGraphUsdPrices, prices?.ustc?.usd]
   )
 
   const getAssetPriceConfidence = useCallback(
@@ -709,6 +538,7 @@ const Market = () => {
             ? `1 ${priceBase.symbol} ≈ ${formatNumber(priceValue, priceValue < 1 ? 6 : 4)} ${priceQuote.symbol}`
             : undefined,
         priceUsd,
+        priceUsesReserveUnits: leftUsd !== undefined && !priceBase.isLunc && !priceBase.isUstc,
         marketCapUsd,
         liquidityUsd,
         priceConfidenceUsd
@@ -749,12 +579,7 @@ const Market = () => {
     (card: MarketCard, tf: Timeframe) => {
       const baseChange = getAssetChange(card.priceBase, tf)
       const quoteChange = getAssetChange(card.priceQuote, tf)
-      if (baseChange === undefined && quoteChange === undefined) return undefined
-      if (baseChange !== undefined && quoteChange !== undefined) {
-        return ((1 + baseChange / 100) / (1 + quoteChange / 100) - 1) * 100
-      }
-      if (baseChange !== undefined) return baseChange
-      return quoteChange !== undefined ? -quoteChange : undefined
+      return calculatePairPriceChange(baseChange, quoteChange)
     },
     [getAssetChange]
   )
@@ -833,15 +658,7 @@ const Market = () => {
   ])
 
   const cw20SupplyContracts = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          supplyCards
-            .map((card) => card.priceBase.id)
-            .filter((id) => id.startsWith("cw20:"))
-            .map((id) => id.slice(5).toLowerCase())
-        )
-      ),
+    () => selectCw20MarketSupplyContracts(supplyCards),
     [supplyCards]
   )
 
@@ -858,7 +675,8 @@ const Market = () => {
             .map((card) => card.priceBase)
             .filter(
               (asset) =>
-                asset.id.startsWith("native:") && !asset.isLunc && !asset.isUstc
+                asset.id.startsWith("native:") && !asset.isLunc && !asset.isUstc &&
+                resolveNativeMarketDecimals(asset.id.slice(7), nativeWhitelist, ibcWhitelist) !== undefined
             )
             .map((asset) => ({ denom: asset.id.slice(7), decimals: asset.decimals }))
             .map((entry) => `${entry.denom}:${entry.decimals}`)
@@ -867,16 +685,17 @@ const Market = () => {
         const [denom, decimals] = entry.split(":")
         return { denom, decimals: Number(decimals || "6") }
       }),
-    [supplyCards]
+    [ibcWhitelist, nativeWhitelist, supplyCards]
   )
 
   const { data: nativeSupplies = {} } = useQuery({
     queryKey: [
       "native-supplies",
       chain.chainId,
+      chain.runtime.chain.lcd,
       nativeSupplyDenoms.map((entry) => `${entry.denom}:${entry.decimals}`).join("|")
     ],
-    queryFn: () => fetchNativeSupplies(nativeSupplyDenoms),
+    queryFn: () => fetchNativeSupplies(nativeSupplyDenoms, chain.runtime.chain),
     enabled: nativeSupplyDenoms.length > 0,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 20 * 60 * 1000
@@ -907,6 +726,8 @@ const Market = () => {
       if ((card.priceConfidenceUsd ?? 0) < 1_000) return undefined
       if (card.priceBase.id.startsWith("native:") && card.priceUsd !== undefined) {
         const denom = card.priceBase.id.slice(7)
+        if (resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist) === undefined) return undefined
+        if (nativeSupplies[denom]?.decimals !== card.priceBase.decimals) return undefined
         const units = nativeSupplies[denom]?.units
         if (units !== undefined) {
           return guardChainRelativeValuation(units * card.priceUsd, chainMarketCapUsd)
@@ -915,11 +736,13 @@ const Market = () => {
       if (!card.priceBase.id.startsWith("cw20:")) return undefined
       if (card.priceUsd === undefined) return undefined
       const contract = card.priceBase.id.slice(5).toLowerCase()
-      const supply = cw20Supplies[contract]?.units
-      if (supply === undefined) return undefined
-      return guardChainRelativeValuation(supply * card.priceUsd, chainMarketCapUsd)
+      if (!card.priceUsesReserveUnits) return undefined
+      const value = resolveCw20ReserveValuation(
+        card.priceUsd, card.priceBase.decimals, cw20Supplies[contract]
+      )
+      return guardChainRelativeValuation(value, chainMarketCapUsd)
     },
-    [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, nativePrice, nativeSupplies, prices]
+    [chainMarketCapUsd, cw20Supplies, dashboardSnapshot, ibcWhitelist, nativeWhitelist, nativePrice, nativeSupplies, prices]
   )
 
   const compareMarketCards = useCallback(
@@ -955,7 +778,10 @@ const Market = () => {
     [compareMarketCards, filteredCards]
   )
 
-  const visible = filteredAndSorted.slice(0, visibleCount)
+  const visible = useMemo(
+    () => filteredAndSorted.slice(0, visibleCount),
+    [filteredAndSorted, visibleCount]
+  )
   const hasMore = filteredAndSorted.length > visible.length
   const visibleCw20Contracts = useMemo(
     () =>
@@ -972,6 +798,19 @@ const Market = () => {
   )
   const { data: visibleCw20Whitelist = {} } =
     useResolvedCw20Whitelist(visibleCw20Contracts)
+  // Reuse strict token_info/supply reads for displayed prices, including pools
+  // below the market-cap confidence threshold. Do not verify the whole graph.
+  const { data: visibleCw20Supplies = {} } = useCw20Supplies(visibleCw20Contracts)
+  const getCardDisplayPriceUsd = (card: MarketCard) => {
+    if (card.priceBase.id.startsWith("native:") && resolveNativeMarketDecimals(card.priceBase.id.slice(7), nativeWhitelist, ibcWhitelist) === undefined) return undefined
+    if (!card.priceBase.id.startsWith("cw20:")) return card.priceUsd
+    if (!card.priceUsesReserveUnits) return undefined
+    const contract = card.priceBase.id.slice(5).toLowerCase()
+    return resolveCw20ReservePrice(
+      card.priceUsd, card.priceBase.decimals,
+      visibleCw20Supplies[contract] ?? cw20Supplies[contract]
+    )
+  }
   const liveRefreshCards = visible.slice(0, LIVE_POOL_REFRESH_LIMIT)
   const liveRefreshKey = liveRefreshCards
     .map((card) => `${card.dexId}:${card.pairAddress}`)
@@ -1020,22 +859,7 @@ const Market = () => {
   }, [buildMarketCard, liveVisiblePools, visible])
 
   const hydrateVisibleCw20Asset = useCallback(
-    (asset: ResolvedAsset): ResolvedAsset => {
-      if (!asset.id.startsWith("cw20:")) return asset
-
-      const contract = asset.id.slice(5).toLowerCase()
-      const token = visibleCw20Whitelist[contract]
-      if (!token) return asset
-
-      const symbol = token.symbol || asset.symbol
-      return {
-        ...asset,
-        symbol,
-        name: token.name || symbol,
-        decimals: token.decimals ?? asset.decimals,
-        iconCandidates: buildCw20IconCandidates(token.icon, symbol)
-      }
-    },
+    (asset: ResolvedAsset) => hydrateMarketCw20Presentation(asset, visibleCw20Whitelist),
     [visibleCw20Whitelist]
   )
 
@@ -1234,8 +1058,8 @@ const Market = () => {
               {isLoading
                 ? "Loading pools..."
                 : effectiveDexFilter === "all"
-                  ? `${filteredAndSorted.length} pools`
-                  : `${filteredAndSorted.length} ${selectedDexFilter.label} pools`}
+                  ? `${filteredAndSorted.length} ${filteredAndSorted.length === 1 ? "pool" : "pools"}`
+                  : `${filteredAndSorted.length} ${selectedDexFilter.label} ${filteredAndSorted.length === 1 ? "pool" : "pools"}`}
             </div>
             <div className={styles.timeframe}>
               {(["1h", "24h", "7d"] as Timeframe[]).map((tf) => (
@@ -1331,6 +1155,11 @@ const Market = () => {
           </div>
         </section>
 
+        {(isPlaceholderData || pools.some((pool) => pool.snapshotSource === "packaged")) && !isLoading ? (
+          <p className={styles.snapshotNotice} role="status">
+            Some pools use a saved snapshot. Live data is not available for these pools. Estimates are not execution quotes.
+          </p>
+        ) : null}
         {isLoading ? (
           <section className={`card ${styles.empty}`}>Loading market data...</section>
         ) : displayVisible.length === 0 ? (
@@ -1343,6 +1172,7 @@ const Market = () => {
               {displayVisible.map((card, index) => {
                 const pairChange = getPairChange(card, timeframe)
                 const marketCapUsd = getCardMarketCapUsd(card)
+                const displayPriceUsd = getCardDisplayPriceUsd(card)
                 const secondaryMetric =
                   sortMetric === "volume"
                     ? {
@@ -1384,6 +1214,7 @@ const Market = () => {
                                 symbol={card.left.symbol}
                                 candidates={card.left.iconCandidates}
                                 size={40}
+                                priority={index < 3}
                               />
                             </span>
                             <span className={styles.pairIconSecondary}>
@@ -1391,6 +1222,7 @@ const Market = () => {
                                 symbol={card.right.symbol}
                                 candidates={card.right.iconCandidates}
                                 size={22}
+                                priority={index < 3}
                               />
                             </span>
                           </div>
@@ -1429,7 +1261,7 @@ const Market = () => {
                         </div>
 
                         <div className={styles.rightMetrics}>
-                          <div className={styles.price}>{card.priceUsd !== undefined ? formatUsdSmart(card.priceUsd) : "--"}</div>
+                          <div className={styles.price}>{displayPriceUsd !== undefined ? formatUsdSmart(displayPriceUsd) : "--"}</div>
                           <div
                             className={`${styles.change} ${
                               pairChange === undefined

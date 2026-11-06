@@ -6,8 +6,9 @@ import {
 } from "@terra-money/log-finder-ruleset"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 import type { CoinBalance, TxItem } from "../data/classic"
-import { formatTokenAmount, truncateHash } from "../utils/format"
+import { truncateHash } from "../utils/format"
 import { getActiveAppChainKey } from "../activeChain"
+import { readAssetDecimals } from "../data/assetPrecision"
 
 export const HISTORY_TX_LIMIT = 50
 export const CONTRACT_LABEL_LOOKUP_LIMIT = 36
@@ -109,14 +110,64 @@ export const formatDenom = (denom: string) => {
   return denom.toUpperCase()
 }
 
-export const formatCoins = (coins: CoinBalance[] = []) => {
+export type HistoryTokenResolver = (denom: string) => TokenLookup | undefined
+
+// Keep the chain's integer amount exact. In particular, a missing token unit is
+// not evidence for the six-decimal convention used by LUNC/LUNA and USTC.
+export const formatHistoryCoin = (
+  amount: string,
+  denom: string,
+  resolveToken?: HistoryTokenResolver
+) => {
+  const meta = resolveToken?.(denom)
+  const symbol = meta?.symbol ?? formatDenom(denom)
+  if (!/^[0-9]+$/.test(amount)) return `-- ${symbol}`
+  const raw = amount.replace(/^0+(?=\d)/, "")
+  const decimals = denom === "uluna" || denom === "uusd"
+    ? 6 : readAssetDecimals(meta?.decimals)
+  const group = (value: string) => value.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  if (decimals === undefined) return `${group(raw)} raw units ${symbol}`
+  if (decimals === 0) return `${group(raw)} ${symbol}`
+  const digits = raw.padStart(decimals + 1, "0")
+  const integer = digits.slice(0, -decimals)
+  const fraction = digits.slice(-decimals).replace(/0+$/, "")
+  // Bound long fractional displays without reporting a positive balance as 0.
+  const shown = fraction.slice(0, 18).replace(/0+$/, "")
+  if (integer === "0" && fraction && !shown) return `<0.000000000000000001 ${symbol}`
+  const approximate = fraction.length > 18 ? "≈" : ""
+  return `${approximate}${group(integer)}${shown ? `.${shown}` : ""} ${symbol}`
+}
+
+export const formatCoins = (coins: CoinBalance[] = [], resolveToken?: HistoryTokenResolver) => {
   if (!coins.length) return "--"
   return coins
-    .map((coin) => {
-      const amount = formatTokenAmount(coin.amount, 6, 6)
-      return `${amount} ${formatDenom(coin.denom)}`
-    })
+    .map((coin) => formatHistoryCoin(coin.amount, coin.denom, resolveToken))
     .join(", ")
+}
+
+export const collectHistoryNativeDenoms = (txs: TxItem[]) => {
+  const denoms = new Set<string>()
+  const add = (coins: CoinBalance[] = []) => coins.forEach(coin => {
+    if (coin.denom && !coin.denom.startsWith("terra1")) denoms.add(coin.denom)
+  })
+  txs.forEach(tx => {
+    add(tx.tx?.auth_info?.fee?.amount)
+    getRawMessages(tx).forEach(message => {
+      add(Array.isArray(message.amount) ? message.amount : message.amount ? [message.amount] : [])
+      if (message.token) add([message.token])
+      message.inputs?.forEach(input => add(input.coins))
+      message.outputs?.forEach(output => add(output.coins))
+    })
+    ;(tx.events ?? []).filter(event => event.type === "transfer").forEach(event => {
+      event.attributes?.filter(attr => decodeEventValue(attr.key) === "amount").forEach(attr => {
+        decodeEventValue(attr.value).split(",").forEach(coin => {
+          const match = coin.match(/^\d+([a-zA-Z][a-zA-Z0-9/:._-]*)$/)
+          if (match) add([{ denom: match[1], amount: "0" }])
+        })
+      })
+    })
+  })
+  return Array.from(denoms).sort()
 }
 
 export const shortenAddress = (value?: string) => truncateHash(value, 6, 4)
@@ -264,7 +315,7 @@ export const parseTokenWord = (value: string) => {
   if (parts.length > 1) {
     return { type: "multi" as const }
   }
-  const match = clean.match(/^([0-9]+)([a-zA-Z0-9/]+)$/)
+  const match = clean.match(/^([0-9]+)([a-zA-Z][a-zA-Z0-9/:._-]*)$/)
   if (!match) return null
   return { type: "single" as const, amount: match[1], denom: match[2] }
 }

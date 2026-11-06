@@ -3,22 +3,21 @@ import type { MainWalletBase, WalletConnectOptions } from "@cosmos-kit/core"
 import { wallets as keplrMobileWallets } from "@cosmos-kit/keplr-mobile"
 import {
   CHAIN_RUNTIME_CONFIG,
-  type ChainRuntimeConfig,
-  type SupportedChainKey
+  type ChainRuntimeConfig
 } from "../config/chainConfig"
 import {
   getBurritoAppOrigin,
   WALLETCONNECT_PROJECT_ID,
   warnIfDefaultWalletConnectProjectId
 } from "../config/walletConfig"
-import type { WalletConnectorId } from "./WalletContext"
-
-export const COSMOS_KIT_CHAIN_NAME = "terra"
-
-export const COSMOS_KIT_CHAIN_NAME_BY_KEY = {
-  lunc: COSMOS_KIT_CHAIN_NAME,
-  luna: "terra2"
-} as const satisfies Record<SupportedChainKey, string>
+export {
+  COSMOS_KIT_CHAIN_NAME,
+  COSMOS_KIT_CHAIN_NAME_BY_KEY,
+  COSMOS_CONNECTOR_CONFIGS,
+  COSMOS_CONNECTOR_IDS,
+  COSMOS_WALLET_NAME_TO_CONNECTOR_ID,
+  isCosmosConnectorId
+} from "./cosmosKitMeta"
 
 const createCosmosKitChain = (runtime: ChainRuntimeConfig): Chain => ({
   chain_name: runtime.cosmosKitChainName,
@@ -128,51 +127,6 @@ export const COSMOS_KIT_ASSET_LISTS = [
   COSMOS_KIT_ASSET_LIST,
   COSMOS_KIT_LUNA_ASSET_LIST
 ]
-
-export const COSMOS_CONNECTOR_CONFIGS: Record<
-  "keplr" | "keplr-mobile",
-  {
-    id: "keplr" | "keplr-mobile"
-    label: string
-    badge: string
-    walletName: string
-    type: "extension" | "mobile"
-  }
-> = {
-  keplr: {
-    id: "keplr",
-    label: "Keplr",
-    badge: "K",
-    walletName: "keplr-extension",
-    type: "extension"
-  },
-  "keplr-mobile": {
-    id: "keplr-mobile",
-    label: "Keplr Mobile",
-    badge: "K",
-    walletName: "keplr-mobile",
-    type: "mobile"
-  }
-}
-
-export const COSMOS_CONNECTOR_IDS = Object.keys(
-  COSMOS_CONNECTOR_CONFIGS
-) as Array<keyof typeof COSMOS_CONNECTOR_CONFIGS>
-
-export const isCosmosConnectorId = (
-  connectorId: WalletConnectorId | undefined
-): connectorId is keyof typeof COSMOS_CONNECTOR_CONFIGS =>
-  Boolean(connectorId && connectorId in COSMOS_CONNECTOR_CONFIGS)
-
-export const COSMOS_WALLET_NAME_TO_CONNECTOR_ID = Object.values(
-  COSMOS_CONNECTOR_CONFIGS
-).reduce<Record<string, keyof typeof COSMOS_CONNECTOR_CONFIGS>>(
-  (result, config) => {
-    result[config.walletName] = config.id
-    return result
-  },
-  {}
-)
 
 export const getWalletConnectOptions = (): WalletConnectOptions => {
   warnIfDefaultWalletConnectProjectId()

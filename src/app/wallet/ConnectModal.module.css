@@ -43,6 +43,12 @@
   margin-top: 2px;
 }
 
+.connectionHint {
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--bui-color-text-secondary);
+}
+
 .closeButton {
   width: 32px;
   height: 32px;

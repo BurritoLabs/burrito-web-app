@@ -1,3 +1,4 @@
+import { fromBech32 } from "@cosmjs/encoding"
 import {
   getLaunchpadConfig,
   getLaunchpadStorageKeys
@@ -385,7 +386,17 @@ export const normalizeOptionalXProfile = (value: string) => {
   return normalized
 }
 
-const TERRA_ADDRESS_PATTERN = /^terra1[0-9a-z]{38,80}$/
+const isTerraAccountOrContractAddress = (address: string) => {
+  try {
+    const decoded = fromBech32(address)
+    return (
+      decoded.prefix === "terra" &&
+      (decoded.data.length === 20 || decoded.data.length === 32)
+    )
+  } catch {
+    return false
+  }
+}
 
 export const parseDistributionTransfers = (
   value: string,
@@ -410,7 +421,7 @@ export const parseDistributionTransfers = (
     }
 
     const [recipient, amountValue] = parts
-    if (!TERRA_ADDRESS_PATTERN.test(recipient)) {
+    if (!isTerraAccountOrContractAddress(recipient)) {
       throw new Error(`Line ${lineNumber}: recipient must be a terra1 address.`)
     }
 

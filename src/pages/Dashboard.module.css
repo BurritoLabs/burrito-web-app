@@ -358,9 +358,15 @@
 
 .trendHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+}
+
+.trendHeader > div {
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .trendTitle {
@@ -375,13 +381,16 @@
   font-size: 20px;
   font-weight: var(--bold);
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  font-variant-numeric: tabular-nums;
 }
 
 .trendMeta {
+  max-width: 100%;
+  flex: 0 1 auto;
   color: var(--bui-color-text-muted);
   font-size: 11px;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .chartLegend {
@@ -420,12 +429,33 @@
 }
 
 .dataNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--bui-color-danger) 35%, transparent);
   border-radius: 8px;
   color: var(--bui-color-danger);
   background: color-mix(in srgb, var(--bui-color-danger) 7%, transparent);
   font-size: var(--font-size-small);
+}
+
+.retryButton {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.retryButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .rangeSwitch {

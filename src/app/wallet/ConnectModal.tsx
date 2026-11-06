@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom"
-import { useEffect, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import styles from "./ConnectModal.module.css"
 import { useWallet } from "./WalletContext"
 import {
@@ -24,6 +24,56 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
     useWallet()
   const isConnecting = status === "connecting"
   const [copied, setCopied] = useState(false)
+  const titleId = useId()
+  const modalRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    if (!open) return
+    const modal = modalRef.current
+    if (!modal) return
+    const previousFocus = document.activeElement
+    modal.focus({ preventScroll: true })
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        event.stopPropagation()
+        // Closing this UI does not cancel an approval already sent to a wallet.
+        closeRef.current()
+        return
+      }
+      if (event.key !== "Tab") return
+      const controls = [...modal.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]"
+      )].filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0)
+      const first = controls[0]
+      const last = controls.at(-1)
+      const active = document.activeElement
+      if (!first || !last) {
+        event.preventDefault()
+        modal.focus({ preventScroll: true })
+      } else if (event.shiftKey && (active === first || active === modal || !modal.contains(active))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (active === last || active === modal || !modal.contains(active))) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus({ preventScroll: true })
+      }
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -51,13 +101,19 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
     <div
       className={styles.backdrop}
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
     >
-      <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
+      <div
+        ref={modalRef}
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className={styles.header}>
           <div>
-            <div className={styles.title}>Connect wallet</div>
+            <div className={styles.title} id={titleId}>Connect wallet</div>
             <div className={styles.subtitle}>{chain.name}</div>
           </div>
           <button
@@ -147,7 +203,13 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
           ))}
         </div>
 
-        {error ? <div className={styles.error}>{error}</div> : null}
+        {isConnecting && connectorId === "burrito-extension" ? (
+          <div className={styles.connectionHint} role="status">
+            Continue in Burrito Wallet. Finish or cancel the request there before
+            switching networks. Closing this panel does not cancel the request.
+          </div>
+        ) : null}
+        {error ? <div className={styles.error} role="alert">{error}</div> : null}
       </div>
     </div>,
     document.body

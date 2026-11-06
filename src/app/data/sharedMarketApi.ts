@@ -1,4 +1,5 @@
 import { BURRITO_MARKET_API_URL } from "../config/externalServices"
+import { throwIfRequestAborted, withRequestDeadline } from "./requestDeadline"
 
 type SharedCandle = {
   time?: number
@@ -24,6 +25,7 @@ export type SharedPairCandle = {
   low: number
   close: number
   volumeQuote: number
+  volumeKnown?: boolean
 }
 
 const activationRequested = new Set<string>()
@@ -101,13 +103,16 @@ export const normalizeSharedCandles = ({
   if (!direct && !reverse) return []
 
   return payload.candles
-    .map((candle) => {
+    .map((candle): SharedPairCandle | null => {
+      if (!candle || typeof candle !== "object") return null
       const bucketStart = Number(candle.time) * 1000
       const open = Number(candle.open)
       const high = Number(candle.high)
       const low = Number(candle.low)
       const close = Number(candle.close)
-      const volumeQuote = Number(candle.volume ?? 0)
+      const volumeQuote = Number(candle.volume)
+      const volumeKnown = candle.volume !== undefined && candle.volume !== null &&
+        Number.isFinite(volumeQuote) && volumeQuote >= 0
       if (
         !Number.isFinite(bucketStart) ||
         !Number.isFinite(open) ||
@@ -121,7 +126,9 @@ export const normalizeSharedCandles = ({
       ) return null
 
       if (direct) {
-        return { bucketStart, open, high, low, close, volumeQuote }
+        return { bucketStart, open, high, low, close,
+          volumeQuote: volumeKnown ? volumeQuote : 0,
+          ...(volumeKnown ? {} : { volumeKnown: false }) }
       }
 
       return {
@@ -132,7 +139,8 @@ export const normalizeSharedCandles = ({
         close: 1 / close,
         // The API stores quote volume in its native orientation. It cannot be
         // relabelled honestly after inversion without the matching base volume.
-        volumeQuote: 0
+        volumeQuote: 0,
+        volumeKnown: false
       }
     })
     .filter((candle): candle is SharedPairCandle => candle !== null)
@@ -145,7 +153,8 @@ export const fetchSharedPairCandles = async ({
   leftAssetKey,
   rightAssetKey,
   bucketMs,
-  maxCandles
+  maxCandles,
+  signal
 }: {
   chainId: string
   pairAddress: string
@@ -153,7 +162,9 @@ export const fetchSharedPairCandles = async ({
   rightAssetKey: string
   bucketMs: number
   maxCandles: number
+  signal?: AbortSignal
 }) => {
+  throwIfRequestAborted(signal)
   const interval = sharedIntervalForBucketMs(bucketMs)
   const normalizedChainId = chainId.trim()
   if (!BURRITO_MARKET_API_URL || !normalizedChainId || !interval) return []
@@ -163,16 +174,23 @@ export const fetchSharedPairCandles = async ({
     pair: pairAddress,
     interval,
     limit: String(Math.max(1, Math.min(5000, maxCandles))),
-    order: "asc"
+    // LIMIT applies in storage order: ascending would return the oldest bars
+    // in the index, not the most recent chart window. Normalize below restores
+    // ascending timestamps for the chart renderer after selecting latest bars.
+    order: "desc"
   })
 
   try {
-    const response = await fetch(`${BURRITO_MARKET_API_URL}/v1/market/candles?${params}`, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(8_000)
-    })
-    if (!response.ok) return []
-    const payload = (await response.json()) as SharedCandleResponse
+    const payload = await withRequestDeadline(async (requestSignal) => {
+      const response = await fetch(`${BURRITO_MARKET_API_URL}/v1/market/candles?${params}`, {
+        headers: { Accept: "application/json" },
+        signal: requestSignal
+      })
+      if (!response.ok) return null
+      return await response.json() as SharedCandleResponse
+    }, { signal, timeoutMs: 8_000 })
+    throwIfRequestAborted(signal)
+    if (!payload) return []
     if (payload.status === "unavailable") {
       if (payload.limitations?.includes("candles_not_indexed")) {
         void requestSharedPairActivation(normalizedChainId, pairAddress)
@@ -181,6 +199,7 @@ export const fetchSharedPairCandles = async ({
     }
     return normalizeSharedCandles({ payload, leftAssetKey, rightAssetKey })
   } catch {
+    throwIfRequestAborted(signal)
     return []
   }
 }
