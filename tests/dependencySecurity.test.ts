@@ -115,7 +115,8 @@ it("preserves the actual TypeScript project-service allowlist consumer and isola
     expect(match(path, patterns ? [...patterns] : undefined), path).toBe(expected)
   }
   const { minimatch, Minimatch } = consumerRequire("minimatch")
-  expect(minimatch("C:\\project\\配置.ts", "C:/project/*.ts", { windowsPathsNoEscape: true })).toBe(true)
+  expect(minimatch("C:\\project\\配置.ts", "C:/project/*.ts", { platform: "win32", windowsPathsNoEscape: true })).toBe(true)
+  expect(minimatch("C:\\project\\配置.ts", "C:/project/*.ts", { platform: "linux", windowsPathsNoEscape: true })).toBe(false)
   expect(new Minimatch("**/*.{ts,tsx}").match("src/配置.tsx")).toBe(true)
   // ESLint's older matcher must not be replaced by the scoped tooling override.
   const eslintRequire = createRequire(require.resolve("eslint"))
