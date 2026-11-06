@@ -48,6 +48,7 @@ const Nav = ({ isOpen, onClose }: NavProps) => {
           <NavLink
             key={path}
             to={path}
+            end={path === "/"}
             onClick={handleNavigate}
             onFocus={() => void preload()}
             onPointerEnter={() => void preload()}

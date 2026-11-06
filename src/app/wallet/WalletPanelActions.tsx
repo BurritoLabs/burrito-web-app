@@ -4,6 +4,7 @@ import type { WalletPanelView } from "./walletPanelUtils"
 
 type WalletPanelActionsProps = {
   view: WalletPanelView
+  assetPrecisionKnown: boolean
   canSubmitSend: boolean
   sendSubmitting: boolean
   walletPreparingForTx: boolean
@@ -18,6 +19,7 @@ type WalletPanelActionsProps = {
 
 const WalletPanelActions = ({
   view,
+  assetPrecisionKnown,
   canSubmitSend,
   sendSubmitting,
   walletPreparingForTx,
@@ -59,6 +61,7 @@ const WalletPanelActions = ({
           className="uiButton uiButtonPrimary"
           type="button"
           onClick={onAssetSend}
+          disabled={!assetPrecisionKnown}
         >
           Send
         </button>
@@ -73,6 +76,7 @@ const WalletPanelActions = ({
           className="uiButton uiButtonOutline"
           type="button"
           onClick={onAssetSwap}
+          disabled={!assetPrecisionKnown}
         >
           <SwapIcon />
           Swap

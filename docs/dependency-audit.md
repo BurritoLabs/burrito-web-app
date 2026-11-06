@@ -1,5 +1,30 @@
 # Dependency Audit
 
+## Release follow-up — 2026-11-06 (Toronto)
+
+Vitest is pinned to 4.1.12 and qs resolves to 6.17.1. Only the
+`@typescript-eslint/typescript-estree` consumer overrides minimatch to 11.0.1;
+ESLint's older callable matcher is not replaced. Ordinary Windows/Unicode and
+dotfile matching is covered through the installed consumer. Full-graph audit
+now has zero moderate/high/critical findings; its raw low count remains 21.
+
+Deepmerge 4.3.1 has no upstream patched release for
+[GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4).
+The local postinstall fix writes own data properties at all three destination
+assignment boundaries in index.js, dist/cjs.js and dist/umd.js. It preserves the
+ordinary result prototype, merge options, symbols, arrays and callback contracts.
+Every locked copy must match version 4.3.1 and exact original or patched SHA-256
+digests. Changed/unpatched copies fail installation or the production gate.
+
+Raw production audit still reports 16 low entries. The gate separately verifies
+the installed fix, then accounts for exactly this advisory on deepmerge and the
+three reviewed provider consumers: 4 locally fixed entries and 12 residual low
+entries under the **unchanged** baseline. It does not waive another advisory,
+severity increase, unknown graph edge or new consumer. Native wallet compromise
+or attacker-controlled signing options were not established by this dependency
+review. The older elliptic-related baseline remains open; this is not a claim of
+zero vulnerabilities. The historical records below describe earlier snapshots.
+
 Both dependency scopes are checked in normal frontend CI, the weekly/manual
 `Dependency Audit` workflow, and `npm run verify`:
 
@@ -116,3 +141,60 @@ After a lockfile-consistent install, both audit gates again pass: production
 12 low and full graph 17 low, with zero moderate/high/critical. Existing low-risk
 wallet findings remain tracked above. Candidate-only remediation is not a
 statement that main, older builds or production deployments have been updated.
+
+## High-severity refresh — 2026-11-03
+
+Update only the compatible locked follow-redirects 1.16.1 → 1.16.2 and Zod
+4.3.6 → 4.6.7. New tests in `tests/dependencySecurity.test.ts` first failed
+against the original installed versions, then passed after a normal clean
+install: foreign-realm custom-sensitive-header redirects with public/same-host
+controls, and bounded over-limit array/set parsing before element callbacks.
+All network fixtures use loopback and synthetic headers; no live credential
+leak or browser Zod reachability is asserted. No wallet version is downgraded.
+
+Fresh production metadata now reports 16 low and zero elevated package entries.
+The existing production gate still rejects four newly reported low packages
+(`deepmerge` and three Keplr provider dependents); the full graph gate also
+rejects moderate tooling advisories. Neither baseline nor severity threshold
+was relaxed. This is a local candidate, not an all-green release, a closed
+GitHub alert or a deployed fix. Zod v3 remains an exported legacy implementation;
+no application import of that API was established by this change.
+
+## Release-gate refresh — 2026-11-06
+
+Pin Vitest and its matching packages to 4.1.12, the upstream backport for
+[manual mock source injection](https://github.com/vitest-dev/vitest/security/advisories/GHSA-qxg6-89mg-rqv8)
+and [Windows redirect traversal](https://github.com/vitest-dev/vitest/security/advisories/GHSA-xp26-3454-mjgp).
+Update the compatible locked qs dependency from 6.16.0 to 6.17.1; the upstream
+[comma-array serialization fix](https://github.com/ljharb/qs/security/advisories/GHSA-6pq8-jhm2-2vcw)
+starts at 6.16.1. A synthetic non-callable own `toString` regression fails on
+6.16.0 and passes after `npm ci`, alongside ordinary comma-array controls.
+All three focused dependency tests and their scoped ESLint check pass. Existing
+follow-redirects 1.16.2 and Zod 4.6.7 resolutions are preserved.
+
+The unchanged production gate still rejects 16 low package findings against
+its 12-low baseline. The new root advisory is
+[deepmerge prototype poisoning](https://github.com/advisories/GHSA-gcqx-w48m-w2h4),
+also propagated to three Keplr provider dependents. The official advisory lists
+no patched release, and the registry's latest deepmerge remains 4.3.1. npm's
+suggested wallet downgrade is not a compatible remediation and was not applied.
+
+The full graph is reduced from 21 low / 10 moderate to 21 low / 7 moderate;
+there are zero high or critical findings. The remaining moderate family is
+[minimatch globparts amplification](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)
+under typescript-eslint. The official fix is 11.0.1, outside the parent's
+`^10.2.2` range even in latest typescript-eslint 8.72.1. A separately authorized
+override is restricted to `@typescript-eslint/typescript-estree` → minimatch
+11.0.1. Its CommonJS named `minimatch` and `Minimatch` exports are retained, and
+its unchanged Node engine (`18 || 20 || >=22`) includes CI/build Node 22.
+ESLint's separate minimatch 3.1.5 is unchanged.
+
+Five focused tests now pass, including the installed project-service consumer's
+own matching function with ordinary, dotfile, Unicode and Windows paths, plus
+a 3-second-bounded subprocess exercising excessive glob preprocessing. An
+initial fixture assumed Windows backslashes were unmatched; the actual matcher
+normalizes them on Windows, and the corrected platform-aware expectation passes.
+The complete `npm run lint` also passes. `npm run check:audit:all` now passes
+with 21 low and zero moderate/high/critical findings. Production baseline 12 is
+unchanged; its deepmerge blocker above remains pending separate remediation.
+No forced downgrade, allowlist increase or severity waiver was applied.

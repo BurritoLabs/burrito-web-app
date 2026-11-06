@@ -2,7 +2,7 @@ export type WalletPanelAssetSnapshot = {
   denom: string
   symbol: string
   name: string
-  decimals: number
+  decimals?: number
 }
 
 export type WalletPanelView = "wallet" | "send" | "receive" | "asset"

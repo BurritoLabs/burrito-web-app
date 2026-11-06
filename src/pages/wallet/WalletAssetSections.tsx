@@ -2,7 +2,8 @@ import { memo } from "react"
 import { CLASSIC_DENOMS } from "../../app/chain"
 import WalletAssetIcon from "../../app/wallet/WalletAssetIcon"
 import type { WalletAssetRow } from "../../app/wallet/useWalletAssets"
-import { formatTokenAmount, formatUsd } from "../../app/utils/format"
+import { formatUsd } from "../../app/utils/format"
+import { formatWalletAmount } from "../../app/wallet/walletAssetMath"
 import styles from "../Wallet.module.css"
 import { getAssetProvenanceLabel } from "../../app/utils/assetProvenance"
 
@@ -179,12 +180,12 @@ export const CoinsSection = memo(
                             Buy
                           </button>
                         ) : null}
-                        <button type="button" onClick={() => onSendAsset(asset)}>
+                        <button type="button" disabled={asset.decimals === undefined} onClick={() => onSendAsset(asset)}>
                           <SendIcon />
                           Send
                         </button>
                         {showSwap ? (
-                          <button type="button" onClick={() => onSwapAsset(asset)}>
+                          <button type="button" disabled={asset.decimals === undefined} onClick={() => onSwapAsset(asset)}>
                             <SwapIcon />
                             Swap
                           </button>
@@ -193,7 +194,7 @@ export const CoinsSection = memo(
                     </div>
                     <div className={styles.assetBottomRow}>
                       <div className={styles.assetAmount}>
-                        {formatTokenAmount(asset.amount, asset.decimals, 2)}
+                        {formatWalletAmount(asset.amount, asset.decimals, 2)}
                       </div>
                       <div className={styles.assetValue}>
                         ≈ {formatUsd(asset.value)}
@@ -288,12 +289,12 @@ export const TokensSection = memo(
                         </div>
                       </div>
                       <div className={styles.assetActions}>
-                        <button type="button" onClick={() => onSendAsset(asset)}>
+                        <button type="button" disabled={asset.decimals === undefined} onClick={() => onSendAsset(asset)}>
                           <SendIcon />
                           Send
                         </button>
                         {showSwap ? (
-                          <button type="button" onClick={() => onSwapAsset(asset)}>
+                          <button type="button" disabled={asset.decimals === undefined} onClick={() => onSwapAsset(asset)}>
                             <SwapIcon />
                             Swap
                           </button>
@@ -302,7 +303,7 @@ export const TokensSection = memo(
                     </div>
                     <div className={styles.assetBottomRow}>
                       <div className={styles.assetAmount}>
-                        {formatTokenAmount(asset.amount, asset.decimals, 2)}
+                        {formatWalletAmount(asset.amount, asset.decimals, 2)}
                       </div>
                       <div className={styles.assetValue}>
                         ≈ {asset.value !== undefined ? formatUsd(asset.value) : "--"}

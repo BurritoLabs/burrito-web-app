@@ -1,7 +1,8 @@
 import styles from "./WalletPanel.module.css"
 import WalletAssetIcon from "./WalletAssetIcon"
 import type { WalletAssetRow } from "./useWalletAssets"
-import { formatPercent, formatTokenAmount, formatUsd } from "../utils/format"
+import { formatWalletAmount } from "./walletAssetMath"
+import { formatPercent, formatUsd } from "../utils/format"
 import {
   ManageIcon,
   PriceDownIcon,
@@ -168,7 +169,7 @@ export const WalletPanelAssetList = ({
                     </div>
                     <div className={styles.assetAmount}>
                       {accountConnected
-                        ? `${formatTokenAmount(asset.amount, asset.decimals, 2)}`
+                        ? formatWalletAmount(asset.amount, asset.decimals, 2)
                         : "--"}
                     </div>
                   </div>

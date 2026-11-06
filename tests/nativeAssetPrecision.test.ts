@@ -105,7 +105,7 @@ describe("native and IBC explicit precision", () => {
   it("keeps the owned registry available when the third-party asset list fails", async () => {
     vi.stubEnv("VITE_BURRITO_REGISTRY_API_URL", "https://registry.invalid")
     vi.stubGlobal("fetch", vi.fn(async input => {
-      if (String(input).includes("registry.invalid")) return Response.json({ assets: [{ type: "ibc", assetKey: `ibc/${hash}`, symbol: "OWN", name: "Owned", decimals: 8 }] })
+      if (String(input).includes("registry.invalid")) return Response.json({ assets: [{ chainId: "columbus-5", type: "ibc", assetKey: `ibc/${hash}`, symbol: "OWN", name: "Owned", decimals: 8 }] })
       throw new Error("third-party list offline")
     }))
     const { fetchIbcWhitelist } = await import("../src/app/data/terraAssets")

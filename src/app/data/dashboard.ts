@@ -1,27 +1,33 @@
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
-import { fetchWithEndpointFallback } from "./endpointFallback"
+import { CLASSIC_CHAIN_CONFIG, LUNA_CHAIN_CONFIG } from "../config/chainConfig"
+import { fetchJsonWithEndpointFallback } from "./endpointFallback"
+import { withRequestDeadline } from "./requestDeadline"
 
 export type DashboardSnapshot = {
   timestamp: number
   height?: number
-  luncSupply: number
-  ustcSupply: number
-  luncCommunity: number
-  ustcCommunity: number
-  luncOracle: number
-  ustcOracle: number
-  luncBurned: number
-  ustcBurned: number
-  circulatingLunc: number
-  circulatingUstc: number
-  stakedLunc: number
-  stakingRatio: number
+  luncSupply?: number
+  ustcSupply?: number
+  luncCommunity?: number
+  ustcCommunity?: number
+  luncOracle?: number
+  ustcOracle?: number
+  luncBurned?: number
+  ustcBurned?: number
+  circulatingLunc?: number
+  circulatingUstc?: number
+  stakedLunc?: number
+  stakingRatio?: number
   activeValidators?: number
   maxValidators?: number
   unbondingTimeSec?: number
   blockHeight?: number
   blockTimeMs?: number
   inflation?: number
+  coverage?: "complete" | "partial"
+  sourceIssues?: string[]
+  stale?: boolean
+  fetchedAt?: number
 }
 
 export type CirculatingSnapshot = Pick<
@@ -44,13 +50,13 @@ const CLASSICTERRA_BASE = "https://classicterra.money"
 const ORACLE_POOL_ADDRESS = "terra1jgp27m8fykex4e4jtt0l7ze8q528ux2lh4zh0f"
 const BURN_ADDRESS = "terra1sk06e3dyexuq4shw77y3dsv480xv42mq73anxu"
 
-const fetchJson = async <T>(url: string): Promise<T> => {
-  const response = await fetchWithEndpointFallback(url)
+const fetchJson = async <T>(url: string): Promise<T> => withRequestDeadline(async (signal) => {
+  const response = await fetchJsonWithEndpointFallback<T>(url, { signal, timeoutMs: 2_000 })
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`)
   }
-  return response.json() as Promise<T>
-}
+  return response.data as T
+}, { timeoutMs: 8_000 })
 
 const buildUrl = (base: string, path: string, params?: Record<string, string>) => {
   const url = new URL(base + path)
@@ -88,12 +94,12 @@ const getCachedSnapshot = (key: string, maxAgeMs: number) => {
     if (!raw) return undefined
     const parsed = JSON.parse(raw) as { ts: number; data: DashboardSnapshot }
     if (!parsed?.data || !parsed?.ts) return undefined
-    if (
+    if (!key.endsWith(":v2:current") && (
       parsed.data.luncOracle === undefined ||
       parsed.data.ustcOracle === undefined ||
       parsed.data.luncBurned === undefined ||
       parsed.data.ustcBurned === undefined
-    ) {
+    )) {
       return undefined
     }
     if (Date.now() - parsed.ts > maxAgeMs) return undefined
@@ -366,33 +372,6 @@ const fetchLatestBlock = async () => {
   }
 }
 
-const parseDurationToSeconds = (value?: string) => {
-  if (!value) return 0
-  const match = value.match(/(\d+)/)
-  if (!match) return 0
-  return Number(match[1])
-}
-
-const fetchStakingParams = async () => {
-  const data = await fetchJson<{ params?: { unbonding_time?: string; max_validators?: string } }>(
-    buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/params")
-  )
-  return {
-    unbondingTimeSec: parseDurationToSeconds(data?.params?.unbonding_time),
-    maxValidators: toNumber(data?.params?.max_validators ?? "0")
-  }
-}
-
-const fetchActiveValidatorCount = async () => {
-  const url = buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/staking/v1beta1/validators", {
-    status: "BOND_STATUS_BONDED",
-    "pagination.limit": "1",
-    "pagination.count_total": "true"
-  })
-  const data = await fetchJson<{ pagination?: { total?: string } }>(url)
-  return toNumber(data?.pagination?.total ?? "0")
-}
-
 const fetchBlockByHeight = async (height: number) => {
   try {
     const data = await fetchJson<{
@@ -581,17 +560,6 @@ const fetchStakingPoolAtHeight = async (height?: number) => {
   return toUnit(data?.pool?.bonded_tokens ?? "0")
 }
 
-const fetchInflation = async () => {
-  try {
-    const data = await fetchJson<{ inflation?: string }>(
-      buildUrl(CLASSIC_CHAIN.lcd, "/cosmos/mint/v1beta1/inflation")
-    )
-    return toNumber(data.inflation)
-  } catch {
-    return undefined
-  }
-}
-
 const fetchClassicCirculatingSupply = async (
   denom: "lunc" | "ustc",
   height?: number
@@ -632,136 +600,177 @@ export const fetchCirculatingSnapshot = async (): Promise<CirculatingSnapshot> =
   }
 }
 
-export const fetchCurrentDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
-  const cached = getCachedSnapshot("current", 60 * 1000)
-  if (cached) return cached
-
-  const [
-    data,
-    latestBlock,
-    stakingParams,
-    activeValidators,
-    circulatingLuncRaw,
-    circulatingUstcRaw,
-    oraclePool,
-    burnedTotals
-  ] = await Promise.all([
-    fetchFcdDashboard(),
-    fetchLatestBlock(),
-    fetchStakingParams(),
-    fetchActiveValidatorCount(),
-    fetchClassicCirculatingSupply("lunc"),
-    fetchClassicCirculatingSupply("ustc"),
-    fetchOraclePool(),
-    fetchBurnedTotals()
-  ])
-  const previousBlock =
-    latestBlock.height > 1 ? await fetchBlockByHeight(latestBlock.height - 1) : null
-  const blockIntervalMs = previousBlock
-    ? Math.max(0, latestBlock.timeMs - previousBlock.timeMs)
-    : undefined
-  const issuances = data?.issuances ?? {}
-  const pool = data?.communityPool ?? {}
-  const luncSupply = toUnit(issuances[CLASSIC_DENOMS.lunc.coinMinimalDenom] ?? "0")
-  const ustcSupply = toUnit(issuances[CLASSIC_DENOMS.ustc.coinMinimalDenom] ?? "0")
-  const luncCommunity = sumCommunity(pool, CLASSIC_DENOMS.lunc.coinMinimalDenom)
-  const ustcCommunity = sumCommunity(pool, CLASSIC_DENOMS.ustc.coinMinimalDenom)
-  const stakedLunc = toUnit(data?.stakingPool?.bondedTokens ?? "0")
-  const stakingRatio = toNumber(data?.stakingPool?.stakingRatio ?? "0")
-  const circulatingLuncFallback = Math.max(luncSupply - luncCommunity - stakedLunc, 0)
-  const circulatingUstcFallback = Math.max(ustcSupply - ustcCommunity, 0)
-  const circulatingLunc =
-    circulatingLuncRaw > 0 ? circulatingLuncRaw : circulatingLuncFallback
-  const circulatingUstc =
-    circulatingUstcRaw > 0 ? circulatingUstcRaw : circulatingUstcFallback
-
-  const snapshot = {
-    timestamp: Date.now(),
-    luncSupply,
-    ustcSupply,
-    luncCommunity,
-    ustcCommunity,
-    luncOracle: oraclePool.lunc,
-    ustcOracle: oraclePool.ustc,
-    luncBurned: burnedTotals.lunc,
-    ustcBurned: burnedTotals.ustc,
-    circulatingLunc,
-    circulatingUstc,
-    stakedLunc,
-    stakingRatio,
-    activeValidators,
-    maxValidators: stakingParams.maxValidators,
-    unbondingTimeSec: stakingParams.unbondingTimeSec,
-    blockHeight: latestBlock.height,
-    blockTimeMs: blockIntervalMs
+// A fixed fan-out of independent sources. Each entire source (including JSON and
+// endpoint retries) is bounded; a failed source never discards another's values.
+const currentSnapshotRequests = new Map<string, Promise<DashboardSnapshot>>()
+const snapshotNumber = (value: unknown): number | undefined => {
+  if (typeof value !== "string" && typeof value !== "number") return undefined
+  if (typeof value === "string" && !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined
+}
+const snapshotRatio = (value: unknown) => {
+  const number = snapshotNumber(value)
+  return number !== undefined && number <= 1 ? number : undefined
+}
+const snapshotUnit = (value: unknown) => {
+  const number = snapshotNumber(value)
+  return number === undefined ? undefined : number / 1_000_000
+}
+const requiredNumber = (value: unknown) => {
+  const number = snapshotNumber(value)
+  if (number === undefined) throw new Error("Missing source value")
+  return number
+}
+const requiredInteger = (value: unknown, minimum = 0) => {
+  const number = requiredNumber(value)
+  if (!Number.isSafeInteger(number) || number < minimum) throw new Error("Invalid source integer")
+  return number
+}
+type SnapshotCoins = { denom?: string; amount?: string }[]
+const snapshotCoins = (coins: unknown) => {
+  if (!Array.isArray(coins)) throw new Error("Missing source balances")
+  const result = new Map<string, number>()
+  for (const coin of coins) {
+    if (!isRecord(coin) || Array.isArray(coin) || typeof coin.denom !== "string" ||
+      !/^[a-zA-Z][a-zA-Z0-9/:._-]{2,127}$/.test(coin.denom) || result.has(coin.denom)) {
+      throw new Error("Invalid source balance")
+    }
+    result.set(coin.denom, requiredNumber(coin.amount) / 1_000_000)
   }
+  // An absent denomination in a successfully returned balance list is zero.
+  return { lunc: result.get("uluna") ?? 0, ustc: result.get("uusd") ?? 0 }
+}
+const currentJson = <T>(url: string, budgetMs = 3_500) => withRequestDeadline(async (signal) => {
+  const response = await fetchJsonWithEndpointFallback<T>(url, { signal, timeoutMs: 1_000 })
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`)
+  return response.data as T
+}, { timeoutMs: budgetMs })
 
-  setCachedSnapshot("current", snapshot)
-  return snapshot
+const fetchCurrentSnapshot = (phoenix: boolean): Promise<DashboardSnapshot> => {
+  // Capture immutable chain context before the first await. A tab switch cannot
+  // redirect in-flight Classic fallback reads into Phoenix (or its cache).
+  const chain = phoenix ? LUNA_CHAIN_CONFIG : CLASSIC_CHAIN_CONFIG
+  const cacheKey = `${chain.chainId}:v2:current`
+  const cached = getCachedSnapshot(cacheKey, 60_000)
+  if (cached?.coverage === "complete") return Promise.resolve(cached)
+  const inFlight = currentSnapshotRequests.get(cacheKey)
+  if (inFlight) return inFlight
+
+  const request = (async () => {
+    const sourceIssues = new Set<string>()
+    const read = async <T>(source: string, operation: () => Promise<T>): Promise<T | undefined> => {
+      try { return await operation() } catch { sourceIssues.add(source); return undefined }
+    }
+    const lcd = <T>(path: string, budgetMs?: number) => currentJson<T>(buildUrl(chain.lcd, path), budgetMs)
+    const fcd = phoenix ? Promise.resolve(undefined) : read("fcd-dashboard", async () => {
+      const data = await currentJson<FcdDashboard>(`${FCD_BASE}/v1/dashboard`, 2_500)
+      if (!data || !data.issuances) throw new Error("Missing dashboard source")
+      return data
+    })
+    const supply = (denom: string) => read(`supply-${denom}`, async () => {
+      const dashboard = await fcd
+      const fromFcd = snapshotUnit(dashboard?.issuances?.[denom])
+      if (fromFcd !== undefined) return fromFcd
+      const data = await lcd<{ amount?: { amount?: string } }>(`/cosmos/bank/v1beta1/supply/by_denom?denom=${denom}`)
+      return requiredNumber(data?.amount?.amount) / 1_000_000
+    })
+    const community = read("community-pool", async () => {
+      const dashboard = await fcd
+      if (dashboard) {
+        try {
+          if (!isRecord(dashboard.communityPool) || Array.isArray(dashboard.communityPool)) throw new Error("Invalid source pool")
+          return snapshotCoins(Object.entries(dashboard.communityPool).map(([denom, amount]) => ({ denom, amount })))
+        } catch {
+          sourceIssues.add("fcd-community-pool")
+        }
+      }
+      const data = await lcd<{ pool?: SnapshotCoins }>("/cosmos/distribution/v1beta1/community_pool")
+      return snapshotCoins(data?.pool)
+    })
+    const staking = read("staking-pool", async () => {
+      const dashboard = await fcd
+      const staked = snapshotUnit(dashboard?.stakingPool?.bondedTokens)
+      if (staked !== undefined) return { staked, ratio: snapshotRatio(dashboard?.stakingPool?.stakingRatio) }
+      const data = await lcd<{ pool?: { bonded_tokens?: string } }>("/cosmos/staking/v1beta1/pool")
+      return { staked: requiredNumber(data?.pool?.bonded_tokens) / 1_000_000, ratio: undefined }
+    })
+    const blocks = read("latest-block", async () => {
+      type Block = { block?: { header?: { height?: string; time?: string } } }
+      const latest = await lcd<Block>("/cosmos/base/tendermint/v1beta1/blocks/latest")
+      const height = requiredInteger(latest?.block?.header?.height, 1)
+      const latestTime = Date.parse(latest?.block?.header?.time ?? "")
+      // Never probe a fabricated previous height when latest failed.
+      const previous = height > 1 ? await read("previous-block", () => lcd<Block>(`/cosmos/base/tendermint/v1beta1/blocks/${height - 1}`, 1_500)) : undefined
+      const previousTime = Date.parse(previous?.block?.header?.time ?? "")
+      const interval = Number.isFinite(latestTime) && Number.isFinite(previousTime) && latestTime >= previousTime ? latestTime - previousTime : undefined
+      if (height > 1 && interval === undefined) sourceIssues.add("previous-block")
+      return { height, interval }
+    })
+    const params = read("staking-params", async () => {
+      const data = await lcd<{ params?: { max_validators?: string; unbonding_time?: string } }>("/cosmos/staking/v1beta1/params")
+      const maxValidators = requiredInteger(data?.params?.max_validators)
+      const duration = data?.params?.unbonding_time?.match(/^(\d+(?:\.\d+)?)s$/)
+      if (!duration) throw new Error("Missing staking duration")
+      return { maxValidators, unbondingTimeSec: Number(duration[1]) }
+    })
+    const validators = read("active-validators", async () => {
+      const data = await lcd<{ pagination?: { total?: string } }>("/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1&pagination.count_total=true")
+      return requiredInteger(data?.pagination?.total)
+    })
+    const balances = (source: string, address: string) => read(source, async () => {
+      const data = await lcd<{ balances?: SnapshotCoins }>(`/cosmos/bank/v1beta1/balances/${address}`)
+      return snapshotCoins(data?.balances)
+    })
+    const circulating = (denom: "lunc" | "ustc") => !phoenix && typeof window === "undefined"
+      ? read(`circulating-${denom}`, async () => requiredNumber(await currentJson<number | string>(`${CLASSICTERRA_BASE}/api/v1/csupply${denom === "ustc" ? "/ustc" : ""}`)))
+      : Promise.resolve(undefined)
+    const [luncSupply, ustcSupply, pool, stake, block, stakingParams, activeValidators, oracle, burned, rawLunc, rawUstc, inflation] = await Promise.all([
+      supply("uluna"), phoenix ? Promise.resolve(undefined) : supply("uusd"), community, staking, blocks, params, validators,
+      phoenix ? Promise.resolve(undefined) : balances("oracle-pool", ORACLE_POOL_ADDRESS),
+      phoenix ? Promise.resolve(undefined) : balances("burn-address", BURN_ADDRESS), circulating("lunc"), circulating("ustc"),
+      phoenix ? read("inflation", async () => requiredNumber((await lcd<{ inflation?: string }>("/cosmos/mint/v1beta1/inflation"))?.inflation)) : Promise.resolve(undefined)
+    ])
+    const circulatingLunc = rawLunc ?? (luncSupply !== undefined && pool && stake ? Math.max(0, luncSupply - pool.lunc - stake.staked) : undefined)
+    const circulatingUstc = rawUstc ?? (ustcSupply !== undefined && pool ? Math.max(0, ustcSupply - pool.ustc) : undefined)
+    const stakingRatio = stake?.ratio ?? (stake && luncSupply !== undefined && luncSupply > 0 ? snapshotRatio(stake.staked / luncSupply) : undefined)
+    if (stake && stakingRatio === undefined) sourceIssues.add("staking-ratio")
+    const now = Date.now()
+    const snapshot: DashboardSnapshot = {
+      timestamp: now, fetchedAt: now, stale: false,
+      luncSupply, ustcSupply, luncCommunity: pool?.lunc, ustcCommunity: phoenix ? undefined : pool?.ustc,
+      luncOracle: oracle?.lunc, ustcOracle: oracle?.ustc, luncBurned: burned?.lunc, ustcBurned: burned?.ustc,
+      circulatingLunc, circulatingUstc, stakedLunc: stake?.staked,
+      stakingRatio,
+      activeValidators, maxValidators: stakingParams?.maxValidators, unbondingTimeSec: stakingParams?.unbondingTimeSec,
+      blockHeight: block?.height, blockTimeMs: block?.interval, inflation,
+      coverage: sourceIssues.size ? "partial" : "complete", sourceIssues: [...sourceIssues].sort()
+    }
+    if (![luncSupply, ustcSupply, pool, stake, block, stakingParams, activeValidators, oracle, burned, rawLunc, rawUstc, inflation].some(value => value !== undefined)) {
+      throw new Error("Dashboard sources unavailable")
+    }
+    // Do not turn an outage into a 60-second healthy cache hit. Existing healthy
+    // cache is never merged silently into a new partially unavailable snapshot.
+    if (snapshot.coverage === "complete") setCachedSnapshot(cacheKey, snapshot)
+    return snapshot
+  })()
+  currentSnapshotRequests.set(cacheKey, request)
+  void request.finally(() => {
+    if (currentSnapshotRequests.get(cacheKey) === request) currentSnapshotRequests.delete(cacheKey)
+  }).catch(() => {})
+  return request
 }
 
-export const fetchCurrentPhoenixDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
-  const cacheKey = `${CLASSIC_CHAIN.chainId}:current`
-  const cached = getCachedSnapshot(cacheKey, 60 * 1000)
-  if (cached) return cached
-
-  const nativeDenom = CLASSIC_DENOMS.lunc.coinMinimalDenom
-  const [
-    totalSupply,
-    community,
-    staked,
-    latestBlock,
-    stakingParams,
-    activeValidators,
-    inflation
-  ] = await Promise.all([
-    fetchSupplyByDenom(nativeDenom),
-    fetchCommunityPool(),
-    fetchStakingPoolAtHeight(),
-    fetchLatestBlock(),
-    fetchStakingParams(),
-    fetchActiveValidatorCount(),
-    fetchInflation()
-  ])
-  const previousBlock =
-    latestBlock.height > 1 ? await fetchBlockByHeight(latestBlock.height - 1) : null
-  const blockIntervalMs = previousBlock
-    ? Math.max(0, latestBlock.timeMs - previousBlock.timeMs)
-    : undefined
-  const circulating = Math.max(totalSupply - community.lunc - staked, 0)
-
-  const snapshot: DashboardSnapshot = {
-    timestamp: Date.now(),
-    luncSupply: totalSupply,
-    ustcSupply: 0,
-    luncCommunity: community.lunc,
-    ustcCommunity: 0,
-    luncOracle: 0,
-    ustcOracle: 0,
-    luncBurned: 0,
-    ustcBurned: 0,
-    circulatingLunc: circulating,
-    circulatingUstc: 0,
-    stakedLunc: staked,
-    stakingRatio: totalSupply ? staked / totalSupply : 0,
-    activeValidators,
-    maxValidators: stakingParams.maxValidators,
-    unbondingTimeSec: stakingParams.unbondingTimeSec,
-    blockHeight: latestBlock.height,
-    blockTimeMs: blockIntervalMs,
-    inflation
-  }
-
-  setCachedSnapshot(cacheKey, snapshot)
-  return snapshot
-}
+export const fetchCurrentDashboardSnapshot = (): Promise<DashboardSnapshot> => fetchCurrentSnapshot(false)
+export const fetchCurrentPhoenixDashboardSnapshot = (): Promise<DashboardSnapshot> => fetchCurrentSnapshot(true)
 
 export const fetchHistoricalDashboardSnapshot = async (
   rangeKey: string,
   rangeMs: number,
   ttlMs: number
 ): Promise<DashboardSnapshot> => {
-  const cached = getCachedSnapshot(rangeKey, ttlMs)
+  const cacheKey = `${CLASSIC_CHAIN.chainId}:v2:historical:${rangeKey}`
+  const cached = getCachedSnapshot(cacheKey, ttlMs)
   if (cached) return cached
 
   const targetMs = Date.now() - rangeMs
@@ -811,7 +820,7 @@ export const fetchHistoricalDashboardSnapshot = async (
     stakingRatio: luncSupply ? stakedLunc / luncSupply : 0
   }
 
-  setCachedSnapshot(rangeKey, snapshot)
+  setCachedSnapshot(cacheKey, snapshot)
   return snapshot
 }
 

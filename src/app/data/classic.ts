@@ -2,6 +2,11 @@ import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../chain"
 export { fetchPrices, getCachedPrices } from "./prices"
 export type { PriceMap } from "./prices"
 import { fetchWithEndpointFallback } from "./endpointFallback"
+import {
+  parseComputedBankSendTaxResponse,
+  parseTaxableTransferResponse,
+  parseTaxRateResponse
+} from "./taxResponse"
 
 export type CoinBalance = {
   denom: string
@@ -396,16 +401,12 @@ export const fetchSpendableBalances = async (address: string) => {
 
 export const fetchTreasuryTaxRate = async () => {
   const url = buildUrl(CLASSIC_CHAIN.lcd, "/terra/treasury/v1beta1/tax_rate")
-  const data = await fetchJson<{ tax_rate?: string }>(url)
-  const parsed = Number(data.tax_rate ?? "0")
-  return Number.isFinite(parsed) ? parsed : 0
+  return parseTaxRateResponse(await fetchJson<unknown>(url))
 }
 
 export const fetchBurnTaxRate = async () => {
   const url = buildUrl(CLASSIC_CHAIN.lcd, "/terra/tax/v1beta1/burn_tax_rate")
-  const data = await fetchJson<{ tax_rate?: string }>(url)
-  const parsed = Number(data.tax_rate ?? "0")
-  return Number.isFinite(parsed) ? parsed : 0
+  return parseTaxRateResponse(await fetchJson<unknown>(url))
 }
 
 export const fetchTaxableTransfer = async (
@@ -416,8 +417,7 @@ export const fetchTaxableTransfer = async (
     CLASSIC_CHAIN.lcd,
     `/terra/taxexemption/v1/taxable/${fromAddress}/${toAddress}`
   )
-  const data = await fetchJson<{ taxable?: boolean }>(url)
-  return data.taxable === true
+  return parseTaxableTransferResponse(await fetchJson<unknown>(url))
 }
 
 export const fetchComputedBankSendTax = async ({
@@ -432,7 +432,7 @@ export const fetchComputedBankSendTax = async ({
   amount: string
 }) => {
   const url = buildUrl(CLASSIC_CHAIN.lcd, "/terra/tx/v1beta1/compute_tax")
-  const data = await postJson<{ tax_amount?: CoinBalance[] }>(url, {
+  const data = await postJson<unknown>(url, {
     tx: {
       body: {
         messages: [
@@ -452,8 +452,7 @@ export const fetchComputedBankSendTax = async ({
     }
   })
 
-  const match = data.tax_amount?.find((coin) => coin.denom === denom)
-  return match?.amount ?? "0"
+  return parseComputedBankSendTaxResponse(data, denom)
 }
 
 export type DelegationResponse = {

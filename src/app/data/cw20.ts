@@ -25,6 +25,10 @@ const BALANCE_FETCH_ATTEMPTS = 2
 const BALANCE_FETCH_RETRY_DELAY_MS = 200
 const BALANCE_FETCH_CONCURRENCY = 8
 
+const isCw20Balance = (value: unknown): value is string =>
+  typeof value === "string" && /^[0-9]{1,39}$/.test(value) &&
+  BigInt(value) <= 340282366920938463463374607431768211455n
+
 type Cw20ChainScope = {
   chainId: string
   lcd: string
@@ -42,11 +46,12 @@ const delay = (ms: number) =>
 
 const loadCachePayload = (key: string, ttl = CACHE_TTL) => {
   if (typeof window === "undefined") return undefined
-  const cached = window.localStorage.getItem(key)
+  const cached = readLocalStorageValue(key)
   if (!cached) return undefined
   try {
     const parsed = JSON.parse(cached) as { ts: number; data: Record<string, string> }
-    if (!parsed?.ts || Date.now() - parsed.ts > ttl) return undefined
+    if (!Number.isFinite(parsed?.ts) || Date.now() - parsed.ts > ttl ||
+      !parsed.data || typeof parsed.data !== "object" || Array.isArray(parsed.data)) return undefined
     return parsed
   } catch {
     return undefined
@@ -97,8 +102,8 @@ const loadSingleBalanceCache = (
     if (!cached) return undefined
     const parsed = JSON.parse(cached) as SingleBalanceCache
     if (
-      typeof parsed.balance !== "string" ||
-      typeof parsed.ts !== "number" ||
+      !isCw20Balance(parsed.balance) ||
+      !Number.isFinite(parsed.ts) ||
       Date.now() - parsed.ts > CACHE_TTL
     ) {
       return undefined
@@ -285,8 +290,10 @@ const fetchCw20BalanceResult = async (
           return { balance: "0", invalid: true }
         }
       } else {
-        const data = (await res.json()) as { data?: { balance?: string } }
-        return { balance: data?.data?.balance ?? "0" }
+        const data = (await res.json()) as { data?: { balance?: unknown } }
+        // CW20 balances are Uint128 strings. A malformed success response is a
+        // failed read, not evidence that the holding has disappeared.
+        if (isCw20Balance(data?.data?.balance)) return { balance: data.data.balance }
       }
 
       if (attempt < BALANCE_FETCH_ATTEMPTS - 1) {
@@ -331,7 +338,7 @@ export const fetchCw20Balances = async (
     scope.chainId
   )
   const invalidKey = `cw20invalid:${scope.chainId}`
-  const cached = loadCache(cacheKey)
+  const cached = getCachedCw20Balances(normalizedAddress, effectiveWhitelist, scope)
   const invalidCached = loadCache(invalidKey) as Record<string, string> | undefined
   const invalidContracts: Record<string, boolean> = {}
 
@@ -341,18 +348,10 @@ export const fetchCw20Balances = async (
     })
   }
 
-  const results: Record<string, string> = cached ? { ...cached } : {}
-  loadActiveBalanceContracts(normalizedAddress, scope.chainId).forEach((contract) => {
-    if (!(contract in effectiveWhitelist) || contract in results) return
-    const cachedSingle = loadSingleBalanceCache(
-      normalizedAddress,
-      contract,
-      scope.chainId
-    )
-    if (cachedSingle) {
-      results[contract] = cachedSingle.balance
-    }
-  })
+  const results: Record<string, string> = Object.fromEntries(
+    (cached?.data ?? []).map((token) => [token.address, token.balance])
+  )
+  const freshResults: Record<string, string> = {}
   const entries = Object.entries(effectiveWhitelist).filter(([contract]) => {
     const normalized = contract.toLowerCase()
     if (forceContracts.has(normalized)) return true
@@ -376,19 +375,29 @@ export const fetchCw20Balances = async (
       if (!result) continue
       if (result.invalid && !forceContracts.has(contract)) {
         invalidContracts[contract] = true
+      } else if (!result.invalid) {
+        delete invalidContracts[contract]
       }
       results[contract] = result.balance
+      freshResults[contract] = result.balance
     }
   })
 
   await Promise.all(workers)
 
-  saveCache(cacheKey, results)
+  if (entries.length && !Object.keys(freshResults).length) {
+    throw new Error("Failed to fetch CW20 balances")
+  }
+  // Aggregate snapshots have one timestamp. Only write one when every listed
+  // token was actually read; partial scans must not renew failed old balances.
+  if (Object.keys(freshResults).length === Object.keys(effectiveWhitelist).length) {
+    saveCache(cacheKey, freshResults)
+  }
   saveCache(invalidKey, Object.fromEntries(Object.keys(invalidContracts).map((k) => [k, "1"])))
-  Object.entries(results).forEach(([contract, balance]) => {
+  Object.entries(freshResults).forEach(([contract, balance]) => {
     saveSingleBalanceCache(normalizedAddress, contract, balance, scope.chainId)
   })
-  saveActiveBalanceContracts(normalizedAddress, results, scope.chainId)
+  saveActiveBalanceContracts(normalizedAddress, freshResults, scope.chainId)
 
   return mapCw20BalanceResults(results, effectiveWhitelist)
 }
@@ -409,39 +418,28 @@ export const getCachedCw20Balances = (
   const payload = loadCachePayload(
     buildBalanceCacheKey(normalizedAddress, effectiveWhitelist, scope.chainId)
   )
-  const data: Record<string, string> = payload ? { ...payload.data } : {}
-
-  loadActiveBalanceContracts(normalizedAddress, scope.chainId).forEach((contract) => {
-    if (!(contract in effectiveWhitelist) || contract in data) return
+  const data: Record<string, string> = {}
+  const timestamps: number[] = []
+  Object.keys(effectiveWhitelist).forEach((contract) => {
     const cachedSingle = loadSingleBalanceCache(
       normalizedAddress,
       contract,
       scope.chainId
     )
-    if (cachedSingle) {
+    if (cachedSingle && (!payload || !isCw20Balance(payload.data[contract]) ||
+      cachedSingle.ts >= payload.ts)) {
       data[contract] = cachedSingle.balance
+      timestamps.push(cachedSingle.ts)
+    } else if (payload && isCw20Balance(payload.data[contract])) {
+      data[contract] = payload.data[contract]
+      timestamps.push(payload.ts)
     }
   })
-
-  if (!payload && !Object.keys(data).length) {
-    Object.keys(effectiveWhitelist).forEach((contractRaw) => {
-      const contract = normalizeContract(contractRaw)
-      if (!contract || contract in data) return
-      const cachedSingle = loadSingleBalanceCache(
-        normalizedAddress,
-        contract,
-        scope.chainId
-      )
-      if (cachedSingle) {
-        data[contract] = cachedSingle.balance
-      }
-    })
-  }
 
   if (!Object.keys(data).length) return undefined
   return {
     data: mapCw20BalanceResults(data, effectiveWhitelist),
-    updatedAt: payload?.ts ?? Date.now() - 1
+    updatedAt: Math.min(...timestamps)
   }
 }
 
@@ -502,7 +500,6 @@ export const useCw20Balances = (
     enabled: Boolean(address && whitelist && Object.keys(whitelist).length),
     initialData: cachedBalances?.data,
     initialDataUpdatedAt: cachedBalances?.updatedAt,
-    placeholderData: (previousData) => previousData,
     staleTime: forceSignature ? 30_000 : 2 * 60_000,
     refetchOnMount: true,
     refetchOnWindowFocus: false

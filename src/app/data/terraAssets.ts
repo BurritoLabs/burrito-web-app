@@ -22,6 +22,7 @@ import { mapSettledWithConcurrency, withInFlightAssetRequest } from "./assetMeta
 import { fetchVerifiedTokenRegistry } from "./tokenRegistry"
 import { writeLocalStorageValue } from "../utils/safeStorage"
 import { readAssetDecimals, readDenomMetadataDecimals } from "./assetPrecision"
+import { withRequestDeadline } from "./requestDeadline"
 
 export type AssetProvenance = {
   verificationStatus?: string
@@ -479,7 +480,9 @@ const hasReliableCw20Fallback = (
 ) => {
   const symbol = fallback?.symbol?.trim()
   if (!symbol || !isSafeDisplaySymbol(symbol)) return false
-  return symbol.toUpperCase() !== contract.slice(0, 6).toUpperCase()
+  const normalized = symbol.toUpperCase()
+  return normalized !== contract.slice(0, 6).toUpperCase() &&
+    normalized !== `CW20-${contract.slice(6, 12).toUpperCase()}`
 }
 
 const mergeCw20TokenMetadata = ({
@@ -679,12 +682,17 @@ const fetchCosmosRegistryAssets = async (
 ) => {
   if (chainKey !== "luna") return EMPTY_COSMOS_REGISTRY_ASSETS
   if (!cosmosRegistryAssetsPromise) {
-    cosmosRegistryAssetsPromise = fetch(COSMOS_TERRA_ASSETLIST_URL)
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Failed to load Terra asset list: ${response.status}`)
-        return mapCosmosRegistryAssets((await response.json()) as CosmosRegistryAssetList)
-      })
-      .catch(() => EMPTY_COSMOS_REGISTRY_ASSETS)
+    const request = withRequestDeadline(async (signal) => {
+      const response = await fetch(COSMOS_TERRA_ASSETLIST_URL, { signal })
+      if (!response.ok) throw new Error(`Failed to load Terra asset list: ${response.status}`)
+      return mapCosmosRegistryAssets((await response.json()) as CosmosRegistryAssetList)
+    }, { timeoutMs: 8_000 }).catch(() => {
+      // Keep the soft-empty contract for native/IBC callers, but do not pin a
+      // transient outage (or stalled WebView transport) for the entire session.
+      if (cosmosRegistryAssetsPromise === request) cosmosRegistryAssetsPromise = null
+      return EMPTY_COSMOS_REGISTRY_ASSETS
+    })
+    cosmosRegistryAssetsPromise = request
   }
   return cosmosRegistryAssetsPromise
 }
@@ -919,45 +927,61 @@ export type Cw20Contract = {
   icon?: string
 }
 
+export const fetchCw20Whitelist = async (scope = getAssetChainScope()) => {
+  // Load independent sources together. A failed legacy list must not discard
+  // verified assets or block the supplemental registry from being requested.
+  const [legacy, registry, cosmos] = await Promise.allSettled([
+    withRequestDeadline(async (signal) => {
+      const response = await fetch(`${ASSET_URL}/cw20/tokens.json`, { signal })
+      if (!response.ok) throw new Error("Failed to load CW20 legacy registry")
+      return response.json() as Promise<Record<string, Record<string, Cw20Token>>>
+    }, { timeoutMs: 8_000 }),
+    fetchVerifiedTokenRegistry(scope.chainKey),
+    fetchCosmosRegistryAssets(scope.chainKey)
+  ])
+  const data = legacy.status === "fulfilled" ? legacy.value : {}
+  const verified = registry.status === "fulfilled" ? registry.value : { cw20: {} }
+  const supplemental = cosmos.status === "fulfilled" ? cosmos.value.cw20 : {}
+  // Registry helpers currently return empty maps on transport failure. Only
+  // actual remote CW20 entries prove usable coverage when legacy failed.
+  if (legacy.status === "rejected" &&
+    ![...Object.values(verified.cw20), ...Object.values(supplemental)]
+      .some((token) => Boolean(token.symbol && isTerraAddress(token.token)))) {
+    throw new Error("CW20 registries unavailable; retry token discovery")
+  }
+  const tokens = pickChainAssets(data, scope.name, scope.chainId) ?? {}
+  const mapped = Object.entries(tokens).reduce<Record<string, Cw20Token>>((acc, entry) => {
+    const [key, token] = entry
+    const address = (token.token || key).toLowerCase()
+    if (!isTerraAddress(address)) return acc
+    const fallbackSymbol = `CW20-${address.slice(6, 12).toUpperCase()}`
+    const symbol = resolveSafeDisplaySymbol(token.symbol, fallbackSymbol)
+
+    const parsedDecimals = Number(token.decimals)
+    acc[address] = {
+      token: address,
+      symbol,
+      name: resolveSafeDisplayName(token.name, symbol),
+      protocol: token.protocol?.trim() || undefined,
+      icon: sanitizeAssetIconUrl(token.icon),
+      decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : 6
+    }
+    return acc
+  }, {})
+  const merged = includeTrustedCw20Tokens(
+    { ...mapped, ...supplemental, ...verified.cw20 },
+    scope.chainKey
+  )
+  return Object.fromEntries(
+    Object.entries(merged).filter(([, token]) => Boolean(token.symbol && token.token))
+  )
+}
+
 export const useCw20Whitelist = () => {
   const scope = getAssetChainScope()
   return useQuery({
     queryKey: ["terra-assets", "cw20", scope.chainId],
-    queryFn: async () => {
-      const [data, verified] = await Promise.all([
-        fetchAsset<Record<string, Record<string, Cw20Token>>>("cw20/tokens.json"),
-        fetchVerifiedTokenRegistry(scope.chainKey)
-      ])
-      const tokens = pickChainAssets(data, scope.name, scope.chainId) ?? {}
-      const mapped = Object.entries(tokens).reduce<Record<string, Cw20Token>>((acc, entry) => {
-        const [key, token] = entry
-        const address = (token.token || key).toLowerCase()
-        if (!isTerraAddress(address)) return acc
-        const fallbackSymbol = `CW20-${address.slice(6, 12).toUpperCase()}`
-        const symbol = resolveSafeDisplaySymbol(token.symbol, fallbackSymbol)
-
-        const parsedDecimals = Number(token.decimals)
-        acc[address] = {
-          token: address,
-          symbol,
-          name: resolveSafeDisplayName(token.name, symbol),
-          protocol: token.protocol?.trim() || undefined,
-          icon: sanitizeAssetIconUrl(token.icon),
-          decimals: Number.isFinite(parsedDecimals) ? parsedDecimals : 6
-        }
-        return acc
-      }, {})
-      const supplemental = (await fetchCosmosRegistryAssets(scope.chainKey)).cw20
-      const merged = includeTrustedCw20Tokens(
-        { ...mapped, ...supplemental, ...verified.cw20 },
-        scope.chainKey
-      )
-      return Object.fromEntries(
-        Object.entries(merged).filter(([, token]) =>
-          Boolean(token.symbol && token.token)
-        )
-      )
-    },
+    queryFn: () => fetchCw20Whitelist(scope),
     staleTime: 60 * 60 * 1000
   })
 }
@@ -1062,7 +1086,8 @@ export const fetchCw20TokenInfos = async (
         const parsedDecimals = Number(info?.decimals)
         let icon: string | undefined
         const hasUsableFallbackIcon = Boolean(
-          sanitizeAssetIconUrl(fallbackWithFinder[contract]?.icon) ||
+          (sanitizeAssetIconUrl(fallbackWithFinder[contract]?.icon) !== "/system/cw20.svg" &&
+            sanitizeAssetIconUrl(fallbackWithFinder[contract]?.icon)) ||
             sanitizeAssetIconUrl(
               getLocalCw20TokenOverride(contract, scope.chainKey)?.icon
             )

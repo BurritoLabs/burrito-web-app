@@ -15,7 +15,6 @@ import LoadingBar from "./app/feedback/LoadingBar"
 import TxStatusModal from "./app/feedback/TxStatusModal"
 import ScrollTopButton from "./app/layout/ScrollTopButton"
 import RouteMetadata from "./app/metadata/RouteMetadata"
-import { retryPendingWebFeeReceipts } from "./app/revenue/webFeeReceipt"
 
 function App() {
   const routes = useAppRoutes()
@@ -25,7 +24,11 @@ function App() {
   const toggleMenu = useCallback(() => setMenuOpen((open) => !open), [])
 
   useEffect(() => {
-    void retryPendingWebFeeReceipts()
+    // Receipt reconciliation is background work, not a dependency of the
+    // first screen or wallet SDK. Failed loads leave receipts queued for retry.
+    void import("./app/revenue/webFeeReceipt")
+      .then(({ retryPendingWebFeeReceipts }) => retryPendingWebFeeReceipts())
+      .catch(() => { /* The durable receipt queue is retained. */ })
   }, [])
 
   return (

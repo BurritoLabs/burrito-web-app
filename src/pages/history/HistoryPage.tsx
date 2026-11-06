@@ -12,12 +12,11 @@ import type { CoinBalance, TxItem, ValidatorItem } from "../../app/data/classic"
 import {
   useCw20Contracts,
   useResolvedCw20Whitelist,
+  useResolvedNativeWhitelist,
   useResolvedIbcWhitelist
 } from "../../app/data/terraAssets"
-import {
-  formatTokenAmount,
-  truncateHash
-} from "../../app/utils/format"
+import { truncateHash } from "../../app/utils/format"
+import { readAssetDecimals } from "../../app/data/assetPrecision"
 import { CLASSIC_CHAIN } from "../../app/chain"
 import { fromBech32, toBech32 } from "@cosmjs/encoding"
 import {
@@ -27,10 +26,11 @@ import {
 import {
   buildCanonicalMessages,
   collectContractCandidates,
+  collectHistoryNativeDenoms,
   CONTRACT_LABEL_LOOKUP_LIMIT,
   decodeEventValue,
   formatCoins,
-  formatDenom,
+  formatHistoryCoin,
   formatHistoryTimestamp,
   formatMsgType,
   getRawMessages,
@@ -70,14 +70,10 @@ const renderCanonicalLine = (
           )
         }
         if (tokenInfo?.type === "single") {
-          const meta = resolveToken?.(tokenInfo.denom)
-          const decimals = meta?.decimals ?? 6
-          const symbol = meta?.symbol ?? formatDenom(tokenInfo.denom)
-          const amount = formatTokenAmount(tokenInfo.amount, decimals, 6)
           return (
             <span key={`${word}-${index}`} className={styles.messagePart}>
               {index > 0 ? " " : ""}
-              {`${amount} ${symbol}`}
+              {formatHistoryCoin(tokenInfo.amount, tokenInfo.denom, resolveToken)}
             </span>
           )
         }
@@ -146,7 +142,8 @@ const renderAddressOrText = (address?: string, label?: string) => {
 
 const buildMessage = (
   msg: HistoryMessage,
-  resolveName?: (address?: string) => string | undefined
+  resolveName?: (address?: string) => string | undefined,
+  resolveToken?: (denom: string) => TokenLookup | undefined
 ): TxMessage => {
   const rawType = msg?.["@type"] ?? msg?.type ?? "Transaction"
   const type = sentenceCase(formatMsgType(rawType))
@@ -163,7 +160,7 @@ const buildMessage = (
         renderActionLine([
           renderAddressOrText(from, resolveName?.(from)),
           multi ? "send multiple tokens to" : "send",
-          multi ? renderAddressOrText(to, resolveName?.(to)) : formatCoins(amount),
+          multi ? renderAddressOrText(to, resolveName?.(to)) : formatCoins(amount, resolveToken),
           multi ? "" : "to",
           multi ? "" : renderAddressOrText(to, resolveName?.(to))
         ])
@@ -190,7 +187,7 @@ const buildMessage = (
         renderActionLine([
           renderAddressOrText(msg?.delegator_address, resolveName?.(msg?.delegator_address)),
           "delegate",
-          formatCoins(amount),
+          formatCoins(amount, resolveToken),
           "to",
           renderAddressOrText(msg?.validator_address, resolveName?.(msg?.validator_address))
         ])
@@ -205,7 +202,7 @@ const buildMessage = (
         renderActionLine([
           renderAddressOrText(msg?.delegator_address, resolveName?.(msg?.delegator_address)),
           "undelegate",
-          formatCoins(amount),
+          formatCoins(amount, resolveToken),
           "from",
           renderAddressOrText(msg?.validator_address, resolveName?.(msg?.validator_address))
         ])
@@ -220,7 +217,7 @@ const buildMessage = (
         renderActionLine([
           renderAddressOrText(msg?.delegator_address, resolveName?.(msg?.delegator_address)),
           "redelegate",
-          formatCoins(amount),
+          formatCoins(amount, resolveToken),
           "to",
           renderAddressOrText(msg?.validator_dst_address, resolveName?.(msg?.validator_dst_address))
         ])
@@ -264,7 +261,7 @@ const buildMessage = (
         renderActionLine([
           renderAddressOrText(msg?.sender, resolveName?.(msg?.sender)),
           "send",
-          formatCoins(token),
+          formatCoins(token, resolveToken),
           "to",
           renderAddressOrText(msg?.receiver, resolveName?.(msg?.receiver))
         ])
@@ -296,7 +293,8 @@ const getTxMessages = (
   tx: TxItem,
   resolveName?: (address?: string) => string | undefined,
   accountAddress?: string,
-  includeEventTransfers = true
+  includeEventTransfers = true,
+  resolveToken?: (denom: string) => TokenLookup | undefined
 ): TxMessage[] => {
   const rawMessages = getRawMessages(tx)
 
@@ -324,7 +322,7 @@ const getTxMessages = (
             .split(",")
             .filter(Boolean)
             .map((entry: string) => {
-              const match = entry.match(/^([0-9]+)([a-zA-Z0-9/]+)$/)
+              const match = entry.match(/^([0-9]+)([a-zA-Z][a-zA-Z0-9/:._-]*)$/)
               return match
                 ? { amount: match[1], denom: match[2] }
                 : { amount: entry, denom: "" }
@@ -376,7 +374,7 @@ const getTxMessages = (
         }
         return
       }
-      otherMessages.push(buildMessage(msg, resolveName))
+      otherMessages.push(buildMessage(msg, resolveName, resolveToken))
     })
   }
 
@@ -417,7 +415,7 @@ const getTxMessages = (
         renderActionLine([
           senderNode,
           multiTokens ? "send multiple tokens to" : "send",
-          multiTokens ? recipientNode : formatCoins(sendActions[0]?.amounts ?? []),
+          multiTokens ? recipientNode : formatCoins(sendActions[0]?.amounts ?? [], resolveToken),
           multiTokens ? "" : "to",
           multiTokens ? "" : recipientNode
         ])
@@ -491,23 +489,9 @@ const History = () => {
 
   const { data: cw20Whitelist = {} } = useResolvedCw20Whitelist(relevantCw20Contracts)
   const { data: cw20Contracts = {} } = useCw20Contracts()
-  const ibcDenoms = useMemo(() => {
-    const denoms = new Set<string>()
-    txs.forEach((tx) => {
-      const messages = getRawMessages(tx)
-      messages.forEach((message) => {
-        const amounts = Array.isArray(message?.amount)
-          ? message.amount
-          : message?.amount
-            ? [message.amount]
-            : []
-        amounts.forEach((coin) => {
-          if (coin?.denom?.startsWith("ibc/")) denoms.add(coin.denom)
-        })
-      })
-    })
-    return Array.from(denoms)
-  }, [txs])
+  const nativeDenoms = useMemo(() => collectHistoryNativeDenoms(txs), [txs])
+  const ibcDenoms = useMemo(() => nativeDenoms.filter(denom => denom.startsWith("ibc/")), [nativeDenoms])
+  const { data: nativeWhitelist = {} } = useResolvedNativeWhitelist(nativeDenoms)
   const { data: ibcWhitelist = {} } = useResolvedIbcWhitelist(ibcDenoms)
 
   const { data: validators = [] } = useQuery<ValidatorItem[]>({
@@ -594,17 +578,20 @@ const History = () => {
     Object.entries(cw20Whitelist ?? {}).forEach(([address, token]) => {
       map.set(address, {
         symbol: token?.symbol ?? token?.name ?? token?.protocol,
-        decimals: token?.decimals ?? 6
+        decimals: readAssetDecimals(token?.decimals)
       })
     })
     Object.entries(ibcWhitelist ?? {}).forEach(([denom, token]) => {
-      map.set(denom, {
+      map.set(`ibc/${denom.replace(/^ibc\//, "").toUpperCase()}`, {
         symbol: token?.symbol ?? token?.name,
-        decimals: token?.decimals ?? 6
+        decimals: readAssetDecimals(token?.decimals)
       })
     })
+    Object.entries(nativeWhitelist).forEach(([denom, token]) => {
+      map.set(denom, { symbol: token.symbol ?? token.name, decimals: readAssetDecimals(token.decimals) })
+    })
     return map
-  }, [cw20Whitelist, ibcWhitelist])
+  }, [cw20Whitelist, ibcWhitelist, nativeWhitelist])
 
   const resolveName = useMemo(
     () => (address?: string) => {
@@ -631,12 +618,12 @@ const History = () => {
 
   const resolveToken = useMemo(
     () => (denom: string) => {
-      const meta = tokenLookupMap.get(denom)
+      const meta = tokenLookupMap.get(denom.startsWith("ibc/") ? `ibc/${denom.slice(4).toUpperCase()}` : denom)
       if (meta) return meta
       if (isAddressToken(denom)) {
         const name = contractNameMap.get(denom)
-        if (name) return { symbol: name, decimals: 6 }
-        return { symbol: truncateHash(denom, 6, 4), decimals: 6 }
+        if (name) return { symbol: name }
+        return { symbol: truncateHash(denom, 6, 4) }
       }
       return undefined
     },
@@ -669,8 +656,8 @@ const History = () => {
           time: formatHistoryTimestamp(tx.timestamp),
           messages: canonicalMessages.length
             ? canonicalMessages
-            : getTxMessages(tx, resolveName, account?.address, !hasStakingAction),
-          fee: formatCoins(tx.tx?.auth_info?.fee?.amount ?? []),
+            : getTxMessages(tx, resolveName, account?.address, !hasStakingAction, resolveToken),
+          fee: formatCoins(tx.tx?.auth_info?.fee?.amount ?? [], resolveToken),
           memo: tx.tx?.body?.memo ?? "",
           log: tx.code ? tx.raw_log ?? "" : "",
           signMode: getSignMode(tx)

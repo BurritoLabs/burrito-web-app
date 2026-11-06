@@ -2,6 +2,12 @@ import type { SVGProps } from "react"
 
 type IconProps = SVGProps<SVGSVGElement>
 
+export const DashboardIcon = (props: IconProps) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+    <path d="M3 3h8v8H3V3Zm10 0h8v8h-8V3ZM3 13h8v8H3v-8Zm10 0h8v8h-8v-8Z" fill="currentColor" />
+  </svg>
+)
+
 export const SwapIcon = (props: IconProps) => (
   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}>
     <path

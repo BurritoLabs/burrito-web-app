@@ -1,8 +1,9 @@
 import { Suspense, lazy, type ComponentType } from "react"
 import { useRoutes } from "react-router-dom"
-import Dashboard from "../pages/Dashboard"
+import DashboardRedirect from "./routes/DashboardRedirect"
 import {
   ContractIcon,
+  DashboardIcon,
   GovIcon,
   HistoryIcon,
   LaunchpadIcon,
@@ -18,6 +19,7 @@ import type { AppChainConfig } from "./appChains"
 
 const ICON_SIZE = { width: 18, height: 18 }
 
+const loadDashboard = () => import("../pages/Dashboard")
 const loadWallet = () => import("../pages/Wallet")
 const loadNft = () => import("../pages/NFT")
 const loadMarket = () => import("../pages/Market")
@@ -30,6 +32,7 @@ const loadGovernance = () => import("../pages/Governance")
 const loadContract = () => import("../pages/Contract")
 const loadPrivacy = () => import("../pages/Privacy")
 
+const Dashboard = lazy(loadDashboard)
 const Wallet = lazy(loadWallet)
 const NFT = lazy(loadNft)
 const Market = lazy(loadMarket)
@@ -66,6 +69,12 @@ const renderFeaturePage = (
 )
 
 export const navMenu = [
+  {
+    path: "/",
+    title: "Dashboard",
+    icon: <DashboardIcon {...ICON_SIZE} />,
+    preload: loadDashboard
+  },
   {
     path: "/wallet",
     title: "Wallet",
@@ -124,6 +133,7 @@ export const navMenu = [
 
 const appRoutes = [
   { path: "/", element: renderPage(Dashboard) },
+  { path: "/dashboard", element: <DashboardRedirect /> },
   {
     path: "/market/pair/:dexId/:pair",
     element: renderFeaturePage(MarketPairDetails, "market", "Market")

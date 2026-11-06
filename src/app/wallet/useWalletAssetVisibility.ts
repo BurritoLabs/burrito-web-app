@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { CLASSIC_DENOMS } from "../chain"
 import type { WalletAssetRow } from "./useWalletAssets"
-import { toUnitAmount } from "../utils/format"
+import { walletUnitAmount } from "./walletAssetMath"
 
 const ALWAYS_VISIBLE_DENOMS: Set<string> = new Set([
   CLASSIC_DENOMS.lunc.coinMinimalDenom,
@@ -20,11 +20,17 @@ const passesLowBalanceFilter = (asset: WalletAssetRow) => {
     return asset.value >= LOW_BALANCE_USD_THRESHOLD
   }
 
+  const units = walletUnitAmount(asset.amount, asset.decimals)
+  // An unknown unit cannot be compared to a whole-token low-balance threshold.
+  if (units === undefined) return /^\d+$/.test(asset.amount) && BigInt(asset.amount) > 0n
+
   if (asset.kind === "cw20") {
-    return false
+    // No price is not proof of a low USD balance. Keep positive unpriced
+    // holdings visible; explicit user hiding and unknown-asset filtering remain.
+    return units > 0
   }
 
-  return toUnitAmount(asset.amount, asset.decimals) >= LOW_BALANCE_AMOUNT_THRESHOLD
+  return units >= LOW_BALANCE_AMOUNT_THRESHOLD
 }
 
 type UseWalletAssetVisibilityOptions = {

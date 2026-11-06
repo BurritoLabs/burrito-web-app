@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { spawnSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
+import { verifiedLocalDependencyFixes } from "./local-dependency-fixes.mjs"
 
 const baselineUrl = new URL("./dependency-audit-baseline.json", import.meta.url)
 const baseline = JSON.parse(await readFile(baselineUrl, "utf8"))
@@ -40,13 +42,22 @@ const elevatedSeverities = new Set(["moderate", "high", "critical"])
 const elevatedPackages = Object.entries(report.vulnerabilities ?? {}).filter(
   ([, vulnerability]) => elevatedSeverities.has(vulnerability?.severity)
 )
-const lowPackages = Object.entries(report.vulnerabilities ?? {})
+const rawLowPackages = Object.entries(report.vulnerabilities ?? {})
   .filter(([, vulnerability]) => vulnerability?.severity === "low")
   .map(([name]) => name)
   .sort()
+let localFixes
+try {
+  localFixes = verifiedLocalDependencyFixes(report, fileURLToPath(new URL("../", import.meta.url)))
+} catch (error) {
+  console.error(`DEPENDENCY_AUDIT_FAILED local_patch=${error.message}`)
+  process.exit(1)
+}
+const lowPackages = rawLowPackages.filter(name => !localFixes.includes(name))
 const allowed = new Set(baseline.allowedLowPackages)
 const unexpected = lowPackages.filter((name) => !allowed.has(name))
-const lowCount = Number(severities.low ?? lowPackages.length)
+const rawLowCount = Number(severities.low ?? rawLowPackages.length)
+const lowCount = rawLowCount - localFixes.length
 
 const collectAdvisoryUrls = (packageName, visited = new Set()) => {
   if (visited.has(packageName)) return []
@@ -116,5 +127,5 @@ if (new Date() > new Date(`${baseline.reviewBy}T23:59:59Z`)) {
 }
 
 console.log(
-  `DEPENDENCY_AUDIT_OK low=${lowCount} moderate=${severities.moderate ?? 0} high=${severities.high ?? 0} critical=${severities.critical ?? 0} reviewed_elevated=${reviewedElevatedPackages.length} review_by=${baseline.reviewBy}`
+  `DEPENDENCY_AUDIT_OK low=${lowCount} raw_low=${rawLowCount} locally_fixed=${localFixes.length} moderate=${severities.moderate ?? 0} high=${severities.high ?? 0} critical=${severities.critical ?? 0} reviewed_elevated=${reviewedElevatedPackages.length} review_by=${baseline.reviewBy}`
 )

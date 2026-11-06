@@ -27,6 +27,8 @@ import {
   useResolvedIbcWhitelist
 } from "../data/terraAssets"
 import { toUnitAmount } from "../utils/format"
+import { readAssetDecimals, resolveNativeMarketDecimals } from "../data/assetPrecision"
+import { walletUnitAmount, walletValueAtPrice, walletValueFromSwaprate, walletOracleUsdPrice, walletCw20Financials } from "./walletAssetMath"
 import {
   formatNativeSymbol,
   resolveNativeAssetIdentity
@@ -42,7 +44,7 @@ export type WalletAssetRow = {
   denom: string
   symbol: string
   name: string
-  decimals: number
+  decimals?: number
   amount: string
   price?: number
   change?: number
@@ -125,8 +127,8 @@ const shouldSwapForDisplay = ({
 }
 
 const sortByValueDesc = (
-  a: { value?: number; amount: string; decimals: number; symbol: string },
-  b: { value?: number; amount: string; decimals: number; symbol: string }
+  a: { value?: number; amount: string; decimals?: number; symbol: string },
+  b: { value?: number; amount: string; decimals?: number; symbol: string }
 ) => {
   const aHasValue = a.value !== undefined
   const bHasValue = b.value !== undefined
@@ -144,8 +146,13 @@ const sortByValueDesc = (
     return bValue - aValue
   }
 
-  const aAmount = toUnitAmount(a.amount, a.decimals)
-  const bAmount = toUnitAmount(b.amount, b.decimals)
+  const aAmount = walletUnitAmount(a.amount, a.decimals)
+  const bAmount = walletUnitAmount(b.amount, b.decimals)
+  if (aAmount === undefined || bAmount === undefined) {
+    if (aAmount !== undefined) return -1
+    if (bAmount !== undefined) return 1
+    return a.symbol.localeCompare(b.symbol)
+  }
   if (aAmount === bAmount) {
     return a.symbol.localeCompare(b.symbol)
   }
@@ -329,24 +336,21 @@ export const useWalletAssets = (accountAddress?: string) => {
 
     balances.forEach((coin) => {
       if (Number(coin.amount) <= 0) return
-      if (coin.denom.startsWith("ibc/")) {
-        const hash = coin.denom.replace("ibc/", "")
-        map.set(coin.denom, ibcWhitelist?.[hash]?.decimals ?? 6)
-        return
-      }
-      map.set(coin.denom, 6)
+      const decimals = resolveNativeMarketDecimals(coin.denom, nativeWhitelist, ibcWhitelist ?? {})
+      if (decimals !== undefined) map.set(coin.denom, decimals)
     })
 
     cw20Balances.forEach((token) => {
       if (Number(token.balance) <= 0) return
-      map.set(token.address, token.decimals ?? 6)
+      const decimals = readAssetDecimals(token.decimals)
+      if (decimals !== undefined) map.set(token.address, decimals)
     })
 
     return Array.from(map.entries()).map(([key, decimals]) => ({
       key,
       decimals
     }))
-  }, [balances, cw20Balances, ibcWhitelist])
+  }, [balances, cw20Balances, ibcWhitelist, nativeWhitelist])
 
   const { data: dexEstimatedPrices } = useDexEstimatedPrices(
     dexAssetMetas,
@@ -367,19 +371,16 @@ export const useWalletAssets = (accountAddress?: string) => {
 
   const marketUsdPriceByAsset = useMemo(() => {
     const getNativeUsdSeedPrice = (denom: string) => {
+      if (resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist ?? {}) === undefined) return undefined
       if (denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) return luncPrice
       if (denom === CLASSIC_DENOMS.ustc.coinMinimalDenom) return ustcPrice
       if (denom.startsWith("ibc/")) return undefined
 
       const swaprate = swapRateMap.get(denom)
-      if (swaprate && Number.isFinite(swaprate) && swaprate > 0) {
-        const unitValue = 1 / swaprate
-        const isClassicStable = formatWalletDenom(denom, isClassic).endsWith("TC")
-        if (isClassicStable) {
-          return ustcPrice !== undefined ? unitValue * ustcPrice : undefined
-        }
-        return unitValue
-      }
+      const oraclePrice = walletOracleUsdPrice(denom,
+        resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist ?? {}),
+        swaprate, ustcPrice, isClassic)
+      if (oraclePrice !== undefined) return oraclePrice
 
       const lower = denom.toLowerCase()
       const fx =
@@ -398,12 +399,12 @@ export const useWalletAssets = (accountAddress?: string) => {
       }
       if (normalizedKey.startsWith("ibc/")) {
         const hash = normalizedKey.slice(4)
-        return ibcWhitelist?.[hash]?.decimals ?? 6
+        return readAssetDecimals(ibcWhitelist?.[hash]?.decimals)
       }
       if (normalizedKey.startsWith("terra1")) {
-        return cw20Whitelist?.[normalizedKey]?.decimals ?? 6
+        return readAssetDecimals(cw20Whitelist?.[normalizedKey]?.decimals)
       }
-      return nativeWhitelist[normalizedKey]?.decimals ?? 6
+      return readAssetDecimals(nativeWhitelist[normalizedKey]?.decimals)
     }
 
     const poolEdges = marketPools
@@ -414,12 +415,14 @@ export const useWalletAssets = (accountAddress?: string) => {
 
         const leftKey = normalizeWalletAssetKey(leftRaw.id)
         const rightKey = normalizeWalletAssetKey(rightRaw.id)
-        const leftUnits = toUnitAmount(leftRaw.amount, getDecimalsForAssetKey(leftRaw.id))
-        const rightUnits = toUnitAmount(rightRaw.amount, getDecimalsForAssetKey(rightRaw.id))
+        const leftUnits = walletUnitAmount(leftRaw.amount, getDecimalsForAssetKey(leftRaw.id))
+        const rightUnits = walletUnitAmount(rightRaw.amount, getDecimalsForAssetKey(rightRaw.id))
 
         if (
           !leftKey ||
           !rightKey ||
+          leftUnits === undefined ||
+          rightUnits === undefined ||
           !Number.isFinite(leftUnits) ||
           !Number.isFinite(rightUnits) ||
           leftUnits <= 0 ||
@@ -538,12 +541,13 @@ export const useWalletAssets = (accountAddress?: string) => {
   )
 
   const resolveDexUsdValue = useCallback(
-    (assetKey: string, amount: string, decimals: number) => {
+    (assetKey: string, amount: string, decimals?: number) => {
+      if (readAssetDecimals(decimals) === undefined) return undefined
       const normalizedKey = normalizeWalletAssetKey(assetKey)
 
       const derivedUsdPrice = marketUsdPriceByAsset[normalizedKey]
       if (derivedUsdPrice !== undefined) {
-        return toUnitAmount(amount, decimals) * derivedUsdPrice
+        return walletValueAtPrice(amount, decimals, derivedUsdPrice)
       }
 
       const estimate =
@@ -554,7 +558,7 @@ export const useWalletAssets = (accountAddress?: string) => {
         estimate.quoteDenom === CLASSIC_DENOMS.ustc.coinMinimalDenom ? ustcPrice : luncPrice
       if (quoteUsd === undefined) return undefined
 
-      return toUnitAmount(amount, decimals) * estimate.priceInQuote * quoteUsd
+      return walletValueAtPrice(amount, decimals, estimate.priceInQuote * quoteUsd)
     },
     [dexEstimatedPrices, directAnchorDexPrices, luncPrice, marketUsdPriceByAsset, ustcPrice]
   )
@@ -563,12 +567,10 @@ export const useWalletAssets = (accountAddress?: string) => {
     const resolveAssetMeta = (assetId: string) => {
       if (assetId.startsWith("native:")) {
         const denom = assetId.slice(7)
-        const isIbc = denom.startsWith("ibc/")
-        const hash = isIbc ? denom.slice(4) : ""
         return {
           id: assetId,
           key: denom.startsWith("ibc/") ? `ibc/${denom.slice(4).toUpperCase()}` : denom.toLowerCase(),
-          decimals: isIbc ? (ibcWhitelist?.[hash]?.decimals ?? 6) : 6,
+          decimals: resolveNativeMarketDecimals(denom, nativeWhitelist, ibcWhitelist ?? {}),
           isLunc: denom === CLASSIC_DENOMS.lunc.coinMinimalDenom,
           isUstc: denom === CLASSIC_DENOMS.ustc.coinMinimalDenom
         }
@@ -578,7 +580,7 @@ export const useWalletAssets = (accountAddress?: string) => {
       return {
         id: `cw20:${contract}`,
         key: contract,
-        decimals: cw20Whitelist?.[contract]?.decimals ?? 6,
+        decimals: readAssetDecimals(cw20Whitelist?.[contract]?.decimals),
         isLunc: false,
         isUstc: false
       }
@@ -612,8 +614,9 @@ export const useWalletAssets = (accountAddress?: string) => {
 
       let left = resolveAssetMeta(leftRaw.id)
       let right = resolveAssetMeta(rightRaw.id)
-      let leftAmount = toUnitAmount(leftRaw.amount, left.decimals)
-      let rightAmount = toUnitAmount(rightRaw.amount, right.decimals)
+      let leftAmount = walletUnitAmount(leftRaw.amount, left.decimals)
+      let rightAmount = walletUnitAmount(rightRaw.amount, right.decimals)
+      if (leftAmount === undefined || rightAmount === undefined) return
 
       if (
         shouldSwapForDisplay({
@@ -672,6 +675,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     luncPrice,
     marketUsdPriceByAsset,
     marketPools,
+    nativeWhitelist,
     ustcChange,
     ustcPrice
   ])
@@ -681,35 +685,30 @@ export const useWalletAssets = (accountAddress?: string) => {
 
     const calcValueFromSwaprate = (
       amount: string,
-      swaprate?: number,
-      isClassicStable?: boolean
+      denom: string,
+      decimals: number | undefined,
+      swaprate?: number
     ) => {
-      if (!swaprate) return undefined
-      const base = Number(amount) / swaprate / 1e6
-      if (isClassicStable) {
-        return ustcPrice ? base * ustcPrice : undefined
-      }
-      return base
+      return walletValueFromSwaprate(amount, denom, decimals, swaprate, ustcPrice, isClassic)
     }
 
-    const calcFxFallback = (amount: string, denom?: string) => {
+    const calcFxFallback = (amount: string, decimals: number | undefined, denom?: string) => {
       if (!ustcPrice || !denom) return undefined
       const lower = denom.toLowerCase()
       const fx =
         lower === "umnt" ? fxRates?.MNT : lower === "utwd" ? fxRates?.TWD : undefined
       if (!fx) return undefined
-      return (Number(amount) / 1e6) * fx * ustcPrice
+      return walletValueAtPrice(amount, decimals, fx * ustcPrice)
     }
 
     const nativeRows = balances
       .filter((coin) => Number(coin.amount) > 0)
       .map((coin): WalletAssetRow => {
         const swaprate = swapRateMap.get(coin.denom)
-        const classicSymbol = formatWalletDenom(coin.denom, isClassic)
-        const isClassicStable = classicSymbol.endsWith("TC")
+        const nativeDecimals = resolveNativeMarketDecimals(coin.denom, nativeWhitelist, ibcWhitelist ?? {})
         const valueFromSwaprate =
-          calcValueFromSwaprate(coin.amount, swaprate, isClassicStable) ??
-          calcFxFallback(coin.amount, coin.denom)
+          calcValueFromSwaprate(coin.amount, coin.denom, nativeDecimals, swaprate) ??
+          calcFxFallback(coin.amount, nativeDecimals, coin.denom)
 
         if (coin.denom === CLASSIC_DENOMS.lunc.coinMinimalDenom) {
           const value =
@@ -785,15 +784,14 @@ export const useWalletAssets = (accountAddress?: string) => {
           const ibcToken = ibcWhitelist?.[hash]
           const symbol = ibcToken?.symbol ?? "IBC"
           const name = ibcToken?.name ?? symbol
-          const decimals = ibcToken?.decimals ?? 6
-          const unitAmount = toUnitAmount(coin.amount, decimals)
+          const decimals = readAssetDecimals(ibcToken?.decimals)
+          const unitAmount = walletUnitAmount(coin.amount, decimals)
           const baseDenom = ibcToken?.base_denom ?? coin.denom
-          const isClassicStableIbc = formatWalletDenom(baseDenom, isClassic).endsWith("TC")
           const value =
-            calcValueFromSwaprate(coin.amount, swaprate, isClassicStableIbc) ??
-            calcFxFallback(coin.amount, baseDenom) ??
+            calcValueFromSwaprate(coin.amount, coin.denom, decimals, swaprate) ??
+            calcFxFallback(coin.amount, decimals, baseDenom) ??
             resolveDexUsdValue(coin.denom, coin.amount, decimals)
-          const price = value !== undefined && unitAmount > 0 ? value / unitAmount : undefined
+          const price = value !== undefined && unitAmount !== undefined && unitAmount > 0 ? value / unitAmount : undefined
 
           return {
             kind: "ibc",
@@ -829,13 +827,13 @@ export const useWalletAssets = (accountAddress?: string) => {
           candidateName: nativeToken?.name,
           chainKey
         })
-        const decimals = nativeToken?.decimals ?? 6
-        const unitAmount = toUnitAmount(coin.amount, decimals)
+        const decimals = readAssetDecimals(nativeToken?.decimals)
+        const unitAmount = walletUnitAmount(coin.amount, decimals)
         const value =
           valueFromSwaprate ??
-          calcFxFallback(coin.amount, coin.denom) ??
+          calcFxFallback(coin.amount, decimals, coin.denom) ??
           resolveDexUsdValue(coin.denom, coin.amount, decimals)
-        const price = value !== undefined && unitAmount > 0 ? value / unitAmount : undefined
+        const price = value !== undefined && unitAmount !== undefined && unitAmount > 0 ? value / unitAmount : undefined
 
         return {
           kind: "native",
@@ -919,14 +917,7 @@ export const useWalletAssets = (accountAddress?: string) => {
     const cw20Rows = cw20Balances
       .filter((token) => Number(token.balance) > 0)
       .map((token): WalletAssetRow => {
-        const decimals = token.decimals ?? 6
-        const unitAmount = toUnitAmount(token.balance, decimals)
-        const price =
-          token.symbol === "LUNC" ? luncPrice : token.symbol === "USTC" ? ustcPrice : undefined
-        const value =
-          (price !== undefined && unitAmount > 0 ? unitAmount * price : undefined) ??
-          resolveDexUsdValue(token.address, token.balance, decimals)
-        const resolvedPrice = value !== undefined && unitAmount > 0 ? value / unitAmount : price
+        const { decimals, value, price } = walletCw20Financials(token, resolveDexUsdValue)
 
         return {
           kind: "cw20",
@@ -935,7 +926,7 @@ export const useWalletAssets = (accountAddress?: string) => {
           name: token.name ?? token.symbol,
           decimals,
           amount: token.balance,
-          price: resolvedPrice,
+          price,
           change: marketStyleChangeByAsset.get(`cw20:${token.address.toLowerCase()}`)?.change,
           value,
           chainCount: 1,

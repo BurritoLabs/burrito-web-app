@@ -221,7 +221,7 @@ describe("Terra asset registry selection", () => {
       return Response.json({ data: { name: "Chain Token", symbol: "CHAIN", decimals, total_supply: "100000000" } })
     }))
     const lcd = "https://terra-classic-lcd.publicnode.com"
-    const fallback = { [contract]: { token: contract, symbol: "CHAIN", icon: "/system/cw20.svg" } }
+    const fallback = { [contract]: { token: contract, symbol: "CHAIN", icon: "/tokens/registry.svg" } }
     const first = fetchCw20TokenInfos([contract], fallback, {
       chainId: "same-url-chain-a", chainKey: "lunc", lcd, name: "Chain A"
     }, { skipFinder: true })

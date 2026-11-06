@@ -1,11 +1,12 @@
 import { CLASSIC_DENOMS } from "../chain"
 import type { WalletAssetRow } from "./useWalletAssets"
+import { readAssetDecimals } from "../data/assetPrecision"
 
 export type SelectedAsset = {
   symbol: string
   name: string
   denom: string
-  decimals: number
+  decimals?: number
 }
 
 export type SendAsset = SelectedAsset & {
@@ -57,7 +58,9 @@ export const parseBigInt = (value?: string) => {
   }
 }
 
-export const toMicroAmount = (value: string, decimals = 6) => {
+export const toMicroAmount = (value: string, precision?: number) => {
+  const decimals = readAssetDecimals(precision)
+  if (decimals === undefined) return 0n
   const cleaned = sanitizeAmount(value).trim()
   if (!cleaned) return 0n
   const [wholePartRaw, fracPartRaw = ""] = cleaned.split(".")
@@ -70,7 +73,9 @@ export const toMicroAmount = (value: string, decimals = 6) => {
   return parseBigInt(merged)
 }
 
-export const fromMicroAmount = (value: bigint, decimals = 6) => {
+export const fromMicroAmount = (value: bigint, precision?: number) => {
+  const decimals = readAssetDecimals(precision)
+  if (decimals === undefined) return ""
   if (value <= 0n) return "0"
   if (decimals <= 0) return value.toString()
   const base = 10n ** BigInt(decimals)

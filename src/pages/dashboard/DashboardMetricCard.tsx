@@ -44,7 +44,8 @@ export const DashboardMetricCard = ({
     }`}
   >
     <div className={styles.metricLabel}>{item.label}</div>
-    <div className={styles.metricValue}>
+    <div className={styles.metricValue} title={item.fullValue}
+      aria-label={item.fullValue ? `${item.fullValue}${item.unit ? ` ${item.unit}` : ""}` : undefined}>
       {item.value}
       {item.unit ? <span>{item.unit}</span> : null}
     </div>

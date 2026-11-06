@@ -9,6 +9,7 @@ export type MetricItem = {
   key: string
   label: string
   value: string
+  fullValue?: string
   unit?: string
   size?: MetricSize
   group?: string

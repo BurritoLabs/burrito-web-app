@@ -1,5 +1,32 @@
 # Production Refactor Notes
 
+## Web release candidate — 2026-11-06 (Toronto)
+
+- User authorized publishing the verified Web optimizations. Release preparation
+  uses a separate source checkout, preserves the current production market-data
+  refreshes and Cloudflare build variables, and retains the previous deployment
+  as a rollback target. Existing dirty generated dist files are excluded.
+- Dashboard has independent bounded sources, LCD recovery for failed FCD reads,
+  explicit unavailable/partial states and section retry controls. Missing network
+  metrics no longer become zero. Dashboard navigation and the /dashboard alias
+  lead to the canonical root; lazy loading reduces initial JS. Compact staking
+  totals retain accessible full values. Brand geometry/assets are unchanged.
+- Wallet/history use verified token precision, display unknown raw units and
+  block precision-dependent sends. CW20 pricing is contract-keyed rather than
+  native-ticker based. Classic tax response validation and availability guards
+  block unconfirmed bank sends; cold panel navigation preserves the selected
+  asset. Fee amounts, destination addresses and public chain IDs are unchanged.
+- CW20 registry pagination remains backwards compatible with the legacy API.
+  Full registry pagination and new server diagnostic retention are separate API
+  releases, not claims made by this Web deployment. The origin's unrelated
+  studio changes and all native/store artifacts remain untouched.
+- Compatible dependency updates and the exact-version/hash-bound deepmerge
+  postinstall fix are described in dependency-audit.md. The existing audit
+  baseline and bundle budgets are not increased. Release validation must run
+  after a clean install so that patch delivery, not only the current node_modules,
+  is exercised. Controlled browser tests do not establish funded transaction or
+  physical-device acceptance.
+
 ## Dependency-only follow-up — 2026-10-11
 
 - Updated only compatible build/test/polyfill lockfile resolutions and pinned

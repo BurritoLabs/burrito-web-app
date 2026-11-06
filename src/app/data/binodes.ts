@@ -112,8 +112,25 @@ export type BinodesGovernanceOverview = {
 }
 
 export type BinodesDashboardFrequency = "HOUR" | "DAY" | "WEEK"
+export type BinodesDashboardEndpoint = "network" | "burns" | "fees" | "stake" | "luncBurns" | "ustcBurns"
+
+export type BinodesDashboardCoverage = {
+  status: "complete" | "partial" | "unavailable"
+  failedEndpoints: BinodesDashboardEndpoint[]
+  emptyEndpoints: BinodesDashboardEndpoint[]
+}
+
+export class BinodesDashboardUnavailableError extends Error {
+  readonly coverage: BinodesDashboardCoverage
+  constructor(failedEndpoints: BinodesDashboardEndpoint[]) {
+    super("BiNodes dashboard activity unavailable")
+    this.name = "BinodesDashboardUnavailableError"
+    this.coverage = { status: "unavailable", failedEndpoints, emptyEndpoints: [] }
+  }
+}
 
 export type BinodesDashboardActivity = {
+  coverage?: BinodesDashboardCoverage
   fetchedAt: string
   bucketCount: number
   frequency: BinodesDashboardFrequency
@@ -187,13 +204,15 @@ const buildBinodesUrl = (path: string, params?: Record<string, string>) => {
 const fetchBinodesList = async <T>(
   path: string,
   params: Record<string, string> = {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  validate?: (payload: unknown) => void
 ) => withRequestDeadline(async (requestSignal) => {
   const response = await fetch(buildBinodesUrl(path, { limit: "1", ...params }), { signal: requestSignal })
   if (!response.ok) {
     throw new Error(`BiNodes request failed: ${response.status}`)
   }
   const payload = (await response.json()) as BinodesResponse<T>
+  validate?.(payload)
   if (payload.code !== undefined && payload.code !== 200) {
     throw new Error(payload.message || "BiNodes request failed")
   }
@@ -223,7 +242,13 @@ const maxNumber = <T>(items: T[], getter: (item: T) => number | undefined) => {
 const sumOrUndefined = <T>(
   items: T[],
   getter: (item: T) => number | undefined
-) => (items.length ? sumNumber(items, getter) : undefined)
+) => (items.length && items.every((item) => Number.isFinite(getter(item)))
+  ? sumNumber(items, getter) : undefined)
+
+const sumKnown = (...values: Array<number | undefined>) =>
+  values.every((value) => Number.isFinite(value))
+    ? values.reduce<number>((sum, value) => sum + Number(value), 0)
+    : undefined
 
 const aggregateNetworkOverview = (
   items: BinodesNetworkOverview[]
@@ -466,10 +491,8 @@ const buildDashboardSeries = (
   ) => {
     items.forEach((item) => {
       const point = ensurePoint(item.dt)
-      const amount =
-        (item.fee_burn_amt_actual ?? 0) +
-        (item.voluntary_burn_amt_actual ?? 0)
-      const usd = (item.fee_burn_amt_usd ?? 0) + (item.voluntary_burn_usd ?? 0)
+      const amount = sumKnown(item.fee_burn_amt_actual, item.voluntary_burn_amt_actual)
+      const usd = sumKnown(item.fee_burn_amt_usd, item.voluntary_burn_usd)
       setFinite(point, amountKey, amount)
       setFinite(point, usdKey, usd)
     })
@@ -480,16 +503,12 @@ const buildDashboardSeries = (
 
   return Array.from(byDate.values())
     .map((point) => {
-      const totalFeeUsd =
-        (point.feeGasUsd ?? 0) +
-        (point.feeCpUsd ?? 0) +
-        (point.feeOpUsd ?? 0) +
-        (point.feeBurnUsd ?? 0)
-      const burnUsd = (point.feeBurnUsd ?? 0) + (point.voluntaryBurnUsd ?? 0)
+      const totalFeeUsd = sumKnown(point.feeGasUsd, point.feeCpUsd, point.feeOpUsd, point.feeBurnUsd)
+      const burnUsd = sumKnown(point.feeBurnUsd, point.voluntaryBurnUsd)
       return {
         ...point,
-        totalFeeUsd: totalFeeUsd || undefined,
-        burnUsd: burnUsd || undefined
+        totalFeeUsd,
+        burnUsd
       }
     })
     .sort((a, b) => a.dt.localeCompare(b.dt))
@@ -497,14 +516,30 @@ const buildDashboardSeries = (
 
 const settleList = async <T>(
   path: string,
-  params?: Record<string, string>
+  params: Record<string, string>,
+  fields: string[],
+  signal?: AbortSignal
 ) => {
   try {
     return {
       failed: false,
-      items: await fetchBinodesList<T>(path, params)
+      items: await fetchBinodesList<T>(path, params, signal, (payload) => {
+        if (!payload || typeof payload !== "object" || !Array.isArray((payload as BinodesResponse<T>).data)) {
+          throw new Error("Malformed BiNodes dashboard response")
+        }
+        for (const item of (payload as BinodesResponse<Record<string, unknown>>).data!) {
+          if (!item || typeof item !== "object" || Array.isArray(item) ||
+            typeof item.dt !== "string" || !Number.isFinite(Date.parse(item.dt)) ||
+            !fields.some((field) => typeof item[field] === "number" && Number.isFinite(item[field])) ||
+            fields.some((field) => item[field] !== undefined &&
+              (typeof item[field] !== "number" || !Number.isFinite(item[field])))) {
+            throw new Error("Malformed BiNodes dashboard row")
+          }
+        }
+      })
     }
   } catch {
+    throwIfRequestAborted(signal)
     return {
       failed: true,
       items: []
@@ -547,8 +582,10 @@ export const fetchBinodesDexTxDetails = async ({
 
 export const fetchBinodesDashboardActivity = async (
   frequency: BinodesDashboardFrequency = "HOUR",
-  bucketLimit = 50
+  bucketLimit = 50,
+  signal?: AbortSignal
 ): Promise<BinodesDashboardActivity> => {
+  throwIfRequestAborted(signal)
   const limit = Math.max(1, Math.min(Math.ceil(bucketLimit), 5000))
   const params = {
     limit: String(limit),
@@ -562,21 +599,30 @@ export const fetchBinodesDashboardActivity = async (
     luncBurnResult,
     ustcBurnResult
   ] = await Promise.all([
-    settleList<BinodesNetworkOverview>("/v1/network/overview", params),
-    settleList<BinodesBurnOverview>("/v1/burns/overview", params),
-    settleList<BinodesFeesOverview>("/v1/fees/overview", params),
-    settleList<BinodesStakeOverview>("/v1/stake/overview", params),
+    settleList<BinodesNetworkOverview>("/v1/network/overview", params,
+      ["block_cnt", "tx_total_cnt", "gas_used", "gas_wanted", "fee_gas_usd", "fee_cp_usd", "fee_op_usd", "fee_burn_usd", "active_addr_cnt", "new_addr_cnt", "ibc_tx_cnt", "ibc_volume_usd", "net_ibc_flow_usd", "dex_tx_cnt", "dex_volume_usd", "transfer_cnt", "transfer_amt_usd"], signal),
+    settleList<BinodesBurnOverview>("/v1/burns/overview", params,
+      ["fee_burn_usd", "voluntary_burn_cnt", "voluntary_burn_usd"], signal),
+    settleList<BinodesFeesOverview>("/v1/fees/overview", params,
+      ["gas_wanted", "gas_used", "fee_gas_usd", "fee_cp_usd", "fee_op_usd"], signal),
+    settleList<BinodesStakeOverview>("/v1/stake/overview", params,
+      ["staking_delegate_cnt", "staking_delegate_actual", "staking_delegate_usd", "staking_undelegate_cnt", "staking_undelegate_actual", "staking_undelegate_usd", "staking_redelegate_cnt", "staking_redelegate_actual", "staking_redelegate_usd"], signal),
     settleList<BinodesBurnAssetOverview>("/v1/burns/assets_info", {
       ...params,
       asset: "LUNC"
-    }),
+    }, ["fee_burn_amt_actual", "fee_burn_amt_usd", "voluntary_burn_cnt", "voluntary_burn_amt_actual", "voluntary_burn_usd"], signal),
     settleList<BinodesBurnAssetOverview>("/v1/burns/assets_info", {
       ...params,
       asset: "USTC"
-    })
+    }, ["fee_burn_amt_actual", "fee_burn_amt_usd", "voluntary_burn_cnt", "voluntary_burn_amt_actual", "voluntary_burn_usd"], signal)
   ])
-  if ([networkResult, burnsResult, feesResult].every((result) => result.failed)) {
-    throw new Error("BiNodes dashboard activity unavailable")
+  throwIfRequestAborted(signal)
+  const results = [networkResult, burnsResult, feesResult, stakeResult, luncBurnResult, ustcBurnResult]
+  const endpoints: BinodesDashboardEndpoint[] = ["network", "burns", "fees", "stake", "luncBurns", "ustcBurns"]
+  const failedEndpoints = endpoints.filter((_, index) => results[index].failed)
+  const emptyEndpoints = endpoints.filter((_, index) => !results[index].failed && !results[index].items.length)
+  if (failedEndpoints.length === endpoints.length) {
+    throw new BinodesDashboardUnavailableError(failedEndpoints)
   }
   const networkItems = networkResult.items
   const burnsItems = burnsResult.items
@@ -589,6 +635,7 @@ export const fetchBinodesDashboardActivity = async (
   const governanceItems: BinodesGovernanceOverview[] = []
 
   return {
+    coverage: { status: failedEndpoints.length ? "partial" : "complete", failedEndpoints, emptyEndpoints },
     fetchedAt: new Date().toISOString(),
     bucketCount: Math.max(
       networkItems.length,
@@ -597,7 +644,9 @@ export const fetchBinodesDashboardActivity = async (
       ibcItems.length,
       stakeItems.length,
       feesItems.length,
-      governanceItems.length
+      governanceItems.length,
+      luncBurnItems.length,
+      ustcBurnItems.length
     ),
     frequency,
     series: buildDashboardSeries(

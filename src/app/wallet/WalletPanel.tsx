@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import styles from "./WalletPanel.module.css"
@@ -32,11 +32,13 @@ import {
   useWalletHideLowBalancePreference
 } from "./useWalletVisibilityPreferences"
 import { useWalletAssets, type WalletAssetRow } from "./useWalletAssets"
+import { readAssetDecimals } from "../data/assetPrecision"
+import { formatWalletAmount, walletValueAtPrice } from "./walletAssetMath"
+import { resolveSendTaxMode } from "./sendTaxStatus"
 import { getWalletSwapPath } from "./swapNavigation"
 import {
   formatTokenAmount,
   formatUsd,
-  toUnitAmount
 } from "../utils/format"
 import { formatTxError } from "../utils/txError"
 import {
@@ -45,7 +47,6 @@ import {
   writeLocalStorageValue
 } from "../utils/safeStorage"
 import {
-  DEFAULT_SEND_ASSET,
   FALLBACK_SEND_GAS_CW20,
   FALLBACK_SEND_GAS_NATIVE,
   RECENT_RECIPIENT_LIMIT,
@@ -70,7 +71,7 @@ import {
   WalletIcon
 } from "./WalletPanelIcons"
 
-const WalletPanel = () => {
+const WalletPanel = ({ onNavigationReady }: { onNavigationReady?: () => void }) => {
   const {
     account,
     connectorId,
@@ -97,9 +98,13 @@ const WalletPanel = () => {
   const [hideLowBalance, setHideLowBalance] =
     useWalletHideLowBalancePreference()
   const [hiddenTokens, setHiddenTokens] = useWalletHiddenTokensPreference()
-  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset>({
-    ...DEFAULT_SEND_ASSET
-  })
+  const [selectedAsset, setSelectedAsset] = useState<SelectedAsset>(() => ({
+    symbol: chain.displayDenom,
+    name: chain.name,
+    denom: chain.nativeDenom,
+    decimals: chain.runtime.nativeDenom.coinDecimals
+  }))
+  const selectionChainRef = useRef(chain.chainId)
   const [sendRecipient, setSendRecipient] = useState("")
   const [sendAmount, setSendAmount] = useState("")
   const [sendMemo, setSendMemo] = useState("")
@@ -120,7 +125,7 @@ const WalletPanel = () => {
     netWorth,
     tokenCatalog
   } = useWalletAssets(account?.address)
-  const { data: burnTaxRate = 0 } = useQuery({
+  const { data: burnTaxRate, isError: burnTaxRateError } = useQuery({
     queryKey: ["burn-tax-rate", chain.chainId],
     queryFn: fetchBurnTaxRate,
     enabled: isClassic,
@@ -137,6 +142,10 @@ const WalletPanel = () => {
   }, [])
 
   useEffect(() => {
+    // Initialize during render, not in a mount effect: replaying effects must
+    // not replace the asset chosen by a queued first-click navigation intent.
+    if (selectionChainRef.current === chain.chainId) return
+    selectionChainRef.current = chain.chainId
     setSelectedAsset({
       symbol: chain.displayDenom,
       name: chain.name,
@@ -204,12 +213,13 @@ const WalletPanel = () => {
     }
 
     window.addEventListener(WALLET_PANEL_NAVIGATION_EVENT, handleNavigation as EventListener)
+    onNavigationReady?.()
     return () =>
       window.removeEventListener(
         WALLET_PANEL_NAVIGATION_EVENT,
         handleNavigation as EventListener
       )
-  }, [openSendView])
+  }, [openSendView, onNavigationReady])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -362,7 +372,7 @@ const WalletPanel = () => {
   )
   const selectedBalance =
     selectedAssetRow?.amount ?? getBalance(selectedAsset.denom) ?? "0"
-  const selectedDecimals = selectedAssetRow?.decimals ?? selectedAsset.decimals
+  const selectedDecimals = readAssetDecimals(selectedAssetRow ? selectedAssetRow.decimals : selectedAsset.decimals)
   const selectedPrice = selectedAssetRow?.price
   const selectedSymbol = selectedAssetRow?.symbol ?? selectedAsset.symbol
   const selectedIconCandidates = selectedAssetRow?.iconCandidates ?? []
@@ -370,9 +380,9 @@ const WalletPanel = () => {
     selectedAssetRow?.value !== undefined
       ? selectedAssetRow.value
       : selectedPrice !== undefined
-      ? toUnitAmount(selectedBalance, selectedDecimals) * selectedPrice
+      ? walletValueAtPrice(selectedBalance, selectedDecimals, selectedPrice)
       : undefined
-  const selectedAmountDisplay = formatTokenAmount(
+  const selectedAmountDisplay = formatWalletAmount(
     selectedBalance,
     selectedDecimals,
     2
@@ -413,9 +423,10 @@ const WalletPanel = () => {
     }
   }, [getBalance, selectedAsset, selectedAssetRow])
   const handleAssetSwap = useCallback(() => {
+    if (selectedDecimals === undefined) return
     navigate(getWalletSwapPath(selectedAssetRow ?? selectedAsset))
     setIsOpen(false)
-  }, [navigate, selectedAsset, selectedAssetRow])
+  }, [navigate, selectedAsset, selectedAssetRow, selectedDecimals])
   const sendBalanceMicro = useMemo(
     () => parseBigInt(sendAsset.amount),
     [sendAsset.amount]
@@ -466,7 +477,7 @@ const WalletPanel = () => {
   })
   const canQueryComputedTax = canQuerySendTaxable && sendAmountMicro > 0n
   const {
-    data: computedSendTaxAmount = "0",
+    data: computedSendTaxAmount,
     isFetching: computedSendTaxFetching,
     isError: computedSendTaxError
   } = useQuery({
@@ -499,32 +510,35 @@ const WalletPanel = () => {
     return sendBalanceMicro > sendFeeMicro
   }, [luncBalanceMicro, requiresLuncFee, sendBalanceMicro, sendFeeMicro])
   const sendAvailableDisplay = useMemo(
-    () => `${formatTokenAmount(sendAsset.amount, sendAsset.decimals, 2)} ${sendAsset.symbol}`,
+    () => `${formatWalletAmount(sendAsset.amount, sendAsset.decimals, 2)} ${sendAsset.symbol}`,
     [sendAsset.amount, sendAsset.decimals, sendAsset.symbol]
   )
   const taxRatePercentDisplay = useMemo(() => {
+    if (burnTaxRate === undefined || burnTaxRateError) return "Unavailable"
     const percent = burnTaxRate * 100
     return `${percent.toFixed(percent > 0 && percent < 0.01 ? 4 : 2)}%`
-  }, [burnTaxRate])
-  const sendBurnTaxMode = useMemo<
-    "pending" | "taxed" | "exempt" | "no-tax" | "cw20" | "error"
-  >(() => {
-    if (!isClassic) return "no-tax"
-    if (sendAsset.kind === "cw20") return "cw20"
-    if (!account?.address || !recipient) return "pending"
-    if (!recipientIsValid) return "pending"
-    if (sendTaxableError || computedSendTaxError) return "error"
-    if (sendTaxableFetching && sendTaxable === undefined) return "pending"
-    if (sendAmountMicro <= 0n) return "pending"
-    if (computedSendTaxFetching && computedSendTaxAmount === "0") return "pending"
-    if (sendTaxable === false) return "exempt"
-    return parseBigInt(computedSendTaxAmount) > 0n ? "taxed" : "no-tax"
-  }, [
+  }, [burnTaxRate, burnTaxRateError])
+  const sendBurnTaxMode = useMemo(() => resolveSendTaxMode({
+    isClassic,
+    kind: sendAsset.kind,
+    hasAccount: Boolean(account?.address),
+    recipientIsValid,
+    rate: burnTaxRate,
+    rateError: burnTaxRateError,
+    taxable: sendTaxable,
+    taxableError: sendTaxableError,
+    taxableFetching: sendTaxableFetching,
+    amount: sendAmountMicro,
+    computedAmount: computedSendTaxAmount,
+    computedError: computedSendTaxError,
+    computedFetching: computedSendTaxFetching
+  }), [
     account?.address,
+    burnTaxRate,
+    burnTaxRateError,
     computedSendTaxAmount,
     computedSendTaxError,
     computedSendTaxFetching,
-    recipient,
     recipientIsValid,
     sendAsset.kind,
     sendAmountMicro,
@@ -538,7 +552,7 @@ const WalletPanel = () => {
   const sendBalanceValue = selectedAssetRow?.value ?? selectedValue
   const sendAmountValue = useMemo(() => {
     if (sendPrice === undefined || sendAmountMicro <= 0n) return undefined
-    return toUnitAmount(sendAmountMicro.toString(), sendAsset.decimals) * sendPrice
+    return walletValueAtPrice(sendAmountMicro.toString(), sendAsset.decimals, sendPrice)
   }, [sendAmountMicro, sendAsset.decimals, sendPrice])
   const sendBurnTaxMicro = useMemo(
     () => parseBigInt(computedSendTaxAmount),
@@ -552,7 +566,7 @@ const WalletPanel = () => {
   const sendRecipientReceivesValue = useMemo(() => {
     if (sendPrice === undefined || sendRecipientReceivesMicro <= 0n) return undefined
     return (
-      toUnitAmount(sendRecipientReceivesMicro.toString(), sendAsset.decimals) * sendPrice
+      walletValueAtPrice(sendRecipientReceivesMicro.toString(), sendAsset.decimals, sendPrice)
     )
   }, [sendAsset.decimals, sendPrice, sendRecipientReceivesMicro])
   const sendRemainingMicro = useMemo(() => {
@@ -563,19 +577,19 @@ const WalletPanel = () => {
   }, [sendAmountMicro, sendAsset.denom, sendBalanceMicro, sendFeeMicro])
   const sendRemainingValue = useMemo(() => {
     if (sendPrice === undefined || sendRemainingMicro <= 0n) return undefined
-    return toUnitAmount(sendRemainingMicro.toString(), sendAsset.decimals) * sendPrice
+    return walletValueAtPrice(sendRemainingMicro.toString(), sendAsset.decimals, sendPrice)
   }, [sendAsset.decimals, sendPrice, sendRemainingMicro])
   const sendRemainingDisplay = useMemo(
-    () => `${formatTokenAmount(sendRemainingMicro.toString(), sendAsset.decimals, 2)} ${sendAsset.symbol}`,
+    () => `${formatWalletAmount(sendRemainingMicro.toString(), sendAsset.decimals, 2)} ${sendAsset.symbol}`,
     [sendAsset.decimals, sendAsset.symbol, sendRemainingMicro]
   )
   const sendBurnTaxDisplay = useMemo(
-    () => `${formatTokenAmount(sendBurnTaxMicro.toString(), sendAsset.decimals, 6)} ${sendAsset.symbol}`,
+    () => `${formatWalletAmount(sendBurnTaxMicro.toString(), sendAsset.decimals, 6)} ${sendAsset.symbol}`,
     [sendAsset.decimals, sendAsset.symbol, sendBurnTaxMicro]
   )
   const sendRecipientReceivesDisplay = useMemo(
     () =>
-      `${formatTokenAmount(sendRecipientReceivesMicro.toString(), sendAsset.decimals, 4)} ${sendAsset.symbol}`,
+      `${formatWalletAmount(sendRecipientReceivesMicro.toString(), sendAsset.decimals, 4)} ${sendAsset.symbol}`,
     [sendAsset.decimals, sendAsset.symbol, sendRecipientReceivesMicro]
   )
   const recipientStatusText = useMemo(() => {
@@ -632,31 +646,30 @@ const WalletPanel = () => {
     return "Leave memo blank only if the destination wallet or exchange does not require it."
   }, [recentRecipientMatch?.memoUsed, recipient, sendMemo])
   const sendTaxMetricDisplay = useMemo(() => {
-    if (burnTaxRate <= 0) return "0.00%"
     switch (sendBurnTaxMode) {
       case "taxed":
         return taxRatePercentDisplay
       case "exempt":
         return "Exempt"
       case "no-tax":
+        return burnTaxRate === 0 ? "0.00%" : "Not applied"
       case "cw20":
         return "Not applied"
       case "error":
         return "Unavailable"
       default:
-        return taxRatePercentDisplay
+        return "Checking..."
     }
   }, [burnTaxRate, sendBurnTaxMode, taxRatePercentDisplay])
   const sendTaxStateLabel = useMemo(() => {
     if (!isClassic) return "Not used on Terra"
-    if (burnTaxRate <= 0) return "Burn tax disabled"
     switch (sendBurnTaxMode) {
       case "taxed":
         return "Taxable route"
       case "exempt":
         return "Tax-exempt route"
       case "no-tax":
-        return "No tax on this asset"
+        return burnTaxRate === 0 ? "Burn tax disabled" : "No tax on this asset"
       case "cw20":
         return "Not applied to CW20"
       case "error":
@@ -685,7 +698,7 @@ const WalletPanel = () => {
     if (!isClassic) {
       return "Phoenix transactions do not use the Terra Classic burn tax module."
     }
-    if (burnTaxRate <= 0) {
+    if (burnTaxRate === 0 && sendBurnTaxMode === "no-tax") {
       return "Burn tax is currently disabled on-chain."
     }
     switch (sendBurnTaxMode) {
@@ -745,6 +758,7 @@ const WalletPanel = () => {
   }, [sendBurnTaxMode])
   const sendSubmitDisabledReason = useMemo(() => {
     if (!account?.address) return "Please connect a wallet first."
+    if (readAssetDecimals(sendAsset.decimals) === undefined) return "Token precision unavailable. Transfers are disabled."
     if (!recipient) return `Enter a ${chain.name} recipient.`
     if (!recipientIsValid) return `Enter a valid ${chain.name} address.`
     if (sendAmountMicro <= 0n) return "Enter an amount greater than zero."
@@ -775,6 +789,7 @@ const WalletPanel = () => {
     recipientIsValid,
     sendAmountMicro,
     sendAsset.denom,
+    sendAsset.decimals,
     sendAsset.kind,
     sendAsset.symbol,
     sendBalanceMicro,
@@ -813,11 +828,22 @@ const WalletPanel = () => {
   }, [])
 
   const handleSendMax = useCallback(() => {
+    if (readAssetDecimals(sendAsset.decimals) === undefined) return
     setSendAmount(fromMicroAmount(sendMaxMicro, sendAsset.decimals))
     setSendError(undefined)
   }, [sendAsset.decimals, sendMaxMicro])
 
   const handleSendSubmit = useCallback(async () => {
+    if (readAssetDecimals(sendAsset.decimals) === undefined) {
+      setSendError("Token precision unavailable. Transfers are disabled.")
+      return
+    }
+
+    if (sendBurnTaxMode === "pending" || sendBurnTaxMode === "error") {
+      setSendError(sendBurnTaxMode === "pending"
+        ? "Checking on-chain tax rules..." : "Tax status could not be verified right now.")
+      return
+    }
     if (!account?.address) {
       setSendError("Please connect a wallet first.")
       return
@@ -967,9 +993,11 @@ const WalletPanel = () => {
     resetSendForm,
     sendAmountMicro,
     sendAsset.denom,
+    sendAsset.decimals,
     sendAsset.kind,
     sendAsset.symbol,
     sendBalanceMicro,
+    sendBurnTaxMode,
     sendFeeDisplay,
     sendFeeMicro,
     sendMemo,
@@ -1086,6 +1114,7 @@ const WalletPanel = () => {
                   className={styles.maxButton}
                   type="button"
                   onClick={handleSendMax}
+                  disabled={readAssetDecimals(sendAsset.decimals) === undefined}
                 >
                   Max
                 </button>
@@ -1096,6 +1125,7 @@ const WalletPanel = () => {
                     className={styles.sendAmountInput}
                     placeholder="0.0"
                     aria-label="Amount"
+                    disabled={readAssetDecimals(sendAsset.decimals) === undefined}
                     inputMode="decimal"
                     value={sendAmount}
                     onChange={(event) => {
@@ -1154,7 +1184,7 @@ const WalletPanel = () => {
                   <div className={styles.summaryPrimaryValue}>
                     <strong>
                       {sendAmountMicro > 0n
-                        ? `${formatTokenAmount(sendAmountMicro.toString(), sendAsset.decimals, 4)} ${sendAsset.symbol}`
+                        ? `${formatWalletAmount(sendAmountMicro.toString(), sendAsset.decimals, 4)} ${sendAsset.symbol}`
                         : "--"}
                     </strong>
                     <small>
@@ -1432,6 +1462,7 @@ const WalletPanel = () => {
         {renderBody()}
         <WalletPanelActions
           view={view}
+          assetPrecisionKnown={selectedDecimals !== undefined}
           canSubmitSend={canSubmitSend}
           sendSubmitting={sendSubmitting}
           walletPreparingForTx={walletPreparingForTx}
