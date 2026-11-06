@@ -1495,6 +1495,7 @@ const MarketPairDetails = () => {
           isCandlesEnabled={Boolean(detail.pool.pair && detailPriceValue)}
           isCandlesError={isCandlesError}
           isCandlesLoading={isCandlesLoading}
+          latestObservedSwapAt={trades[0]?.timestamp}
           onRetryCandles={() => { void refetchCandles() }}
           onTimeframeChange={setTimeframe}
           onResetView={() => {

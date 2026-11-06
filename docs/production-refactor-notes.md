@@ -1,5 +1,20 @@
 # Production Refactor Notes
 
+## Observed candle closeout — 2026-11-06 (Toronto)
+
+- Static candle snapshots now aggregate only actual observed swaps and include
+  tradeCount. Empty intervals and times before the first swap are not invented.
+  Existing legacy zero-volume snapshot fills are excluded at the packaged-data
+  boundary; explicitly observed zero-volume buckets remain valid.
+- Quiet chart ranges offer a wider history range and show the latest observed
+  swap time only when the actual recent-trade source supplies it. Collector
+  bucket start times are not mislabeled as exact swap times.
+- No brand, fee, signing, public route, production environment or server schema
+  changes. The live sample's empty one-hour range was a real trading gap, not
+  proof of a broken collector. Local focused tests and light/dark desktop/mobile
+  component acceptance pass; exact-source CI and post-release checks still gate
+  production publication.
+
 ## Web release candidate — 2026-11-06 (Toronto)
 
 - User authorized publishing the verified Web optimizations. Release preparation

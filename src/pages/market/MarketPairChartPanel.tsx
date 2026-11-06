@@ -14,6 +14,7 @@ type MarketPairChartPanelProps = {
   isCandlesEnabled: boolean
   isCandlesError: boolean
   isCandlesLoading: boolean
+  latestObservedSwapAt?: number
   onResetView: () => void
   onRetryCandles: () => void
   onTimeframeChange: (timeframe: Timeframe) => void
@@ -28,6 +29,16 @@ const bucketLabels: Record<Timeframe, string> = {
   "7d": "2h candles"
 }
 
+const observedSwapTime = (timestamp?: number) => {
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp) || timestamp <= 0 || timestamp > 8.64e15) return null
+  return {
+    iso: new Date(timestamp).toISOString(),
+    label: new Intl.DateTimeFormat("en", {
+      month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC"
+    }).format(timestamp)
+  }
+}
+
 const MarketPairChartPanel = ({
   activeCandle,
   candleTimeLabel,
@@ -38,12 +49,15 @@ const MarketPairChartPanel = ({
   isCandlesEnabled,
   isCandlesError,
   isCandlesLoading,
+  latestObservedSwapAt,
   onResetView,
   onRetryCandles,
   onTimeframeChange,
   quoteSymbol,
   timeframe
-}: MarketPairChartPanelProps) => (
+}: MarketPairChartPanelProps) => {
+  const latestSwap = observedSwapTime(latestObservedSwapAt)
+  return (
   <section className={styles.chartSection} aria-label="Price chart">
     <header className={styles.chartHeader}>
       <div className={styles.chartHeading}>
@@ -89,7 +103,7 @@ const MarketPairChartPanel = ({
           <span className={styles.ohlcItem}><span>C</span><strong>{formatChartAxisPrice(activeCandle.close)}</strong></span>
         </div>
       ) : (
-        <span className={styles.noCandle}>No candle data yet</span>
+        <span className={styles.noCandle}>No candle selected</span>
       )}
     </div>
 
@@ -104,7 +118,19 @@ const MarketPairChartPanel = ({
       </div>
     ) : !hasCandles ? (
       <div className={styles.chartFallback}>
-        No recent swaps to build candles for this timeframe.
+        <span>No observed swaps in this {timeframe} range.</span>
+        {latestSwap ? (
+          <span className={styles.lastObservedSwap}>
+            Latest observed swap: <time dateTime={latestSwap.iso}>
+              {latestSwap.label} UTC
+            </time>
+          </span>
+        ) : null}
+        {timeframe !== "7d" ? (
+          <button type="button" onClick={() => onTimeframeChange(timeframe === "1h" ? "24h" : "7d")}>
+            View {timeframe === "1h" ? "24h" : "7d"} history
+          </button>
+        ) : null}
       </div>
     ) : (
       <div className={styles.chartCanvas}>
@@ -126,6 +152,7 @@ const MarketPairChartPanel = ({
       <span className={styles.candleTime}>{candleTimeLabel}</span>
     </footer>
   </section>
-)
+  )
+}
 
 export default MarketPairChartPanel

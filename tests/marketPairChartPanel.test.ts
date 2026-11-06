@@ -63,7 +63,26 @@ describe("market chart presentation", () => {
   })
 
   it("distinguishes empty history from invalid-price unavailability", () => {
-    expect(render({ activeCandle: undefined, hasCandles: false })).toContain("No recent swaps to build candles")
+    expect(render({ activeCandle: undefined, hasCandles: false })).toContain("No observed swaps in this 24h range")
     expect(render({ activeCandle: undefined, hasCandles: false, isCandlesEnabled: false })).toContain("Chart unavailable until this pair has a valid price")
+  })
+
+  it("offers a wider range without substituting invented bars", () => {
+    const empty = { activeCandle: undefined, hasCandles: false }
+    expect(render({ ...empty, timeframe: "1h" })).toContain("View 24h history")
+    expect(render({ ...empty, timeframe: "24h" })).toContain("View 7d history")
+    expect(render({ ...empty, timeframe: "7d" })).not.toContain("View 7d history")
+    expect(render({ ...empty, isCandlesError: true })).not.toContain("View 7d history")
+  })
+
+  it("labels a known observation time, but never invents the latest trade time from a candle", () => {
+    const empty = { activeCandle: undefined, hasCandles: false }
+    const html = render({ ...empty, latestObservedSwapAt: Date.parse("2026-11-05T22:08:21Z") })
+    expect(html).toContain("Latest observed swap:")
+    expect(html).toContain('dateTime="2026-11-05T22:08:21.000Z"')
+    expect(html).toContain("Nov 05, 22:08")
+    expect(render(empty)).not.toContain("Latest observed swap")
+    expect(render({ ...empty, latestObservedSwapAt: NaN })).not.toContain("Latest observed swap")
+    expect(render({ ...empty, latestObservedSwapAt: Infinity })).not.toContain("Latest observed swap")
   })
 })

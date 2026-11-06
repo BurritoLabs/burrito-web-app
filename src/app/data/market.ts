@@ -154,6 +154,7 @@ type LocalCandle = {
   low?: number
   close?: number
   volumeQuote?: number
+  tradeCount?: number
 }
 
 type LocalPairCandlePayload = {
@@ -285,8 +286,16 @@ const normalizeLocalCandle = (raw: LocalCandle): PairCandle | null => {
   const low = Number(raw.low)
   const close = Number(raw.close)
   const volumeQuote = Number(raw.volumeQuote ?? 0)
+  // Old snapshot jobs filled quiet intervals with flat zero-volume bars. They
+  // have no observation count; only keep their positive-volume swap buckets.
+  // New jobs carry tradeCount, so a genuinely observed zero-volume bar stays.
+  const hasObservationCount = raw.tradeCount !== undefined
+  const isObserved = hasObservationCount
+    ? typeof raw.tradeCount === "number" && Number.isSafeInteger(raw.tradeCount) && raw.tradeCount > 0
+    : volumeQuote > 0
 
   if (
+    !isObserved ||
     !Number.isFinite(bucketStart) ||
     !Number.isFinite(open) ||
     !Number.isFinite(high) ||
