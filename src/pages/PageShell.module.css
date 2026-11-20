@@ -116,6 +116,7 @@
 
 @media (max-width: 991.98px) {
   .page {
+    --closed-wallet-clearance: 44px;
     height: auto;
     min-height: 0;
     overflow: visible;
@@ -135,15 +136,22 @@
   }
 
   .grid {
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
 
+  .content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .title {
+    overflow-wrap: anywhere;
     font-size: var(--font-size-page-title);
   }
 
   .header {
-    margin-right: 0;
+    /* Keep page actions clear of the existing fixed Wallet handle. */
+    margin-right: max(0px, calc(var(--closed-wallet-clearance) - var(--main-padding)));
     padding: 0;
     align-items: flex-start;
     flex-wrap: wrap;
@@ -174,6 +182,12 @@
   .banner {
     gap: 12px;
     padding: 12px 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .page {
+    --closed-wallet-clearance: 28px;
   }
 }
 

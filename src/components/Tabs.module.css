@@ -1,4 +1,5 @@
 .container {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -112,12 +113,11 @@
     width: 100%;
   }
 
-  .page {
-    display: flex;
-  }
-
+  .page,
   .card {
     display: flex;
+    align-items: stretch;
+    white-space: normal;
   }
 
   .content {
@@ -131,9 +131,22 @@
     border-right: 0;
   }
 
+  .page .tab,
   .card .tab {
-    flex: 1;
+    flex: 1 1 0;
+    height: auto;
+    min-height: 48px;
+    padding: 6px 4px;
     text-align: center;
+  }
+
+  .page .tab .title {
+    padding-right: 0;
+  }
+
+  .tab .title {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 
