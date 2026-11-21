@@ -51,6 +51,12 @@ for (const width of [320, 390, 420, 421, 430, 470, 768]) {
         return range.getClientRects().length
       })).toBe(1)
     }
+    if (width === 320) {
+      const voting = await bounds(shell.getByRole("button", { name: "Voting", exact: true }))
+      const passed = await bounds(shell.getByRole("button", { name: "Passed", exact: true }))
+      expect(passed.x).toBeCloseTo(voting.x, 0)
+      expect(passed.y).toBeGreaterThanOrEqual(voting.y + voting.height - 1)
+    }
     await fitsBeforeWallet(proposal, rail.x)
     await fitsBeforeWallet(proposal.getByText(/%/).first(), rail.x)
     await fitsBeforeWallet(action, rail.x)

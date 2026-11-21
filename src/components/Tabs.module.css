@@ -156,6 +156,21 @@
   }
 }
 
+@media (max-width: 360px) {
+  .narrowGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .narrowGrid .tab:nth-child(even) {
+    border-right: 0;
+  }
+
+  .narrowGrid .tab:nth-child(n + 3) {
+    border-top: var(--border-width) solid var(--card-border);
+  }
+}
+
 @media (min-width: 992px) {
   .tab {
     padding: 0 30px;

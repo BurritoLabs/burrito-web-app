@@ -417,12 +417,6 @@
   }
 }
 
-@media (max-width: 360px) {
-  .governancePage {
-    --font-size-tabs: 12px;
-  }
-}
-
 @media (max-width: 640px) {
   .panelWrap,
   .panel,

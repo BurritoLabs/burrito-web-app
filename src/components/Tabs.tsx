@@ -13,6 +13,7 @@ type TabsProps = {
   tabs: Tab[]
   defaultKey?: string
   variant?: "page" | "card"
+  wrapOnNarrow?: boolean
   activeKey?: string
   onChange?: (key: string) => void
 }
@@ -21,6 +22,7 @@ const Tabs = ({
   tabs,
   defaultKey,
   variant = "page",
+  wrapOnNarrow = false,
   activeKey,
   onChange
 }: TabsProps) => {
@@ -55,7 +57,7 @@ const Tabs = ({
 
   return (
     <div className={styles.container}>
-      <div className={`${styles.tabs} ${styles[variant] ?? ""}`}>
+      <div className={`${styles.tabs} ${styles[variant]} ${wrapOnNarrow ? styles.narrowGrid : ""}`}>
         {visibleTabs.map((tab, index) => (
           <button
             key={tab.key}

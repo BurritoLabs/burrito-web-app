@@ -379,7 +379,6 @@ const Governance = () => {
   return (
     <PageShell
       title="Governance"
-      className={styles.governancePage}
       extra={
         <Link className="uiButton uiButtonPrimary" to="/proposal/new">
           New proposal
@@ -389,6 +388,7 @@ const Governance = () => {
       <Tabs
         tabs={tabs}
         variant="card"
+        wrapOnNarrow
         activeKey={activeKey}
         onChange={(key) => updateTab(key)}
       />
