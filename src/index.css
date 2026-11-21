@@ -123,6 +123,7 @@
 @media (max-width: 991.98px) {
   :root {
     --main-padding: 24px;
+    --mobile-wallet-clearance: 44px;
     --font-size-page-title: 28px;
   }
 }
@@ -512,12 +513,18 @@ textarea::placeholder {
   }
 
   .pageArea {
+    --page-extra-gutter: max(0px, calc(var(--mobile-wallet-clearance) - var(--main-padding)));
+    min-width: 0;
     min-height: calc(100vh - var(--header-height));
     min-height: calc(100svh - var(--header-height));
     background: transparent;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     padding-bottom: env(safe-area-inset-bottom);
+    /* PageShell supplies the base padding. Match the extra right-side Wallet
+       clearance on the left so cards stay centered, including on scroll. */
+    padding-right: calc(var(--page-extra-gutter) + env(safe-area-inset-right, 0px));
+    padding-left: calc(var(--page-extra-gutter) + env(safe-area-inset-left, 0px));
   }
 
   .cardGrid {
@@ -568,5 +575,6 @@ textarea::placeholder {
 @media (max-width: 420px) {
   :root {
     --header-height: calc(100px + env(safe-area-inset-top, 0px));
+    --mobile-wallet-clearance: 30px;
   }
 }

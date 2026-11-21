@@ -718,6 +718,20 @@
 }
 
 @media (max-width: 560px) {
+  .headerRight {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pairTitle {
+    flex-wrap: wrap;
+  }
+
+  .pairBase,
+  .pairQuote {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .toolbar {
     padding: 12px;
   }

@@ -742,7 +742,11 @@
 
 @media (max-width: 991.98px) {
   .summaryGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stakedCard {
+    min-width: 0;
   }
 
   .chartContent {

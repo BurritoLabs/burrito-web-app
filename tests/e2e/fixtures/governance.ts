@@ -25,7 +25,7 @@ export const governanceFixtures = [
   }
 }))
 
-export const installGovernanceFixtures = async (page: Page) => {
+export const installGovernanceFixtures = async (page: Page, longDescription?: string) => {
   await page.route(/\/cosmos\/gov\/v1(?:beta1)?\//, async (route) => {
     if (route.request().method() !== "GET") return route.abort("blockedbyclient")
     const url = new URL(route.request().url())
@@ -40,7 +40,10 @@ export const installGovernanceFixtures = async (page: Page) => {
     const detail = suffix.match(/^proposals\/(\d+)$/)
     if (detail) {
       const proposal = governanceFixtures.find((fixture) => fixture.proposal.id === detail[1])?.proposal
-      return route.fulfill({ status: proposal ? 200 : 404, json: { proposal } })
+      const rendered = longDescription && proposal?.id === "99001"
+        ? { ...proposal, title: "QA " + "LongTitle".repeat(12), summary: longDescription }
+        : proposal
+      return route.fulfill({ status: proposal ? 200 : 404, json: { proposal: rendered } })
     }
     if (suffix.endsWith("/tally")) return route.fulfill({ json: { tally: governanceFixtures[0].proposal.final_tally_result } })
     if (suffix.endsWith("/votes")) return route.fulfill({ json: { votes: [], pagination: { next_key: null } } })

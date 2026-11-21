@@ -379,6 +379,7 @@ const Governance = () => {
   return (
     <PageShell
       title="Governance"
+      className={styles.governancePage}
       extra={
         <Link className="uiButton uiButtonPrimary" to="/proposal/new">
           New proposal

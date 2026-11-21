@@ -1276,7 +1276,7 @@
 
 @media (max-width: 991.98px) {
   .detailPage {
-    padding: 16px 16px 32px;
+    padding: 16px var(--main-padding) max(32px, env(safe-area-inset-bottom));
   }
 
   .liquidityTopMeta {

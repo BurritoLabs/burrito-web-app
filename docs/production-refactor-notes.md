@@ -979,3 +979,20 @@ other DApp consumers, mobile-device/authentication and independent review.
 - The exact deterministic reproductions passed three repetitions (12 cases)
   after the patch; one helper unit regression covers the not-yet-attempted gate.
   Full local/remote reruns are recorded separately for the final commit.
+
+## Portrait page and Wallet clearance — 2026-11-21
+
+- Carry forward the previously local Governance grid, card and tab fixes on
+  top of current production source. Keep both forms of the right-edge Wallet
+  handle, the opened drawer, and the brand header at their existing positions.
+- Use equal gutters for the routed page area, with enough space on the right
+  for the fixed handle even after scrolling. Market pair detail keeps the
+  shared horizontal padding. Allow narrow staking cards, fallback Market
+  token labels and long proposal titles, descriptions and URLs to reflow.
+- Regress sampled 320–768 CSS px widths, including both sides of the 420px
+  handle breakpoint, and check route content edges and midpoints independently
+  of document scroll width. Exercise tab switching, expanded proposal details,
+  the deposit dialog without funding, and drawer opening/closing.
+- No change to wallet connectors, signing, proposal actions, transaction
+  construction, or network/data sources. Keep intentional scrolling inside
+  dense tables and market data strips.
