@@ -388,6 +388,7 @@ const Governance = () => {
       <Tabs
         tabs={tabs}
         variant="card"
+        wrapOnNarrow
         activeKey={activeKey}
         onChange={(key) => updateTab(key)}
       />

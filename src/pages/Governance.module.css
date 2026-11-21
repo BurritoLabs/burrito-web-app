@@ -418,6 +418,42 @@
 }
 
 @media (max-width: 640px) {
+  .panelWrap,
+  .panel,
+  .panelBody,
+  .proposals,
+  .proposalLink,
+  .proposalCard {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .proposalCard {
+    --card-padding: 16px;
+  }
+
+  .proposalTitle {
+    overflow-wrap: anywhere;
+  }
+
+  .proposalFooter {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .rulesCard {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .rulesItem {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    text-align: start;
+  }
+
   .depositMeta {
     flex-direction: column;
     align-items: flex-start;

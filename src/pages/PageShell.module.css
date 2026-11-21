@@ -122,14 +122,18 @@
     padding: 28px var(--main-padding)
       max(28px, calc(20px + env(safe-area-inset-bottom)));
   }
+
+  .grid,
+  .content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .header {
+    margin-right: 0;
+  }
 }
 
 @media (max-width: 600px) {
-  .page {
-    padding: 28px var(--main-padding)
-      max(28px, calc(20px + env(safe-area-inset-bottom)));
-  }
-
   .banner {
     gap: 20px;
   }
@@ -139,11 +143,11 @@
   }
 
   .title {
+    overflow-wrap: anywhere;
     font-size: var(--font-size-page-title);
   }
 
   .header {
-    margin-right: 0;
     padding: 0;
     align-items: flex-start;
     flex-wrap: wrap;

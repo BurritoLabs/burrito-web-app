@@ -1032,7 +1032,29 @@
 
 @media (max-width: 991.98px) {
   .detailGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mainColumn,
+  .sideColumn,
+  .detailCard,
+  .summaryCard {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailTitle,
+  .description,
+  .summaryLink {
+    overflow-wrap: anywhere;
+  }
+
+  .summaryLink {
+    display: inline;
+  }
+
+  .summaryLink::after {
+    margin-inline-start: 4px;
   }
 
   .depositSummaryGrid {
