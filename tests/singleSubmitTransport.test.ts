@@ -170,3 +170,57 @@ it("rejects pre-built signing data for a different chain before prompting", asyn
   expect(rpc.sign).not.toHaveBeenCalled()
   expect(rpc.broadcastTx).not.toHaveBeenCalled()
 })
+
+it.each(["resolve", "reject"] as const)("a stalled write becomes unknown once; late %s is harmless", async late => {
+  vi.useFakeTimers()
+  try {
+    const { rpc, connect } = setup()
+    let approve!: (value: typeof raw) => void
+    let settleLate!: () => void
+    rpc.sign.mockImplementationOnce(() => new Promise(resolve => { approve = resolve }))
+    rpc.broadcastTx.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      settleLate = () => late === "resolve"
+        ? resolve({ code: 0, rawLog: "", transactionHash: hash }) : reject(new Error("late response"))
+    }))
+    const client = await connectStargateClientForConnector("keplr-mobile")
+    const outcome = vi.fn()
+    const result = client.signAndBroadcast(account, [], fee).then(outcome, outcome)
+    await vi.advanceTimersByTimeAsync(180_000)
+    expect(rpc.sign).toHaveBeenCalledTimes(1)
+    expect(rpc.broadcastTx).not.toHaveBeenCalled()
+    expect(outcome).not.toHaveBeenCalled()
+    approve(raw)
+    await vi.advanceTimersByTimeAsync(64_999)
+    expect(outcome).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    await result
+    expect(outcome).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      name: "TxConfirmationUnknownError", txHash: hash, chainId
+    }))
+    settleLate()
+    await vi.advanceTimersByTimeAsync(100_000)
+    expect(outcome).toHaveBeenCalledTimes(1)
+    expect(rpc.sign).toHaveBeenCalledTimes(1)
+    expect(rpc.broadcastTx).toHaveBeenCalledTimes(1)
+    expect(connect).toHaveBeenCalledTimes(1)
+  } finally { vi.useRealTimers() }
+})
+
+it("respects the specified receipt timeout and grace rather than the default", async () => {
+  vi.useFakeTimers()
+  try {
+    const { rpc } = setup()
+    rpc.broadcastTx.mockImplementationOnce(() => new Promise(() => {}))
+    const client = await connectStargateClientForConnector("keplr-mobile")
+    const settle = vi.fn()
+    const outcome = client.broadcastTx(bytes, 120_000, 2_000).then(settle, settle)
+    await vi.advanceTimersByTimeAsync(124_999)
+    expect(settle).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    await outcome
+    expect(settle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      name: "TxConfirmationUnknownError", txHash: hash
+    }))
+    expect(rpc.broadcastTx).toHaveBeenCalledExactlyOnceWith(bytes, 120_000, 2_000)
+  } finally { vi.useRealTimers() }
+})

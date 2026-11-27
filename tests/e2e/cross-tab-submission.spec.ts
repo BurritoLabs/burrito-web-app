@@ -37,8 +37,14 @@ test("a second tab does not submit or queue while the first awaits the wallet or
   await otherStart.click()
   await expect(blocked).toBeVisible()
   await expect(second.getByLabel("Accepted intents")).toHaveText("0")
-  await originalStart.click()
+  // Refreshing the original tab must restore the read-only receipt and
+  // reacquire cross-tab protection without requesting a wallet or a signature.
+  await page.reload()
   await expect(unknown).toBeVisible()
+  await blocked.getByRole("button", { name: "Confirm" }).click()
+  await otherStart.click()
+  await expect(blocked).toBeVisible()
+  await expect(second.getByLabel("Accepted intents")).toHaveText("0")
   included = true
   await unknown.getByRole("button", { name: "Check chain receipt" }).click()
   await expect(page.getByRole("dialog", { name: "Transaction confirmed" })).toBeVisible()

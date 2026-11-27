@@ -110,6 +110,9 @@ type ClassicClientOptions = {
 
 const unique = <T,>(items: readonly T[]) => Array.from(new Set(items))
 
+const DEFAULT_INCLUSION_TIMEOUT_MS = 60_000
+const TRANSPORT_GRACE_MS = 5_000
+
 export const CLASSIC_SIGNING_RPC_ENDPOINTS = unique([
   CLASSIC_CHAIN.rpc,
   ...CLASSIC_READ_ENDPOINTS_CONFIG.rpc
@@ -303,15 +306,27 @@ const connectClassicClientWithFallback = async (
 
   // Never replay a write or a signature, including on another RPC. The
   // previous endpoint can accept the transaction even when its reply is lost.
-  const dispatchOnce = async <T extends string | BroadcastResultLike>(tx: Uint8Array, write: () => Promise<T>) => {
+  const dispatchOnce = async <T extends string | BroadcastResultLike>(
+    tx: Uint8Array, write: () => Promise<T>, inclusionTimeoutMs = DEFAULT_INCLUSION_TIMEOUT_MS
+  ) => {
     assertSigningContext()
     await options?.selection?.verifySigner()
     assertSigningContext()
     options?.selection?.assertCurrent()
     const hash = getClassicTxHash(tx)
     noteSignedTxForConfirmation(hash, chainId)
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      const response = await write()
+      // CosmJS's inclusion timer does not interrupt a stalled RPC call. Start
+      // this bound ONLY after signing, on the one network write. Late SDK
+      // settlement is observed by Promise.race; it never dispatches again.
+      const timeout = Number.isFinite(inclusionTimeoutMs) && inclusionTimeoutMs >= 0
+        ? inclusionTimeoutMs : DEFAULT_INCLUSION_TIMEOUT_MS
+      const stalled = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("No RPC receipt received")),
+          Math.min(2_147_483_647, timeout + TRANSPORT_GRACE_MS))
+      })
+      const response = await Promise.race([write(), stalled])
       const observed = typeof response === "string" ? response : response.transactionHash
       if (observed?.toUpperCase() !== hash) throw new Error("RPC returned a different transaction ID")
       return response
@@ -323,6 +338,8 @@ const connectClassicClientWithFallback = async (
         throw error
       }
       throw asTxConfirmationUnknown(error, hash, chainId) ?? error
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
     }
   }
 
@@ -360,7 +377,7 @@ const connectClassicClientWithFallback = async (
       return client.sign(signerAddress, messages, fee, memo, signerData)
     },
     broadcastTx: (tx, timeoutMs, pollIntervalMs) =>
-      dispatchOnce(tx, () => client.broadcastTx(tx, timeoutMs, pollIntervalMs)),
+      dispatchOnce(tx, () => client.broadcastTx(tx, timeoutMs, pollIntervalMs), timeoutMs),
     broadcastTxSync: tx => dispatchOnce(tx, () => client.broadcastTxSync(tx)),
     delegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
       signAndBroadcastOnce(delegatorAddress, [{

@@ -20,7 +20,11 @@ export function useTransactionReceipt(chainKey: SupportedChainKey, address?: str
   useEffect(() => {
     const generation = ++mount.current
     if (current.current.status === "unconfirmed" && !lease.current) {
-      void tryAcquireBrowserSubmissionLock().then(result => {
+      // StrictMode immediately retires its first mount; don't race that
+      // speculative mount against the real owner's non-queued acquisition.
+      queueMicrotask(async () => {
+        if (mount.current !== generation || current.current.status !== "unconfirmed") return
+        const result = await tryAcquireBrowserSubmissionLock()
         if (result.kind !== "acquired") return
         if (mount.current !== generation || current.current.status !== "unconfirmed" || lease.current) result.release()
         else lease.current = result.release
