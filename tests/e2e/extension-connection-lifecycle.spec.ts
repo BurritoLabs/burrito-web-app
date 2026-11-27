@@ -44,7 +44,7 @@ type ProviderOptions = {
 }
 
 const PROVIDER_STORAGE_KEY = "burrito:e2e:extension-lifecycle:public-state"
-const CONNECTOR_STORAGE_KEY = "burritoWalletConnector"
+const CONNECTOR_STORAGE_KEY = "burrito:preferred-wallet"
 const pageErrors = new WeakMap<Page, string[]>()
 
 test.beforeEach(async ({ page, baseURL }) => {
@@ -116,13 +116,14 @@ const installProvider = async (page: Page, options: ProviderOptions = {}) => {
       if (options.runtime) {
         // Existing supported boot path. There are no saved WalletConnect
         // pairings/sessions and no mobile-wallet connection is requested.
+        // Exercise migration from before the WC SDK claimed the old key.
         localStorage.setItem("burritoWalletConnector", "keplr-mobile")
       } else if (options.rememberedKeplr) {
-        localStorage.setItem("burritoWalletConnector", "keplr")
+        localStorage.setItem("burrito:preferred-wallet", "keplr")
       } else if (options.remembered) {
-        localStorage.setItem("burritoWalletConnector", "burrito-extension")
+        localStorage.setItem("burrito:preferred-wallet", "burrito-extension")
       } else {
-        localStorage.removeItem("burritoWalletConnector")
+        localStorage.removeItem("burrito:preferred-wallet")
       }
     }
     const persist = () => localStorage.setItem(storageKey, JSON.stringify(state))

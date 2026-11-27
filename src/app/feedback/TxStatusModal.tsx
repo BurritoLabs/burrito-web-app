@@ -4,7 +4,7 @@ import styles from "./TxStatusModal.module.css"
 import { useWallet, type TxState } from "../wallet/WalletContext"
 import { buildTxDiagnosticsReport } from "../tx/txDiagnostics"
 import { useAppChain } from "../appChainContext"
-import { getTxExplorerUrl } from "../explorer"
+import { getAddressExplorerUrl, getTxExplorerUrl } from "../explorer"
 
 const formatHash = (hash: string) =>
   `${hash.slice(0, 10)}...${hash.slice(-8)}`
@@ -16,7 +16,9 @@ type CopyAttempt = {
 
 const TxStatusModal = () => {
   const { chainKey } = useAppChain()
-  const { txState, clearTx } = useWallet()
+  const { txState, clearTx, checkTxReceipt, acknowledgeTxReview } = useWallet()
+  const [reviewed, setReviewed] = useState<number>()
+  const [checkResult, setCheckResult] = useState<{tx: TxState; waiting: boolean}>()
   const [copyAttempt, setCopyAttempt] = useState<CopyAttempt | null>(null)
   const copyState = copyAttempt?.transaction === txState ? copyAttempt.state : "idle"
   const titleId = useId()
@@ -27,7 +29,9 @@ const TxStatusModal = () => {
   const isPending = status === "pending"
   const isSuccess = status === "success"
   const isError = status === "error"
-  const visible = status !== "idle"
+  const isUnconfirmed = status === "unconfirmed"
+  const visible = status !== "idle" && !txState.hidden
+  const originalChain = txState.chainKey ?? chainKey
 
   const dismiss = useCallback(() => {
     setCopyAttempt(null)
@@ -92,11 +96,14 @@ const TxStatusModal = () => {
   }, [visible, status, copyState])
 
   const title = useMemo(() => {
-    if (isPending) return "Broadcasting transaction"
-    if (isSuccess) return "Transaction submitted"
+    if (isPending) return txState.phase === "signing" ? "Check your wallet" :
+      txState.phase === "confirming" ? "Waiting for chain confirmation" : "Transaction in progress"
+    if (isUnconfirmed) return "Confirmation unknown"
+    if (status === "blocked") return "Transaction not started"
+    if (isSuccess) return "Transaction confirmed"
     if (isError) return "Transaction failed"
     return ""
-  }, [isError, isPending, isSuccess])
+  }, [isError, isPending, isSuccess, isUnconfirmed, status, txState.phase])
 
   const copyDiagnostics = async () => {
     const attempt: CopyAttempt = { transaction: txState, state: "copying" }
@@ -129,14 +136,14 @@ const TxStatusModal = () => {
         <div className={styles.iconWrap}>
           <div
             className={`${styles.iconCircle} ${
-              isPending
+              isPending || isUnconfirmed
                 ? styles.pending
                 : isSuccess
                 ? styles.success
                 : styles.error
             }`}
           >
-            {isPending ? (
+            {isUnconfirmed ? "?" : isPending ? (
               <span className={styles.spinner} />
             ) : isSuccess ? (
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -171,7 +178,7 @@ const TxStatusModal = () => {
 
         <h3 id={titleId} className={styles.title}>{title}</h3>
         <p className={styles.detail}>
-          {isError
+          {isUnconfirmed ? "The result has not been verified. Do not sign or send this transaction again. Check the original transaction or your wallet activity." : isError || status === "blocked"
             ? txState.error || "Transaction failed. Please try again."
             : txState.label || "Please wait while the transaction is processed."}
         </p>
@@ -179,12 +186,30 @@ const TxStatusModal = () => {
         {txState.hash ? (
           <a
             className={styles.hashLink}
-            href={getTxExplorerUrl(chainKey, txState.hash)}
+            href={getTxExplorerUrl(originalChain, txState.hash)}
             target="_blank"
             rel="noreferrer"
           >
             {formatHash(txState.hash)}
           </a>
+        ) : null}
+
+        {isUnconfirmed ? (
+          <div className={styles.diagnostics}>
+            {txState.hash ? <button type="button" className={styles.diagnosticsButton}
+              disabled={checkResult?.tx === txState && checkResult.waiting}
+              onClick={async () => {
+                setCheckResult({ tx: txState, waiting: true })
+                try { await checkTxReceipt() } finally { setCheckResult({ tx: txState, waiting: false }) }
+              }}>Check chain receipt</button> : null}
+            {checkResult?.tx === txState && <span role="status">{checkResult.waiting ? "Checking…" : "No confirmed receipt yet."}</span>}
+            {txState.address && <a className={styles.hashLink} href={getAddressExplorerUrl(originalChain, txState.address)}
+              target="_blank" rel="noreferrer">View wallet activity</a>}
+            <label><input type="checkbox" checked={Boolean(reviewed && reviewed === txState.startedAt)}
+              onChange={(e) => setReviewed(e.target.checked ? txState.startedAt : undefined)} /> I have checked the outcome independently.</label>
+            {reviewed && reviewed === txState.startedAt ? <button type="button" className={styles.diagnosticsButton}
+              onClick={acknowledgeTxReview}>Clear reminder without sending</button> : null}
+          </div>
         ) : null}
 
         {isError ? (
@@ -217,7 +242,7 @@ const TxStatusModal = () => {
             className={`uiButton uiButtonPrimary ${styles.confirmButton}`}
             onClick={dismiss}
           >
-            Confirm
+            {isUnconfirmed ? "Close for now" : "Confirm"}
           </button>
         ) : null}
       </div>

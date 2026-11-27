@@ -9,7 +9,7 @@ const createQuotaStorage = () => {
   const values = new Map<string, string>([
     ["cw20balance-single:v1:wallet:columbus-5:token", "cached"],
     ["burritoIbcTraceCacheV4", "cached"],
-    ["burritoWalletConnector", "keplr"]
+    ["burrito:preferred-wallet", "keplr"]
   ])
   return {
     get length() {
@@ -36,7 +36,7 @@ describe("safe browser storage", () => {
 
     expect(writeLocalStorageValue("burritoHiddenTokens:columbus-5", "[]")).toBe(true)
     expect(readLocalStorageValue("burritoHiddenTokens:columbus-5")).toBe("[]")
-    expect(readLocalStorageValue("burritoWalletConnector")).toBe("keplr")
+    expect(readLocalStorageValue("burrito:preferred-wallet")).toBe("keplr")
     expect(
       readLocalStorageValue("cw20balance-single:v1:wallet:columbus-5:token")
     ).toBeNull()

@@ -446,9 +446,9 @@ const ProposalNew = () => {
       }
     }
 
+    if (!(await startTx("Submit proposal"))) return
     try {
       setSubmitting(true)
-      startTx("Submit proposal")
       if (!connectorId) throw new Error("Wallet not connected")
       const signer = await getOfflineSignerForConnector(connectorId)
       const signerAccount = (await signer.getAccounts())[0]
@@ -486,7 +486,7 @@ const ProposalNew = () => {
       finishTx(result.transactionHash)
     } catch (err) {
       const message = formatTxError(err, "Submission failed")
-      failTx(message)
+      failTx(err)
       setError(message)
     } finally {
       setSubmitting(false)

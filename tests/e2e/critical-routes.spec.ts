@@ -420,7 +420,7 @@ test("Chrome extension provider connects, follows the active chain, invalidates,
                 }>
               }
             ).__burritoExtensionCalls,
-          connector: window.localStorage.getItem("burritoWalletConnector"),
+          connector: window.localStorage.getItem("burrito:preferred-wallet"),
           manuallyDisconnected: window.localStorage.getItem(
             "burritoWalletManuallyDisconnected"
           )
@@ -451,7 +451,7 @@ test("Chrome extension provider connects, follows the active chain, invalidates,
   ).toBeVisible()
   expect(
     await page.evaluate(() => ({
-      connector: window.localStorage.getItem("burritoWalletConnector"),
+      connector: window.localStorage.getItem("burrito:preferred-wallet"),
       manuallyDisconnected: window.localStorage.getItem(
         "burritoWalletManuallyDisconnected"
       ),
@@ -522,7 +522,7 @@ test("wallet recovers from a full local asset cache", async ({ page }) => {
     const cacheKey = "cw20balance-single:v1:wallet:columbus-5:token"
     const originalSetItem = Storage.prototype.setItem
     originalSetItem.call(window.localStorage, cacheKey, "cached")
-    originalSetItem.call(window.localStorage, "burritoWalletConnector", "keplr")
+    originalSetItem.call(window.localStorage, "burrito:preferred-wallet", "keplr")
 
     Storage.prototype.setItem = function setItem(key: string, value: string) {
       if (
@@ -549,7 +549,7 @@ test("wallet recovers from a full local asset cache", async ({ page }) => {
     .toBeNull()
   await expect
     .poll(() =>
-      page.evaluate(() => window.localStorage.getItem("burritoWalletConnector"))
+      page.evaluate(() => window.localStorage.getItem("burrito:preferred-wallet"))
     )
     .toBe("keplr")
   expect(pageErrors).toEqual([])
@@ -559,7 +559,7 @@ test("stored mobile wallet session cannot crash the app shell", async ({
   page
 }) => {
   await page.addInitScript(() => {
-    window.localStorage.setItem("burritoWalletConnector", "keplr-mobile")
+    window.localStorage.setItem("burrito:preferred-wallet", "keplr-mobile")
     window.localStorage.setItem(
       "cosmos-kit@2:core//current-wallet",
       "keplr-mobile"
@@ -581,7 +581,7 @@ test("mobile wallet runtime failure degrades to a disconnected app", async ({
     (route) => route.abort()
   )
   await page.addInitScript(() => {
-    window.localStorage.setItem("burritoWalletConnector", "keplr-mobile")
+    window.localStorage.setItem("burrito:preferred-wallet", "keplr-mobile")
   })
 
   await page.goto("/")
@@ -595,7 +595,7 @@ test("mobile wallet runtime failure degrades to a disconnected app", async ({
   await expect
     .poll(() =>
       page.evaluate(() =>
-        window.localStorage.getItem("burritoWalletConnector")
+        window.localStorage.getItem("burrito:preferred-wallet")
       )
     )
     .toBeNull()

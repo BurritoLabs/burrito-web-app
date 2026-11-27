@@ -3,7 +3,10 @@ import type {
   WalletConnectorId
 } from "./WalletContext"
 
-export const WALLET_CONNECTOR_STORAGE_KEY = "burritoWalletConnector"
+// WalletConnect's first-run storage migration moves any key containing
+// "walletconnect" (case-insensitive) out of localStorage. Our old key matched.
+export const WALLET_CONNECTOR_STORAGE_KEY = "burrito:preferred-wallet"
+const LEGACY_CONNECTOR_KEY = "burritoWalletConnector"
 export const WALLET_MANUAL_DISCONNECT_STORAGE_KEY =
   "burritoWalletManuallyDisconnected"
 const COSMOS_KIT_STORAGE_KEYS = [
@@ -69,7 +72,12 @@ export const getStoredWalletConnectorId = () => {
   try {
     if (isWalletManualDisconnectStored()) return undefined
     const stored = window.localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)
-    return isKnownWalletConnectorId(stored) ? stored : undefined
+    if (isKnownWalletConnectorId(stored)) return stored
+    const previous = window.localStorage.getItem(LEGACY_CONNECTOR_KEY)
+    if (!isKnownWalletConnectorId(previous)) return undefined
+    window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, previous)
+    window.localStorage.removeItem(LEGACY_CONNECTOR_KEY)
+    return previous
   } catch {
     return undefined
   }
@@ -107,6 +115,7 @@ export const rememberWalletConnectorId = (id: WalletConnectorId) => {
   try {
     window.localStorage.removeItem(WALLET_MANUAL_DISCONNECT_STORAGE_KEY)
     window.localStorage.setItem(WALLET_CONNECTOR_STORAGE_KEY, id)
+    window.localStorage.removeItem(LEGACY_CONNECTOR_KEY)
   } catch {
     // Storage can be unavailable in private or restricted mobile browsers.
   }
@@ -116,6 +125,7 @@ export const forgetStoredWalletConnectorId = () => {
   if (typeof window === "undefined") return
   try {
     window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
+    window.localStorage.removeItem(LEGACY_CONNECTOR_KEY)
   } catch {
     // Storage can be unavailable in private or restricted mobile browsers.
   }
@@ -125,6 +135,7 @@ export const forgetStoredWalletSession = () => {
   if (typeof window === "undefined") return
   try {
     window.localStorage.removeItem(WALLET_CONNECTOR_STORAGE_KEY)
+    window.localStorage.removeItem(LEGACY_CONNECTOR_KEY)
     COSMOS_KIT_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key))
   } catch {
     // Storage can be unavailable in private or restricted mobile browsers.

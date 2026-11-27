@@ -359,16 +359,15 @@ const NftPage = () => {
       return
     }
 
+    if (!(await startTx("Send NFT"))) return
     setSendSubmitting(true)
     setSendError(undefined)
     try {
       const walletReady = await prepareWalletForTx()
       if (!walletReady) {
-        setSendError("Wallet is still syncing. Wait a moment, then submit again.")
-        return
+        throw new Error("Wallet is still syncing. Wait a moment, then submit again.")
       }
       if (!connectorId) throw new Error("Wallet not connected")
-      startTx("Send NFT")
       const [{ connectSigningClientForConnector, getSignerAddressForConnector }, { MsgExecuteContract }, { encodeJsonBytes }] = await Promise.all([
         import("../../app/wallet/walletAdapters"),
         import("cosmjs-types/cosmwasm/wasm/v1/tx"),
@@ -390,13 +389,13 @@ const NftPage = () => {
       }
       const result = await client.signAndBroadcast(signerAddress, [message], "auto", "Burrito NFT transfer")
       if (result.code !== 0) throw new Error(result.rawLog || "NFT transfer failed")
-      await queryClient.invalidateQueries({ queryKey: nftQueryKey })
       finishTx(result.transactionHash)
+      void queryClient.invalidateQueries({ queryKey: nftQueryKey }).catch(() => undefined)
       closeDetails()
     } catch (error) {
       const message = formatTxError(error, "NFT transfer failed")
       setSendError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setSendSubmitting(false)
     }

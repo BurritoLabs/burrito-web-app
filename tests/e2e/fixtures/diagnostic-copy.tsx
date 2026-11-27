@@ -34,6 +34,8 @@ export function Fixture() {
       status: "disconnected", walletReadyForTx: false, walletPreparingForTx: false,
       connectors: [], connect: unexpectedWalletAction, disconnect: unexpectedWalletAction,
       prepareWalletForTx: unexpectedWalletAction,
+      setTxPhase: unexpectedWalletAction, showTxReceipt: unexpectedWalletAction,
+      acknowledgeTxReview: unexpectedWalletAction, checkTxReceipt: unexpectedWalletAction,
       startTx: () => { throw new Error("Synthetic fixture cannot start a transaction") },
       finishTx: () => { throw new Error("Synthetic fixture cannot finish a transaction") },
       failTx: () => { throw new Error("Synthetic fixture cannot fail a transaction") },

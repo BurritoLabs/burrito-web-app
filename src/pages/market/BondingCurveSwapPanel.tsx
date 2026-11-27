@@ -7,7 +7,7 @@ import {
 } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toBase64, toUtf8 } from "@cosmjs/encoding"
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
+import { signAndConfirmOnce } from "../../app/tx/signAndConfirmOnce"
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
 import {
@@ -23,17 +23,12 @@ import {
   parseTokenAmountToBaseUnits,
 } from "../../app/launchpad/cw20"
 import {
-  isTxAlreadyInCacheError,
-  parseSequenceMismatchExpected,
-} from "../../app/tx/txDiagnostics"
-import {
   buildClassicNativeIconCandidates,
   buildCw20IconCandidates,
 } from "../../app/utils/assetIcons"
 import { truncateHash } from "../../app/utils/format"
 import { formatTxError } from "../../app/utils/txError"
 import { useWallet } from "../../app/wallet/WalletContext"
-import { getClassicTxHash } from "../../app/wallet/signingClient"
 import type { ClassicStargateClient } from "../../app/wallet/walletAdapters"
 import {
   connectClassicSigningClientForConnector,
@@ -106,8 +101,6 @@ const EMPTY_ICON_CANDIDATES: string[] = []
 const BONDING_SWAP_MEMO = "Burrito bonding swap"
 const FALLBACK_BONDING_BUY_GAS = 420_000
 const FALLBACK_BONDING_SELL_GAS = 520_000
-const BONDING_BROADCAST_TIMEOUT_MS = 60_000
-const BONDING_BROADCAST_POLL_INTERVAL_MS = 2_000
 
 const parseBondingAsset = (
   asset: BondingAsset | undefined,
@@ -202,72 +195,16 @@ const estimateFee = async ({
 }
 
 const signAndBroadcastFast = async ({
-  client,
-  fallbackGas,
-  messages,
-  signerAddress,
+  client, fallbackGas, messages, signerAddress, onPhase
 }: {
   client: ClassicStargateClient
   fallbackGas: number
   messages: readonly TxMessage[]
   signerAddress: string
+  onPhase: Parameters<typeof signAndConfirmOnce>[0]["onPhase"]
 }) => {
-  let sequenceHint: number | undefined
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const fee = await estimateFee({
-        client,
-        fallbackGas,
-        messages,
-        signerAddress,
-      })
-      const signerState = await client.getSequence(signerAddress)
-      const signed = await client.sign(
-        signerAddress,
-        messages,
-        fee,
-        BONDING_SWAP_MEMO,
-        {
-          accountNumber: signerState.accountNumber,
-          sequence: sequenceHint ?? signerState.sequence,
-          chainId: CLASSIC_CHAIN.chainId,
-        },
-      )
-      const txBytes = TxRaw.encode(signed).finish()
-      const result = await client.broadcastTx(
-        txBytes,
-        BONDING_BROADCAST_TIMEOUT_MS,
-        BONDING_BROADCAST_POLL_INTERVAL_MS,
-      ).catch((broadcastError) => {
-        if (isTxAlreadyInCacheError(broadcastError)) {
-          return {
-            code: 0,
-            rawLog: "Transaction already exists in cache",
-            transactionHash: getClassicTxHash(txBytes),
-          }
-        }
-        throw broadcastError
-      })
-      if (result.code !== 0) {
-        throw new Error(
-          result.rawLog || `Bonding swap failed with code ${result.code}`,
-        )
-      }
-      if (!result.transactionHash) throw new Error("Bonding swap broadcast failed")
-      return result.transactionHash
-    } catch (error) {
-      const expectedSequence = parseSequenceMismatchExpected(
-        error instanceof Error ? error.message : String(error),
-      )
-      if (expectedSequence === undefined || attempt === 2) {
-        throw error
-      }
-      sequenceHint = expectedSequence
-    }
-  }
-
-  throw new Error("Bonding swap broadcast failed")
+  const fee = await estimateFee({ client, fallbackGas, messages, signerAddress })
+  return signAndConfirmOnce({ client, signerAddress, messages, fee, memo: BONDING_SWAP_MEMO, chainId: CLASSIC_CHAIN.chainId, onPhase })
 }
 
 const formatBalance = (amount: string | undefined, decimals: number) =>
@@ -303,7 +240,7 @@ const BondingCurveSwapPanel = ({
   dexLabel,
   pairAddress,
 }: BondingCurveSwapPanelProps) => {
-  const { account, connectorId, failTx, finishTx, startTx } = useWallet()
+  const { account, connectorId, failTx, finishTx, startTx, setTxPhase } = useWallet()
   const queryClient = useQueryClient()
   const [tradeMode, setTradeMode] = useState<TradeMode>("buy")
   const [amount, setAmount] = useState("")
@@ -660,13 +597,13 @@ const BondingCurveSwapPanel = ({
       return
     }
 
+    if (!(await startTx(
+      `Swap ${fromAsset?.symbol ?? "asset"} for ${toAsset?.symbol ?? "asset"}`,
+    ))) return
     try {
       setSubmitting(true)
       setSubmitError(undefined)
       setTxHash("")
-      startTx(
-        `Swap ${fromAsset?.symbol ?? "asset"} for ${toAsset?.symbol ?? "asset"}`,
-      )
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const message = await buildTradeMessage(signerAddress)
@@ -678,16 +615,17 @@ const BondingCurveSwapPanel = ({
             : FALLBACK_BONDING_SELL_GAS,
         messages: [message],
         signerAddress,
+        onPhase: setTxPhase,
       })
+      finishTx(hash)
       setTxHash(hash)
       setAmount("")
       setQuoteAmount("")
-      await refreshBalances()
-      finishTx(hash)
+      void refreshBalances().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Bonding swap failed.")
       setSubmitError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setSubmitting(false)
     }
@@ -894,7 +832,7 @@ const BondingCurveSwapPanel = ({
           type="submit"
         >
           {submitting
-            ? "Broadcasting..."
+            ? "Processing..."
             : !connectorId || !accountAddress
               ? "Connect wallet first"
               : isTradingDisabled

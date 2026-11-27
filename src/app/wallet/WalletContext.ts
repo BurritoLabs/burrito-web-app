@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react"
+import type { SupportedChainKey } from "../config/chainConfig"
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error"
 export type WalletConnectorId =
@@ -7,7 +8,7 @@ export type WalletConnectorId =
   | "keplr"
   | "keplr-mobile"
   | "galaxy"
-export type TxStatus = "idle" | "pending" | "success" | "error"
+export type TxStatus = "idle" | "pending" | "unconfirmed" | "success" | "error" | "blocked"
 
 export type TxState = {
   status: TxStatus
@@ -15,6 +16,10 @@ export type TxState = {
   label?: string
   error?: string
   startedAt?: number
+  chainKey?: SupportedChainKey
+  address?: string
+  hidden?: boolean
+  phase?: "signing" | "confirming"
 }
 
 export type WalletAccount = {
@@ -41,7 +46,11 @@ export type WalletContextValue = {
   disconnect: () => Promise<void>
   prepareWalletForTx: () => Promise<boolean>
   txState: TxState
-  startTx: (label?: string) => void
+  startTx: (label?: string) => Promise<boolean>
+  setTxPhase: (phase: "signing" | "confirming") => void
+  showTxReceipt: () => void
+  checkTxReceipt: () => Promise<void>
+  acknowledgeTxReview: () => void
   finishTx: (hash?: string) => void
   failTx: (error?: unknown) => void
   clearTx: () => void

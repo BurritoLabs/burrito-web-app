@@ -7,6 +7,8 @@ import {
 } from "@cosmjs/cosmwasm-stargate"
 import {
   AminoTypes,
+  BroadcastTxError,
+  calculateFee,
   GasPrice,
   SigningStargateClient,
   createDefaultAminoConverters,
@@ -23,10 +25,8 @@ import {
   CLASSIC_READ_ENDPOINTS_CONFIG,
   type ChainRuntimeConfig
 } from "../config/chainConfig"
-import {
-  isTxAlreadyInCacheError,
-  parseSequenceMismatchExpected
-} from "../tx/txDiagnostics"
+import { asTxConfirmationUnknown } from "../tx/broadcastOutcome"
+import { noteSignedTxForConfirmation } from "../tx/receiptJournal"
 import { runSerializedTransaction } from "../tx/transactionQueue"
 
 type EncodeObjectLike = {
@@ -105,6 +105,7 @@ export type ClassicSigningClient = {
 type ClassicClientOptions = {
   feeDenom?: string
   runtime?: ChainRuntimeConfig
+  selection?: { assertCurrent: () => void; verifySigner: () => Promise<void> }
 }
 
 const unique = <T,>(items: readonly T[]) => Array.from(new Set(items))
@@ -141,12 +142,6 @@ export const isClassicEndpointRetryableError = (error: unknown) => {
 export const getClassicTxHash = (txBytes: Uint8Array) =>
   toHex(sha256(txBytes)).toUpperCase()
 
-const createAlreadySubmittedResult = (txBytes: Uint8Array) => ({
-  code: 0,
-  rawLog: "Transaction already exists in cache",
-  transactionHash: getClassicTxHash(txBytes)
-})
-
 const createBroadcastResultError = (result: BroadcastResultLike) =>
   new Error(result.rawLog || `Classic transaction failed with code ${result.code}`)
 
@@ -156,9 +151,6 @@ const ensureBroadcastSuccess = (result: BroadcastResultLike) => {
   }
   return result
 }
-
-const waitBeforeSequenceRetry = () =>
-  new Promise((resolve) => setTimeout(resolve, 220))
 
 export const getClassicRegistry = () => {
   return new Registry([...defaultRegistryTypes, ...wasmTypes])
@@ -304,138 +296,82 @@ const connectClassicClientWithFallback = async (
       : new Error("Classic RPC endpoint request failed")
   }
 
+  const chainId = runtime.chain.chainId
+  const gasPrice = GasPrice.fromString(
+    `${runtime.gasPriceStep.average}${options?.feeDenom ?? runtime.nativeDenom.coinMinimalDenom}`
+  )
+
+  // Never replay a write or a signature, including on another RPC. The
+  // previous endpoint can accept the transaction even when its reply is lost.
+  const dispatchOnce = async <T extends string | BroadcastResultLike>(tx: Uint8Array, write: () => Promise<T>) => {
+    assertSigningContext()
+    await options?.selection?.verifySigner()
+    assertSigningContext()
+    options?.selection?.assertCurrent()
+    const hash = getClassicTxHash(tx)
+    noteSignedTxForConfirmation(hash, chainId)
+    try {
+      const response = await write()
+      const observed = typeof response === "string" ? response : response.transactionHash
+      if (observed?.toUpperCase() !== hash) throw new Error("RPC returned a different transaction ID")
+      return response
+    } catch (error) {
+      // Explicit CheckTx rejection is definitive. "In cache" denotes possible
+      // prior acceptance, never successful inclusion. All polling/transport
+      // faults remain uncertain, including Safari's generic "Load failed".
+      if (error instanceof BroadcastTxError && !/already exists in cache/i.test(error.message)) {
+        throw error
+      }
+      throw asTxConfirmationUnknown(error, hash, chainId) ?? error
+    }
+  }
+
+  const signAndBroadcastOnce: ClassicSigningClient["signAndBroadcast"] = (
+    signerAddress, messages, fee, memo = ""
+  ) => runSerializedTransaction(`${chainId}:${signerAddress}`, async () => {
+    assertSigningContext()
+    // Same multiplier and rounding as the pinned CosmJS default for "auto".
+    const usedFee = fee === "auto"
+      ? calculateFee(Math.round(1.4 * await withEndpointFallback(active =>
+          active.simulate(signerAddress, messages, memo))), gasPrice)
+      : fee
+    const signerState = await withEndpointFallback(active => active.getSequence(signerAddress))
+    assertSigningContext()
+    options?.selection?.assertCurrent()
+    const signed = await client.sign(signerAddress, messages, usedFee, memo, { ...signerState, chainId })
+    const bytes = TxRaw.encode(signed).finish()
+    const result = await dispatchOnce(bytes, () => client.broadcastTx(bytes))
+    // A nonzero DeliverTx result is a known execution failure, not uncertainty.
+    return ensureBroadcastSuccess(result)
+  })
+
   return {
     simulate: (signerAddress, messages, memo) => {
       assertSigningContext()
-      return withEndpointFallback((activeClient) =>
-        activeClient.simulate(signerAddress, messages, memo)
-      )
+      return withEndpointFallback(active => active.simulate(signerAddress, messages, memo))
     },
-    signAndBroadcast: (signerAddress, messages, fee, memo = "") =>
-      runSerializedTransaction(
-        `${runtime.chain.chainId}:${signerAddress}`,
-        async () => {
-          assertSigningContext()
-          if (fee === "auto") {
-            // CosmJS owns simulation, signing, and broadcast in this call. Do
-            // not move it to another endpoint after a timeout: the wallet may
-            // already have approved and the chain may already have accepted it.
-            return ensureBroadcastSuccess(
-              await client.signAndBroadcast(signerAddress, messages, fee, memo)
-            )
-          }
-
-          let sequenceHint: number | undefined
-
-          for (let attempt = 0; attempt < 3; attempt += 1) {
-            try {
-              assertSigningContext()
-              let signingClient = client
-              const { accountNumber, sequence } = await withEndpointFallback(
-                async (activeClient) => {
-                  signingClient = activeClient
-                  return activeClient.getSequence(signerAddress)
-                }
-              )
-              const txRaw = await signingClient.sign(
-                signerAddress,
-                messages,
-                fee,
-                memo,
-                {
-                  accountNumber,
-                  sequence: sequenceHint ?? sequence,
-                  chainId: runtime.chain.chainId
-                }
-              )
-              assertSigningContext()
-              const txBytes = Uint8Array.from(TxRaw.encode(txRaw).finish())
-              try {
-                const result = await withEndpointFallback(async (activeClient) =>
-                  ensureBroadcastSuccess(await activeClient.broadcastTx(txBytes))
-                )
-                return result
-              } catch (broadcastError) {
-                if (isTxAlreadyInCacheError(broadcastError)) {
-                  return createAlreadySubmittedResult(txBytes)
-                }
-                throw broadcastError
-              }
-            } catch (error) {
-              const message = error instanceof Error ? error.message : String(error)
-              const expectedSequence = parseSequenceMismatchExpected(message)
-              if (expectedSequence !== undefined && attempt < 2) {
-                sequenceHint = expectedSequence
-                await waitBeforeSequenceRetry()
-                continue
-              }
-              throw error
-            }
-          }
-
-          throw new Error("Classic transaction broadcast failed")
-        }
-      ),
+    signAndBroadcast: signAndBroadcastOnce,
     getSequence: (address) =>
-      withEndpointFallback((activeClient) => activeClient.getSequence(address)),
+      withEndpointFallback(active => active.getSequence(address)),
     sign: (signerAddress, messages, fee, memo, signerData) => {
       assertSigningContext()
+      if (signerData.chainId !== chainId) throw new Error("Signing request is for a different chain.")
+      options?.selection?.assertCurrent()
       return client.sign(signerAddress, messages, fee, memo, signerData)
     },
-    broadcastTx: async (tx, timeoutMs, pollIntervalMs) => {
-      assertSigningContext()
-      try {
-        return await withEndpointFallback((activeClient) =>
-          activeClient.broadcastTx(tx, timeoutMs, pollIntervalMs)
-        )
-      } catch (error) {
-        if (isTxAlreadyInCacheError(error)) {
-          return createAlreadySubmittedResult(tx)
-        }
-        throw error
-      }
-    },
-    broadcastTxSync: async (tx) => {
-      assertSigningContext()
-      try {
-        return await withEndpointFallback((activeClient) =>
-          activeClient.broadcastTxSync(tx)
-        )
-      } catch (error) {
-        if (isTxAlreadyInCacheError(error)) {
-          return getClassicTxHash(tx)
-        }
-        throw error
-      }
-    },
+    broadcastTx: (tx, timeoutMs, pollIntervalMs) =>
+      dispatchOnce(tx, () => client.broadcastTx(tx, timeoutMs, pollIntervalMs)),
+    broadcastTxSync: tx => dispatchOnce(tx, () => client.broadcastTxSync(tx)),
     delegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
-      runSerializedTransaction(
-        `${runtime.chain.chainId}:${delegatorAddress}`,
-        async () => {
-          assertSigningContext()
-          return client.delegateTokens(
-            delegatorAddress,
-            validatorAddress,
-            amount,
-            fee,
-            memo
-          )
-        }
-      ),
+      signAndBroadcastOnce(delegatorAddress, [{
+        typeUrl: "/cosmos.staking.v1beta1.MsgDelegate",
+        value: { delegatorAddress, validatorAddress, amount }
+      }], fee, memo),
     undelegateTokens: (delegatorAddress, validatorAddress, amount, fee, memo) =>
-      runSerializedTransaction(
-        `${runtime.chain.chainId}:${delegatorAddress}`,
-        async () => {
-          assertSigningContext()
-          return client.undelegateTokens(
-            delegatorAddress,
-            validatorAddress,
-            amount,
-            fee,
-            memo
-          )
-        }
-      )
+      signAndBroadcastOnce(delegatorAddress, [{
+        typeUrl: "/cosmos.staking.v1beta1.MsgUndelegate",
+        value: { delegatorAddress, validatorAddress, amount }
+      }], fee, memo)
   }
 }
 
@@ -466,9 +402,11 @@ export const connectSigningClient = async (
 export const connectStargateClient = async (
   signer: OfflineSigner,
   runtime: ChainRuntimeConfig,
-  feeDenom: string = runtime.nativeDenom.coinMinimalDenom
+  feeDenom: string = runtime.nativeDenom.coinMinimalDenom,
+  selection?: ClassicClientOptions["selection"]
 ) =>
   connectClassicClientWithFallback(signer, {
     runtime,
-    feeDenom
+    feeDenom,
+    selection
   })

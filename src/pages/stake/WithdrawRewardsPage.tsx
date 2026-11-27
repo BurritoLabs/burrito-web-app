@@ -307,14 +307,13 @@ const WithdrawRewards = () => {
       return
     }
     if (!selected.length) return
+    if (!(await startTx("Withdraw rewards"))) return
     try {
       setSubmitting(true)
       const walletReady = await prepareWalletForTx()
       if (!walletReady) {
-        setSubmitError("Wallet is still syncing. Wait a moment, then submit again.")
-        return
+        throw new Error("Wallet is still syncing. Wait a moment, then submit again.")
       }
-      startTx("Withdraw rewards")
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         {

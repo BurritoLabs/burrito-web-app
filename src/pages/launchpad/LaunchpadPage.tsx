@@ -508,6 +508,7 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(`Create ${tokenSymbol}`))) return
     try {
       setCreateSubmitting(true)
       setCreateError(undefined)
@@ -518,7 +519,6 @@ const Launchpad = () => {
       )
       const normalizedXProfile = normalizeOptionalXProfile(draft.xProfile)
       const normalizedLogoUrl = normalizeOptionalImageUrl(draft.logoUrl)
-      startTx(`Create ${tokenSymbol}`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const creationFeeDistribution =
@@ -634,7 +634,7 @@ const Launchpad = () => {
     } catch (error) {
       const message = formatTxError(error, "Create token failed")
       setCreateError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setCreateSubmitting(false)
     }
@@ -1407,11 +1407,11 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(`Create ${activeOwnerLaunch.symbol} / ${nativeSymbol} pair`))) return
     try {
       setCreatePairSubmitting(true)
       setCreatePairError(undefined)
       setCreatePairTxHash("")
-      startTx(`Create ${activeOwnerLaunch.symbol} / ${nativeSymbol} pair`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const message = buildCreateTerraswapLuncPairMessage(
@@ -1428,8 +1428,9 @@ const Launchpad = () => {
         throw new Error(result.rawLog || "Create pair failed")
       }
 
-      const pair = await waitForTerraswapLuncPair(activeTokenAddress)
+      finishTx(result.transactionHash)
       setCreatePairTxHash(result.transactionHash)
+      const pair = await waitForTerraswapLuncPair(activeTokenAddress).catch(() => undefined)
       if (pair) {
         setPairLookup((current) => ({
           ...current,
@@ -1462,11 +1463,10 @@ const Launchpad = () => {
           }
         }))
       }
-      finishTx(result.transactionHash)
     } catch (error) {
       const message = formatTxError(error, "Create pair failed.")
       setCreatePairError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setCreatePairSubmitting(false)
     }
@@ -1489,6 +1489,7 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(`Lock ${activeOwnerLaunch.symbol} / ${nativeSymbol} LP`))) return
     try {
       setLockLpSubmitting(true)
       setLockLpError(undefined)
@@ -1496,7 +1497,6 @@ const Launchpad = () => {
       const amount = parseLpAmountToBaseUnits(lockLpAmount, activeLpDecimals)
       const unlockTimestamp = getLpUnlockTimestampSeconds(lockLpDays)
 
-      startTx(`Lock ${activeOwnerLaunch.symbol} / ${nativeSymbol} LP`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -1543,7 +1543,7 @@ const Launchpad = () => {
     } catch (error) {
       const message = formatTxError(error, "Lock LP failed.")
       setLockLpError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setLockLpSubmitting(false)
     }
@@ -1571,11 +1571,11 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(`Update ${activeOwnerLaunch.symbol} public LP lock`))) return
     try {
       setLockRegistrySubmitting(true)
       setLockRegistryError(undefined)
       setLockRegistryTxHash("")
-      startTx(`Update ${activeOwnerLaunch.symbol} public LP lock`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -1607,12 +1607,12 @@ const Launchpad = () => {
             : record
         )
       )
-      await refreshRegistryLaunches()
       finishTx(result.transactionHash)
+      void refreshRegistryLaunches().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Update public LP lock failed.")
       setLockRegistryError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setLockRegistrySubmitting(false)
     }
@@ -1636,11 +1636,11 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(`Withdraw ${activeOwnerLaunch.symbol} / ${nativeSymbol} LP`))) return
     try {
       setWithdrawLpSubmitting(true)
       setWithdrawLpError(undefined)
       setWithdrawLpTxHash("")
-      startTx(`Withdraw ${activeOwnerLaunch.symbol} / ${nativeSymbol} LP`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -1676,7 +1676,7 @@ const Launchpad = () => {
     } catch (error) {
       const message = formatTxError(error, "Withdraw locked LP failed.")
       setWithdrawLpError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setWithdrawLpSubmitting(false)
     }
@@ -1701,11 +1701,11 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(`Distribute ${activeOwnerLaunch.symbol}`))) return
     try {
       setDistributionSubmitting(true)
       setDistributionError(undefined)
       setDistributionTxHash("")
-      startTx(`Distribute ${activeOwnerLaunch.symbol}`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const messages = distributionPreview.transfers.map((transfer) =>
@@ -1742,7 +1742,7 @@ const Launchpad = () => {
     } catch (error) {
       const message = formatTxError(error, "Distribute tokens failed.")
       setDistributionError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setDistributionSubmitting(false)
     }
@@ -1786,6 +1786,11 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(
+      isUpdatingExistingListing
+        ? `Update ${activeOwnerLaunch.symbol} listing`
+        : `Publish ${activeOwnerLaunch.symbol} launch`
+    ))) return
     try {
       setPublishSubmitting(true)
       setPublishError(undefined)
@@ -1805,11 +1810,6 @@ const Launchpad = () => {
       const normalizedXProfile = normalizeOptionalXProfile(publishXProfile)
       const normalizedDescription = publishDescription.trim()
 
-      startTx(
-        isUpdatingExistingListing
-          ? `Update ${activeOwnerLaunch.symbol} listing`
-          : `Publish ${activeOwnerLaunch.symbol} launch`
-      )
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -1888,12 +1888,12 @@ const Launchpad = () => {
             : record
         )
       )
-      await refreshRegistryLaunches()
       finishTx(result.transactionHash)
+      void refreshRegistryLaunches().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Publish listing failed.")
       setPublishError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setPublishSubmitting(false)
     }
@@ -1913,15 +1913,15 @@ const Launchpad = () => {
       return
     }
 
+    if (!(await startTx(
+      status === "hidden"
+        ? `Hide ${activeOwnerLaunch.symbol} listing`
+        : `Restore ${activeOwnerLaunch.symbol} listing`
+    ))) return
     try {
       setListingStatusSubmitting(status)
       setListingStatusError(undefined)
       setListingStatusTxHash("")
-      startTx(
-        status === "hidden"
-          ? `Hide ${activeOwnerLaunch.symbol} listing`
-          : `Restore ${activeOwnerLaunch.symbol} listing`
-      )
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const result = await client.signAndBroadcast(
@@ -1958,12 +1958,12 @@ const Launchpad = () => {
             : record
         )
       )
-      await refreshRegistryLaunches()
       finishTx(result.transactionHash)
+      void refreshRegistryLaunches().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Update listing visibility failed.")
       setListingStatusError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setListingStatusSubmitting(null)
     }
@@ -2220,7 +2220,7 @@ const Launchpad = () => {
                 onClick={handleCreateTerraswapPair}
               >
                 {createPairSubmitting
-                  ? "Broadcasting..."
+                  ? "Processing..."
                   : activePairAddress
                   ? "Pair already exists"
                   : `Create ${nativeSymbol} pair`}
@@ -2364,7 +2364,7 @@ const Launchpad = () => {
                       disabled={!canLockLp}
                     >
                       {lockLpSubmitting
-                        ? "Broadcasting..."
+                        ? "Processing..."
                         : !connectorId || !account?.address
                         ? "Connect wallet first"
                         : hasLockInput
@@ -2441,7 +2441,7 @@ const Launchpad = () => {
                           onClick={handleUpdateRegistryLock}
                         >
                           {lockRegistrySubmitting
-                            ? "Broadcasting..."
+                            ? "Processing..."
                             : !connectorId || !account?.address
                             ? "Connect wallet first"
                             : "Update public LP lock"}
@@ -2477,7 +2477,7 @@ const Launchpad = () => {
                         onClick={handleWithdrawLockedLp}
                       >
                         {withdrawLpSubmitting
-                          ? "Broadcasting..."
+                          ? "Processing..."
                           : activeOwnerLaunch.lpWithdrawTxHash
                           ? "LP withdrawn"
                           : activeLpLockHasExpired
@@ -2596,7 +2596,7 @@ const Launchpad = () => {
                     disabled={!canPublishListing}
                   >
                     {publishSubmitting
-                      ? "Broadcasting..."
+                      ? "Processing..."
                       : isActiveListingPublished
                       ? "Update listing"
                       : !connectorId || !account?.address
@@ -2646,7 +2646,7 @@ const Launchpad = () => {
                           onClick={() => handleSetListingStatus("hidden")}
                         >
                           {listingStatusSubmitting === "hidden"
-                            ? "Broadcasting..."
+                            ? "Processing..."
                             : "Hide listing"}
                         </button>
                         <button
@@ -2659,7 +2659,7 @@ const Launchpad = () => {
                           onClick={() => handleSetListingStatus("live")}
                         >
                           {listingStatusSubmitting === "live"
-                            ? "Broadcasting..."
+                            ? "Processing..."
                             : "Restore listing"}
                         </button>
                       </div>

@@ -1,5 +1,13 @@
 # Production Refactor Notes
 
+## Keplr mobile handoff and single-submit receipts — 2026-11-27
+
+- One outstanding Keplr authorization; returning to the tab or restoring a valid session must not start another approval.
+- Transaction submission and read retries are separate: reuse neither a signature request nor a network write after an ambiguous reply. Chain inclusion is not inferred from mempool cache.
+- Keep the original chain and public receipt pointer in this tab through a refresh. Checking a receipt only reads the chain; closing its panel does not authorize a new transaction.
+- On browsers with Web Locks, an outstanding transaction also blocks submission from a second Burrito tab without sharing wallet details. WalletConnect's legacy storage migration no longer consumes the app's saved connector preference.
+- QA uses controlled wallet callbacks and synthetic receipts, not live signatures or production broadcasts. Fees, chain endpoints, messages, slippage and the wallet drawer position are not part of this change.
+
 ## Observed candle closeout — 2026-11-06 (Toronto)
 
 - Static candle snapshots now aggregate only actual observed swaps and include
