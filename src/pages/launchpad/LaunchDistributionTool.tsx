@@ -123,7 +123,7 @@ function LaunchDistributionTool({
           disabled={!canDistributeTokens}
         >
           {distributionSubmitting
-            ? "Broadcasting..."
+            ? "Processing..."
             : !walletReady
             ? "Connect wallet first"
             : distributionPreview.transfers.length

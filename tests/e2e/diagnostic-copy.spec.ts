@@ -158,7 +158,7 @@ test("transaction dialog contains keyboard focus and restores it without closing
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(trigger).toBeFocused()
   await page.evaluate(() => (window as unknown as DiagnosticQA).qaSetTransaction({ status: "pending" }))
-  const pending = page.getByRole("dialog", { name: "Broadcasting transaction", exact: true })
+  const pending = page.getByRole("dialog", { name: "Transaction in progress", exact: true })
   await expect(pending).toBeFocused()
   await page.keyboard.press("Escape")
   await expect(pending).toBeVisible()

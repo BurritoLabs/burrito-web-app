@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
+import { signAndConfirmOnce } from "../../app/tx/signAndConfirmOnce"
 import styles from "../Swap.module.css"
 import { useAppChain } from "../../app/appChainContext"
 import { CLASSIC_CHAIN, CLASSIC_DENOMS } from "../../app/chain"
@@ -43,10 +43,6 @@ import {
 } from "../../app/utils/assetIdentity"
 import { getAssetProvenanceLabel } from "../../app/utils/assetProvenance"
 import {
-  isTxAlreadyInCacheError,
-  parseSequenceMismatchExpected
-} from "../../app/tx/txDiagnostics"
-import {
   fromMicroAmount,
   parseBigInt,
   sanitizeAmount,
@@ -78,7 +74,6 @@ import {
 } from "../../app/revenue/feeDistribution"
 import { queueWebFeeReceipt } from "../../app/revenue/webFeeReceipt"
 import type { ClassicStargateClient } from "../../app/wallet/walletAdapters"
-import { getClassicTxHash } from "../../app/wallet/signingClient"
 import SwapAssetPickerModal from "./swap/SwapAssetPickerModal"
 import SwapAssetIcon from "./swap/SwapAssetIcon"
 
@@ -193,8 +188,6 @@ type SwapPanelProps = {
   assetOverrides?: SwapAssetOverride[]
   pairOnly?: PairOnlySwapConfig
 }
-const SWAP_BROADCAST_TIMEOUT_MS = 60_000
-const SWAP_BROADCAST_POLL_INTERVAL_MS = 2_000
 const normalizeDexName = normalizeDexFamily
 const FACTORY_PAIR_CACHE = new Map<string, string>()
 
@@ -621,7 +614,8 @@ const signAndBroadcastSwapFast = async ({
   gasPrice,
   messages,
   networkRewardFee,
-  signerAddress
+  signerAddress,
+  onPhase
 }: {
   client: ClassicStargateClient
   chainId: string
@@ -631,71 +625,11 @@ const signAndBroadcastSwapFast = async ({
   messages: readonly SwapMessage[]
   networkRewardFee: bigint
   signerAddress: string
+  onPhase: Parameters<typeof signAndConfirmOnce>[0]["onPhase"]
 }) => {
-  let sequenceHint: number | undefined
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const standardFee = await estimateSwapFee({
-        client,
-        fallbackGas,
-        feeDenom,
-        gasPrice,
-        messages,
-        signerAddress
-      })
-      const fee = applyLunaNetworkRewardFee(
-        standardFee,
-        feeDenom,
-        networkRewardFee
-      )
-      const signerState = await client.getSequence(signerAddress)
-      const signed = await client.sign(
-        signerAddress,
-        messages,
-        fee,
-        SWAP_MEMO,
-        {
-          accountNumber: signerState.accountNumber,
-          sequence: sequenceHint ?? signerState.sequence,
-          chainId
-        }
-      )
-      const txBytes = TxRaw.encode(signed).finish()
-      const result = await client.broadcastTx(
-        txBytes,
-        SWAP_BROADCAST_TIMEOUT_MS,
-        SWAP_BROADCAST_POLL_INTERVAL_MS
-      ).catch((broadcastError) => {
-        if (isTxAlreadyInCacheError(broadcastError)) {
-          return {
-            code: 0,
-            rawLog: "Transaction already exists in cache",
-            transactionHash: getClassicTxHash(txBytes)
-          }
-        }
-        throw broadcastError
-      })
-      if (result.code !== 0) {
-        throw new Error(result.rawLog || `Swap failed with code ${result.code}`)
-      }
-      if (!result.transactionHash) {
-        throw new Error("Swap broadcast failed")
-      }
-      return result.transactionHash
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      const expectedSequence = parseSequenceMismatchExpected(message)
-      if (expectedSequence !== undefined && attempt < 2) {
-        sequenceHint = expectedSequence
-        await new Promise((resolve) => window.setTimeout(resolve, 220))
-        continue
-      }
-      throw error
-    }
-  }
-
-  throw new Error("Swap broadcast failed")
+  const standardFee = await estimateSwapFee({ client, fallbackGas, feeDenom, gasPrice, messages, signerAddress })
+  const fee = applyLunaNetworkRewardFee(standardFee, feeDenom, networkRewardFee)
+  return signAndConfirmOnce({ client, signerAddress, messages, fee, memo: SWAP_MEMO, chainId, onPhase })
 }
 
 const getAmountDensity = (value?: string) => {
@@ -721,6 +655,7 @@ const SwapPanel = ({
     connectors,
     connect,
     startTx,
+    setTxPhase,
     finishTx,
     failTx
   } = useWallet()
@@ -1823,10 +1758,10 @@ const SwapPanel = ({
       return
     }
 
+    if (!(await startTx("Swap"))) return
     setSubmitError(undefined)
     setSubmitLoading(true)
     try {
-      startTx("Swap")
       if (!connectorId) throw new Error("Wallet not connected")
       const { connectSigningClientForConnector } = await import(
         "../../app/wallet/walletAdapters"
@@ -1875,6 +1810,7 @@ const SwapPanel = ({
         gasPrice: chain.runtime.gasPriceStep.average,
         messages,
         networkRewardFee: revenueDistribution.networkRewardFee,
+        onPhase: setTxPhase,
         signerAddress
       })
       finishTx(hash)
@@ -1887,7 +1823,7 @@ const SwapPanel = ({
       }
     } catch (error) {
       const message = formatTxError(error, "Swap failed")
-      failTx(message)
+      failTx(error)
       setSubmitError(message)
     } finally {
       setSubmitLoading(false)

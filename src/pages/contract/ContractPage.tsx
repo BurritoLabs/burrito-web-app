@@ -244,12 +244,12 @@ const Contract = () => {
       return
     }
 
+    if (!(await startTx("Upload contract"))) return
     try {
       setUploadSubmitting(true)
       setUploadError(undefined)
       setUploadHash("")
       setUploadCodeId("")
-      startTx("Upload contract")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const wasmByteCode = new Uint8Array(await uploadFile.arrayBuffer())
@@ -275,7 +275,7 @@ const Contract = () => {
     } catch (error) {
       const message = formatTxError(error, "Upload failed")
       setUploadError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setUploadSubmitting(false)
     }
@@ -315,12 +315,12 @@ const Contract = () => {
 
     const fundAmount = toMicroAmount(instantiateFunds)
 
+    if (!(await startTx("Instantiate contract"))) return
     try {
       setInstantiateSubmitting(true)
       setInstantiateError(undefined)
       setInstantiateHash("")
       setInstantiateAddress("")
-      startTx("Instantiate contract")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
@@ -357,7 +357,7 @@ const Contract = () => {
     } catch (error) {
       const message = formatTxError(error, "Instantiate failed")
       setInstantiateError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setInstantiateSubmitting(false)
     }
@@ -386,11 +386,11 @@ const Contract = () => {
 
     const fundAmount = toMicroAmount(executeFunds)
 
+    if (!(await startTx("Execute contract"))) return
     try {
       setExecuteSubmitting(true)
       setExecuteError(undefined)
       setExecuteHash("")
-      startTx("Execute contract")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
@@ -417,11 +417,11 @@ const Contract = () => {
       }
       setExecuteHash(result.transactionHash)
       finishTx(result.transactionHash)
-      await invalidateContract()
+      void invalidateContract().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Execute failed")
       setExecuteError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setExecuteSubmitting(false)
     }
@@ -465,11 +465,11 @@ const Contract = () => {
       return
     }
 
+    if (!(await startTx("Migrate contract"))) return
     try {
       setMigrateSubmitting(true)
       setMigrateError(undefined)
       setMigrateHash("")
-      startTx("Migrate contract")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
@@ -488,11 +488,11 @@ const Contract = () => {
       }
       setMigrateHash(result.transactionHash)
       finishTx(result.transactionHash)
-      await invalidateContract()
+      void invalidateContract().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Migrate failed")
       setMigrateError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setMigrateSubmitting(false)
     }
@@ -519,12 +519,12 @@ const Contract = () => {
       return
     }
 
+    if (!(await startTx(clearAdmin ? "Clear contract admin" : "Update contract admin"))) return
     try {
       setAdminSubmitting(true)
       setAdminError(undefined)
       setAdminHash("")
       setAdminResultText("")
-      startTx(clearAdmin ? "Clear contract admin" : "Update contract admin")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClient()
@@ -554,11 +554,11 @@ const Contract = () => {
         clearAdmin ? "Admin removed from contract." : `New admin: ${next}`
       )
       finishTx(result.transactionHash)
-      await invalidateContract()
+      void invalidateContract().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Update admin failed")
       setAdminError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setAdminSubmitting(false)
     }
@@ -1008,7 +1008,7 @@ const Contract = () => {
                         type="submit"
                         disabled={instantiateSubmitting}
                       >
-                        {instantiateSubmitting ? "Broadcasting..." : "Instantiate"}
+                        {instantiateSubmitting ? "Processing..." : "Instantiate"}
                       </button>
                     </div>
                   </form>
@@ -1101,7 +1101,7 @@ const Contract = () => {
                         type="submit"
                         disabled={executeSubmitting}
                       >
-                        {executeSubmitting ? "Broadcasting..." : "Execute"}
+                        {executeSubmitting ? "Processing..." : "Execute"}
                       </button>
                     </div>
                   </form>
@@ -1166,7 +1166,7 @@ const Contract = () => {
                         type="submit"
                         disabled={migrateSubmitting}
                       >
-                        {migrateSubmitting ? "Broadcasting..." : "Migrate"}
+                        {migrateSubmitting ? "Processing..." : "Migrate"}
                       </button>
                     </div>
                   </form>
@@ -1241,7 +1241,7 @@ const Contract = () => {
                         disabled={adminSubmitting}
                       >
                         {adminSubmitting
-                          ? "Broadcasting..."
+                          ? "Processing..."
                           : clearAdmin
                           ? "Clear admin"
                           : "Update admin"}

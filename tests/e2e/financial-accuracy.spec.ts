@@ -70,6 +70,9 @@ async function installSyntheticNetwork(page: Page, baseURL: string, malformedTax
       contentType: "application/json", body: JSON.stringify(body)
     })
     // Never forward a signer/broadcast/mutating API request to a live service.
+    // This is the local Vite source module, not a broadcast endpoint.
+    if (url.origin === appOrigin && request.method() === "GET" &&
+      request.resourceType() === "script" && path === "/src/app/tx/broadcastOutcome.ts") return route.continue()
     if (/broadcast|simulate|sign(_|\/|$)/i.test(path) ||
       (!/^(GET|HEAD)$/.test(request.method()) && !path.endsWith("/finder/account-assets") &&
         path !== "/terra/tx/v1beta1/compute_tax")) {

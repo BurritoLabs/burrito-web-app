@@ -877,16 +877,15 @@ const WalletPanel = ({ onNavigationReady }: { onNavigationReady?: () => void }) 
       return
     }
 
+    if (!(await startTx(`Send ${sendAsset.symbol}`))) return
     setSendSubmitting(true)
     setSendError(undefined)
 
     try {
       const walletReady = await prepareWalletForTx()
       if (!walletReady) {
-        setSendError("Wallet is still syncing. Wait a moment, then submit again.")
-        return
+        throw new Error("Wallet is still syncing. Wait a moment, then submit again.")
       }
-      startTx(`Send ${sendAsset.symbol}`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         { connectSigningClientForConnector },
@@ -938,6 +937,7 @@ const WalletPanel = ({ onNavigationReady }: { onNavigationReady?: () => void }) 
       if (result.code !== 0) {
         throw new Error(result.rawLog || "Send failed")
       }
+      finishTx(result.transactionHash)
 
       if (typeof window !== "undefined") {
         removeLocalStorageValue(
@@ -957,7 +957,7 @@ const WalletPanel = ({ onNavigationReady }: { onNavigationReady?: () => void }) 
           RECENT_RECIPIENT_LIMIT
         )
       })
-      await Promise.all([
+      void Promise.allSettled([
         queryClient.invalidateQueries({
           queryKey: ["wallet", chain.chainId, "balances", account.address]
         }),
@@ -969,13 +969,12 @@ const WalletPanel = ({ onNavigationReady }: { onNavigationReady?: () => void }) 
         })
       ])
 
-      finishTx(result.transactionHash)
       resetSendForm()
       setView("wallet")
     } catch (error) {
       const message = formatTxError(error, "Send failed")
       setSendError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setSendSubmitting(false)
     }

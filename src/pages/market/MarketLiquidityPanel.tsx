@@ -989,6 +989,7 @@ const MarketLiquidityPanel = ({
       return
     }
 
+    if (!(await startTx(`Add ${tokenSymbol} / ${luncSymbol} liquidity`))) return
     try {
       setProvideSubmitting(true)
       setProvideError(undefined)
@@ -1015,7 +1016,6 @@ const MarketLiquidityPanel = ({
       ) {
         throw new Error(`Insufficient ${luncSymbol} balance.`)
       }
-      startTx(`Add ${tokenSymbol} / ${luncSymbol} liquidity`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const liquidityMessages = [
@@ -1085,12 +1085,12 @@ const MarketLiquidityPanel = ({
       setProvideTxHash(result.transactionHash)
       setTokenAmount("")
       setLuncAmount("")
-      await refreshLiquidityData()
       finishTx(result.transactionHash)
+      void refreshLiquidityData().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Add liquidity failed.")
       setProvideError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setProvideSubmitting(false)
     }
@@ -1107,6 +1107,7 @@ const MarketLiquidityPanel = ({
       return
     }
 
+    if (!(await startTx(`Remove ${tokenSymbol} / ${luncSymbol} liquidity`))) return
     try {
       setWithdrawSubmitting(true)
       setWithdrawError(undefined)
@@ -1116,7 +1117,6 @@ const MarketLiquidityPanel = ({
         lpDecimals,
         "LP token amount"
       )
-      startTx(`Remove ${tokenSymbol} / ${luncSymbol} liquidity`)
       const signerAddress = await getSignerAddressForConnector(connectorId)
       const client = await connectClassicSigningClientForConnector(connectorId)
       const withdrawMessages = supportsGarudaLiquidity
@@ -1152,12 +1152,12 @@ const MarketLiquidityPanel = ({
       }
       setWithdrawTxHash(result.transactionHash)
       setLpAmount("")
-      await refreshLiquidityData()
       finishTx(result.transactionHash)
+      void refreshLiquidityData().catch(() => undefined)
     } catch (error) {
       const message = formatTxError(error, "Remove liquidity failed.")
       setWithdrawError(message)
-      failTx(message)
+      failTx(error)
     } finally {
       setWithdrawSubmitting(false)
     }
@@ -1400,7 +1400,7 @@ const MarketLiquidityPanel = ({
             }
           >
             {provideSubmitting
-              ? "Broadcasting..."
+              ? "Processing..."
               : !connectorId || !accountAddress
                 ? "Connect wallet first"
                 : supportsGarudaLiquidity && !garudaAssetOrder
@@ -1538,7 +1538,7 @@ const MarketLiquidityPanel = ({
             }
           >
             {withdrawSubmitting
-              ? "Broadcasting..."
+              ? "Processing..."
               : !connectorId || !accountAddress
                 ? "Connect wallet first"
                 : !lpTokenAddress

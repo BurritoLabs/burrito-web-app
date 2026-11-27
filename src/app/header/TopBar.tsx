@@ -27,7 +27,7 @@ type TopBarProps = {
 const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { account, txState, connectorId, disconnect, status } = useWallet()
+  const { account, txState, connectorId, disconnect, status, showTxReceipt } = useWallet()
   const { chainKey, chain, setChainKey } = useAppChain()
   const [connectOpen, setConnectOpen] = useState(false)
   const [addressesOpen, setAddressesOpen] = useState(false)
@@ -75,12 +75,14 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
   })
   const validatorMoniker = validator?.description?.moniker?.trim() ?? ""
   const showValidator = Boolean(validatorMoniker)
-  const showTx = txState.status !== "idle"
+  const showTx = txState.status !== "idle" && txState.status !== "blocked"
   const txTitle =
     txState.status === "pending"
-      ? "Broadcasting"
+      ? "In progress"
+      : txState.status === "unconfirmed"
+      ? "Check confirmation"
       : txState.status === "success"
-      ? "Tx submitted"
+      ? "Tx confirmed"
       : txState.status === "error"
       ? "Tx failed"
       : ""
@@ -471,25 +473,29 @@ const TopBar = ({ onMenuClick, menuOpen }: TopBarProps) => {
 
       <div
         className={`${styles.latestTx} ${
-          txState.status === "pending" ? styles.latestTxPending : ""
+          txState.status === "pending" || txState.status === "unconfirmed" ? styles.latestTxPending : ""
         } ${txState.status === "error" ? styles.latestTxError : ""}`}
         data-visible={showTx ? "true" : "false"}
         aria-hidden={showTx ? "false" : "true"}
         onClick={() => {
+          if (txState.status === "unconfirmed") { showTxReceipt(); return }
           if (txState.hash) {
             window.open(
-              getTxExplorerUrl(chainKey, txState.hash),
+              getTxExplorerUrl(txState.chainKey ?? chainKey, txState.hash),
               "_blank",
               "noopener,noreferrer"
             )
           }
         }}
-        role={txState.hash ? "button" : undefined}
-        tabIndex={txState.hash ? 0 : -1}
+        role={txState.hash || txState.status === "unconfirmed" ? "button" : undefined}
+        tabIndex={txState.hash || txState.status === "unconfirmed" ? 0 : -1}
         onKeyDown={(event) => {
+          if ((event.key === "Enter" || event.key === " ") && txState.status === "unconfirmed") {
+            event.preventDefault(); showTxReceipt(); return
+          }
           if (event.key === "Enter" && txState.hash) {
             window.open(
-              getTxExplorerUrl(chainKey, txState.hash),
+              getTxExplorerUrl(txState.chainKey ?? chainKey, txState.hash),
               "_blank",
               "noopener,noreferrer"
             )

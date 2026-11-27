@@ -14,7 +14,19 @@ import { hasDesktopKeplrProvider } from "./keplrProviderIdentity"
 import { WalletProvider } from "./WalletProvider"
 import type { WalletRuntimeSnapshot } from "./walletRuntimeBridge"
 
-const WalletRuntimeProvider = lazy(loadWalletRuntimeProvider)
+const WalletRuntimeProvider = lazy(async () => {
+  const runtime = await loadWalletRuntimeProvider()
+  // Cosmos Kit otherwise publishes local account data as Connected before
+  // initializing its WC client. Let Burrito restore the live relay session.
+  // Keep the Burrito preference, wallet accounts and WC pairing/session store.
+  try {
+    const key = "cosmos-kit@2:core//current-wallet"
+    if (window.localStorage.getItem(key) === "keplr-mobile") {
+      window.localStorage.removeItem(key)
+    }
+  } catch { /* Storage may be restricted. The controller still verifies sessions. */ }
+  return runtime
+})
 
 const shouldLoadWalletRuntime = () =>
   !hasDesktopKeplrProvider() && getStoredWalletConnectorId() === "keplr-mobile"

@@ -209,6 +209,15 @@ const ConnectModal = ({ open, onClose }: ConnectModalProps) => {
             switching networks. Closing this panel does not cancel the request.
           </div>
         ) : null}
+        {isConnecting && connectorId === "keplr-mobile" ? (
+          <div className={styles.connectionHint} role="status">
+            Waiting for Keplr. Open Keplr to approve or decline the connection,
+            then return to this browser tab. Closing this panel does not cancel the request.
+            <button type="button" className={styles.actionButton} onClick={() => void disconnect()}>
+              Stop waiting in this browser
+            </button>
+          </div>
+        ) : null}
         {error ? <div className={styles.error} role="alert">{error}</div> : null}
       </div>
     </div>,

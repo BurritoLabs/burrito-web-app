@@ -96,7 +96,7 @@ test("an invalidated extension rejection cannot replace a newer Keplr session wi
   await expect(page.getByText("Connected", { exact: true })).toBeVisible()
   await expect.poll(() => pendingCalls(page)).toBe(1)
   await expect.poll(() => page.evaluate(() => ({
-    connector: localStorage.getItem("burritoWalletConnector"),
+    connector: localStorage.getItem("burrito:preferred-wallet"),
     manual: localStorage.getItem("burritoWalletManuallyDisconnected")
   }))).toEqual({ connector: "keplr", manual: null })
 })
@@ -116,7 +116,7 @@ test("an invalidated extension request remains BUSY until its original approval 
   await page.evaluate(() => (window as Window & { __walletRace: { reject: () => void } }).__walletRace.reject())
   // An obsolete rejection must not replace the newer BUSY feedback or restore a session.
   await expect(page.getByRole("alert")).toContainText("connection request is already open")
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("burritoWalletConnector"))).toBeNull()
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("burrito:preferred-wallet"))).toBeNull()
   await extensionButton(page).click()
   await expect.poll(() => pendingCalls(page)).toBe(2)
   await expect(page.getByText("Connected", { exact: true })).toHaveCount(0)
@@ -124,7 +124,7 @@ test("an invalidated extension request remains BUSY until its original approval 
   await expect(page.getByText("Connected", { exact: true })).toBeVisible()
   await expect(page.getByRole("alert")).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => ({
-    connector: localStorage.getItem("burritoWalletConnector"),
+    connector: localStorage.getItem("burrito:preferred-wallet"),
     manual: localStorage.getItem("burritoWalletManuallyDisconnected")
   }))).toEqual({ connector: "burrito-extension", manual: null })
 })
@@ -151,7 +151,7 @@ test("an account change during the first lazy adapter load prevents a new approv
   await expect(page.getByRole("button", { name: "Connect", exact: true }).first()).toBeVisible()
   await expect.poll(() => pendingCalls(page)).toBe(0)
   await expect.poll(() => page.evaluate(() => ({
-    connector: localStorage.getItem("burritoWalletConnector"),
+    connector: localStorage.getItem("burrito:preferred-wallet"),
     manual: localStorage.getItem("burritoWalletManuallyDisconnected")
   }))).toEqual({ connector: null, manual: "true" })
 })
@@ -179,7 +179,7 @@ test("a slow disconnect completes without removing a newer wallet connection", a
   await page.evaluate(() => (window as Window & { __walletRace: { releaseDisconnect: () => void } }).__walletRace.releaseDisconnect())
   await expect(page.getByText("Connected", { exact: true })).toBeVisible()
   await expect.poll(() => page.evaluate(() => ({
-    connector: localStorage.getItem("burritoWalletConnector"),
+    connector: localStorage.getItem("burrito:preferred-wallet"),
     manual: localStorage.getItem("burritoWalletManuallyDisconnected")
   }))).toEqual({ connector: "burrito-extension", manual: null })
 })

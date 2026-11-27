@@ -283,15 +283,14 @@ const StakeManageModal = ({
       setSubmitError("Select source validator.")
       return
     }
+    if (!(await startTx(`${tab} stake`))) return
     try {
       setSubmitting(true)
       setSubmitError(undefined)
       const walletReady = await prepareWalletForTx()
       if (!walletReady) {
-        setSubmitError("Wallet is still syncing. Wait a moment, then submit again.")
-        return
+        throw new Error("Wallet is still syncing. Wait a moment, then submit again.")
       }
-      startTx(`${tab} stake`)
       if (!connectorId) throw new Error("Wallet not connected")
       const [
         { connectSigningClientForConnector },
@@ -377,7 +376,7 @@ const StakeManageModal = ({
       onClose()
     } catch (err) {
       const message = formatTxError(err, "Transaction failed")
-      failTx(message)
+      failTx(err)
       setSubmitError(message)
     } finally {
       setSubmitting(false)

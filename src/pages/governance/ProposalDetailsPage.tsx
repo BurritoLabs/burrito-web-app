@@ -7,7 +7,7 @@ import {
 import { useLocation, useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { MsgDeposit, MsgVote } from "cosmjs-types/cosmos/gov/v1beta1/tx"
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx"
+import { signAndConfirmOnce } from "../../app/tx/signAndConfirmOnce"
 import PageShell from "../PageShell"
 import styles from "../ProposalDetails.module.css"
 import ProposalDepositModal from "./ProposalDepositModal"
@@ -47,7 +47,6 @@ import {
   formatDurationLabel,
   isSummaryMap,
   normalizeRenderedVoteOption,
-  parseSequenceMismatchExpected,
   toMicroAmount,
   toSafeBigInt,
   type SummaryMap,
@@ -76,8 +75,6 @@ const VOTE_GAS_LIMIT = 220000
 const DEPOSIT_GAS_LIMIT = 220000
 const GOV_GAS_ADJUSTMENT = 1.6
 const SIMULATION_FALLBACK_GAS_MULTIPLIER = 1.35
-const GOV_BROADCAST_TIMEOUT_MS = 60_000
-const GOV_BROADCAST_POLL_INTERVAL_MS = 2_000
 const buildGovFee = (
   gasLimit: number,
   feeDenom: string,
@@ -123,7 +120,7 @@ const ProposalDetails = () => {
   const nativeDenom = chain.runtime.nativeDenom.coinMinimalDenom
   const nativeSymbol = chain.displayDenom
   const gasPriceMicro = chain.runtime.gasPriceStep.average
-  const { account, connectorId, startTx, finishTx, failTx } = useWallet()
+  const { account, connectorId, startTx, setTxPhase, finishTx, failTx } = useWallet()
   const [voteModalOpen, setVoteModalOpen] = useState(false)
   const [voteChoice, setVoteChoice] = useState<VoteChoice>("YES")
   const [voteSubmitting, setVoteSubmitting] = useState(false)
@@ -830,10 +827,10 @@ const ProposalDetails = () => {
       return
     }
 
+    if (!(await startTx("Vote proposal"))) return
     try {
       setVoteSubmitting(true)
       setVoteError(undefined)
-      startTx("Vote proposal")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
       let proposalIdValue: bigint
@@ -852,80 +849,21 @@ const ProposalDetails = () => {
         })
       }
 
-      let sequenceHint: number | undefined
-      let result: string | undefined
-
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const client = await connectStargateClientForConnector(
-            connectorId
-          )
-          const fee = await estimateGovFee(
-            client,
-            signerAddress,
-            [msg],
-            VOTE_GAS_LIMIT,
-            nativeDenom,
-            gasPriceMicro
-          )
-          const signerState = await client.getSequence(signerAddress)
-          const sequenceToUse = sequenceHint ?? signerState.sequence
-
-          const signed = await client.sign(
-            signerAddress,
-            [msg],
-            fee,
-            "",
-            {
-              accountNumber: signerState.accountNumber,
-              sequence: Number(sequenceToUse),
-              chainId: chain.chainId
-            }
-          )
-          const txBytes = TxRaw.encode(signed).finish()
-          const broadcastResult = await client.broadcastTx(
-            txBytes,
-            GOV_BROADCAST_TIMEOUT_MS,
-            GOV_BROADCAST_POLL_INTERVAL_MS
-          )
-          if (broadcastResult.code !== 0) {
-            throw new Error(
-              broadcastResult.rawLog ||
-                `Vote transaction failed with code ${broadcastResult.code}`
-            )
-          }
-          if (!broadcastResult.transactionHash) {
-            throw new Error("Vote transaction failed")
-          }
-          result = broadcastResult.transactionHash
-          break
-        } catch (innerErr) {
-          const message =
-            innerErr instanceof Error ? innerErr.message : String(innerErr)
-          const expectedSequence = parseSequenceMismatchExpected(message)
-          if (expectedSequence !== undefined && attempt < 2) {
-            sequenceHint = expectedSequence
-            await new Promise((resolve) => setTimeout(resolve, 220))
-            continue
-          }
-          throw innerErr
-        }
-      }
-
-      if (!result) {
-        throw new Error("Vote transaction failed")
-      }
-
+      const client = await connectStargateClientForConnector(connectorId)
+      const fee = await estimateGovFee(client, signerAddress, [msg], VOTE_GAS_LIMIT, nativeDenom, gasPriceMicro)
+      const result = await signAndConfirmOnce({
+        client, signerAddress, messages: [msg], fee, memo: "", chainId: chain.chainId, onPhase: setTxPhase
+      })
       finishTx(result)
       setVoteModalOpen(false)
-      await Promise.all([
+      void Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["proposal", chain.chainId, proposalId] }),
         queryClient.invalidateQueries({ queryKey: ["proposalTally", chain.chainId, proposalId] }),
         queryClient.invalidateQueries({ queryKey: ["proposalVotes", chain.chainId, proposalId] })
       ])
     } catch (err) {
       const message = formatTxError(err, "Vote failed")
-      failTx(message)
+      failTx(err)
       setVoteError(message)
     } finally {
       setVoteSubmitting(false)
@@ -956,10 +894,10 @@ const ProposalDetails = () => {
       return
     }
 
+    if (!(await startTx("Deposit proposal"))) return
     try {
       setDepositSubmitting(true)
       setDepositError(undefined)
-      startTx("Deposit proposal")
       if (!connectorId) throw new Error("Wallet not connected")
       const signerAddress = await getSignerAddressForConnector(connectorId)
 
@@ -984,74 +922,15 @@ const ProposalDetails = () => {
         })
       }
 
-      let sequenceHint: number | undefined
-      let result: string | undefined
-
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const client = await connectStargateClientForConnector(
-            connectorId
-          )
-          const fee = await estimateGovFee(
-            client,
-            signerAddress,
-            [msg],
-            DEPOSIT_GAS_LIMIT,
-            nativeDenom,
-            gasPriceMicro
-          )
-          const signerState = await client.getSequence(signerAddress)
-          const sequenceToUse = sequenceHint ?? signerState.sequence
-
-          const signed = await client.sign(
-            signerAddress,
-            [msg],
-            fee,
-            "",
-            {
-              accountNumber: signerState.accountNumber,
-              sequence: Number(sequenceToUse),
-              chainId: chain.chainId
-            }
-          )
-          const txBytes = TxRaw.encode(signed).finish()
-          const broadcastResult = await client.broadcastTx(
-            txBytes,
-            GOV_BROADCAST_TIMEOUT_MS,
-            GOV_BROADCAST_POLL_INTERVAL_MS
-          )
-          if (broadcastResult.code !== 0) {
-            throw new Error(
-              broadcastResult.rawLog ||
-                `Deposit transaction failed with code ${broadcastResult.code}`
-            )
-          }
-          if (!broadcastResult.transactionHash) {
-            throw new Error("Deposit transaction failed")
-          }
-          result = broadcastResult.transactionHash
-          break
-        } catch (innerErr) {
-          const message =
-            innerErr instanceof Error ? innerErr.message : String(innerErr)
-          const expectedSequence = parseSequenceMismatchExpected(message)
-          if (expectedSequence !== undefined && attempt < 2) {
-            sequenceHint = expectedSequence
-            await new Promise((resolve) => setTimeout(resolve, 220))
-            continue
-          }
-          throw innerErr
-        }
-      }
-
-      if (!result) {
-        throw new Error("Deposit transaction failed")
-      }
-
+      const client = await connectStargateClientForConnector(connectorId)
+      const fee = await estimateGovFee(client, signerAddress, [msg], DEPOSIT_GAS_LIMIT, nativeDenom, gasPriceMicro)
+      const result = await signAndConfirmOnce({
+        client, signerAddress, messages: [msg], fee, memo: "", chainId: chain.chainId, onPhase: setTxPhase
+      })
       finishTx(result)
       setDepositModalOpen(false)
       setDepositAmount("")
-      await Promise.all([
+      void Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["proposal", chain.chainId, proposalId] }),
         queryClient.invalidateQueries({
           queryKey: ["proposalDeposits", chain.chainId, proposalId]
@@ -1063,7 +942,7 @@ const ProposalDetails = () => {
       ])
     } catch (err) {
       const message = formatTxError(err, "Deposit failed")
-      failTx(message)
+      failTx(err)
       setDepositError(message)
     } finally {
       setDepositSubmitting(false)

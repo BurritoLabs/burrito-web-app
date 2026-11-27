@@ -296,7 +296,7 @@ const LaunchCreateForm = ({
         }}
       >
         {createSubmitting
-          ? "Broadcasting..."
+          ? "Processing..."
           : activeStepIsLast
           ? isCw20Only
             ? "Create CW20"

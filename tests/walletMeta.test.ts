@@ -24,6 +24,23 @@ const createLocalStorage = () => {
 }
 
 describe("wallet storage metadata", () => {
+  it("migrates a legacy mobile or desktop preference before WalletConnect opens its storage", () => {
+    for (const id of ["keplr-mobile", "keplr", "burrito-extension"] as const) {
+      const localStorage = createLocalStorage()
+      vi.stubGlobal("window", { localStorage })
+      localStorage.setItem("burritoWalletConnector", id)
+      expect(getStoredWalletConnectorId()).toBe(id)
+      expect(localStorage.getItem("burritoWalletConnector")).toBeNull()
+      expect(localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)).toBe(id)
+      expect(WALLET_CONNECTOR_STORAGE_KEY).not.toMatch(/walletconnect|wallet_connect|wc@|wc_/i)
+      localStorage.setItem("burritoWalletConnector", id)
+      rememberWalletManualDisconnect()
+      expect(getStoredWalletConnectorId()).toBeUndefined()
+      forgetStoredWalletSession()
+      expect(localStorage.getItem("burritoWalletConnector")).toBeNull()
+      expect(localStorage.getItem(WALLET_CONNECTOR_STORAGE_KEY)).toBeNull()
+    }
+  })
   afterEach(() => {
     vi.unstubAllGlobals()
   })
